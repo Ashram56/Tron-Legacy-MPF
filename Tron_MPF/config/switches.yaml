@@ -1,0 +1,155 @@
+# config/switches.yaml
+# Switch configuration file for the Tron MPF pinball machine (P-Roc)
+# Switch numbers are based on the Stern Tron Legacy service manual matrix.
+# IMPORTANT: These numbers must match the wiring on your P-Roc board.
+
+switches:
+  # Matrix switches (Playfield)
+  # These numbers correspond to S.W.#1 to S.W.#64
+  # It is important to verify them with your P-Roc board documentation
+  s_target_t:
+    number: "1" # S.W. #1: TRON (T)
+    tags:
+      - tron_target
+  s_target_r:
+    number: "2" # S.W. #2: TRON (R)
+    tags:
+      - tron_target
+  s_target_o:
+    number: "3" # S.W. #3: TRON (O)
+    tags:
+      - tron_target
+  s_target_n:
+    number: "4" # S.W. #4: TRON (N)
+    tags:
+      - tron_target
+
+  s_target_z:
+    number: "5" # S.W. #5: ZUSE (U)
+    tags:
+      - zuse_target
+  s_target_u:
+    number: "6" # S.W. #6: ZUSE (S)
+    tags:
+      - zuse_target
+  s_target_s:
+    number: "7" # S.W. #7: ZUSE (E)
+    tags:
+      - zuse_target
+  s_target_e:
+    number: "8" # S.W. #8: ZUSE (Z)
+    tags:
+      - zuse_target
+
+  s_flipper_upper_left:
+    number: "9" # S.W. #9: UPPER LEFT FLIPPER
+    tags:
+      - flipper_upper_left
+
+  s_left_orbit:
+    number: "10" # S.W. #10: LEFT ORBIT
+    tags:
+      - orbit_left
+  s_right_orbit:
+    number: "11" # S.W. #11: RIGHT ORBIT
+    tags:
+      - orbit_right
+
+  s_pop_bumper_1:
+    number: "12" # S.W. #12: LEFT BUMPER
+    tags:
+      - bumper
+  s_pop_bumper_2:
+    number: "13" # S.W. #13: CENTER BUMPER
+    tags:
+      - bumper
+  s_pop_bumper_3:
+    number: "14" # S.W. #14: RIGHT BUMPER
+    tags:
+      - bumper
+  
+  s_slingshot_left:
+    number: "15" # S.W. #15: LEFT SLINGSHOT
+    tags:
+      - slingshot_left
+  s_slingshot_right:
+    number: "16" # S.W. #16: RIGHT SLINGSHOT
+    tags:
+      - slingshot_right
+
+  # Holes and ejectors
+  s_recognizer_hole:
+    number: "17" # S.W. #17: RECOGNIZER HOLE
+    tags:
+      - recognizer_eject
+  s_disc_arena_entry:
+    number: "18" # S.W. #18: DISC ARENA ENTRY
+    tags:
+      - disc_arena
+  s_disc_arena_exit:
+    number: "19" # S.W. #19: DISC ARENA EXIT
+    tags:
+      - disc_arena
+
+  # End-of-stroke switches (EOS)
+  s_flipper_left_eos:
+    number: "20" # S.W. #20: LEFT FLIPPER EOS
+    tags:
+      - flipper_left_eos
+  s_flipper_right_eos:
+    number: "21" # S.W. #21: RIGHT FLIPPER EOS
+    tags:
+      - flipper_right_eos
+
+  # Ramp switches (entries and exits)
+  s_ramp_left_enter:
+    number: "22" # S.W. #22: LEFT RAMP ENTRY
+  s_ramp_left_exit:
+    number: "23" # S.W. #23: LEFT RAMP EXIT
+  s_ramp_right_enter:
+    number: "24" # S.W. #24: RIGHT RAMP ENTRY
+  s_ramp_right_exit:
+    number: "25" # S.W. #25: RIGHT RAMP EXIT
+
+  # Troughs (places where balls are stored)
+  s_trough_1:
+    number: "26" # S.W. #26: TROUGH 1
+    tags:
+      - trough
+  s_trough_2:
+    number: "27" # S.W. #27: TROUGH 2
+    tags:
+      - trough
+  s_trough_3:
+    number: "28" # S.W. #28: TROUGH 3
+    tags:
+      - trough
+  s_trough_4:
+    number: "29" # S.W. #29: TROUGH 4
+    tags:
+      - trough
+  s_trough_5:
+    number: "30" # S.W. #30: TROUGH 5
+    tags:
+      - trough
+
+  # Dedicated switches (D-switches)
+  # These numbers correspond to S.W. D#1 to S.W. D#16
+  s_coin_door_left:
+    number: "D1" # S.W. D#1: LEFT COIN DOOR BUTTON
+  s_coin_door_center:
+    number: "D2" # S.W. D#2: CENTER COIN DOOR BUTTON
+  s_coin_door_right:
+    number: "D3" # S.W. D#3: RIGHT COIN DOOR BUTTON
+  s_tilt_bob:
+    number: "D5" # S.W. D#5: TILT BOB
+  s_flipper_button_left:
+    number: "D8" # S.W. D#8: LEFT FLIPPER BUTTON
+  s_flipper_button_right:
+    number: "D9" # S.W. D#9: RIGHT FLIPPER BUTTON
+  s_plunger_lane:
+    number: "D15" # S.W. D#15: PLUNGER LANE
+    tags:
+      - plunger
+  s_plunger_eject:
+    number: "D16" # S.W. D#16: PLUNGER EJECT
