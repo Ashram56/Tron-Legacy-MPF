@@ -1,0 +1,26 @@
+    # config/flippers.yaml
+    # Flipper configuration file for the Tron MPF pinball machine.
+
+    flippers:
+      # The left and right flippers are standard.
+      # Their power coils are defined in coils.yaml and the buttons and EOS switches
+      # are defined in switches.yaml.
+      left_flipper:
+        main_coil: c_left_flipper_main
+        activation_switch: s_flipper_button_left
+        end_of_stroke_switch: s_flipper_left_eos
+
+      right_flipper:
+        main_coil: c_right_flipper_main
+        activation_switch: s_flipper_button_right
+        end_of_stroke_switch: s_flipper_right_eos
+
+      # The upper left flipper is also configured here.
+      # Note that according to the service manual, it has its own dedicated switch.
+      upper_left_flipper:
+        main_coil: c_upper_left_flipper
+        activation_switch: s_flipper_upper_left
+        # The EOS switch for the upper flipper is optional on some Stern games,
+        # but the service manual shows one, so we'll include it.
+        end_of_stroke_switch: s_flipper_upper_left_eos
+    

@@ -1,0 +1,167 @@
+# modes/tron_main/tron_main.yaml
+# Main game mode configuration file for Tron MPF.
+# This mode handles the logic for the three skill shots, mystery awards, the main progress ladder, combos, and the end-of-ball bonus.
+mode:
+  # The mode is named "Tron_Main" and has a priority.
+  # Higher priority modes override lower priority ones.
+  code: tron_main
+  priority: 200
+  start_events: ball_started
+  stop_events: ball_ended
+
+# This section is for the logic of the three skill shots and mystery awards.
+event_player:
+  # Timer for skill shots.
+  ball_started:
+    - action: start_timer
+      timer: skill_shot_timer
+    
+  # Mystery Award is lit at the start of each ball.
+  ball_started:
+    - action: light_mystery_award
+    
+  # Skill Shot 1: Soft plunge into Flynn's Arcade scoop
+  # Awards a base score and the Mystery Award.
+  s_recognizer_hole_active:
+    - action: award_skill_shot
+      condition: mode_tron_main_skill_shot_timer_running
+      parameter: 1
+    - action: award_mystery
+      condition: mode_tron_main_skill_shot_timer_running
+
+  # Skill Shot 2: Left ramp shot (after a failed soft plunge)
+  # Awards a score, lights a "Light Cycle" insert, and starts the Flynn mode.
+  s_ramp_left_enter_active:
+    - action: award_skill_shot
+      condition: mode_tron_main_skill_shot_timer_running
+      parameter: 2
+    - action: light_light_cycle_insert
+    - action: mode_flynn_start_mode
+
+  # Skill Shot 3: Right ramp from upper flipper
+  # Awards a score and lights a "Light Cycle" insert.
+  s_flipper_button_left_active:
+    # This is a simplified approach. A more robust solution might use a custom MPF plugin.
+    - action: enable_upper_flipper_skill_shot
+      condition: mode_tron_main_skill_shot_timer_running
+
+  s_ramp_right_enter_active:
+    - action: award_skill_shot
+      condition: mode_tron_main_upper_flipper_skill_shot_enabled
+      parameter: 3
+    - action: light_light_cycle_insert
+    
+  # Relight Mystery Award
+  s_right_orbit_enter:
+    - action: light_mystery_award
+      condition: not mode_tron_main_mystery_award_lit
+
+  # Start Flynn Mode via the inlane switch
+  s_inlane_left_active:
+    - action: mode_flynn_start_mode
+
+  # Combo logic
+  # When a major shot is hit, the combo timer starts and the arrows flash.
+  major_shot_hit:
+    - action: start_timer
+      timer: combo_timer
+    - action: increment_player_variable
+      variable: combo_shots_made
+    - action: start_show
+      show: combo_arrows_flash
+
+  # When the scoop is hit, the End of Line bonus is awarded.
+  s_recognizer_hole_active:
+    - action: award_end_of_line_bonus
+      condition: timer_is_running(combo_timer)
+    - action: stop_timer
+      timer: combo_timer
+
+  # Bonus multiplier logic
+  s_right_inner_loop_active:
+    - action: increment_player_variable
+      variable: bonus_multiplier
+      value: 1
+
+  # End-of-ball bonus calculation
+  ball_ended:
+    - action: calculate_end_of_ball_bonus
+    - action: award_end_of_ball_bonus
+
+  # Animations and display events
+  mode_started_tron_main:
+    - action: play_show
+      show: game_started_show
+      
+timers:
+  skill_shot_timer:
+    start_value: 5s # The skill shot is only available for 5 seconds after launch.
+    events_when_complete: skill_shot_timer_expired
+
+  combo_timer:
+    start_value: 3s # The player has 3 seconds to make the next shot.
+    end_value: 0
+    events_when_complete: combo_sequence_reset
+    
+variable_player:
+  mode_started_tron_main:
+    skill_shot_completed: 0
+    flynn_status: "not_started"
+    gem_status: "not_started"
+    clu_status: "not_started"
+    zuse_status: "not_started"
+    quorra_status: "not_started"
+    disc_status: "not_started"
+    light_cycle_status: "not_started"
+    recognizer_status: "not_started"
+    tron_status: "not_started"
+    portal_status: "not_started"
+    # Combo variables
+    combo_shots_made: 0
+    end_of_line_base_value: 500000
+    # End-of-ball bonus variables
+    bonus_multiplier: 1
+    end_of_ball_bonus: 50000
+    
+  ball_ended:
+    # Reset combo variables at the end of each ball.
+    combo_shots_made: 0
+    end_of_line_base_value: 500000
+    
+# Score and game logic
+score:
+  award_skill_shot_1:
+    - type: add
+      score: 500000 + (player.skill_shot_completed * 50000)
+    - type: event
+      event: player_awarded_skill_shot
+
+  award_skill_shot_2:
+    - type: add
+      score: 250000 + (player.skill_shot_completed * 50000)
+    - type: event
+      event: player_awarded_skill_shot
+
+  award_skill_shot_3:
+    - type: add
+      score: 300000 + (player.skill_shot_completed * 50000)
+    - type: event
+      event: player_awarded_skill_shot
+
+  flynn_award_score:
+    - type: add
+      score: 275000 + (player.flynn_completed * 50000)
+    - type: event
+      event: player_awarded_flynn
+
+  end_of_line_bonus:
+    - type: add
+      score: player.end_of_line_base_value * player.combo_shots_made
+    - type: event
+      event: end_of_line_bonus_awarded
+
+  end_of_ball_bonus_award:
+    - type: add
+      score: player.end_of_ball_bonus * player.bonus_multiplier
+    - type: event
+      event: end_of_ball_bonus_awarded

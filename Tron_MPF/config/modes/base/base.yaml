@@ -1,0 +1,35 @@
+# modes/base/base.yaml
+# Configuration for the base game mode.
+# This mode is always active during a game and handles fundamental game features.
+
+mode:
+  code: base
+  start_events: game_started
+  stop_events: game_ended
+  priority: 100
+
+# Event handlers for ball management.
+event_player:
+  ball_drained:
+    - action: remove_ball_from_play
+  ball_ended:
+    - action: player_turn_end
+
+# This section defines the settings for the game, including number of balls.
+game:
+  balls_per_game: 3
+  balls_in_play: 1
+
+# This section ensures that a ball is ejected at the start of a turn.
+ball_starts:
+  eject_coil: c_trough_up_kicker
+  eject_switch: s_trough_1
+  
+# This section defines the settings for the slingshots.
+slingshots:
+  slingshot_left:
+    coil: c_left_slingshot
+    switch: s_slingshot_left
+  slingshot_right:
+    coil: c_right_slingshot
+    switch: s_slingshot_right

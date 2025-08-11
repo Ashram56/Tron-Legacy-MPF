@@ -1,0 +1,77 @@
+    # config/devices.yaml
+    # Device configuration file for the Tron MPF pinball machine.
+    # This file defines mechanisms like ball devices, bumpers, and slingshots.
+
+    ball_devices:
+      # The trough is where balls are stored before being launched or after being drained.
+      # We need to define all trough switches to know how many balls are available.
+      bd_trough:
+        eject_coil: c_trough_up_kicker
+        eject_coil_pulse_ms: 15
+        # The eject coil kicks balls out of the trough.
+        # The switches array defines where the balls are located in the trough.
+        switches: s_trough_1, s_trough_2, s_trough_3, s_trough_4, s_trough_5
+        eject_targets: bd_shooter_lane
+        tags:
+          - home
+          - drain
+
+      # The shooter lane is the device that launches the ball into the playfield.
+      bd_shooter_lane:
+        eject_coil: c_auto_launch
+        eject_coil_pulse_ms: 20
+        # The eject switch tells the device that the ball has been ejected.
+        eject_switch: s_plunger_eject
+        # The entrance switch confirms that a new ball is available for launch.
+        entrance_switch: s_plunger_lane
+        eject_targets: playfield
+        tags:
+          - ball_source
+
+      # The recognizer hole ejects the ball after a target sequence is completed.
+      bd_recognizer_eject:
+        eject_coil: c_recognizer_3_bank_mtr_relay
+        eject_coil_pulse_ms: 10
+        eject_targets: playfield
+        entrance_switch: s_recognizer_hole
+
+    playfield:
+      # The playfield is a special device that represents the main playing area.
+      # We associate all playfield-related switches here.
+      # The name 'playfield' is a convention in MPF.
+      balls_in_play_switches: s_trough_1, s_trough_2, s_trough_3, s_trough_4, s_trough_5
+      
+    slingshots:
+      # Left and right slingshots, triggered by their respective switches.
+      slingshot_left:
+        switch: s_slingshot_left
+        coil: c_left_slingshot
+        tags:
+          - slingshot
+      
+      slingshot_right:
+        switch: s_slingshot_right
+        coil: c_right_slingshot
+        tags:
+          - slingshot
+
+    pop_bumpers:
+      # Configuration for the three pop bumpers.
+      pop_bumper_1:
+        switch: s_pop_bumper_1
+        coil: c_left_pop_bumper
+        tags:
+          - bumper
+
+      pop_bumper_2:
+        switch: s_pop_bumper_2
+        coil: c_bottom_pop_bumper
+        tags:
+          - bumper
+
+      pop_bumper_3:
+        switch: s_pop_bumper_3
+        coil: c_right_pop_bumper
+        tags:
+          - bumper
+    

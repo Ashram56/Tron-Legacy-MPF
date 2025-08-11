@@ -1,0 +1,90 @@
+# modes/gem/gem.yaml
+# Configuration for the "Gem" game mode.
+# This mode is a timed mode that requires multiple shots to the inner right loop.
+
+mode:
+  code: gem
+  priority: 300
+  start_events: mode_gem_start_mode
+  stop_events: mode_gem_stop
+  
+timers:
+  gem_timer:
+    start_value: 25
+    end_value: 0
+    # Add time to the timer when the spinners are hit
+    events_when_started:
+      - timer_gem_add_spinners_time
+    events_when_complete: mode_gem_stop
+    
+# Player variables to track the Gem mode progress and score.
+variable_player:
+  mode_gem_start_mode:
+    gem_shots_needed: 3
+    gem_shots_made: 0
+    gem_value: 750000
+    
+  gem_advance:
+    gem_shots_needed: 2
+    
+# Event handlers for the Gem mode.
+event_player:
+  mode_gem_start_mode:
+    - action: start_timer
+      timer: gem_timer
+    - action: light_gem_flashing # Flashes the Gem insert
+    - action: play_slide
+      slide: gem_start_slide
+          
+  s_inner_right_loop_active:
+    - action: score
+      score: gem_value
+    - action: increment_player_variable
+      variable: gem_shots_made
+    - action: increment_player_variable
+      variable: gem_value
+      value: 250000
+      max_value: 2500000
+    - action: light_gem_solid # Lights the Gem insert solidly on shot
+    - action: stop_timer
+      condition: player.gem_shots_made >= player.gem_shots_needed
+      timer: gem_timer
+    - action: play_slide
+      slide: gem_shot_slide
+          
+  # Spinners add time to the timer.
+  s_spinner_left_active:
+    - action: add_timer
+      timer: gem_timer
+      value: 10
+      max_value: 40
+    - action: play_slide
+      slide: gem_spinner_slide
+          
+  s_spinner_right_active:
+    - action: add_timer
+      timer: gem_timer
+      value: 10
+      max_value: 40
+    - action: play_slide
+      slide: gem_spinner_slide
+
+  mode_gem_stop:
+    - action: play_slide
+      slide: gem_end_slide
+          
+# Lights and shows for the Gem mode.
+lights:
+  l_gem:
+    type: event
+    events_on: mode_gem_start_mode
+    events_off: mode_gem_stop
+        
+shows:
+  light_gem_flashing:
+    - light: l_gem
+      mode: flash
+      
+  light_gem_solid:
+    - light: l_gem
+      mode: on

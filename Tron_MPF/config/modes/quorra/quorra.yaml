@@ -1,0 +1,109 @@
+# modes/quorra/quorra.yaml
+# Configuration for the "Quorra" multiball mode.
+# This mode is a timed "multiball" mode triggered by shooting the left inner loop 5 times,
+# and then starting it at the scoop.
+
+mode:
+  code: quorra
+  priority: 300
+  start_events: mode_quorra_start_mode
+  stop_events: mode_quorra_stop
+  
+multiball:
+  quorra_multiball:
+    ball_count: 2
+    ball_count_type: balls
+    # The multiball stops when only one ball remains.
+    stop_events:
+      - multiball_quorra_multiball_balls_remaining_1
+
+variable_player:
+  mode_quorra_start_mode:
+    quorra_jackpot_value: 250000
+    quorra_super_jackpot_value: 1000000
+    quorra_multiball_balls_added: 0
+    
+# Event handlers for the Quorra mode.
+event_player:
+  # To qualify Quorra Multiball, 5 shots to the left inner loop are needed.
+  s_left_inner_loop_active:
+    - action: increment_player_variable
+      variable: quorra_shots_needed
+      
+  # The scoop is shot to start the multiball.
+  s_recognizer_hole_active:
+    - action: mode_quorra_start_mode
+      condition: player.quorra_shots_needed >= 5
+      
+  mode_quorra_start_mode:
+    - action: light_quorra_flashing # Flashes the Quorra insert on the ladder.
+    - action: multiball_quorra_multiball_start
+    - action: set_shot_profile_state
+      shot: s_left_inner_loop
+      state: lit
+    - action: play_slide
+      slide: quorra_start_slide
+      
+  # Logic for collecting jackpots.
+  s_left_inner_loop_active:
+    - action: score
+      score: quorra_jackpot_award
+    - action: increment_player_variable
+      variable: quorra_jackpot_value
+      value: 50000
+      max_value: 500000
+    - action: play_slide
+      slide: quorra_jackpot_slide
+      
+  # Logic for collecting the super jackpot.
+  s_right_inner_loop_active:
+    - action: score
+      score: quorra_super_jackpot_award
+    - action: set_player_variable
+      variable: quorra_super_jackpot_value
+      value: 1000000
+    - action: play_slide
+      slide: quorra_super_jackpot_slide
+
+  # Logic for adding balls by shooting the Recognizer 3-bank.
+  # This will require a shot group or a counter.
+  s_recognizer_target_hit:
+    - action: increment_player_variable
+      variable: recognizer_target_hits
+    - action: add_ball
+      condition: player.recognizer_target_hits == 3 and player.quorra_multiball_balls_added < 1
+    - action: play_slide
+      slide: quorra_add_ball_slide
+      
+  mode_quorra_stop:
+    - action: play_slide
+      slide: quorra_end_slide
+      
+# Score and game logic
+score:
+  quorra_jackpot_award:
+    - type: add
+      score: player.quorra_jackpot_value
+    - type: event
+      event: quorra_jackpot_collected
+      
+  quorra_super_jackpot_award:
+    - type: add
+      score: player.quorra_super_jackpot_value
+    - type: event
+      event: quorra_super_jackpot_collected
+          
+lights:
+  l_quorra:
+    type: event
+    events_on: mode_quorra_start_mode
+    events_off: mode_quorra_stop
+        
+shows:
+  light_quorra_flashing:
+    - light: l_quorra
+      mode: flash
+      
+  light_quorra_solid:
+    - light: l_quorra
+      mode: on

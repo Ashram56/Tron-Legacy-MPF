@@ -1,0 +1,30 @@
+# modes/service/service.yaml
+# Configuration for the built-in MPF service mode.
+
+mode:
+  code: service
+  priority: 1000 # High priority so it overrides all other modes.
+  start_events: s_coin_door_center_active # Start with the center button.
+  stop_events: s_coin_door_right_active # Exit with the right button.
+
+# These events map the cabinet buttons to the service mode functions.
+# This mimics the standard Stern SAM behavior.
+event_player:
+  s_coin_door_left_active:
+    - action: service_mode_up
+  s_coin_door_right_active:
+    - action: service_mode_down
+  s_coin_door_center_active:
+    - action: service_mode_select
+  s_coin_door_center_active_for_3s:
+    - action: service_mode_exit
+
+# This section configures the display for the service mode.
+# We'll use the DMD for this.
+dmd:
+  modes:
+    service:
+      # This tells MPF to use the built-in DMD slides for service mode.
+      slides:
+        - name: service_mode_main
+          # ... (You can customize the slides here)

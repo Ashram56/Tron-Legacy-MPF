@@ -1,0 +1,131 @@
+# modes/zuse/zuse.yaml
+# Configuration for the "Zuse Fast Scoring" game mode.
+# This mode is a timed "frenzy" mode triggered by completing the Z-U-S-E standup targets.
+
+mode:
+  code: zuse
+  priority: 300
+  start_events: mode_zuse_start_mode
+  stop_events: mode_zuse_stop
+
+# Shot Group to manage the Z-U-S-E targets.
+# We'll use a `shot_group` to track completion of all four targets.
+shot_groups:
+  zuse_targets:
+    shots: zuse_z, zuse_u, zuse_s, zuse_e
+    profile: zuse_target_profile
+    # This event is fired when all shots in the group are completed.
+    events_when_complete: all_zuse_targets_completed
+    
+shots:
+  zuse_z:
+    switch: s_target_z
+    events:
+      hit: zuse_target_hit
+  zuse_u:
+    switch: s_target_u
+    events:
+      hit: zuse_target_hit
+  zuse_s:
+    switch: s_target_s
+    events:
+      hit: zuse_target_hit
+  zuse_e:
+    switch: s_target_e
+    events:
+      hit: zuse_target_hit
+
+shot_profiles:
+  zuse_target_profile:
+    states:
+      - name: flashing
+        light_events: mode_zuse_start_mode
+      - name: lit
+        light_events: zuse_target_hit
+
+timers:
+  zuse_timer:
+    start_value: 25
+    end_value: 0
+    events_when_complete: mode_zuse_stop
+    
+variable_player:
+  mode_zuse_start_mode:
+    zuse_completions: 0
+    zuse_switch_value: 10000
+
+# Event handlers for the Zuse mode.
+event_player:
+  # Start the Zuse Fast Scoring mode.
+  mode_zuse_start_mode:
+    - action: start_timer
+      timer: zuse_timer
+    - action: light_zuse_flashing # Flashes the Zuse insert on the ladder.
+    - action: score
+      score: zuse_completion_award
+    - action: start_timer
+      timer: zuse_timer
+    - action: set_shot_profile_state
+      shot_group: zuse_targets
+      state: flashing
+    - action: play_slide
+      slide: zuse_start_slide
+  
+  # Logic for hitting the targets during Fast Scoring.
+  zuse_target_hit:
+    - action: score
+      score: zuse_target_hit_award
+    - action: set_shot_profile_state
+      shot: self
+      state: lit
+    - action: advance_zuse_target_score
+      condition: player.zuse_shots_completed < 3
+    - action: reset_zuse_targets_and_add_time
+      condition: player.zuse_shots_completed == 3
+    - action: play_slide
+      slide: zuse_target_hit_slide
+
+  # When the fourth target is hit, extend the timer and reset the targets.
+  reset_zuse_targets_and_add_time:
+    - action: add_timer
+      timer: zuse_timer
+      value: 10
+    - action: set_shot_profile_state
+      shot_group: zuse_targets
+      state: flashing
+    - action: set_player_variable
+      variable: zuse_shots_completed
+      value: 0
+
+  mode_zuse_stop:
+    - action: play_slide
+      slide: zuse_end_slide
+      
+# Lights and shows for the Zuse mode.
+lights:
+  l_zuse:
+    type: event
+    events_on: mode_zuse_start_mode
+    events_off: mode_zuse_stop
+
+shows:
+  light_zuse_flashing:
+    - light: l_zuse
+      mode: flash
+      
+  light_zuse_solid:
+    - light: l_zuse
+      mode: on
+      
+# Update the main game mode to start the Zuse mode.
+# This assumes we have a way to track the number of Zuse completions.
+# This can be done with a player variable in the main game mode.
+# Example:
+# event_player:
+#   all_zuse_targets_completed:
+#     - action: start_mode
+#       mode: zuse
+#       condition: player.zuse_fast_scoring_completions < 1
+#     - action: set_player_variable
+#       variable: zuse_fast_scoring_completions
+#       value: 1

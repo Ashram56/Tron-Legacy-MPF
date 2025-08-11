@@ -1,0 +1,130 @@
+    # config/lights.yaml
+    # Light configuration file for the Tron MPF pinball machine.
+    # Light numbers are based on the Stern Tron Legacy service manual.
+    # IMPORTANT: These numbers must correspond to your wiring.
+
+    lights:
+      # General Playfield Lights
+      l_tron_t:
+        number: "L.P.#1" # T in TRON
+      l_tron_r_o:
+        number: "L.P.#2" # R(O) in TRON
+      l_tron_r_t:
+        number: "L.P.#3" # R(T) in TRON
+      l_tron_n:
+        number: "L.P.#4" # N in TRON
+      l_double_score:
+        number: "L.P.#5" # DOUBLE SCORE
+      l_flippers:
+        number: "L.P.#6" # BUMPERS
+      l_spinners:
+        number: "L.P.#7" # SPINNERS
+      l_outlane_left:
+        number: "L.P.#8" # LEFT OUTLANE
+
+      l_zuse_c:
+        number: "L.P.#9" # C(LU) in Z(U)SE
+      l_zuse_z:
+        number: "L.P.#10" # Z(U)SE
+      l_ramp_left_cycle:
+        number: "L.P.#11" # LEFT RAMP (LIGHT CYCLE)
+      l_orbit_left_clu:
+        number: "L.P.#12" # LEFT ORBIT (CLU)
+      l_orbit_left_cycle:
+        number: "L.P.#13" # LEFT ORBIT (LIGHT CYCLE)
+      l_orbit_left_disc:
+        number: "L.P.#14" # LEFT ORBIT (DISC)
+      l_outlane_right:
+        number: "L.P.#16" # RIGHT OUTLANE
+
+      l_center_portal:
+        number: "L.P.#17" # CENTER PORTAL
+      l_center_tron:
+        number: "L.P.#18" # CENTER TRON
+      l_recognizer:
+        number: "L.P.#19" # CENTER RECOGNIZER
+      l_center_cycle:
+        number: "L.P.#20" # CENTER LIGHT CYCLE
+      l_center_disc:
+        number: "L.P.#21" # CENTER DISC
+      l_center_quorra:
+        number: "L.P.#22" # CENTER QUORRA
+      l_center_zuse:
+        number: "L.P.#23" # CENTER ZUSE
+      l_center_clu:
+        number: "L.P.#24" # CENTER CLU
+
+      l_gem:
+        number: "L.P.#25" # GEM
+      l_shoot_again:
+        number: "L.P.#26" # SHOOT AGAIN
+      l_flynn:
+        number: "L.P.#27" # CENTER FLYNN
+      l_eject_clu:
+        number: "L.P.#28" # EJECT CLU
+      l_zuse_e:
+        number: "L.P.#29" # ZUS(E)
+      l_clu_u:
+        number: "L.P.#30" # C(L)U
+      l_clu_l:
+        number: "L.P.#31" # C(L)U
+      l_right_outlane:
+        number: "L.P.#32" # RIGHT OUTLANE
+
+      l_left_loop_arrow:
+        number: "L.P.#33" # LEFT LOOP ARROW
+      l_right_orbit_disc:
+        number: "L.P.#34" # RIGHT ORBIT (DISC)
+      l_right_orbit_cycle:
+        number: "L.P.#35" # RIGHT ORBIT (LIGHT CYCLE)
+      l_right_orbit_clu:
+        number: "L.P.#36" # RIGHT ORBIT (CLU)
+      l_extra_ball:
+        number: "L.P.#37" # EXTRA BALL
+      l_eject_cycle:
+        number: "L.P.#38" # EJECT CYCLE
+      l_eject_quorra:
+        number: "L.P.#39" # EJECT QUORRA
+      l_eject_portal:
+        number: "L.P.#40" # EJECT PORTAL
+
+      l_left_ramp_arrow:
+        number: "L.P.#41" # LEFT RAMP ARROW
+      l_disc_right:
+        number: "L.P.#42" # RAMP (DISC)
+      l_ramp_right:
+        number: "L.P.#43" # R. RAMP (LIGHT CYCLE)
+      l_recognizer_left:
+        number: "L.P.#44" # RECOGNIZER LEFT
+      l_flynns_arcade:
+        number: "L.P.#45" # FLYNNS ARCADE
+      l_left_bumper:
+        number: "L.P.#46" # LEFT BUMPER
+      l_right_bumper:
+        number: "L.P.#47" # RIGHT BUMPER
+      l_bottom_bumper:
+        number: "L.P.#48" # BOTTOM BUMPER
+
+      l_left_ramp_inner_arrow:
+        number: "L.P.#49" # LEFT RAMP INNER ARROW
+      l_disc_left:
+        number: "L.P.#50" # DISC (LEFT)
+      l_recognizer_center:
+        number: "L.P.#51" # RECOGNIZER CENTER
+      l_recognizer_right:
+        number: "L.P.#52" # RECOGNIZER RIGHT
+      l_loop_inner_clu:
+        number: "L.P.#53" # L. INNER LOOP (CLU)
+      l_loop_inner_disc:
+        number: "L.P.#54" # L. INNER LOOP (DISC)
+      l_loop_inner_arrow:
+        number: "L.P.#55" # L. INNER LOOP ARROW
+      l_r_ramp_arrow:
+        number: "L.P.#56" # R. RAMP ARROW
+
+      l_start_button:
+        number: "L.P.#65" # START BUTTON
+      l_tourn_start:
+        number: "L.P.#66" # TOURN START
+      # ... etc. The matrix continues with more lights.
+    

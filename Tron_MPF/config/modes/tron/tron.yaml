@@ -1,0 +1,125 @@
+# modes/tron/tron.yaml
+# Configuration for the "Tron" modes: Double Scoring, Super Pops, and Super Spinners.
+
+mode:
+  code: tron
+  priority: 500
+  start_events: mode_tron_start_mode
+  stop_events: mode_tron_stop
+
+# Shot Group to manage the T-R-O-N targets.
+shot_groups:
+  tron_targets:
+    shots: tron_t, tron_r, tron_o, tron_n
+    events_when_hit: tron_target_hit
+    events_when_complete: tron_targets_completed
+    
+shots:
+  tron_t:
+    switch: s_target_t
+  tron_r:
+    switch: s_target_r
+  tron_o:
+    switch: s_target_o
+  tron_n:
+    switch: s_target_n
+
+# Timers for the three Tron modes.
+timers:
+  double_scoring_timer:
+    start_value: 30
+    end_value: 0
+    events_when_complete: double_scoring_stop
+    
+  super_pops_timer:
+    start_value: 30
+    end_value: 0
+    events_when_complete: super_pops_stop
+    
+  super_spinners_timer:
+    start_value: 30
+    end_value: 0
+    events_when_complete: super_spinners_stop
+    
+variable_player:
+  mode_tron_start_mode:
+    current_tron_mode: "double_scoring"
+    next_tron_mode: "super_pops"
+    zen_awards: 0
+    
+# Event handlers for the Tron mode.
+event_player:
+  # Zen feature logic.
+  s_zen_active: # Zen is the switch to the right of the Arcade scoop.
+    - action: increment_player_variable
+      variable: zen_awards
+      
+  tron_targets_completed:
+    - action: start_tron_mode
+      mode: player.current_tron_mode
+    - action: play_slide
+      slide: tron_completed_slide
+    
+  # Logic to start a Tron mode.
+  start_tron_mode:
+    - action: start_timer
+      timer: timer_from_variable(player.current_tron_mode)
+    - action: light_tron_mode_on(player.current_tron_mode)
+    - action: set_next_tron_mode
+    - action: play_slide
+      slide: tron_mode_start_slide
+      
+  # Logic for scoring during the Tron modes.
+  # This will be handled in the main game mode to apply multipliers.
+  
+  # Logic to start all three modes with banked Zen awards.
+  tron_targets_completed:
+    - action: start_all_tron_modes
+      condition: player.zen_awards >= 3
+    - action: reset_player_variable
+      variable: zen_awards
+      
+  double_scoring_stop:
+    - action: play_slide
+      slide: double_scoring_end_slide
+      
+  super_pops_stop:
+    - action: play_slide
+      slide: super_pops_end_slide
+      
+  super_spinners_stop:
+    - action: play_slide
+      slide: super_spinners_end_slide
+      
+# Lights and shows for the Tron modes.
+lights:
+  l_tron_double_scoring:
+    type: event
+    events_on: double_scoring_start
+    events_off: double_scoring_stop
+    
+  l_tron_super_pops:
+    type: event
+    events_on: super_pops_start
+    events_off: super_pops_stop
+    
+  l_tron_super_spinners:
+    type: event
+    events_on: super_spinners_start
+    events_off: super_spinners_stop
+
+shows:
+  light_tron_flashing:
+    - light: l_tron_double_scoring
+      mode: flash
+    - light: l_tron_super_pops
+      mode: flash
+    - light: l_tron_super_spinners
+      mode: flash
+      
+  light_tron_solid:
+    - light: l_tron_double_scoring
+      mode: on
+      
+# The rest of the logic for scoring multipliers and timer bars will be
+# handled in the main game mode, as it affects the entire game state.

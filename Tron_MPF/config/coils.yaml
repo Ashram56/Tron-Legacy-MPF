@@ -1,0 +1,78 @@
+    # config/coils.yaml
+    # Coil configuration file for the Tron MPF pinball machine (P-Roc)
+    # Coil numbers are based on the Stern Tron Legacy service manual.
+    # IMPORTANT: These numbers must match the wiring on your P-Roc board.
+
+    coils:
+      # High Current Coils Group 1
+      c_trough_up_kicker:
+        number: "Q1"
+      c_auto_launch:
+        number: "Q2"
+      c_3_bank_drop_target:
+        number: "Q3"
+      c_video_game_eject:
+        number: "Q4"
+      c_disc_motor_power:
+        number: "Q5"
+      c_recognizer_3_bank_mtr_relay:
+        number: "Q6"
+      c_orbit_up_down_post:
+        number: "Q7"
+      c_shaker_motor:
+        number: "Q8"
+
+      # High Current Coils Group 2
+      c_left_pop_bumper:
+        number: "Q9"
+      c_right_pop_bumper:
+        number: "Q10"
+      c_bottom_pop_bumper:
+        number: "Q11"
+      c_upper_left_flipper:
+        number: "Q12"
+      c_left_slingshot:
+        number: "Q13"
+      c_right_slingshot:
+        number: "Q14"
+      c_left_flipper_main:
+        number: "Q15"
+      c_right_flipper_main:
+        number: "Q16"
+
+      # Low Current Coils Group 1 (Flasher and Relays)
+      c_zen_flasher:
+        number: "Q17"
+      c_flash_video_game:
+        number: "Q18"
+      c_flash_right_domes:
+        number: "Q19"
+      c_flash_bottom_arch_left:
+        number: "Q20"
+      c_flash_bottom_arch_right:
+        number: "Q21"
+      c_disc_direction_relay:
+        number: "Q22"
+      c_recognizer_relay:
+        number: "Q23"
+      c_optional_coin_meter:
+        number: "Q24"
+        
+      # Low Current Coils Group 2 (Flasher)
+      c_flash_left_domes:
+        number: "Q25"
+      c_flash_disc_left:
+        number: "Q26"
+      c_flash_disc_right:
+        number: "Q27"
+      c_flash_backpanel:
+        number: "Q28"
+      c_flash_recognizer:
+        number: "Q29"
+      c_disc_motor_relay:
+        number: "Q30"
+      c_flash_red_disc_left:
+        number: "Q31"
+      c_flash_red_disc_right:
+        number: "Q32"
+    

@@ -1,0 +1,125 @@
+# modes/clu/clu.yaml
+# Configuration for the "Terminate Clu" game mode.
+# This mode is a timed mode that requires completing three C-L-U inlane rollovers
+# to start, and then shooting four specific shots to complete.
+
+mode:
+  code: clu
+  priority: 300
+  start_events: mode_clu_start_mode
+  stop_events: mode_clu_stop
+  
+timers:
+  clu_timer:
+    start_value: 25
+    end_value: 0
+    events_when_complete: mode_clu_stop
+
+variable_player:
+  mode_clu_start_mode:
+    clu_shots_made: 0
+    clu_shot_value: 250000
+    
+# Event handlers for the C-L-U inlane rollovers.
+event_player:
+  s_cl_lane_c_active:
+    - action: lit_clu_lane_c
+    - action: check_all_clu_lanes
+      
+  s_cl_lane_l_active:
+    - action: lit_clu_lane_l
+    - action: check_all_clu_lanes
+      
+  s_cl_lane_u_active:
+    - action: lit_clu_lane_u
+    - action: check_all_clu_lanes
+      
+  check_all_clu_lanes:
+    - action: light_clu_insert
+      condition: clu_lanes_c_lit and clu_lanes_l_lit and clu_lanes_u_lit
+    - action: play_slide
+      slide: clu_lanes_slide
+      
+  # The scoop is shot to start the mode after the lanes are completed.
+  s_recognizer_hole_active:
+    - action: mode_clu_start_mode
+      condition: clu_lanes_completed
+      
+# Event handlers for the Clu mode shots.
+  mode_clu_start_mode:
+    - action: start_timer
+      timer: clu_timer
+    - action: light_clu_flashing # Flashes the Clu insert on the ladder.
+    - action: light_clu_shots # Lights the Clu helmet shots.
+    - action: play_slide
+      slide: clu_start_slide
+    
+  # Logic for shooting the four Clu targets.
+  s_left_orbit_enter_active:
+    - action: score_clu_shot
+      condition: shot_left_orbit_lit and not shot_left_orbit_completed
+    - action: play_slide
+      slide: clu_hit_slide
+  
+  s_left_inner_loop_active:
+    - action: score_clu_shot
+      condition: shot_left_inner_loop_lit and not shot_left_inner_loop_completed
+    - action: play_slide
+      slide: clu_hit_slide
+      
+  s_right_orbit_enter_active:
+    - action: score_clu_shot
+      condition: shot_right_orbit_lit and not shot_right_orbit_completed
+    - action: play_slide
+      slide: clu_hit_slide
+  
+  s_recognizer_hole_active: # This is the scoop shot for Clu.
+    - action: score_clu_shot
+      condition: shot_scoop_lit and not shot_scoop_completed
+    - action: play_slide
+      slide: clu_hit_slide
+      
+  mode_clu_stop:
+    - action: play_slide
+      slide: clu_end_slide
+      
+# Lights and shows for the Clu mode.
+lights:
+  l_clu_c:
+    type: event
+    events_on: lit_clu_lane_c
+    
+  l_clu_l:
+    type: event
+    events_on: lit_clu_lane_l
+    
+  l_clu_u:
+    type: event
+    events_on: lit_clu_lane_u
+    
+shows:
+  light_clu_flashing:
+    - light: l_clu
+      mode: flash
+      
+  light_clu_solid:
+    - light: l_clu
+      mode: on
+      
+  light_clu_shots:
+    - light: l_left_orbit
+      mode: on
+    - light: l_left_inner_loop
+      mode: on
+    - light: l_right_orbit
+      mode: on
+    - light: l_recognizer_hole
+      mode: on
+
+# Score and game logic
+score:
+  clu_shot_award:
+    - type: add
+      score: 250000 + (player.clu_shots_made * 250000)
+    - type: event
+      event: player_awarded_clu_shot

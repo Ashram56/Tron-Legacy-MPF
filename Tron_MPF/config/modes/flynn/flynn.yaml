@@ -1,0 +1,63 @@
+# modes/flynn/flynn.yaml
+# Configuration for the "Flynn" game mode.
+# This mode is triggered by a skill shot or an inlane switch and
+# involves a "roaming" light show that the player must shoot.
+
+mode:
+  code: flynn
+  priority: 300
+  start_events: mode_flynn_start_mode
+  stop_events: mode_flynn_complete
+
+event_player:
+  # Logic for the "roaming" light show.
+  mode_flynn_started:
+    - action: start_show
+      show: flynn_roaming_light_show
+      priority: 1000
+    - action: mode_flynn_started
+    - action: play_slide
+      slide: flynn_intro_slide # New slide for the LCD
+      
+  # If the player hits the currently lit target, complete the mode.
+  s_left_orbit_enter_active:
+    - action: mode_flynn_complete
+      condition: light_is_on(l_left_orbit_enter)
+    - action: play_slide
+      slide: flynn_completed_slide # New slide for the LCD
+      
+  s_ramp_left_enter_active:
+    - action: mode_flynn_complete
+      condition: light_is_on(l_ramp_left_enter)
+    - action: play_slide
+      slide: flynn_completed_slide # New slide for the LCD
+
+  # Add event handlers for all other roaming targets here.
+  # s_left_inner_loop_active:
+  #   - action: mode_flynn_complete
+  #     condition: light_is_on(l_left_inner_loop)
+  #     - action: play_slide
+  #       slide: flynn_completed_slide
+  # ... etc.
+    
+variable_player:
+  mode_flynn_complete:
+    flynn_completed: 1
+
+score:
+  flynn_award_score:
+    - type: add
+      score: 275000 + (player.flynn_completed * 50000)
+    - type: event
+      event: player_awarded_flynn
+
+shows:
+  flynn_roaming_light_show:
+    - duration: 2s
+      events:
+        - action: play_show
+          show: light_cycle_roam_left_to_right
+    - duration: 2s
+      events:
+        - action: play_show
+          show: light_cycle_roam_right_to_left

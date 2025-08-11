@@ -1,0 +1,189 @@
+# modes/disc/disc.yaml
+# Configuration for the "Disc" multiball mode.
+# This is the main multiball mode with a multi-stage progression.
+
+mode:
+  code: disc
+  priority: 400
+  start_events: mode_disc_start_mode
+  stop_events: mode_disc_stop
+
+# This multiball is the core of the mode.
+multiball:
+  disc_multiball:
+    ball_count: 3
+    ball_count_type: balls
+    stop_events:
+      - multiball_disc_multiball_balls_remaining_1
+
+# This shot group tracks the Recognizer target bank hits.
+shot_groups:
+  recognizer_target_bank:
+    shots: recognizer_target_1, recognizer_target_2, recognizer_target_3
+    profile: recognizer_profile
+    events_when_complete: recognizer_targets_down
+
+shots:
+  recognizer_target_1:
+    switch: s_recognizer_target_1
+    events: hit: recognizer_target_hit
+  recognizer_target_2:
+    switch: s_recognizer_target_2
+    events: hit: recognizer_target_hit
+  recognizer_target_3:
+    switch: s_recognizer_target_3
+    events: hit: recognizer_target_hit
+
+  spinning_disc:
+    switch: s_disc_arena_entry
+    events: hit: spinning_disc_hit
+
+# Shot profiles to handle the state of the lights.
+shot_profiles:
+  recognizer_profile:
+    states:
+      - name: flashing
+        light_events: mode_disc_start_mode
+      - name: lit
+        light_events: recognizer_target_hit
+
+variable_player:
+  mode_disc_start_mode:
+    disc_jackpot_value: 250000
+    disc_jackpots_collected: 0
+    disc_double_jackpot_value: 500000
+    disc_double_jackpots_collected: 0
+    super_jackpot_value: 0
+    recognizer_hits_needed: 4
+  
+# Event handlers for the Disc mode progression.
+event_player:
+  # Recognizer targets stage.
+  recognizer_target_hit:
+    - action: decrement_player_variable
+      variable: recognizer_hits_needed
+    - action: play_slide
+      slide: recognizer_hit_slide
+          
+  recognizer_targets_down:
+    - action: set_player_variable
+      variable: recognizer_hits_needed
+      value: 7 # Now we need 7 shots into the disc arena.
+    - action: light_disc_flashing # Flashes the Disc insert on the ladder.
+    - action: light_recognizer_solid # Solidly lights the Recognizer insert.
+    - action: start_motor
+      motor: disc_motor # This assumes we have a disc motor defined in devices.yaml
+    - action: play_slide
+      slide: recognizer_down_slide
+          
+  # Spinning disc stage.
+  spinning_disc_hit:
+    - action: decrement_player_variable
+      variable: recognizer_hits_needed
+    - action: check_for_disc_multiball_start
+    
+  check_for_disc_multiball_start:
+    - action: mode_disc_multiball_start
+      condition: player.recognizer_hits_needed <= 0
+      
+  # Disc Multiball stage.
+  mode_disc_multiball_start:
+    - action: multiball_disc_multiball_start
+    - action: play_show
+      show: disc_multiball_start_show
+    - action: light_disc_jackpot_shots
+    - action: set_player_variable
+      variable: disc_jackpots_collected
+      value: 0
+    - action: play_slide
+      slide: disc_multiball_start_slide
+          
+  # Jackpots collection.
+  disc_jackpot_shot_hit: # This event should be tied to the blue disc shots.
+    - action: score
+      score: disc_jackpot_award
+    - action: increment_player_variable
+      variable: disc_jackpots_collected
+    - action: light_off_shot # Turn off the light for the hit shot.
+    - action: check_for_double_jackpots
+    - action: play_slide
+      slide: disc_jackpot_slide
+          
+  # Spinning disc hit during multiball.
+  spinning_disc_hit:
+    - action: score
+      score: fixed_disc_award
+    - action: increment_player_variable
+      variable: disc_jackpot_value
+      value: 25000
+    - action: relight_disc_jackpot_shots
+    - action: play_slide
+      slide: spinning_disc_hit_slide
+          
+  check_for_double_jackpots:
+    - action: mode_disc_double_jackpots_start
+      condition: player.disc_jackpots_collected >= 10
+
+  mode_disc_stop:
+    - action: play_slide
+      slide: disc_end_slide
+          
+# Score and game logic
+score:
+  recognizer_target_hit_award:
+    - type: add
+      score: 75000 # Example score for hitting the targets.
+          
+  disc_multiball_start_award:
+    - type: add
+      score: 2000000
+
+  disc_jackpot_award:
+    - type: add
+      score: player.disc_jackpot_value
+    - type: event
+      event: disc_jackpot_collected
+          
+  fixed_disc_award:
+    - type: add
+      score: 100000
+          
+  double_jackpot_award:
+    - type: add
+      score: 500000 # 500K per shot.
+    - type: event
+      event: disc_double_jackpot_collected
+          
+  super_jackpot_award:
+    - type: add
+      score: player.super_jackpot_value
+    - type: event
+      event: disc_super_jackpot_collected
+
+lights:
+  l_recognizer:
+    type: event
+    events_on: mode_disc_start_mode
+    events_off: mode_disc_multiball_start
+        
+  l_disc:
+    type: event
+    events_on: mode_disc_multiball_start
+    events_off: mode_disc_stop
+
+shows:
+  light_recognizer_flashing:
+    - light: l_recognizer
+      mode: flash
+      
+  light_recognizer_solid:
+    - light: l_recognizer
+      mode: on
+      
+  light_disc_flashing:
+    - light: l_disc
+      mode: flash
+      
+  light_disc_solid:
+    - light: l_disc
+      mode: on

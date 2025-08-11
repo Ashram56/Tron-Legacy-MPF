@@ -1,0 +1,177 @@
+# modes/light_cycle/light_cycle.yaml
+# Configuration for the "Light Cycle" multiball mode.
+# This mode is a multiball mode with a multi-stage progression.
+
+mode:
+  code: light_cycle
+  priority: 400
+  start_events: mode_light_cycle_start_mode
+  stop_events: mode_light_cycle_stop
+
+# This multiball is the core of the mode.
+multiball:
+  light_cycle_multiball:
+    ball_count: 2
+    ball_count_type: balls
+    stop_events:
+      - multiball_light_cycle_multiball_balls_remaining_1
+
+# This shot group tracks the Light Cycle inserts for qualification.
+shot_groups:
+  light_cycle_shots:
+    shots: left_ramp, right_ramp, left_orbit, right_orbit, left_inner_loop, right_inner_loop
+    profile: light_cycle_profile
+    events_when_complete: light_cycle_qualified
+
+shots:
+  left_ramp:
+    switch: s_ramp_left_enter
+  right_ramp:
+    switch: s_ramp_right_enter
+  left_orbit:
+    switch: s_left_orbit
+  right_orbit:
+    switch: s_right_orbit
+  left_inner_loop:
+    switch: s_left_inner_loop_active
+  right_inner_loop:
+    switch: s_right_inner_loop_active
+
+shot_profiles:
+  light_cycle_profile:
+    states:
+      - name: flashing
+        light_events: mode_light_cycle_start_mode
+      - name: lit
+        light_events: light_cycle_shot_made
+
+variable_player:
+  mode_light_cycle_start_mode:
+    jackpot_value: 350000
+    super_jackpot_value: 750000
+    double_super_jackpot_value: 1500000
+    super_jackpots_collected: 0
+
+# Event handlers for the Light Cycle mode progression.
+event_player:
+  # Qualification stage.
+  light_cycle_qualified:
+    - action: light_cycle_multiball_ready
+    - action: light_light_cycle_flashing
+    - action: play_slide
+      slide: light_cycle_qualified_slide
+
+  s_recognizer_hole_active:
+    - action: mode_light_cycle_start_mode
+      condition: player.light_cycle_multiball_ready
+
+  # Multiball start.
+  mode_light_cycle_start_mode:
+    - action: multiball_light_cycle_multiball_start
+    - action: play_show
+      show: light_cycle_start_show
+    - action: light_initial_jackpot_shots
+    - action: score
+      score: light_cycle_start_award
+    - action: play_slide
+      slide: light_cycle_start_slide
+
+  # Jackpot collection.
+  s_ramp_left_enter_active:
+    - action: score_jackpot
+    - action: start_timer
+      timer: super_jackpot_timer # Start the timer for the combo shot.
+    - action: play_slide
+      slide: light_cycle_jackpot_slide
+      
+  s_ramp_right_enter_active:
+    - action: score_jackpot
+    - action: play_slide
+      slide: light_cycle_jackpot_slide
+      
+  s_right_orbit_active:
+    - action: score_jackpot
+    - action: play_slide
+      slide: light_cycle_jackpot_slide
+      
+  # Combo shot for Super Jackpot.
+  s_left_inner_loop_active:
+    - action: score_super_jackpot
+      condition: timer_is_running(super_jackpot_timer)
+    - action: stop_timer
+      timer: super_jackpot_timer
+    - action: start_timer
+      timer: double_super_jackpot_timer
+    - action: play_slide
+      slide: light_cycle_super_jackpot_slide
+      
+  # Combo shot for Double Super Jackpot.
+  s_ramp_right_enter_active:
+    - action: score_double_super_jackpot
+      condition: timer_is_running(double_super_jackpot_timer)
+    - action: stop_timer
+      timer: double_super_jackpot_timer
+    - action: play_slide
+      slide: light_cycle_double_super_jackpot_slide
+      
+  mode_light_cycle_stop:
+    - action: play_slide
+      slide: light_cycle_end_slide
+
+timers:
+  super_jackpot_timer:
+    start_value: 2
+    end_value: 0
+    events_when_complete: super_jackpot_missed
+    
+  double_super_jackpot_timer:
+    start_value: 2
+    end_value: 0
+    events_when_complete: double_super_jackpot_missed
+          
+# Score and game logic
+score:
+  light_cycle_start_award:
+    - type: add
+      score: 150000
+  
+  jackpot_award:
+    - type: add
+      score: player.jackpot_value
+    - type: event
+      event: light_cycle_jackpot_collected
+      
+  super_jackpot_award:
+    - type: add
+      score: player.super_jackpot_value
+    - type: event
+      event: light_cycle_super_jackpot_collected
+      
+  double_super_jackpot_award:
+    - type: add
+      score: player.double_super_jackpot_value
+    - type: event
+      event: light_cycle_double_super_jackpot_collected
+          
+lights:
+  l_light_cycle:
+    type: event
+    events_on: mode_light_cycle_start_mode
+    events_off: mode_light_cycle_stop
+        
+shows:
+  light_cycle_flashing:
+    - light: l_light_cycle
+      mode: flash
+      
+  light_cycle_solid:
+    - light: l_light_cycle
+      mode: on
+      
+  light_initial_jackpot_shots:
+    - light: l_ramp_left
+      mode: on
+    - light: l_ramp_right
+      mode: on
+    - light: l_right_orbit
+      mode: on

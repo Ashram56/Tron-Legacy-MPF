@@ -1,0 +1,60 @@
+# Tron_MPF.yaml
+
+# P-ROC hardware platform configuration
+mpf:
+  platform: p_roc
+  coils_default_hw_rule:
+    # Default hardware rules can be set here
+
+# Includes all other configuration files
+- !include_config(coils.yaml)
+- !include_config(switches.yaml)
+- !include_config(lights.yaml)
+- !include_config(devices.yaml)
+- !include_config(shots.yaml)
+- !include_config(modes/base/base.yaml)
+
+# Includes the main game mode and all individual game modes.
+# This new structure keeps the main game mode clean and organized.
+- !include_config(modes/tron_main/tron_main.yaml)
+- !include_config(modes/flynn/flynn.yaml)
+- !include_config(modes/gem/gem.yaml)
+- !include_config(modes/clu/clu.yaml)
+- !include_config(modes/zuse/zuse.yaml)
+- !include_config(modes/quorra/quorra.yaml)
+- !include_config(modes/disc/disc.yaml)
+- !include_config(modes/light_cycle/light_cycle.yaml)
+- !include_config(modes/tron/tron.yaml)
+- !include_config(modes/sea_of_simulation/sea_of_simulation.yaml)
+- !include_config(modes/portal/portal.yaml)
+
+# Includes the built-in service mode
+- !include_config(modes/service/service.yaml)
+# Includes the sound player configuration
+- !include_config(sound_player.yaml)
+# Includes the video player configuration
+- !include_config(video_player.yaml)
+# Includes the slide player configuration
+- !include_config(slides.yaml)
+
+
+# Sound and DMD configuration
+sound_system:
+  enabled: true
+
+# Replaced DMD configuration with LCD display configuration
+displays:
+  window:
+    width: 800
+    height: 480
+    default_background_color: black
+
+# Match Event configuration
+match:
+  # 'match_enabled' must be true to activate the feature.
+  match_enabled: true
+  # 'match_event_on_game_end' is a standard event that triggers the match.
+  events_when_match_succeeds: game_match_succeeded
+  events_when_match_fails: game_match_failed
+  # 'match_probability' is the percentage chance of a match happening.
+  match_probability: 7

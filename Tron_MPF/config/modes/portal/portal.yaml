@@ -1,0 +1,101 @@
+# modes/portal/portal.yaml
+# Configuration for the "Portal" wizard mode.
+# This is a four-ball multiball mode with two distinct stages.
+
+mode:
+  code: portal
+  priority: 700
+  start_events: mode_portal_start_mode
+  stop_events: mode_portal_stop
+
+multiball:
+  portal_multiball:
+    ball_count: 4
+    ball_count_type: balls
+    stop_events:
+      - multiball_portal_multiball_balls_remaining_1
+
+variable_player:
+  mode_portal_start_mode:
+    shot_value: 50000
+    super_jackpot_value: 1000000
+    shots_collected: 0
+
+# Event handlers for the Portal mode.
+event_player:
+  mode_portal_start_mode:
+    - action: award_bonus_points # Award the same bonus points as Sea of Simulation.
+    - action: multiball_portal_multiball_start
+    - action: play_show
+      show: portal_start_show
+    - action: light_initial_portal_shots
+    - action: play_slide
+      slide: portal_intro_slide
+
+  # Logic for collecting shots in the first stage.
+  portal_shot_hit:
+    - action: score
+      score: portal_shot_award
+    - action: increment_player_variable
+      variable: portal_shot_value
+      value: 50000
+      max_value: 1500000
+    - action: increment_player_variable
+      variable: shots_collected
+    - action: check_for_stage_2
+    - action: play_slide
+      slide: portal_shot_hit_slide
+      
+  check_for_stage_2:
+    - action: start_stage_2
+      condition: player.shots_collected >= 21 # Total of 21 shots in the first stage.
+      
+  # Logic for shooting the red arrow to add a ball.
+  red_arrow_shot_hit:
+    - action: add_ball_if_needed
+    - action: activate_ball_saver
+      duration: 1
+    - action: play_slide
+      slide: portal_add_ball_slide
+      
+  # Logic for the second stage.
+  start_stage_2:
+    - action: reset_lights
+    - action: light_all_major_shots # All major shots are now worth 1M.
+    - action: spinning_disc_is_lit
+    - action: collect_super_jackpot # Collect the accumulated super jackpot.
+    - action: play_slide
+      slide: portal_stage_2_slide
+
+  mode_portal_stop:
+    - action: play_slide
+      slide: portal_end_slide
+      
+# Score and game logic
+score:
+  portal_shot_award:
+    - type: add
+      score: player.shot_value
+    - type: add_to_super_jackpot
+      score: player.shot_value
+      
+  super_jackpot_award:
+    - type: add
+      score: player.super_jackpot_value
+      
+  stage_2_award:
+    - type: add
+      score: 1000000
+          
+lights:
+  l_portal:
+    type: event
+    events_on: all_progress_ladder_completed
+    events_off: mode_portal_stop
+        
+shows:
+  portal_start_show:
+    - duration: 5
+      events:
+        - action: play_dmd_video
+          video: portal_intro

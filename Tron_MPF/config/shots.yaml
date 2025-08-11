@@ -1,0 +1,91 @@
+    # config/shots.yaml
+    # Shot configuration file for the Tron MPF pinball machine.
+    # This file defines the shots and shot profiles needed for game logic,
+    # including the three skill shot options.
+
+    shots:
+      # Skill Shot 1: Flynn's Arcade scoop
+      # Triggered by a slow plunge, the ball falls into the Flynn's Arcade scoop.
+      skill_shot_arcade_scoop:
+        switch: s_recognizer_hole
+        profile: skill_shot_soft_plunge
+
+      # Skill Shot 2: Left ramp
+      # Triggered by a specific shot after a missed scoop.
+      skill_shot_left_ramp:
+        switch: s_ramp_left_enter
+        profile: skill_shot_inlane_shot
+
+      # Skill Shot 3: Right ramp from upper flipper
+      # Triggered by holding the left flipper button, then hitting the right ramp
+      # with the upper left flipper.
+      skill_shot_right_ramp:
+        switch: s_ramp_right_enter
+        profile: skill_shot_upper_flipper_shot
+
+      # Other important shots on the playfield
+      shot_tron_targets:
+        switch: s_target_t, s_target_r, s_target_o, s_target_n
+        profile: common_target_hit
+
+      shot_zuse_targets:
+        switch: s_target_z, s_target_u, s_target_s, s_target_e
+        profile: common_target_hit
+      
+      shot_left_orbit:
+        switch: s_left_orbit
+        profile: common_orbit_shot
+
+      shot_right_orbit:
+        switch: s_right_orbit
+        profile: common_orbit_shot
+
+      shot_left_ramp:
+        switch: s_ramp_left_enter
+        profile: common_ramp_shot
+
+      shot_right_ramp:
+        switch: s_ramp_right_enter
+        profile: common_ramp_shot
+
+
+    shot_profiles:
+      # Shot profile for the first skill shot (soft plunge into scoop).
+      skill_shot_soft_plunge:
+        states:
+          - name: active
+            # This shot is active for a short period after a ball is launched.
+            # We will configure this in the game mode later.
+      
+      # Shot profile for the second skill shot (inlane to left ramp).
+      skill_shot_inlane_shot:
+        states:
+          - name: active
+            # This shot is active after a missed scoop, for a limited time.
+            
+      # Shot profile for the third skill shot (upper flipper to right ramp).
+      skill_shot_upper_flipper_shot:
+        states:
+          - name: active
+            # This shot is active when the left flipper button is held down.
+
+      # Common profile for most targets.
+      common_target_hit:
+        states:
+          - name: lit
+            # State to indicate the target is lit for a mission.
+          - name: hit
+            # State after the target has been hit.
+            
+      # Common profile for ramp shots.
+      common_ramp_shot:
+        states:
+          - name: lit
+          - name: complete
+
+      # Common profile for orbit shots.
+      common_orbit_shot:
+        states:
+          - name: lit
+          - name: complete
+    

@@ -1,0 +1,61 @@
+# modes/sea_of_simulation/sea_of_simulation.yaml
+# Configuration for the "Sea of Simulation" mode.
+# This is a one-ball sub-wizard mode to help the player complete the progress ladder.
+
+mode:
+  code: sea_of_simulation
+  priority: 600
+  start_events: mode_sea_of_simulation_start_mode
+  stop_events: mode_sea_of_simulation_stop
+
+variable_player:
+  mode_sea_of_simulation_start_mode:
+    award_multiplier: 1
+    # Check if Double Scoring is active and set a multiplier.
+    # This assumes we have a way to check active modes.
+    # For now, we'll assume a multiplier of 1, but this would be a code-based check.
+
+# Event handlers for the Sea of Simulation mode.
+event_player:
+  mode_sea_of_simulation_start_mode:
+    - action: award_bonus_points
+    - action: light_uncompleted_shots
+    - action: play_slide
+      slide: sea_of_simulation_intro_slide
+        
+  # Logic for shooting the lit shots to complete a mode.
+  # This section would be very long, with conditions for each shot.
+  # Example for Flynn:
+  s_recognizer_hole_active:
+    - action: complete_flynn_in_simulation
+      condition: player.flynn_status == "flashing"
+      
+  complete_flynn_in_simulation:
+    - action: set_player_variable
+      variable: flynn_status
+      value: "completed"
+    - action: award_bonus_points_for_flynn
+    - action: light_flynn_solid
+    - action: play_slide
+      slide: simulation_flynn_completed_slide
+          
+  mode_sea_of_simulation_stop:
+    - action: play_slide
+      slide: sea_of_simulation_end_slide
+          
+# Score and game logic
+score:
+  simulation_bonus_award:
+    - type: add
+      score: 1000000 * player.ladder_completed_count * player.award_multiplier
+    - type: event
+      event: simulation_bonus_awarded
+
+lights:
+  # The lights here will be tied to the state of the progress ladder in the main game mode.
+  l_flynn:
+    type: event
+    events_on: player_variable_flynn_status_completed
+    events_off: mode_sea_of_simulation_stop
+
+  # The other lights for each mode would be configured similarly.
