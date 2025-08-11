@@ -1,0 +1,556 @@
+#config_version=5
+# This configuration file consolidates all slide and animation definitions
+# from the Tron Legacy MPF project. It's designed to provide a centralized
+# library of all visual assets and their presentation logic.
+#
+# It includes the minimal configuration for displays and assets
+# to allow these slides to be tested and displayed.
+
+# 1. Display & Window Configuration
+# ---------------------------------
+# Basic setup for the DMD and the on-screen window.
+displays:
+  dmd:
+    width: 128
+    height: 32
+    default: true
+    shaper: dmd_shaper
+
+window:
+  width: 512
+  height: 128
+  title: Mission Pinball Framework - TRON Legacy
+
+# 2. Asset Definitions
+# --------------------
+# All video and image assets used across the slides are pre-loaded here.
+# This makes the slide definitions cleaner and easier to manage.
+videos:
+  attract_loop:
+    file: attract_loop.mp4
+  attract_tron_logo:
+    file: attract_tron_logo.mp4
+  attract_daft_punk_logo:
+    file: attract_daft_punk_logo.mp4
+  attract_game_over:
+    file: attract_game_over.mp4
+  ball_starting:
+    file: ball_starting.mp4
+  add_a_ball:
+    file: add_a_ball.mp4
+  clu_start:
+    file: clu_start.mp4
+  clu_hit:
+    file: clu_hit.mp4
+  clu_success:
+    file: clu_success.mp4
+  combo_jet_bumper_slide:
+    file: combo_jet_bumper_slide.mp4
+  combo_ramp_slide:
+    file: combo_ramp_slide.mp4
+  combo_orbit_slide:
+    file: combo_orbit_slide.mp4
+  daft_punk_start:
+    file: daft_punk_start.mp4
+  daft_punk_hit:
+    file: daft_punk_hit.mp4
+  daft_punk_success:
+    file: daft_punk_success.mp4
+  disc_wars_start:
+    file: disc_wars_start.mp4
+  disc_wars_hit:
+    file: disc_wars_hit.mp4
+  disc_wars_success:
+    file: disc_wars_success.mp4
+  flynn_arcade_start:
+    file: flynn_arcade_start.mp4
+  flynn_arcade_hit:
+    file: flynn_arcade_hit.mp4
+  flynn_arcade_success:
+    file: flynn_arcade_success.mp4
+  gem_start:
+    file: gem_start.mp4
+  gem_hit:
+    file: gem_hit.mp4
+  gem_success:
+    file: gem_success.mp4
+  light_cycle_start:
+    file: light_cycle_start.mp4
+  light_cycle_hit_slide:
+    file: light_cycle_hit_slide.mp4
+  light_cycle_success_slide:
+    file: light_cycle_success_slide.mp4
+  portal_start:
+    file: portal_start.mp4
+  portal_hit:
+    file: portal_hit.mp4
+  portal_success:
+    file: portal_success.mp4
+  quorra_start:
+    file: quorra_start.mp4
+  quorra_hit:
+    file: quorra_hit.mp4
+  quorra_success:
+    file: quorra_success.mp4
+  sea_of_simulation_start:
+    file: sea_of_simulation_start.mp4
+  sea_of_simulation_hit:
+    file: sea_of_simulation_hit.mp4
+  sea_of_simulation_success:
+    file: sea_of_simulation_success.mp4
+  zuse_start:
+    file: zuse_start.mp4
+  zuse_hit:
+    file: zuse_hit.mp4
+  zuse_success:
+    file: zuse_success.mp4
+
+images:
+  attract_top_scores_bg:
+    file: attract_top_scores.png
+  attract_credits_bg:
+    file: attract_credits.png
+
+# 3. Widget Definitions
+# ---------------------
+# Custom widgets used in slides, such as styled text for scores.
+widgets:
+  score_label:
+    - type: text
+      font_size: 22
+      font_name: Hyperspace
+      color: FFFFFF
+      y: 20
+      anchor_y: top
+      
+# 4. Slide Definitions
+# --------------------
+# This is the main library of all slides used in the game. Each slide
+# is a self-contained unit with its background video/animation and
+# foreground text or score widgets.
+# These slides can be triggered by events using the 'slide_player:'.
+slides:
+  # --- Attract Mode Slides ---
+  attract_loop:
+    - type: video
+      video: attract_loop
+  attract_tron_logo:
+    - type: video
+      video: attract_tron_logo
+  attract_daft_punk_logo:
+    - type: video
+      video: attract_daft_punk_logo
+  attract_game_over:
+    - type: video
+      video: attract_game_over
+  attract_top_scores:
+    - type: image
+      image: attract_top_scores_bg
+    - type: text
+      text: "HIGH SCORES"
+      font_size: 20
+      font_name: Hyperspace
+      color: FFFFFF
+      y: 25
+  attract_credits:
+    - type: image
+      image: attract_credits_bg
+    - type: text
+      text: (machine_vars.credits_string)
+      font_size: 20
+      font_name: Hyperspace
+      color: FFFFFF
+      y: 25
+
+  # --- Base Game Slides ---
+  base_slide:
+    - type: text
+      text: (current_player.score)
+      number_grouping: true
+      min_digits: 2
+      font_size: 22
+      font_name: Hyperspace
+      color: FFFFFF
+      y: 20
+      anchor_y: top
+      x: 5
+      anchor_x: left
+    - type: text
+      text: "BALL: (current_player.ball)"
+      font_size: 15
+      font_name: Hyperspace
+      color: FFFFFF
+      y: 5
+      anchor_y: bottom
+      x: 5
+      anchor_x: left
+  ball_starting:
+    - type: video
+      video: ball_starting
+      end_action: play
+    - type: text
+      text: "BALL (current_player.ball) START"
+      font_size: 20
+      font_name: Hyperspace
+      color: FFFFFF
+  add_a_ball:
+    - type: video
+      video: add_a_ball
+      end_action: play
+    - type: text
+      text: "EXTRA BALL"
+      font_size: 20
+      font_name: Hyperspace
+      color: FFFFFF
+
+  # --- CLU Mode Slides ---
+  clu_start:
+    - type: video
+      video: clu_start
+      end_action: play
+    - type: text
+      text: "CLU"
+      widget_settings:
+        color: FF0000
+    - type: score_label
+      text: (current_player.score)
+  clu_hit:
+    - type: video
+      video: clu_hit
+      end_action: play
+    - type: text
+      text: "TARGET HIT"
+      widget_settings:
+        color: FF0000
+    - type: score_label
+      text: (current_player.score)
+  clu_success:
+    - type: video
+      video: clu_success
+      end_action: play
+    - type: text
+      text: "CLU COMPLETE"
+      widget_settings:
+        color: FF0000
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Combo Mode Slides ---
+  combo_jet_bumper_slide:
+    - type: video
+      video: combo_jet_bumper_slide
+      end_action: play
+    - type: text
+      text: "JET BUMPER COMBO"
+      widget_settings:
+        color: 00FF00
+    - type: score_label
+      text: (current_player.score)
+  combo_ramp_slide:
+    - type: video
+      video: combo_ramp_slide
+      end_action: play
+    - type: text
+      text: "RAMP COMBO"
+      widget_settings:
+        color: 00FF00
+    - type: score_label
+      text: (current_player.score)
+  combo_orbit_slide:
+    - type: video
+      video: combo_orbit_slide
+      end_action: play
+    - type: text
+      text: "ORBIT COMBO"
+      widget_settings:
+        color: 00FF00
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Daft Punk Mode Slides ---
+  daft_punk_start:
+    - type: video
+      video: daft_punk_start
+      end_action: play
+    - type: text
+      text: "DAFT PUNK"
+      widget_settings:
+        color: FFFF00
+    - type: score_label
+      text: (current_player.score)
+  daft_punk_hit:
+    - type: video
+      video: daft_punk_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: FFFF00
+    - type: score_label
+      text: (current_player.score)
+  daft_punk_success:
+    - type: video
+      video: daft_punk_success
+      end_action: play
+    - type: text
+      text: "DAFT PUNK COMPLETE"
+      widget_settings:
+        color: FFFF00
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Disc Wars Mode Slides ---
+  disc_wars_start:
+    - type: video
+      video: disc_wars_start
+      end_action: play
+    - type: text
+      text: "DISC WARS"
+      widget_settings:
+        color: FF00FF
+    - type: score_label
+      text: (current_player.score)
+  disc_wars_hit:
+    - type: video
+      video: disc_wars_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: FF00FF
+    - type: score_label
+      text: (current_player.score)
+  disc_wars_success:
+    - type: video
+      video: disc_wars_success
+      end_action: play
+    - type: text
+      text: "DISC WARS COMPLETE"
+      widget_settings:
+        color: FF00FF
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Flynn's Arcade Mode Slides ---
+  flynn_arcade_start:
+    - type: video
+      video: flynn_arcade_start
+      end_action: play
+    - type: text
+      text: "FLYNN'S ARCADE"
+      widget_settings:
+        color: 00FFFF
+    - type: score_label
+      text: (current_player.score)
+  flynn_arcade_hit:
+    - type: video
+      video: flynn_arcade_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: 00FFFF
+    - type: score_label
+      text: (current_player.score)
+  flynn_arcade_success:
+    - type: video
+      video: flynn_arcade_success
+      end_action: play
+    - type: text
+      text: "FLYNN'S ARCADE COMPLETE"
+      widget_settings:
+        color: 00FFFF
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Gem Mode Slides ---
+  gem_start:
+    - type: video
+      video: gem_start
+      end_action: play
+    - type: text
+      text: "GEM"
+      widget_settings:
+        color: FFFFFF
+    - type: score_label
+      text: (current_player.score)
+  gem_hit:
+    - type: video
+      video: gem_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: FFFFFF
+    - type: score_label
+      text: (current_player.score)
+  gem_success:
+    - type: video
+      video: gem_success
+      end_action: play
+    - type: text
+      text: "GEM COMPLETE"
+      widget_settings:
+        color: FFFFFF
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Light Cycle Multiball Slides ---
+  light_cycle_start:
+    - type: video
+      video: light_cycle_start
+      end_action: play
+    - type: text
+      text: "LIGHT CYCLE MULTIBALL"
+      widget_settings:
+        color: 00BFFF
+    - type: score_label
+      text: (current_player.score)
+  light_cycle_hit_slide:
+    - type: video
+      video: light_cycle_hit_slide
+      end_action: play
+    - type: text
+      text: "JACKPOT"
+      widget_settings:
+        color: 00BFFF
+    - type: score_label
+      text: (current_player.score)
+  light_cycle_success_slide:
+    - type: video
+      video: light_cycle_success_slide
+      end_action: play
+    - type: text
+      text: "SUPER JACKPOT"
+      widget_settings:
+        color: 00BFFF
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Portal Mode Slides ---
+  portal_start:
+    - type: video
+      video: portal_start
+      end_action: play
+    - type: text
+      text: "PORTAL"
+      widget_settings:
+        color: FFA500
+    - type: score_label
+      text: (current_player.score)
+  portal_hit:
+    - type: video
+      video: portal_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: FFA500
+    - type: score_label
+      text: (current_player.score)
+  portal_success:
+    - type: video
+      video: portal_success
+      end_action: play
+    - type: text
+      text: "PORTAL COMPLETE"
+      widget_settings:
+        color: FFA500
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Quorra Mode Slides ---
+  quorra_start:
+    - type: video
+      video: quorra_start
+      end_action: play
+    - type: text
+      text: "QUORRA"
+      widget_settings:
+        color: 32CD32
+    - type: score_label
+      text: (current_player.score)
+  quorra_hit:
+    - type: video
+      video: quorra_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: 32CD32
+    - type: score_label
+      text: (current_player.score)
+  quorra_success:
+    - type: video
+      video: quorra_success
+      end_action: play
+    - type: text
+      text: "QUORRA COMPLETE"
+      widget_settings:
+        color: 32CD32
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Sea of Simulation Mode Slides ---
+  sea_of_simulation_start:
+    - type: video
+      video: sea_of_simulation_start
+      end_action: play
+    - type: text
+      text: "SEA OF SIMULATION"
+      widget_settings:
+        color: 4169E1
+    - type: score_label
+      text: (current_player.score)
+  sea_of_simulation_hit:
+    - type: video
+      video: sea_of_simulation_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: 4169E1
+    - type: score_label
+      text: (current_player.score)
+  sea_of_simulation_success:
+    - type: video
+      video: sea_of_simulation_success
+      end_action: play
+    - type: text
+      text: "SEA OF SIMULATION COMPLETE"
+      widget_settings:
+        color: 4169E1
+    - type: score_label
+      text: (current_player.score)
+
+  # --- Zuse Mode Slides ---
+  zuse_start:
+    - type: video
+      video: zuse_start
+      end_action: play
+    - type: text
+      text: "ZUSE"
+      widget_settings:
+        color: DDA0DD
+    - type: score_label
+      text: (current_player.score)
+  zuse_hit:
+    - type: video
+      video: zuse_hit
+      end_action: play
+    - type: text
+      text: "HIT"
+      widget_settings:
+        color: DDA0DD
+    - type: score_label
+      text: (current_player.score)
+  zuse_success:
+    - type: video
+      video: zuse_success
+      end_action: play
+    - type: text
+      text: "ZUSE COMPLETE"
+      widget_settings:
+        color: DDA0DD
+    - type: score_label
+      text: (current_player.score)
