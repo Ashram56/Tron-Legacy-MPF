@@ -41,6 +41,15 @@ SAVE_EJECT_TICKS = 39
 AUTO_LAUNCH_TICKS = 12      # task 0x3c after an auto-launch (inferred: covers the shooter lane opening)
 MB_TASK = "multiball"       # the multiball task (ROM id: trough device + 0x18)
 MB_EJECT_TICKS = 101        # trough eject cycle while it launches multiball balls (portal_multiball.jsonl)
+# The VUK device stays busy for a fixed time after its kick, however soon MPF confirms the eject: the first
+# multiball ball leaves the shooter lane (sound 0x0ea) 3.0 s after the kick in every ROM trace
+# (light_cycle_multiball 26.70 -> 29.73, portal_multiball 17.87 -> 20.86, quorra_multiball 28.86 -> 31.88);
+# MPF's trough eject + auto-launch take the remaining ~0.6 s.
+VUK_BUSY_TICKS = 149
+# A request without the VUK (add-a-ball, a drain during the save) launches its first ball after a trough
+# cycle: sound 0x0ea 1.43 s after the Quorra add-a-ball (quorra_multiball 46.68 -> 48.11), of which MPF's
+# trough eject + auto-launch take ~0.6 s.
+MB_FIRST_EJECT_TICKS = 51
 SAVE_SERVE_TICKS = 48           # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
@@ -121,6 +130,7 @@ class TronOS(CustomCode):
         self.coins = 0
         self._mb_pending = 0
         self._mb_save = (0, 0)
+        self._mb_balls = 0          # balls requested from the running multiball task (rom_balls_in_play)
         self.rules = []
         self._refresh_pending = False
         self.refresh_count = 0       # rules refreshes run so far (display._hold)
@@ -136,6 +146,8 @@ class TronOS(CustomCode):
         self.ball_validated = False  # the playfield was validated on this ball (base music 0x01b)
         self.vuk_ejecting = False    # VUK eject not yet confirmed by a playfield switch (no ball search)
         self.vuk_device_busy = False  # VUK released, eject not yet confirmed by the ball device
+        self.vuk_released_at = -999.0 # when the VUK last kicked its ball out (switches.vuk_eject)
+        self._mb_first_at = -999.0    # earliest launch of a new multiball request's first ball
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
                                 "settings.yaml")
         self.adj_table = adjustment_defaults(settings)
@@ -263,9 +275,8 @@ class TronOS(CustomCode):
         self.rules.sort(key=lambda r: r[4])
 
     def deff_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
-        """lamp_rule_init(list 2, cond, deff, music, priority): mode background deff + music (display.py).
-        Returns the rule (display.raise_rule)."""
-        return self.display.add_rule(cond, deff_id, music, priority, on_start)
+        """lamp_rule_init(list 2, cond, deff, music, priority): mode background deff + music (display.py)."""
+        self.display.add_rule(cond, deff_id, music, priority, on_start)
 
     def request_refresh(self, *_):
         """rules_refresh_request: evaluate the lamp rules once the current handler has finished."""
@@ -454,7 +465,11 @@ class TronOS(CustomCode):
         return game.balls_in_play if game else 0
 
     def rom_balls_in_play(self):
-        """The ROM's count: a ball held in the VUK is not in play."""
+        """The ROM's balls_in_play [0x0001e4a8]: while the multiball task runs (balls still to launch, or its
+        ball save / grace) it is the requested count; otherwise the balls not in a device (a ball held in
+        the VUK is not in play). E.g. a second multiball started during the first one's save adds a ball."""
+        if self.task_running(MB_TASK) or self.mb_save_running():
+            return self._mb_balls
         return max(0, self.balls_in_play() - (1 if self.ball_held else 0))
 
     # ------------------------------------------------------------------ multiball (0x0001ed7c)
@@ -472,7 +487,10 @@ class TronOS(CustomCode):
             return False
         self.machine.events.post("tron_multiball_start", balls=balls)
         self.kill_ball_save()
-        add = min(balls, 4) - self.balls_in_play()
+        target = min(balls, 4)
+        running = self.task_running(MB_TASK) or self.mb_save_running()
+        self._mb_balls = max(target, self._mb_balls) if running else target
+        add = target - self.balls_in_play()
         if add > 0:
             self._mb_pending += add
             self.game.balls_in_play += add
@@ -480,7 +498,7 @@ class TronOS(CustomCode):
         self.after(1, lambda: self.game and not self.state & 0x214 and self.leff_start(13))
         if not (self.task_running(MB_TASK) or self.mb_save_running()):
             self._mb_save = (save_ticks, grace_ticks)          # no multiball task: the new values
-            self._mb_task()
+            self._mb_request()
             return True
         # a running multiball task: the larger save and grace win
         if self.task_running(MB_TASK) and not (self.task_running(0x34) or self.task_running(0x35)):
@@ -489,13 +507,20 @@ class TronOS(CustomCode):
             self.task_kill(0x35)
             self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
         if not self.task_running(MB_TASK) and self._mb_pending:
-            self._mb_task(start_save=False)
+            self._mb_request(start_save=False)
         return True
+
+    def _mb_request(self, start_save=True):
+        """(Re)create the multiball task for new balls: the first one waits a trough cycle."""
+        self._mb_first_at = self.now + (MB_FIRST_EJECT_TICKS - 0.5) * TICK
+        self._mb_task(start_save)
 
     def _mb_task(self, start_save=True):
         """Multiball task FUN_0001ea60: wait until no ball device is busy (the VUK keeps or is ejecting
-        its ball), then start the save and launch the balls one per trough eject cycle."""
-        if self.ball_held or self.vuk_device_busy:
+        its ball), then start the save and launch the balls one per trough eject cycle, the first one
+        after a trough cycle (_mb_request)."""
+        vuk_busy_until = self.vuk_released_at + (VUK_BUSY_TICKS - 0.5) * TICK
+        if self.ball_held or self.vuk_device_busy or self.now < vuk_busy_until:
             self.task_start(MB_TASK, 1, lambda: self._mb_task(start_save))
             return
         if start_save:
@@ -505,6 +530,9 @@ class TronOS(CustomCode):
                 self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
             else:
                 self._mb_save_grace(grace_ticks)
+        if self.now < self._mb_first_at:
+            self.task_start(MB_TASK, 1, lambda: self._mb_task(False))
+            return
         self._mb_launch()
 
     def _mb_launch(self):
@@ -792,13 +820,15 @@ class TronOS(CustomCode):
         self.vuk_ejecting = False
         if self.balls_in_play() - balls > 0:
             if self.mb_save_running() and not self.tilted:
-                # multiball save: the ball comes back, auto-launched (serve type 6); no "ball saved"
-                # audit or hook (no reference trace has audit 0x2b for a multiball save)
-                self.after(SAVE_EJECT_TICKS,
-                           lambda: self.machine.playfield.add_ball(balls=balls, player_controlled=False))
+                # multiball save: the multiball task launches a replacement. Unlike the single-ball save
+                # (ball_save_try 0x00019b34) it shows nothing and audits nothing.
+                self._mb_pending += balls
+                if not self.task_running(MB_TASK):
+                    self._mb_request(start_save=False)
                 return {"balls": 0}
             self.hook("ball_drained", balls)
-            if self.balls_in_play() - balls < 2:
+            # trough entry (0x0101bbc0 case 0xe): installed - balls in devices (the VUK counts) < 2
+            if self.balls_in_play() - balls - (1 if self.ball_held else 0) < 2:
                 self.kill_mb_save()
                 self.hook("multiball_end")           # 0x0101bcec: fewer than 2 balls in play
             return {"balls": balls}

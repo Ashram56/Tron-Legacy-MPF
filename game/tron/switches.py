@@ -197,6 +197,7 @@ class SwitchLayer:
             os_.leff_start(36)
             os_.sound(0x0fe)
         os_.ball_held = False
+        os_.vuk_released_at = os_.now     # the multiball task waits a fixed time after the kick
         os_.vuk_ejecting = True
         os_.ball_search_reload()
         self.machine.events.post("tron_vuk_release")

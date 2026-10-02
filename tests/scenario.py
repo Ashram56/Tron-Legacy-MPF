@@ -53,7 +53,8 @@ def forced_picks(name):
             forced.setdefault("match", []).append(len(hits))
         if e.get("ev") == "deff_start" and e.get("id") == 105:
             # the reel stops at a random slot: take the length from what followed the deff in the ROM.
-            # What follows starts as the reel's show ends, at the start of the deff's 10-tick hold.
+            # That is the start of its 10-tick hold (deff_hold_frames(10, 0x20)), where the next deff may
+            # start, so the run length is 10 ticks longer.
             hold = 10 * 0.01626
             for n in evs[i + 1:]:
                 if n.get("ev") == "deff_start" and n.get("id") not in (19, 105):

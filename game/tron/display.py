@@ -73,6 +73,7 @@ class Display:
         # The true rule with the highest priority owns the background deff and the music; without one, the
         # score display (deff 19) runs with the OS base music (os.base_music()).
         self.rules = []
+        self.hold_tail = {}         # deff id -> seconds of its hold when not HOLD_TICKS (set_hold_tail)
         self.music = None           # music call the background rules last played
 
     # ------------------------------------------------------------------ start / stop
@@ -116,7 +117,8 @@ class Display:
                 from tron.os_layer import TICK
                 hold_ticks = HOLD_TICKS_BY_DEFF.get(deff_id, HOLD_TICKS)
                 self._sound_handles.append(os_.machine.clock.schedule_once(
-                    lambda: self._hold(deff_id), max(0.0, seconds - hold_ticks * TICK)))
+                    lambda: self._hold(deff_id),
+                    max(0.0, seconds - self.hold_tail.get(deff_id, hold_ticks * TICK))))
         if refresh and not self.show:
             os_.after(1, self.refresh)
         return True
@@ -131,7 +133,7 @@ class Display:
         events = [(t, "sound", c) for t, c in info.sounds] + [(t, "tube", n) for t, n in info.tubes]
         for offset, kind, value in sorted(events, key=lambda e: e[0]):
             fire = (lambda k, v: lambda: self.fg == deff_id and (
-                os_.sound(v, in_deff=deff_id) if k == "sound" else os_.tube_start(v)))(kind, value)
+                self._deff_sound(v, deff_id) if k == "sound" else os_.tube_start(v)))(kind, value)
             if offset <= 0:
                 fire()
             else:
@@ -143,6 +145,12 @@ class Display:
         [queue_fullscreen_deff 0x0100fbb0]; its rules pass restarts a mode's background deff behind the
         held deff (traces/end_of_line_multiball.jsonl: deff 57 at the hold of deff 56 and at its end)."""
         self.fg_prio = HOLD_PRIORITY
+        if not self.show and deff_id in self.hold_tail:
+            # a measured hold (set_hold_tail): its rules pass restarts the mode's background deff behind
+            # it (traces/quorra_multiball: deff 65 again 2.78 s into deff 68)
+            if self.os.in_play and self.bg not in (None, 19):
+                self.start(self.bg, refresh=False)
+            self.os.request_refresh()
         if self.show:
             # the show's rules refresh request is served a tick later, unless a refresh ran meanwhile
             # (one pending request; traces/gem_hurryup.jsonl: one tube 18 start as deff 76 ends 1 tick
@@ -167,6 +175,23 @@ class Display:
             self._after_fg()
         elif self.bg == deff_id:
             self.bg = None
+
+    def set_hold_tail(self, deff_id, seconds):
+        """deff_hold_frames(n, 0x20) [0x01024460] when a deff's hold is not the usual 10 ticks: for its last
+        `seconds` the deff runs at priority 0x20, so any other deff may replace it (measured per deff)."""
+        self.hold_tail[deff_id] = seconds
+
+    def _deff_sound(self, call, deff_id):
+        """A deff's own sound. When it is a mode rule's music call (intro deff 64 plays the Quorra music
+        0x066), that music is playing, so the rule does not start it again (traces/quorra_multiball)."""
+        self.os.sound(call, in_deff=deff_id)
+        if any((r[3]() if callable(r[3]) else r[3]) == call for r in self.rules):
+            self.music = call
+        return True
+
+    def queued(self, task_id):
+        """Show task task_id is waiting in the queue (not playing yet)."""
+        return any(s.task_id == task_id for s in self.shows)
 
     def extend(self, deff_id):
         """A running deff that takes new values (e.g. deff 43 on every pop hit) shows its full length again."""
@@ -228,17 +253,17 @@ class Display:
     def add_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
         """lamp_rule_init(list 2): while cond() is true the background deff deff_id runs, with music
         (None/0 = keep; a callable gives the call, e.g. music by mode level). on_start() is called when
-        the rule (re)starts the deff (the deff's own code). Returns the rule (raise_rule)."""
-        rule = (priority, cond, deff_id, music, on_start)
-        self.rules.append(rule)
+        the rule (re)starts the deff (the deff's own code)."""
+        self.rules.append((priority, cond, deff_id, music, on_start))
         self.rules.sort(key=lambda r: -r[0])
-        return rule
 
-    def raise_rule(self, rule):
-        """Re-insert a rule ahead of the rules of equal priority (FUN_010028dc at a mode start)."""
+    def raise_rule(self, deff_id):
+        """A mode start re-inserts its rule before the others of its priority (e.g. FUN_0101ac74), so
+        the mode started last shows its deff when several are true (stacked Light Cycle + Quorra)."""
+        rule = next(r for r in self.rules if r[2] == deff_id)
         self.rules.remove(rule)
-        at = next((i for i, r in enumerate(self.rules) if r[0] <= rule[0]), len(self.rules))
-        self.rules.insert(at, rule)
+        i = next((k for k, r in enumerate(self.rules) if r[0] <= rule[0]), len(self.rules))
+        self.rules.insert(i, rule)
 
     def is_rule_deff(self, deff_id):
         return any(r[2] == deff_id for r in self.rules)

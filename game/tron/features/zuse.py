@@ -33,7 +33,7 @@ class Zuse(Feature):
         # leff rules are tried newest registration first (equal priority): leff 125, then leff 124
         os_.lamp_rule(self.clock.counting, leff=125, order=0x01031b5c)
         os_.lamp_rule(self.clock.counting, leff=124, tube=30, order=0x01031b5d)
-        self.rule = os_.deff_rule(self._background, 95, 0x0aa, 5)
+        os_.deff_rule(self._background, 95, 0x0aa, 5)
 
     def player_first_ball(self):
         """zfs_player_init 0x010315d8 and zuse_player_init 0x01033680."""
@@ -130,7 +130,7 @@ class Zuse(Feature):
         pd.zfs_starts = min(pd.zfs_starts + 1, 0xff)
         os_.hook("item_light", ZUSE_ITEM)
         os_.audit(0x52)
-        os_.display.raise_rule(self.rule)
+        os_.display.raise_rule(95)
         os_.request_refresh()
         return True
 
