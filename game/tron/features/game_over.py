@@ -12,6 +12,10 @@ class GameOver(Feature):
 
     def run(self, done):
         os_ = self.os
+        if os_.hook("slammed"):                   # a slam tilt resets the machine: straight to attract
+            os_.hook("attract_start")
+            done()
+            return
         os_.deff_start(38)
         number = random.randrange(0, 100, 10)
         forced = os_.forced.get("match")

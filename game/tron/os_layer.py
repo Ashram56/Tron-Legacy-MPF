@@ -570,15 +570,16 @@ class TronOS(CustomCode):
 
     def replay_award(self, n):
         """replay_award [0x00022d2c]: award per adj 13 (0 = credit + knocker 0x019), audit 9 + n, then task
-        0x33 (an end-of-ball wait task) shows deff 28 REPLAY with leff 17 until the deff ends."""
+        0x33 (an end-of-ball wait task) shows deff 28 REPLAY with leff 17 once no show runs (traces/
+        portal_multiball.jsonl: replay 16.53 s, deff 28 at 25.09 s when show deff 140 ends), until it ends."""
         if self.adj_value(13) == 0:
             self.machine.events.post("tron_award_credit")
         self.audit(9 + n)
         self.after(1, lambda: self.sound(0x019))     # knocker, fired by the OS knocker queue
 
         def show():
-            if self.display.fg is not None and self.display.prio.get(self.display.fg, 0) > self.display.prio.get(28, 0):
-                self.task_start(0x33, 1, show)       # wait for a higher display effect to finish
+            if self.display.show_running():
+                self.task_start(0x33, 1, show)       # FUN_000287a4: wait while a show runs
                 return
             if self.deff_start(28):
                 self.leff_start(17)
