@@ -82,6 +82,7 @@ class Display:
     def start(self, deff_id, hold=False, refresh=True, run_seconds=None, **args):
         """run_seconds: the run length when this call's variant differs from the recorded one."""
         os_ = self.os
+        os_.shaker_deff(deff_id)        # the deffs that run the shaker (shaker_run in the deff function)
         if deff_id in self.background:
             if self.bg not in (None, deff_id):
                 os_.media.deff_stop(self.bg)
@@ -517,6 +518,12 @@ class Leffs:
         outputs, prio, _ = self.info.get(leff_id, (frozenset(), 0, None))
         return any(other != leff_id and o_out & outputs and o_prio > prio
                    for other in self.running for o_out, o_prio, _ in (self.info.get(other, (frozenset(), 0, None)),))
+
+    def flasher_outranked(self, leff_id, flasher):
+        """A running leff with a higher priority than `leff_id` uses `flasher` (lamp_effects.csv)."""
+        prio = self.info.get(leff_id, (frozenset(), 0, None))[1]
+        return any(other != leff_id and flasher in self.info.get(other, (frozenset(), 0, None))[0]
+                   and self.info[other][1] > prio for other in self.running)
 
     def start(self, leff_id, loop=False, lamp=None):
         """lamp: the lamp(s) a token effect draws (tron.lamps: the show's "(lamp)" token)."""

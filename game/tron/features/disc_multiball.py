@@ -50,11 +50,28 @@ class DiscMultiball(Feature):
         os_.deff_rule(self.restart_display_cond, 53, music=0x02b, priority=7)
         os_.lamp_rule(self.status_display_cond, leff=45, tube=43, order=0x010081c0)
         os_.lamps.leff_code(45, self._leff_status)
+        os_.lamps.leff_code(47, self._leff_phase1_chase)
         os_.lamp_rule(lambda: self.running_or_ending() and self.phase == 1, leff=47, order=0x01006e14)
         os_.lamp_rule(lambda: os_.flag(0x24) and self.phase == 2, leff=46, order=0x010083b8)
         # same condition: the ROM starts leff 54 before leff 53 (traces/disc_multiball_restart.jsonl)
         os_.lamp_rule(self.restart_display_cond, leff=54, tube=49, order=0x010097ec)
         os_.lamp_rule(self.restart_display_cond, leff=53, order=0x010097ec)
+
+    def _leff_phase1_chase(self, task):
+        """leff_047 [0x010082e4]: over lamp group 0x34 (the recognizer target inserts), every 8 ticks one
+        step of: fill up, empty up, fill down, empty down (OS 0x9d00, 0x9fb8, 0x9b9c, 0x9e54)."""
+        group = self.os.lamps.group("rom_group_52")
+        step = task.data.get("step", 0)                 # 0 .. 4 * len(group) - 1
+        n = len(group)
+        if "step" not in task.data:
+            for lamp in group:                          # lamp_layer_create(0x34): the group, all off
+                task.set(lamp, False)
+        if n:
+            stage, i = divmod(step, n)
+            lamp = group[i] if stage < 2 else group[n - 1 - i]
+            task.set(lamp, stage in (0, 2))
+            task.data["step"] = (step + 1) % (4 * n)
+        task.sleep(8, self._leff_phase1_chase)
 
     def _leff_status(self, task):
         """leff_045 [0x01008208]: the inserts of the lit shots (dmb_lit_mask) toggle every 3 ticks (reads

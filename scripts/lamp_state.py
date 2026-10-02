@@ -2,7 +2,7 @@
 """Steady lamp states from a trace's `lamp` events (ROM reference or rebuild).
 
 The ROM's lamp output is the game image (lamp on / off, plus a flash mask that blanks flashing lamps
-every other 9-tick phase), overridden by the lamp-matrix effects (leffs) and lamp layers. Exact toggle
+every other 5-tick phase), overridden by the lamp-matrix effects (leffs) and lamp layers. Exact toggle
 times differ between the ROM and the rebuild (flash phase, leff frame timing), so lamps are compared
 as *steady states* over a short window ending at a sample time:
 

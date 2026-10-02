@@ -216,6 +216,7 @@ class Zuse(Feature):
         points = os_.score_add(self.value)
         self.total += points
         pd.zfs_switch_hits = min(pd.zfs_switch_hits + 1, 0xffff)
+        os_.shaker_handler("tron_shaker_zuse_score")         # every hit (shaker.yaml)
         if os_.display.running(94) or os_.display.task_running(0x9b):
             return
         if not os_.display.running(96) and not os_.any_multiball():

@@ -9,6 +9,7 @@ from tests.test_base import BaseCase
 from tests.tron_test import ROOT
 
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import coil_state  # noqa: E402
 import lamp_state  # noqa: E402
 
 
@@ -85,6 +86,73 @@ class TestLampModel(BaseCase):
         self.hit("s_tron_t")
         self.advance_time_and_run(0.5)
         self.assertEqual(1, tron.lamps.lamp_state(4))      # (T)RON collected, its drop down
+
+    def coil_events(self, n, t0):
+        return [(e["t"], e["on"]) for e in self.tron.trace.of("coil") if e["coil"] == n and e["t"] >= t0]
+
+    def test_flasher_pulses_read_as_one_flash(self):
+        self.start_game()
+        self.advance_time_and_run(3)
+        t0 = self.machine.clock.get_time()
+        lamps = self.tron.lamps
+        for _ in range(3):                        # back-to-back pulses: one on / off pair, held like the ROM
+            lamps.flasher("f_left_ramp", 64)
+            self.advance_time_and_run(0.1)
+        self.advance_time_and_run(1)
+        events = self.coil_events(19, t0)
+        self.assertEqual([1, 0], [on for _, on in events])
+        self.assertAlmostEqual(0.2 + 0.064 + 0.24, events[1][0] - events[0][0], delta=0.03)
+
+    def test_shaker_runs_in_game_only(self):
+        tron = self.tron
+        t0 = self.machine.clock.get_time()
+        tron.shaker_run(2, 2)                     # attract: no shaker
+        self.advance_time_and_run(1)
+        self.assertEqual([], self.coil_events(8, t0))
+        self.start_game()
+        self.advance_time_and_run(3)
+        t0 = self.machine.clock.get_time()
+        tron.shaker_run(2, 2)
+        self.advance_time_and_run(1)
+        events = self.coil_events(8, t0)
+        self.assertEqual([1, 0], [on for _, on in events])
+        tron.adj[86] = 1                          # SHAKER MOTOR minimal: a min setting 2 call does nothing
+        t0 = self.machine.clock.get_time()
+        tron.shaker_run(2, 2)
+        self.advance_time_and_run(1)
+        self.assertEqual([], self.coil_events(8, t0))
+
+    def test_clu_shot_lamps_leff(self):
+        self.start_game()
+        self.advance_time_and_run(3)
+        clu = self.tron.features_by_name["clu"]
+        clu.shots = 0x001 | 0x100                 # left orbit and VUK still to make
+        self.tron.leff_start(78, loop=True)
+        self.advance_time_and_run(1)
+        lamps = self.tron.lamps
+        layer = lamps.leff_players[78][1]
+        self.assertEqual({13, 61, 36, 28}, layer.mask)
+        self.assertFalse(lamps.composite(61) or lamps.composite(36))     # made: held off
+        seen = set()
+        for _ in range(4):                        # toggles every 3 ticks
+            seen.add(lamps.composite(13))
+            self.advance_time_and_run(0.05)
+        self.assertEqual({True, False}, seen)
+
+
+class TestCoilCompare(unittest.TestCase):
+
+    def test_bursts_and_match(self):
+        pwm = [(1.0 + i * 0.016, i % 2 == 0) for i in range(40)]           # a PWM train: one burst
+        self.assertEqual(1, len(coil_state.bursts([(t, int(on)) for t, on in pwm])))
+        two = [(1.0, 1), (1.3, 0), (1.5, 1), (1.8, 0)]                       # 0.2 s apart: two flashes
+        self.assertEqual(2, len(coil_state.bursts(two)))
+        ref = [(1.0, 1.3), (5.0, 5.3), (9.0, 9.2)]
+        cand = [(1.1, 1.4), (5.6, 5.9), (9.0, 9.1)]
+        matched, lost, extra = coil_state.match(ref, cand)
+        self.assertEqual(2, matched)
+        self.assertEqual([5.0], lost)
+        self.assertEqual([5.6], extra)
 
 
 class TestLampCompare(unittest.TestCase):

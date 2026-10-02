@@ -30,7 +30,7 @@ def main(names):
             if m:
                 cells.append("{}=ok".format(m.group(1)[:5]))
                 continue
-            m = re.match(r"(\w+)\s+DIFF (\d+)/(\d+) samples", line)     # lamp: matching samples / samples
+            m = re.match(r"(\w+)\s+DIFF (\d+)/(\d+) (?:samples|bursts)", line)   # lamp / coil: matching / compared
             if m:
                 cells.append("{}={}/{}".format(m.group(1)[:5], m.group(2), m.group(3)))
                 continue

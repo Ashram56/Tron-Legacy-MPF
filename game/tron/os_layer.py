@@ -81,6 +81,32 @@ def adjustment_defaults(settings_path):
     return {n: tuple(v) for n, v in out.items()}
 
 
+# shaker_run(strength, min_setting): strength 1/2/3 runs the motor (coil 8) about 75/265/1100 ms
+# (assets/mpf_package/config/shaker.yaml, observed on coil 8 in emulated play)
+SHAKER_MS = {1: 75, 2: 265, 3: 1100}
+SHAKER_ADJ = 86              # adjustment 86 SHAKER MOTOR: 0 none, 1 minimal, 2 moderate, 3 maximal
+
+
+def shaker_table(shaker_path):
+    """Read the shaker_run calls from the asset package's shaker.yaml:
+    -> ({deff id: (strength, min_setting)}, {switch handler event: (strength, min_setting)})."""
+    deffs, handlers = {}, {}
+    if not os.path.exists(shaker_path):
+        return deffs, handlers
+    with open(shaker_path) as f:
+        for line in f:
+            m = re.match(r"\s+(\w+)\{settings\.shaker_motor>=(\d)\}: shaker_strength_(\d)\s*(?:# effect (\d+))?",
+                         line)
+            if not m:
+                continue
+            entry = (int(m.group(3)), int(m.group(2)))
+            if m.group(4):
+                deffs[int(m.group(4))] = entry
+            else:
+                handlers[m.group(1)] = entry
+    return deffs, handlers
+
+
 class Task:
     """One ROM task: a timer that calls back after a number of ticks."""
 
@@ -131,7 +157,10 @@ class TronOS(CustomCode):
         self.ball_scored = False
         self.serve_type = 0
         self.coins = 0
-        self.credits = 0            # credits (start button lamp)
+        # CREDIT STAND-IN (phase 6): a bare credit count, only so the start button lamp knows whether a
+        # credit is left. The Phase 7 credit system replaces it: keep has_credit() and drop the lines
+        # marked "CREDIT STAND-IN" (this one, _coin, _credit, the game start).
+        self.credits = 0
         self._mb_pending = 0
         self._mb_save = (0, 0)
         self._mb_balls = 0          # balls requested from the running multiball task (rom_balls_in_play)
@@ -155,6 +184,8 @@ class TronOS(CustomCode):
                                 "settings.yaml")
         self.adj_table = adjustment_defaults(settings)
         self.adj = {n: d for n, (_, d) in self.adj_table.items()}
+        self.shaker_deffs, self.shaker_handlers = shaker_table(os.path.join(os.path.dirname(settings),
+                                                                            "shaker.yaml"))
         self.machine.tron = self
 
         ev = self.machine.events
@@ -166,7 +197,7 @@ class TronOS(CustomCode):
         ev.add_handler("game_ending", self._game_ending, priority=1000)
         ev.add_handler("game_ended", self._game_ended, priority=1000)
         ev.add_handler("mode_attract_started", self._attract_started)
-        ev.add_handler("tron_award_credit", self._credit)
+        ev.add_handler("tron_award_credit", self._credit)     # CREDIT STAND-IN (phase 6)
         ev.add_handler("tron_vuk_release", self._vuk_eject_confirmed, unconfirmed=True)
         ev.add_handler("balldevice_bd_vuk_ball_eject_success", self._vuk_eject_confirmed)
         ev.add_handler("balldevice_bd_shooter_lane_ejecting_ball", self._shooter_ejecting)
@@ -499,6 +530,36 @@ class TronOS(CustomCode):
     def tilted(self):
         return bool(self.state & ST_TILT)
 
+    def shaker_run(self, strength, min_setting):
+        """shaker_run(strength, min_setting): run the shaker motor (coil 8) when adjustment 86 is at least
+        min_setting, never while tilted or in game over (gf_state & 0x310)."""
+        if self.adj.get(SHAKER_ADJ, 3) < min_setting or self.state & 0x310 or not self.game:
+            return
+        ms = SHAKER_MS.get(strength, SHAKER_MS[1])
+        coil = self.machine.coils.get("c_shaker_motor_optional")
+        if coil is not None:
+            try:
+                coil.enable()
+                self.machine.clock.schedule_once(lambda: coil.disable(), ms / 1000.0)
+            except Exception:       # noqa: BLE001 (a disabled driver in a test machine)
+                pass
+        self.lamps.coil_log(8, ms)
+
+    def shaker_deff(self, deff_id):
+        """The display effects that call shaker_run (shaker.yaml, by effect number). The call is in the
+        deff's own function, which runs once the deff has the display: a deff replaced in the same tick
+        (e.g. by a higher priority one) does not run it."""
+        if deff_id in self.shaker_deffs:
+            def run():
+                if self.display.running(deff_id):
+                    self.shaker_run(*self.shaker_deffs[deff_id])
+            self.machine.clock.schedule_once(run, 0)
+
+    def shaker_handler(self, event):
+        """A switch handler's shaker_run (shaker.yaml: tron_shaker_drop_target, tron_shaker_zuse_score)."""
+        if event in self.shaker_handlers:
+            self.shaker_run(*self.shaker_handlers[event])
+
     @property
     def in_play(self):
         """Normal play: a game runs and no tilt, end-of-ball or bonus is in progress."""
@@ -730,7 +791,7 @@ class TronOS(CustomCode):
         self.audit(4)
         self.audit(7)
         if self.coins % 3 == 0:
-            self.credits += 1
+            self.credits += 1                       # CREDIT STAND-IN (phase 6)
             self.audit(1)
             self.sound(0x0f1)
             self.flag_set(47)
@@ -744,13 +805,18 @@ class TronOS(CustomCode):
         FUN_0002032c: 8 ticks on, 8 off) and is solid otherwise (a credit won at the match lights it at
         once); without credit it is off."""
         if self.state & ST_ATTRACT and not self.state & 0x08:      # attract proper, not the game's end
-            if self.credits and not self.task_running(0x2d):
+            if self.has_credit() and not self.task_running(0x2d):
                 self._start_blink(True)
             return
         self.task_kill(0x2d)
-        self.lamps.lamp_set(START_LAMP, 1 if self.credits else 0)
+        self.lamps.lamp_set(START_LAMP, 1 if self.has_credit() else 0)
+
+    def has_credit(self):
+        """A credit is left (the start button lamp's only question)."""
+        return self.credits > 0
 
     def _credit(self, n=1, **kwargs):
+        """CREDIT STAND-IN (phase 6): count a credit won (tron_award_credit) or used (game start)."""
         self.credits = max(0, self.credits + n)
         self.start_button_lamp()
 
@@ -789,7 +855,7 @@ class TronOS(CustomCode):
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
-        self._credit(-1)                             # the game used a credit (FUN_00020448: lamp update)
+        self._credit(-1)                             # CREDIT STAND-IN (phase 6): the game used a credit
         self.audit(0x11)
         self.display.clear()
         self._new_game = True

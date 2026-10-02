@@ -19,7 +19,7 @@ ADD_BALL_TICKS = 0x3e
 class Portal(Feature):
     name = "portal"
     HOOKS = ("player_first_ball", "portal_vuk", "portal_mb_shot", "portal_running", "multiball_end",
-             "ball_end", "ball_end_wait")
+             "ball_end", "ball_end_wait", "portal_mb_super_lit")
 
     def __init__(self, os_):
         super().__init__(os_)
@@ -50,6 +50,10 @@ class Portal(Feature):
     def running_or_grace(self):
         """FUN_0102f694."""
         return self.os.flag(0x37) or self.os.task_running(0xd2)
+
+    def portal_mb_super_lit(self):
+        """portal_mb_super_lit [0x0102f654]: running (or grace) and all shots done (leff 76's rule)."""
+        return self.all_shots_done()
 
     def all_shots_done(self):
         """portal_mb_all_shots_done [0x0102f37c] (the disc's max is 0)."""

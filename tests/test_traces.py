@@ -1,7 +1,8 @@
 """Regression: replay ROM reference scenarios and compare with the ROM traces.
 
 TRACES lists, per scenario, the event kinds that already match the ROM. A feature that makes more
-kinds match adds them here. "lamp" is the steady-state lamp comparison of scripts/lamp_state.py.
+kinds match adds them here. "lamp" is the steady-state lamp comparison of scripts/lamp_state.py,
+"coil" the flasher / shaker burst comparison of scripts/coil_state.py.
 """
 import os
 import subprocess
@@ -13,21 +14,21 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TRACES = {
     "game_flow": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "game_flow_tilt": "score,deff_start,sound,tube_show_start,audit,multiball_start,mark,lamp",
-    "attract_and_service": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
+    "attract_and_service": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "bonus": "audit,multiball_start,mark",
     "bonus_skip": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "skill_shots": "deff_start,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
-    "skill_shots_b": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
-    "skill_shots_c": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
+    "skill_shots_b": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
+    "skill_shots_c": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "switches_and_shots": "score,deff_start,sound,audit,multiball_start,mark,lamp",
     "find_flynn_and_items": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
-    "flynns_arcade": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
+    "flynns_arcade": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "sea_of_simulation": "score,deff_start,sound,audit,multiball_start,mark",
     "portal_multiball": "score,deff_start,sound,audit,multiball_start,mark,lamp",
     "portal_multiball_shots": "score,deff_start,sound,leff_start,audit,multiball_start,mark,lamp",
-    "combos": "score,deff_start,sound,tube_show_start,audit,multiball_start,mark,lamp",
-    "combos_eol_jackpot": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
-    "tron_targets": "audit,multiball_start,mark,lamp",
+    "combos": "score,deff_start,sound,tube_show_start,audit,multiball_start,mark,lamp,coil",
+    "combos_eol_jackpot": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
+    "tron_targets": "audit,multiball_start,mark,lamp,coil",
     "zen_rollover": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
     "recognizer_and_disc_battle": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
     "disc_multiball": "score,deff_start,tube_show_start,multiball_start,mark",
@@ -41,7 +42,7 @@ TRACES = {
     "end_of_line_multiball_scoring": "score,deff_start,tube_show_start,audit,multiball_start,mark",
     "daft_punk_multiball": "score,deff_start,tube_show_start,audit,multiball_start,mark,lamp",
     "clu_hurryup": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
-    "gem_hurryup": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
+    "gem_hurryup": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,coil",
     "zuse_fast_scoring": "audit,multiball_start,mark",
 }
 

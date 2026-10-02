@@ -35,6 +35,10 @@ FLASH_TICKS = 5             # compositor FUN_00007f68 inverts the flash phase ev
 # filter; the MPF lights get the unfiltered output.
 OFF_DELAY = 0.065
 MPF_KEY = "tron"
+# The reference traces report a pulsed coil as on until ~0.24 s after its pulse ended (an 18 ms zen
+# flasher pulse reads 0.24 s, a 64 ms pulse ~0.33 s, shaker strength 1/2 (75/265 ms) 0.27/0.46 s):
+# the `coil` events are logged through the same hold, so back-to-back pulses read as one flash.
+COIL_OFF_DELAY = 0.24
 WHITE, BLACK = "ffffff", "000000"
 
 
@@ -80,8 +84,9 @@ class Layer:
 class ShowPlayer:
     """Plays a parsed show on a layer (lamps), MPF RGB lights (tubes) and flashers."""
 
-    def __init__(self, lamps, steps, layer=None, loops=0, tokens=None, on_end=None, rgb=False):
+    def __init__(self, lamps, steps, layer=None, loops=0, tokens=None, on_end=None, rgb=False, owner=None):
         self.lamps = lamps
+        self.owner = owner          # the leff id whose show this is (flasher arbitration)
         self.steps = steps
         self.layer = layer
         self.loops = loops
@@ -122,7 +127,7 @@ class ShowPlayer:
                     else:
                         self.layer.image.discard(n)
         for name, ms in flashers.items():
-            lm.flasher(name, ms)
+            lm.flasher(name, ms, owner=self.owner)
         if lights and not self.rgb:
             lm.changed()
         self.handle = lm.clock.schedule_once(self._step, max(seconds, 0.001))
@@ -381,7 +386,7 @@ class Lamps:
                 for target in (tokens.get(light.strip("()"), ()) if light.startswith("(") else (light,)):
                     mask.update(self.lamp_numbers(target))
         layer = self.layer_create(prio, mask, name="leff_{}".format(leff_id))
-        self.leff_players[leff_id] = (ShowPlayer(self, steps, layer, loops, tokens,
+        self.leff_players[leff_id] = (ShowPlayer(self, steps, layer, loops, tokens, owner=leff_id,
                                                  on_end=lambda: self._leff_show_done(leff_id)), layer)
 
     def _leff_show_done(self, leff_id):
@@ -424,8 +429,13 @@ class Lamps:
         if light is not None:
             light.color(value.lstrip("#"), key=MPF_KEY)
 
-    def flasher(self, name, ms=30):
-        """coil_pulse(coil, time) for a flasher: pulse the MPF coil, log coil on/off like the ROM traces."""
+    def flasher(self, name, ms=30, owner=None):
+        """coil_pulse(coil, time) for a flasher: pulse the MPF coil, log coil on/off like the ROM traces.
+        owner: the leff pulsing it. While a running leff with a higher priority uses the same flasher,
+        a lower leff's pulses do not reach it (the ROM's flasher ownership: traces/portal_multiball.jsonl
+        35.4 s, the disc flashers of leff 167 stop while leff 169 runs)."""
+        if owner is not None and self.os.leffs.flasher_outranked(owner, name):
+            return
         coil = getattr(self.machine, "coils", {}).get(name)
         num = self.coil_numbers.get(name)
         if coil is not None:
@@ -433,15 +443,18 @@ class Lamps:
                 coil.pulse(int(ms))
             except Exception:       # noqa: BLE001 (a disabled driver in a test machine)
                 pass
-        if num is None:
-            return
+        if num is not None:
+            self.coil_log(num, ms)
+
+    def coil_log(self, num, ms):
+        """Log a `coil` on/off pair for a driver on for `ms`, through the reference traces' output hold."""
         # the driver stays on through back-to-back pulses: one on/off pair, as the traces log the driver
         now = self.clock.get_time()
-        until = now + ms / 1000.0
+        until = now + ms / 1000.0 + COIL_OFF_DELAY
         if self._coil_until.get(num, 0) <= now:
             self.os.trace.log("coil", coil=num, on=1)
             self._coil_until[num] = until
-            self.clock.schedule_once(lambda: self._coil_off(num), ms / 1000.0)
+            self.clock.schedule_once(lambda: self._coil_off(num), until - now)
         else:
             self._coil_until[num] = max(self._coil_until[num], until)
 
