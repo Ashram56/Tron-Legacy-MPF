@@ -1,11 +1,28 @@
 #config_version=6
 
 # Stern Tron Legacy LE v1.74, MPF machine config.
-# Phase 1: virtual platform only, enough to boot into attract mode and
-# drive the Godot media controller (GMC) over BCP.
+# Switch, coil and light numbers are the original SAM numbers from the asset package; map them to
+# your controller later. The rules themselves run in Python (game/tron/), see tron/os_layer.py.
+
+config:
+  - rom/switches.yaml
+  - rom/coils.yaml
+  - rom/lights.yaml
+  - hardware.yaml
 
 hardware:
   platform: virtual
 
 modes:
   - attract
+  - game
+
+custom_code: tron.os_layer.TronOS
+
+game:
+  balls_per_game: 3
+  max_players: 4
+
+machine:
+  balls_installed: 4
+  min_balls: 1

@@ -1,0 +1,603 @@
+"""Switch handlers, base scores and the 8 canonical shots (assets/rules/modes/switches_and_shots.md).
+
+Each playfield switch has one handler. It applies its repeat guard, calls the feature hooks in the
+ROM's fixed order (os.hook(name, ...)), then adds its base score. Hooks that no feature registered
+yet do nothing. Shot indexes, bits and masks follow section 5.3 of the spec.
+"""
+
+SW = {  # SAM switch number -> MPF switch name (asset package switches.yaml)
+    1: "s_tron_t", 2: "s_tron_r", 3: "s_tron_o", 4: "s_tron_n",
+    7: "s_zuse_z", 8: "s_zuse_u", 48: "s_zuse_s", 13: "s_zuse_e",
+    11: "s_video_game_eject", 12: "s_zen_rollover",
+    14: "s_clu_l", 25: "s_clu_c", 28: "s_clu_u",
+    23: "s_shooter_lane", 24: "s_left_outlane", 29: "s_right_outlane",
+    26: "s_left_slingshot", 27: "s_right_slingshot",
+    30: "s_left_bumper", 31: "s_right_bumper", 32: "s_bottom_bumper",
+    34: "s_r_ramp_exit", 35: "s_l_ramp_entrance", 36: "s_right_orbit_spinner",
+    37: "s_l_ramp_exit", 38: "s_r_ramp_entrance", 39: "s_right_inner_loop",
+    41: "s_disc_opto", 43: "s_left_orbit", 44: "s_left_spinner", 46: "s_right_orbit",
+    49: "s_recogniz_3_bank_l", 50: "s_recogniz_3_bank_c", 51: "s_recogniz_3_bank_r",
+    52: "s_3_bank_motor_dn", 54: "s_recog_motor_pos_1", 55: "s_recog_motor_pos_2",
+    56: "s_recog_motor_pos_3",
+}
+NUM = {name: num for num, name in SW.items()}
+
+# shot index -> (CLU/light-cycle bit, combo/arrow mask) per section 5.3
+SHOT_BIT = {0: 0x01, 1: 0x02, 2: 0x04, 3: 0x08, 4: 0x40, 5: 0x80}
+
+TRON_LETTER = {1: (1, 4), 2: (2, 3), 3: (4, 2), 4: (8, 1)}     # sw -> (bit, letter number)
+ZUSE_INDEX = {7: 0, 8: 1, 48: 2, 13: 3}
+CLU_INDEX = {25: 0, 14: 1, 28: 2}
+BANK_BIT = {49: 1, 50: 2, 51: 4}
+BANK_LAMP = {49: 53, 50: 52, 51: 51}
+POP_LAMP = {30: 46, 31: 47, 32: 48}
+
+
+class SwitchLayer:
+
+    def __init__(self, os_):
+        self.os = os_
+        self.machine = os_.machine
+        self.lspin = {"pending": 0, "last": 0, "total": 0}
+        self.rspin = {"pending": 0, "last": 0, "total": 0}
+        self.orbit_post = 0
+        sc = self.machine.switch_controller
+        for num, name in SW.items():
+            if name not in self.machine.switches:
+                continue
+            handler = getattr(self, "sw_{}".format(num), None)
+            if handler:
+                sc.add_switch_handler(name, self._dispatch(num, handler))
+        sc.add_switch_handler("s_shooter_lane", self.shooter_close, state=1)
+        sc.add_switch_handler("s_shooter_lane", self.shooter_open, state=0)
+        os_.register("player_first_ball", self.player_first_ball)
+        os_.register("ball_start", self.ball_start)
+
+    def _dispatch(self, num, handler):
+        """The ROM runs a playfield handler as a task about one tick after the switch closes."""
+        def on_close():
+            if not self.os.game or not self.os.in_play:
+                return
+            self.os.after(1, handler)
+        return on_close
+
+    # ------------------------------------------------------------------ per player / ball state
+
+    def player_first_ball(self):
+        pd = self.os.pd
+        pd.lspin_value = 10000
+        pd.rspin_value = 10000
+        pd.pop_levels_done = 0
+        pd.pop_value_level = 0
+        pd.pop_hits_left = self.pop_hits_needed()
+
+    def ball_start(self):
+        pd = self.os.pd
+        for flag, key in ((0x10, "lspin_value"), (0x11, "rspin_value")):
+            if self.os.flag(flag):
+                self.os.flag_clear(flag)
+            else:
+                pd[key] = 10000
+        if self.os.flag(0x19):
+            self.os.flag_clear(0x19)
+        else:
+            pd.pop_value_level = 0
+
+    def pop_hits_needed(self):
+        return min((self.os.adj_value(65) + self.os.pd.pop_levels_done) * 5 + 20, 50)
+
+    # ------------------------------------------------------------------ helpers
+
+    def h(self, name, *args):
+        return self.os.hook(name, *args)
+
+    def z4_eol(self):
+        self.h("zuse_target_hit", 4)
+        self.h("eol_shot_score")
+
+    # ------------------------------------------------------------------ TRON targets 1-4
+
+    def _tron(self, sw):
+        os_ = self.os
+        if os_.state & 0x312:
+            return
+        bit, letter = TRON_LETTER[sw]
+        self.h("counting_switch", sw)                 # posts 0x6b but does not validate the playfield
+        self.z4_eol()
+        self.h("simulation_shot", 1 + sw)
+        self.h("tron_letter", bit, letter)
+        self.h("rules_refresh")
+        os_.base_score(30)
+
+    def sw_1(self):
+        self._tron(1)
+
+    def sw_2(self):
+        self._tron(2)
+
+    def sw_3(self):
+        self._tron(3)
+
+    def sw_4(self):
+        self._tron(4)
+
+    # ------------------------------------------------------------------ ZUSE 7, 8, 48, 13
+
+    def _zuse(self, sw):
+        self.os.playfield_switch(sw)
+        idx = ZUSE_INDEX[sw]
+        self.h("zuse_target_hit", idx)
+        self.h("eol_shot_score")
+        self.h("simulation_shot", 9 + idx)
+        self.h("zuse_letter", idx)
+        self.os.base_score(1130)
+
+    def sw_7(self):
+        self._zuse(7)
+
+    def sw_8(self):
+        self._zuse(8)
+
+    def sw_48(self):
+        self._zuse(48)
+
+    def sw_13(self):
+        self._zuse(13)
+
+    # ------------------------------------------------------------------ VUK 11 (device settles first)
+
+    def sw_11(self):
+        self.os.playfield_switch(11)
+        # The ball device settles about 0.76 s before on_vuk runs (section 5, sw11).
+        self.os.after(47, self.on_vuk)
+
+    def on_vuk(self):
+        """on_vuk [0x0102eddc]."""
+        os_ = self.os
+        os_.audit(0x66)
+        self.h("vuk_skill_shot")
+        self.h("simulation_shot", 0)
+        self.h("clu_hurryup_awards", 0x100)
+        self.h("eol_combo_jackpot")
+        self.h("vuk_features")                        # arcade, portal, SoS, CLU, LC, Quorra, EOL (3.2)
+        self.h("vuk_extra")
+        self.z4_eol()
+        os_.base_score(350)
+
+    # ------------------------------------------------------------------ ZEN 12
+
+    def sw_12(self):
+        os_ = self.os
+        os_.playfield_switch(12)
+        self.h("left_ramp_skill_shot_start")
+        self.z4_eol()
+        self.h("find_flynn_started")
+        self.h("zen_rollover")
+        os_.base_score(1090)
+
+    # ------------------------------------------------------------------ CLU 25, 14, 28
+
+    def _clu(self, sw):
+        self.os.playfield_switch(sw)
+        self.z4_eol()
+        self.h("simulation_shot", {25: 6, 14: 7, 28: 8}[sw])
+        self.h("clu_letter", CLU_INDEX[sw])
+        self.os.base_score(1090)
+
+    def sw_14(self):
+        self._clu(14)
+
+    def sw_25(self):
+        self._clu(25)
+
+    def sw_28(self):
+        self._clu(28)
+
+    # ------------------------------------------------------------------ shooter lane 23
+
+    def shooter_close(self):
+        self.os.task_start(0x3d, 6)
+
+    def shooter_open(self):
+        os_ = self.os
+        if not os_.game:
+            return
+        os_.task_start(0x3e, 125)
+        if self.machine.switches["s_left_flipper"].state:
+            self.h("right_ramp_skill_shot")
+        if os_.task_running(0x3d) or not os_.in_play:
+            return
+        os_.sound(0x0ea)
+        os_.task_start(0x68, 187)
+        if (os_.adj_value(79) == 0 and not os_.task_running(0x3c)
+                and not self.h("right_ramp_skill_shot_running")):
+            self.raise_orbit_post()
+        if not self.orbit_post:
+            os_.task_start(0x66, 187)
+
+    def raise_orbit_post(self):
+        if self.os.adj_value(78):
+            return
+        self.orbit_post = 1
+        coil = self.machine.coils.get("c_orbit_up_down_post")
+        if coil:
+            coil.enable()
+        self.os.task_start("orbit_post", 125, self.drop_orbit_post)
+
+    def drop_orbit_post(self):
+        self.orbit_post = 0
+        coil = self.machine.coils.get("c_orbit_up_down_post")
+        if coil:
+            coil.disable()
+
+    # ------------------------------------------------------------------ outlanes 24, 29
+
+    def _outlane(self, sw, lamp):
+        os_ = self.os
+        os_.playfield_switch(sw)
+        self.h("outlane_ball_save", 1 if sw == 24 else 2)
+        insult = False
+        if sw == 24 and os_.pf_valid and os_.balls_in_play() == 1 and not os_.ball_save:
+            insult = bool(self.h("insult_speech"))
+        if self.h("outlane_special", lamp):
+            os_.deff_start(82)
+            os_.leff_start(90)
+            if not insult:
+                os_.sound(0x09e)
+            os_.score_add(100000)
+        elif not insult:
+            os_.sound(0x0a2)
+        self.z4_eol()
+
+    def sw_24(self):
+        self._outlane(24, 8)
+
+    def sw_29(self):
+        self._outlane(29, 32)
+
+    # ------------------------------------------------------------------ slings 26, 27
+
+    def _sling(self, sw):
+        self.h("counting_switch", sw)                 # posts 0x6b but does not validate the playfield
+        self.z4_eol()
+        self.h("lane_change")
+        self.os.sound(0x0e8 if sw == 26 else 0x0e9)
+        self.os.base_score(440)
+
+    def sw_26(self):
+        self._sling(26)
+
+    def sw_27(self):
+        self._sling(27)
+
+    # ------------------------------------------------------------------ pop bumpers 30-32 (5.2)
+
+    def _pop(self, sw):
+        os_ = self.os
+        os_.task_start(0x40, 156)                     # bumper_busy
+        os_.playfield_switch(sw)
+        self.z4_eol()
+        self.pop_value(sw)
+        os_.base_score(170)
+
+    def pop_value(self, sw):
+        os_, pd = self.os, self.os.pd
+        mult = 3 if os_.task_running(199) else 1
+        self.h("pop_lamp_pattern")
+        if os_.task_running(0xcb):
+            self.h("big_bumps_hit")
+        if pd.pop_hits_left not in (0, 1):
+            points = min(10000 + 2500 * pd.pop_value_level, 50000) * mult
+            os_.score_add(points)
+            os_.deff_start(43, hits_left=pd.pop_hits_left - 1, value=points)
+            os_.leff_start(41)
+            os_.sound(0x50 if mult == 1 else 0x51)
+            pd.pop_hits_left -= 1
+        else:
+            points = min(100000 + 25000 * pd.pop_value_level, 500000) * mult
+            os_.score_add(points)
+            pd.pop_levels_done = min(pd.pop_levels_done + 1, 0xff)
+            pd.pop_value_level = min(pd.pop_value_level + 1, 0xff)
+            os_.deff_start(44, level=pd.pop_levels_done, value=points, mult=mult)
+            os_.leff_start(42)
+            os_.sound(0x50)
+            pd.pop_hits_left = self.pop_hits_needed()
+
+    def sw_30(self):
+        self._pop(30)
+
+    def sw_31(self):
+        self._pop(31)
+
+    def sw_32(self):
+        self._pop(32)
+
+    # ------------------------------------------------------------------ ramps 34-38
+
+    def sw_34(self):
+        self.os.playfield_switch(34)
+        self.on_right_ramp()
+
+    def sw_37(self):
+        self.os.playfield_switch(37)
+        self.on_left_ramp()
+
+    def sw_35(self):
+        self.os.playfield_switch(35)
+        self.os.sound(0x0eb)
+        self.z4_eol()
+        self.os.base_score(560)
+
+    def sw_38(self):
+        self.os.playfield_switch(38)
+        self.os.sound(0x0eb)
+        self.z4_eol()
+        self.os.base_score(560)
+
+    def on_left_ramp(self):
+        """Shot 1 [on_left_ramp 0x0102a940]."""
+        os_ = self.os
+        os_.audit(0x62)
+        self.h("portal_mb_shot", 1)
+        self.h("simulation_shot", 0x0f)
+        self.h("left_ramp_skill_shot")
+        self.h("disc_mb_shot", 1)
+        self.h("light_cycle_mb_shot", 2)
+        self.h("light_cycle_target", 2)
+        self.h("combo_awards", 1)
+        self.h("find_flynn_completed", 1)
+        self.z4_eol()
+        self.h("eol_ramp_jackpot", 0)
+        self.h("eol_letter", 0)
+        os_.sound(0x0eb)
+        os_.base_score(1170)
+
+    def on_right_ramp(self):
+        """Shot 4 [on_right_ramp 0x0102aa50]."""
+        os_ = self.os
+        os_.audit(0x63)
+        self.h("portal_mb_shot", 4)
+        self.h("simulation_shot", 0x12)
+        self.h("right_ramp_skill_shot_collect")
+        self.h("clu_hurryup_awards", 0x40)
+        self.h("disc_mb_shot", 4)
+        self.h("light_cycle_mb_shot", 0x40)
+        self.h("light_cycle_target", 0x40)
+        self.h("combo_awards", 4)
+        self.h("find_flynn_completed", 4)
+        self.z4_eol()
+        self.h("eol_ramp_jackpot", 1)
+        self.h("eol_letter", 1)
+        self.h("eol_combo_jackpot_light")
+        os_.sound(0x0eb)
+        os_.base_score(1170)
+
+    # ------------------------------------------------------------------ spinners 44, 36 (5.1)
+
+    def _spin_value(self, key):
+        return self.os.pd[key] * (3 if self.os.task_running(200) else 1)
+
+    def sw_44(self):
+        os_ = self.os
+        os_.playfield_switch(44)
+        if os_.task_running(0x64):
+            self.lspin["pending"] += 1
+            os_.task_start(0x64, 62, None)
+        else:
+            self.lspin.update(total=0, pending=0)
+            self._score_lspin()
+            os_.deff_start(41)
+            self._lspin_task()
+            os_.audit(0x64)
+            self.shot_left_inner_loop()
+        self.z4_eol()
+        self.h("gem_spin")
+        os_.base_score(90)
+
+    def _lspin_task(self):
+        """Task 0x64: scores one pending spin per tick, ends after 62 idle ticks."""
+        os_ = self.os
+        state = {"idle": 0}
+
+        def tick():
+            if self.lspin["pending"]:
+                self.lspin["pending"] -= 1
+                self._score_lspin()
+                state["idle"] = 0
+            else:
+                state["idle"] += 1
+            if state["idle"] < 62:
+                os_.task_start(0x64, 1, tick)
+        os_.task_start(0x64, 1, tick)
+
+    def _score_lspin(self):
+        value = self._spin_value("lspin_value")
+        self.os.score_add(value)
+        self.lspin["last"] = value
+        self.lspin["total"] += value
+        self.os.leff_start(33)
+        self.os.sound(0x0ec)
+
+    def shot_left_inner_loop(self):
+        """Shot 2 hooks [on_l_inner_loop 0x01029ba4] (after the first spin is scored)."""
+        self.h("portal_mb_shot", 2)
+        self.h("simulation_shot", 0x10)
+        self.h("clu_hurryup_awards", 4)
+        self.h("disc_mb_shot", 2)
+        self.h("quorra_super_jackpots", 4)
+        self.h("light_cycle_mb_shot", 4)
+        self.h("light_cycle_target", 4)
+        self.h("quorra_to_light", 4)
+        self.h("combo_awards", 2)
+        self.h("find_flynn_completed", 2)
+
+    def sw_36(self):
+        os_ = self.os
+        os_.playfield_switch(36)
+        if os_.task_running(0x65):
+            self.rspin["pending"] += 1
+        else:
+            self.rspin.update(total=0, pending=0)
+            self._score_rspin()
+            os_.deff_start(42)
+            self._rspin_task()
+            if (os_.task_running(199) and not self.h("any_multiball")
+                    and not self.h("combo_lit", 5)):
+                self.raise_orbit_post()
+            if self.orbit_post == 1:
+                self.shot_right_orbit()
+        self.z4_eol()
+        self.h("gem_spin")
+        os_.base_score(90)
+
+    def _rspin_task(self):
+        os_ = self.os
+        state = {"idle": 0}
+
+        def tick():
+            if self.rspin["pending"]:
+                self.rspin["pending"] -= 1
+                self._score_rspin()
+                state["idle"] = 0
+            else:
+                state["idle"] += 1
+            if state["idle"] < 93:
+                os_.task_start(0x65, 1, tick)
+        os_.task_start(0x65, 1, tick)
+
+    def _score_rspin(self):
+        value = self._spin_value("rspin_value")
+        self.os.score_add(value)
+        self.rspin["last"] = value
+        self.rspin["total"] += value
+        self.os.leff_start(34)
+        self.os.sound(0x0ee)
+
+    # ------------------------------------------------------------------ right inner loop 39
+
+    def sw_39(self):
+        """Shot 3 [0x0102ae3c]."""
+        os_ = self.os
+        os_.playfield_switch(39)
+        os_.audit(0x65)
+        self.h("portal_mb_shot", 3)
+        self.h("simulation_shot", 0x11)
+        self.h("combo_awards", 3)
+        self.h("find_flynn_completed", 3)
+        self.h("disc_mb_shot", 3)
+        self.h("quorra_super_jackpots", 8)
+        self.h("light_cycle_mb_shot", 8)
+        self.h("light_cycle_target", 8)
+        self.z4_eol()
+        self.h("bonus_x_add")
+        self.h("gem_hurryup_awards", 8)
+        self.h("gem_qualify")
+        os_.base_score(1190)
+
+    # ------------------------------------------------------------------ disc 41
+
+    def sw_41(self):
+        os_ = self.os
+        os_.playfield_switch(41)
+        if os_.task_running(0x3f):
+            os_.task_kill(0x3f)
+            os_.sound(0x54)
+            return
+        os_.task_start(0x3f, 125)
+        self.h("portal_mb_shot", 6)
+        self.h("simulation_shot", 1)
+        self.h("disc_mb_shot", 7)
+        self.h("disc_restart_autofire")
+        self.z4_eol()
+        self.h("eol_disc_jackpot", 2)
+        self.h("disc_battle", 2, 0)
+        os_.leff_start(75)
+        os_.sound(0x52)
+        os_.sound(0x53)
+        os_.base_score(2310)
+
+    # ------------------------------------------------------------------ orbits 43, 46
+
+    def sw_43(self):
+        os_ = self.os
+        os_.playfield_switch(43)
+        if os_.task_kill(0x67):
+            pass
+        elif os_.task_running(0x66):
+            os_.task_kill(0x66)
+            os_.task_kill(0x69)
+        else:
+            os_.audit(0x60)
+            self.shot_left_orbit()
+            os_.task_start(0x67, 125)
+            os_.task_start(0x68, 187)
+            os_.sound(0x0ed)
+        os_.base_score(1220)
+
+    def shot_left_orbit(self):
+        """FUN_0102a728."""
+        if self.os.task_running(0x3c):
+            return
+        self.h("portal_mb_shot", 0)
+        self.h("simulation_shot", 0x0e)
+        self.h("clu_hurryup_awards", 1)
+        self.h("disc_mb_shot", 0)
+        self.h("light_cycle_mb_shot", 1)
+        self.h("light_cycle_target", 1)
+        self.h("combo_awards", 0)
+        self.h("find_flynn_completed", 0)
+        self.z4_eol()
+
+    def sw_46(self):
+        os_ = self.os
+        os_.playfield_switch(46)
+        if os_.task_kill(0x69):
+            pass
+        elif os_.task_running(0x68):
+            os_.task_kill(0x68)
+            os_.task_kill(0x67)
+        else:
+            os_.audit(0x61)
+            self.shot_right_orbit()
+            os_.task_start(0x69, 125)
+            os_.task_start(0x66, 187)
+            os_.sound(0x0ef)
+        os_.base_score(1220)
+
+    def shot_right_orbit(self):
+        """FUN_0102a794."""
+        if self.os.task_running(0x3c):
+            return
+        self.h("portal_mb_shot", 5)
+        self.h("simulation_shot", 0x13)
+        self.h("clu_hurryup_awards", 0x80)
+        self.h("disc_mb_shot", 5)
+        self.h("light_cycle_mb_shot", 0x80)
+        self.h("light_cycle_target", 0x80)
+        self.h("combo_awards", 5)
+        self.h("find_flynn_completed", 5)
+        self.z4_eol()
+        self.h("arcade_light", 1)
+
+    # ------------------------------------------------------------------ recognizer 3-bank 49-51
+
+    def _bank(self, sw):
+        os_ = self.os
+        os_.playfield_switch(sw)
+        if not os_.task_running(0x7b):
+            self.h("quorra_super_jackpots", 0x10)
+            self.h("disc_mb_shot", 6)
+            self.z4_eol()
+            self.h("simulation_shot", 0x0d)
+            self.h("recognizer_bank", BANK_BIT[sw], BANK_LAMP[sw])
+            os_.base_score(1080)
+        os_.task_start(0x7b, 10)
+
+    def sw_49(self):
+        self._bank(49)
+
+    def sw_50(self):
+        self._bank(50)
+
+    def sw_51(self):
+        self._bank(51)

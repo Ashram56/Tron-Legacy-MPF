@@ -1,0 +1,45 @@
+#config_version=6
+
+# Hardware the ROM switch table does not list (SAM dedicated switches), and the ball devices.
+
+switches:
+  s_left_flipper:
+    number: D1
+  s_right_flipper:
+    number: D2
+  s_plumb_bob_tilt:
+    number: D3
+  s_slam_tilt:
+    number: D18
+  s_coin:
+    number: D4
+  s_start_button:     # number comes from the asset package
+    tags: start
+
+playfields:
+  playfield:
+    default_source_device: bd_shooter_lane
+    tags: default
+
+ball_devices:
+  bd_trough:
+    ball_switches: s_trough_1_r, s_trough_2, s_trough_3, s_trough_4_l
+    jam_switch: s_trough_jam
+    eject_coil: c_trough_up_kicker
+    eject_targets: bd_shooter_lane
+    tags: trough, home, drain
+    entrance_count_delay: 500ms
+    debug: false
+  bd_shooter_lane:
+    ball_switches: s_shooter_lane
+    eject_coil: c_auto_launch
+    mechanical_eject: true
+    eject_timeouts: 3s
+  bd_vuk:
+    ball_switches: s_video_game_eject
+    eject_coil: c_video_game_eject
+    eject_timeouts: 2s
+
+coils:
+  c_orbit_up_down_post:     # held up for about 2 s after a plunge (switches_and_shots.md sw23)
+    default_hold_power: 1.0

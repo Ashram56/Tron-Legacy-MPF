@@ -1,0 +1,176 @@
+"""Run a tron_ref reference scenario (assets/rules/traces/<name>.txt) against the MPF rebuild.
+
+The scenario language is documented in assets/rules/tools/trace/README.md. The ball simulation is
+MPF's smart_virtual platform: coil pulses move balls between devices, and this runner plays the
+part of the player (plunge, drain, hits).
+
+Usage: .venv/bin/python -m tests.scenario <name> [out.jsonl]
+"""
+import os
+import shlex
+import sys
+import unittest
+
+from tests.tron_test import ROOT, TronTestCase
+
+TRACES = os.path.join(ROOT, "assets", "rules", "traces")
+OUT = os.path.join(ROOT, "captures", "traces")
+
+SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
+COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
+SETTLE = 0.1                        # every hit is followed by 100 ms settle
+BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
+           "start": "s_start_button", "tournament": "s_tournament_start"}
+
+
+def switch_name(num):
+    from tron.switches import SW
+    return SW[int(num)]
+
+
+class ScenarioRun(TronTestCase):
+    """One scenario per test instance; the scenario name comes from the environment."""
+
+    scenario = None
+    out_path = None
+
+    def runTest(self):
+        self.run_scenario(self.scenario, self.out_path)
+
+    # ------------------------------------------------------------------ helpers
+
+    def wait(self, seconds):
+        self.advance_time_and_run(seconds)
+
+    def sw(self, name, state):
+        self.machine.switch_controller.process_switch(name, state, True)
+
+    def log(self, ev, **kw):
+        self.tron.trace.log(ev, **kw)
+
+    def _on_shooter(self, **kwargs):
+        if self.autoplunge > 0:
+            self.machine.clock.schedule_once(self._auto_plunge, self.autoplunge)
+
+    def _auto_plunge(self):
+        if self.machine.switches["s_shooter_lane"].state:
+            self.log("sim", what="plunged")
+            self.sw("s_shooter_lane", 0)
+
+    # ------------------------------------------------------------------ commands
+
+    def run_scenario(self, name, out_path=None):
+        os.makedirs(OUT, exist_ok=True)
+        out_path = out_path or os.path.join(OUT, name + ".jsonl")
+        trace = self.tron.trace
+        trace.path = out_path
+        trace._file = open(out_path, "w")
+        self.autoplunge = 1.0
+        self.machine.switch_controller.add_switch_handler("s_shooter_lane", self._on_shooter, state=1)
+        self.fill_trough()
+        self.wait(6)                                  # the ROM boots 8 s before line 1
+        self.log("ready")
+        with open(os.path.join(TRACES, name + ".txt")) as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip()
+                if line:
+                    self.command(shlex.split(line))
+        self.log("end")
+        trace.close()
+        return out_path
+
+    def command(self, args):
+        cmd, rest = args[0], args[1:]
+        getattr(self, "cmd_" + cmd)(*rest)
+
+    def cmd_start(self, n="1"):
+        n = int(n)
+        self.log("script", what="start", players=n)
+        self.wait(COIN_FIRST)
+        for i in range(3 * n):
+            if i:
+                self.wait(COIN_GAP)
+            self.sw("s_coin", 1)
+            self.wait(0.01)
+            self.sw("s_coin", 0)
+        self.wait(START_AFTER_COIN - 0.01)
+        for _ in range(n):
+            self.sw("s_start_button", 1)
+            self.wait(0.05)
+            self.sw("s_start_button", 0)
+            self.wait(0.05)
+        self.wait(SCRIPT_START_TIME - 0.1 * n)
+
+    def cmd_wait(self, s):
+        self.wait(float(s))
+
+    def cmd_hit(self, sw, ms="60"):
+        name = switch_name(sw)
+        self.log("switch", sw=int(sw))
+        self.sw(name, 1 if int(sw) != 41 else 0)
+        if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
+            self.wait(float(ms) / 1000 + SETTLE)
+            return
+        self.wait(float(ms) / 1000)
+        self.sw(name, 0 if int(sw) != 41 else 1)
+        self.wait(SETTLE)
+
+    def cmd_hold(self, sw):
+        self.log("switch_hold", sw=int(sw))
+        self.sw(switch_name(sw), 1)
+
+    def cmd_release(self, sw):
+        self.log("switch_release", sw=int(sw))
+        self.sw(switch_name(sw), 0)
+
+    def cmd_plunge(self):
+        self._auto_plunge()
+
+    def cmd_autoplunge(self, s="1"):
+        self.autoplunge = float(s)
+
+    def cmd_drain(self, side=None):
+        if side:
+            name = "s_left_outlane" if side == "left" else "s_right_outlane"
+            self.log("switch", sw=24 if side == "left" else 29)
+            self.sw(name, 1)
+            self.wait(0.06)
+            self.sw(name, 0)
+            self.wait(SETTLE)
+        self.log("sim", what="drain")
+        self.machine.default_platform.add_ball_to_device(self.machine.ball_devices["bd_trough"])
+        self.wait(0.12)
+
+    def cmd_adj(self, num, value):
+        self.tron.adj[int(num)] = int(value)
+
+    def cmd_poke(self, addr, value, size="1"):
+        self.tron.poke(int(addr, 16), int(value))
+
+    def cmd_button(self, button, ms="100"):
+        name = BUTTONS[button]
+        ms = int(ms)
+        self.log("button", button=button, ms=ms)
+        if ms == 0:
+            self.sw(name, 0)
+        elif ms < 0:
+            self.sw(name, 1)
+        else:
+            self.sw(name, 1)
+            self.wait(ms / 1000)
+            self.sw(name, 0)
+
+    def cmd_mark(self, *text):
+        self.log("mark", text=" ".join(text))
+
+
+def run(name, out_path=None):
+    test = ScenarioRun()
+    test.scenario, test.out_path = name, out_path
+    result = unittest.TextTestRunner(verbosity=0).run(test)
+    return result.wasSuccessful()
+
+
+if __name__ == "__main__":
+    ok = run(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    sys.exit(0 if ok else 1)

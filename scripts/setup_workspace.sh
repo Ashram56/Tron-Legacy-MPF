@@ -45,6 +45,9 @@ if [ ! -f game/addons/mpf-gmc/plugin.cfg ]; then
 fi
 grep '^version' game/addons/mpf-gmc/plugin.cfg
 
+echo "== MPF config generated from the asset package"
+.venv/bin/python scripts/gen_config.py
+
 echo "== Godot import (builds game/.godot/)"
 # The first import pass can report add-on icon errors; the second is clean.
 for _ in 1 2; do tools/godot/godot --headless --path game --import >/dev/null 2>&1 || true; done

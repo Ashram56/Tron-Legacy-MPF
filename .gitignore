@@ -8,3 +8,4 @@ game/audits/
 game/data/
 captures/
 __pycache__/
+game/config/rom/
