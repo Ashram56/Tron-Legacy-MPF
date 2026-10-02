@@ -29,7 +29,7 @@ ST_BONUS, ST_END_BALL, ST_ATTRACT, ST_TILT = 0x01, 0x04, 0x10, 0x200
 
 # valid playfield (game_flow.md 4.3): "force" switches validate at once, 3 distinct "counting" ones do
 FORCE_SWITCHES = {11, 12, 14, 24, 25, 28, 29, 34, 37, 39, 43, 46}
-COUNTING_SWITCHES = {7, 8, 13, 48, 35, 36, 38, 41, 44, 49, 50, 51, 30, 31, 32}
+COUNTING_SWITCHES = {7, 8, 13, 48, 35, 36, 38, 41, 44, 49, 50, 51, 30, 31, 32, 1, 2, 3, 4}   # + TRON targets
 
 MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
 BALL_SAVE_GRACE = 218
@@ -388,6 +388,7 @@ class TronOS(CustomCode):
         if not self.game or self.state & 0x210 or not self.game.player:
             return 0
         self.trace.log("score_add", points=points, multiplier=1, player=self.player_num)
+        points = self.score_event(points)
         self.ball_search_reload()
         self._add_score(points)
         if not self.ball_scored:
@@ -395,6 +396,12 @@ class TronOS(CustomCode):
             if self.shoot_again:
                 self.shoot_again = False
                 self.flag_clear(9)
+        return points
+
+    def score_event(self, points):
+        """Score event 0x4c: its hooks may change the points (TRON double scoring x2)."""
+        for fn in self.hooks.get("score_event", ()):
+            points = fn(points)
         return points
 
     def _add_score(self, points):
@@ -732,7 +739,9 @@ class TronOS(CustomCode):
 
     def _bonus_done(self, queue, total):
         if total:
-            self._add_score(total)                   # event 0x16, multiplier 1, not a score_add
+            # event 0x16, multiplier 1, not a score_add; the score event still applies (a TRON double
+            # scoring still running doubles the bonus: traces/zen_rollover.jsonl 31.67 s, 2 x 150,000)
+            self._add_score(self.score_event(total))
             self.hook("score_changed")
         self.state &= ~ST_BONUS
         self._ball_ending_done(queue)
