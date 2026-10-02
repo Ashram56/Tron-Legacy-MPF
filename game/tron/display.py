@@ -140,6 +140,15 @@ class Display:
         elif self.bg == deff_id:
             self.bg = None
 
+    def extend(self, deff_id):
+        """A running foreground deff that shows a growing value runs its full length again from now
+        (no new deff_start; spinner deffs 41 / 42, see switches.SwitchLayer.sw_36)."""
+        if self.fg != deff_id or not self.fg_handle:
+            return
+        self.os.machine.clock.unschedule(self.fg_handle)
+        self.fg_handle = self.os.machine.clock.schedule_once(
+            lambda: self._ended(deff_id), self.media[deff_id].seconds)
+
     def running(self, deff_id):
         return deff_id in (self.fg, self.bg)
 

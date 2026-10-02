@@ -436,6 +436,7 @@ class SwitchLayer:
         os_.playfield_switch(44)
         if os_.task_running(0x64):
             self.lspin["pending"] += 1
+            os_.display.extend(41)
             os_.task_start(0x64, 62, None)
         else:
             self.lspin.update(total=0, pending=0)
@@ -490,6 +491,10 @@ class SwitchLayer:
         os_.playfield_switch(36)
         if os_.task_running(0x65):
             self.rspin["pending"] += 1
+            # the spinner deff stays up for its length after the last spin (inferred from
+            # traces/gem_hurryup.jsonl: the GEM countdown restarted by the last spin waits for the
+            # display until 1.68 s, deff 42's length, after that spin)
+            os_.display.extend(42)
             os_.after(0, self._rspin_now)
         else:
             self.rspin.update(total=0, pending=0)
