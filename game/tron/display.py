@@ -165,7 +165,9 @@ class Display:
             return
         self.fg_hold = True
         if self.show and self.show.deff_id == deff_id:
-            self._end_show()
+            # the show's rules refresh request is served after the deff exits (traces/gem_hurryup.jsonl:
+            # one deff 77 / tube 18 start as deff 76 ends), see _ended
+            self._end_show(rules=False)
             self._pump()
 
     def _end_fg(self, stopped=False, exit_handler=True):
@@ -194,7 +196,10 @@ class Display:
         self.fg_handle = None
         if self.fg != deff_id:
             return
+        held = self.fg_hold
         self._end_fg()
+        if held:
+            self.os.request_refresh()              # the request of a show that ended in the hold (_hold)
         # the deff rules restart a mode's background deff when the effect in front of it ends
         # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
         if self.mode_bg():
@@ -207,12 +212,13 @@ class Display:
             self._end_show()
         self._pump()
 
-    def _end_show(self):
+    def _end_show(self, rules=True):
         show, self.show = self.show, None
         if show.on_end:
             show.on_end()
         self.refresh()
-        self.os.request_refresh()                  # queue_fullscreen_deff: rules_refresh_request at the end
+        if rules:
+            self.os.request_refresh()              # queue_fullscreen_deff: rules_refresh_request at the end
 
     def add_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
         """lamp_rule_init(list 2): while cond() is true the background deff deff_id runs, with music

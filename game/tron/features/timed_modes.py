@@ -24,8 +24,8 @@ class Countdown:
     returns True when the clock is done; then sleep `tail` (46) ticks, continue as the grace task for
     `grace_ticks` (125) and call on_end().
 
-    ZUSE style (restart_on_pause): no intro wait and no lead-in; a second is 11 steps of 6 ticks and a
-    paused step restarts the count; grace task 0x5b for 250 ticks, no tail.
+    ZUSE style (restart_on_pause): no intro wait and no lead-in; a second is 11 steps of 6 ticks (and one
+    more tick) and a paused step restarts the count; grace task 0x5b for 250 ticks, no tail.
     """
 
     def __init__(self, os_, var, task, grace, tick, on_end, intro=None, lead_in=156, step=4, steps=16,
@@ -120,7 +120,8 @@ class Countdown:
         if self.tick():
             self._expire()
         else:
-            self._zstep()
+            # a second takes 67 ticks, not 66 (traces/zuse_fast_scoring.jsonl: 1.09 s per count, no pause)
+            self.os.task_start(self.task, 1, self._zstep)
 
     # ------------------------------------------------------------------ end
 

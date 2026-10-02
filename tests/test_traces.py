@@ -22,6 +22,9 @@ TRACES = {
     "recognizer_and_disc_battle": "score,deff_start,tube_show_start,audit,multiball_start,mark",
     "disc_multiball": "multiball_start,mark",
     "disc_multiball_restart": "score,audit,multiball_start,mark",
+    "clu_hurryup": "score,sound,tube_show_start,audit,multiball_start,mark",
+    "gem_hurryup": "score,sound,leff_start,tube_show_start,audit,multiball_start,mark",
+    "zuse_fast_scoring": "audit,multiball_start,mark",
 }
 
 
