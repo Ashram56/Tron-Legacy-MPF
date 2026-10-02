@@ -57,7 +57,7 @@ class LightCycle(Feature):
         self.mb_super_points = 0
         self.total = 0
         # rules [0x0101b5b4]: background deff 86 + music 0x0c2 (priority 7), leff 94, tube show 54
-        self.deff_rule = os_.deff_rule(self.rule_active, 86, 0x0c2, 7)
+        self.deff_rule = os_.display.bg_rule(self.rule_active, 86, 0x0c2, 7)
         os_.lamp_rule(self.rule_active, leff=94, tube=54, order=0x0101ac3c)
         for addr, key in ((0x2111744, "lc_remaining"), (0x2111754, "lc_collected"), (0x2111764, "lc_starts")):
             os_.register_poke(addr, (lambda k: lambda p, v: setattr(os_.players[p], k, v))(key))
@@ -148,9 +148,9 @@ class LightCycle(Feature):
             os_.task_kill(task)
         self.mb_super_points = 0
         os_.show(0x92, 85, on_start=os_.request_refresh)     # task 0x92 queues the intro
-        dmb_cancel_restart_window(os_)
+        os_.hook("dmb_cancel_restart_window")
         os_.hook("quorra_mb_resume_in_end_window")
-        os_.deff_rule_raise(self.deff_rule)
+        os_.display.bg_rule_raise(self.deff_rule)
         os_.request_refresh()
         return True
 
@@ -260,7 +260,7 @@ class LightCycle(Feature):
         os_.task_kill(0xb8)
         os_.task_kill(0xb9)
         os_.flag_set(0x2b)
-        dmb_cancel_restart_window(os_)
+        os_.hook("dmb_cancel_restart_window")
         os_.request_refresh()
         return True
 
@@ -302,13 +302,6 @@ class LightCycle(Feature):
                 if self.light_cycle_target(mask, quiet=True):
                     return True
         return False
-
-
-def dmb_cancel_restart_window(os_):
-    """dmb_cancel_restart_window [0x010078c8]: kill the Disc Multiball restart tasks 0xad-0xaf."""
-    for task in (0xad, 0xae, 0xaf):
-        os_.task_kill(task)
-    os_.request_refresh()
 
 
 feature = LightCycle

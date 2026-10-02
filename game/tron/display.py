@@ -14,8 +14,7 @@ Model of the SAM OS deff system as the Tron rules use it:
   re-created task goes to the end), then play their deff to the end. While a show task runs, mode
   clocks pause and the VUK holds its ball.
 - After a plain foreground deff starts, and after a show ends, the deff rules re-assert the score
-  display (deff rule 0x000198a8): deff 19 is restarted in the background during normal play, or the
-  background deff of the winning mode rule (os.deff_rule, e.g. Light Cycle Multiball deff 86).
+  display (deff rule 0x000198a8): deff 19 is restarted in the background during normal play.
 """
 import csv
 import os
@@ -48,26 +47,26 @@ class Display:
                 if row["background_loop"] == "yes":
                     self.background.add(deff_id)
         self.fg = None              # running foreground deff id
-        self.fg_until = None        # when it ends (None: held until stopped)
-        self.hold_tail = {}         # deff id -> seconds at its end shown at priority 0x20 (set_hold_tail)
-        self._bg_next = None        # background deff started during that hold
         self.fg_handle = None
         self.bg = None              # running background deff id
         self.shows = []             # waiting Show entries
         self.show = None            # Show playing now
         self._sound_handles = []
         self._pump_handle = None
+        # Background deff rules (lamp_rule_init type 2): [prio, cond, deff, music]. The active rule with
+        # the highest priority owns the background deff and the music; without one, the score display
+        # (deff 19) runs with the OS base music (os.base_music()).
+        self.bg_rules = []
+        self.fg_until = None        # when the foreground deff ends (None: held until stopped)
+        self.hold_tail = {}         # deff id -> seconds at its end shown at priority 0x20 (set_hold_tail)
+        self.music = None           # music call the background rules last played
 
     # ------------------------------------------------------------------ start / stop
 
     def start(self, deff_id, hold=False, refresh=True, **args):
         os_ = self.os
         if deff_id in self.background:
-            # behind a foreground deff it is not running yet: the deff rules start it again when the
-            # foreground deff ends (traces: D87 ... D86, then D86 again when deff 87 is over)
-            self.bg = deff_id if self.fg is None else None
-            if self.fg is not None and self.fg_prio() == 0x20:
-                self._bg_next = deff_id              # it takes over when the holding deff ends
+            self.bg = deff_id
             os_.trace.log("deff_start", id=deff_id)
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
             if deff_id == 19:
@@ -75,7 +74,11 @@ class Display:
             return True
         os_.trace.log("deff_start", id=deff_id)    # the ROM trace logs every start call
         if self.fg is not None and self.fg_prio() > self.prio.get(deff_id, 0):
-            return False                           # a higher priority deff keeps the display
+            # a higher priority deff keeps the display; the deff rules still run and restart a mode's
+            # background deff (traces/disc_multiball.jsonl: deff 48 refused behind deff 50, deff 47 again)
+            if refresh and not self.show and self.bg not in (None, 19):
+                os_.after(1, lambda: os_.in_play and self.bg not in (None, 19) and self.start(self.bg, refresh=False))
+            return False
         self._end_fg(stopped=True)
         self.fg = deff_id
         self.bg = None
@@ -88,19 +91,16 @@ class Display:
             seconds = info.seconds
             forced = os_.forced.get("deff_{}_seconds".format(deff_id))
             if forced:
-                seconds = forced.pop(0)              # random length (e.g. the arcade reel), from a test
+                seconds = forced.pop(0) or seconds   # random length (e.g. the arcade reel), from a test
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
                 self.fg_until = os_.now + seconds
                 tail = self.hold_tail.get(deff_id)
                 if tail:                             # the priority change runs the deff rules
                     self._sound_handles.append(os_.machine.clock.schedule_once(
-                        lambda: self.fg == deff_id and os_.request_refresh(), max(0, seconds - tail)))
+                        lambda: self.fg == deff_id and self._hold_started(), max(0, seconds - tail)))
         if refresh and not self.show:
-            if os_.deff_rule_winner():
-                os_.request_refresh()                # the mode's deff rule re-asserts its deff (os.deff_rule)
-            else:
-                os_.after(1, self.refresh)
+            os_.after(1, self.refresh)
         return True
 
     def _media(self, deff_id):
@@ -134,16 +134,33 @@ class Display:
         so any other deff may replace it; the priority change runs the deff rules once."""
         self.hold_tail[deff_id] = seconds
 
+    def _hold_started(self):
+        """The deff rules run at the priority drop and restart a mode's background deff behind it
+        (traces/quorra_multiball: deff 65 again 2.78 s into deff 68)."""
+        os_ = self.os
+        if os_.in_play and not self.show and self.bg not in (None, 19):
+            self.start(self.bg, refresh=False)
+        os_.request_refresh()
+
     def fg_prio(self):
         tail = self.hold_tail.get(self.fg)
         if tail and self.fg_until is not None and self.os.now >= self.fg_until - tail:
             return 0x20
         return self.prio.get(self.fg, 0)
 
+    def queued(self, task_id):
+        """Show task task_id is waiting in the queue (not playing yet)."""
+        return any(s.task_id == task_id for s in self.shows)
+
     def running(self, deff_id):
         return deff_id in (self.fg, self.bg)
 
     def _end_fg(self, stopped=False):
+        info = self.media.get(self.fg) if self.fg is not None else None
+        if info:
+            for leff in info.leffs:                # the deff's exit handler stops its lamp effects
+                if self.os.leffs.is_running(leff):
+                    self.os.leff_stop(leff)
         if self.fg_handle:
             self.os.machine.clock.unschedule(self.fg_handle)
             self.fg_handle = None
@@ -152,17 +169,17 @@ class Display:
         self._sound_handles = []
         self.fg = None
         self.fg_until = None
-        self._bg_next = None
 
     def _ended(self, deff_id):
         self.fg_handle = None
         if self.fg != deff_id:
             return
-        nxt = self._bg_next
         self._end_fg()
-        if nxt is not None and self.bg is None:
-            self.bg = nxt                            # already started during the hold: no new start
-            self.os.machine.events.post("tron_deff_{}".format(nxt))
+        # the deff rules restart a mode's background deff when the effect in front of it ends
+        # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
+        if self.bg is not None and self.bg != 19 and self.os.in_play:
+            self.start(self.bg, refresh=False)
+            self.os.request_refresh()              # the same rules pass restarts the mode's tube show
         self._after_fg()
 
     def _after_fg(self):
@@ -173,20 +190,50 @@ class Display:
                 show.on_end()
             self.refresh()
         self._pump()
-        if not show and not self.show:
-            self.refresh()                       # the deff rules re-assert the background deff
 
     def refresh(self):
-        """Deff rule for the score display: restart deff 19 behind whatever runs, in normal play."""
+        """Deff rules: restart the background deff (deff 19 or a mode's) behind whatever runs, in normal play."""
         os_ = self.os
-        if os_.deff_rule_winner():
-            os_.request_refresh()                    # a mode's background deff rule (os.deff_rule)
-        elif os_.in_play and self.bg is None and not self.show:
-            self.start(19)
+        if os_.in_play and self.bg is None and not self.show:
+            self.start(self.bg_select()[0])
 
-    def queued(self, task_id):
-        """Show task task_id is waiting in the queue (not playing yet)."""
-        return any(s.task_id == task_id for s in self.shows)
+    # ------------------------------------------------------------------ background deff rules
+
+    def bg_rule(self, cond, deff_id, music, prio):
+        """lamp_rule_init(obj, 2, cond, deff, music, ..., prio): while cond() is true, deff_id is the
+        background deff and `music` the music call (0 = keep)."""
+        rule = [prio, cond, deff_id, music]
+        self.bg_rules.append(rule)
+        self.bg_rules.sort(key=lambda r: -r[0])
+        return rule
+
+    def bg_rule_raise(self, rule):
+        """A mode start re-inserts its rule before the others of its priority (e.g. FUN_0101ac74), so
+        the mode started last shows its deff when several are active (stacked Light Cycle + Quorra)."""
+        self.bg_rules.remove(rule)
+        i = next((k for k, r in enumerate(self.bg_rules) if r[0] <= rule[0]), len(self.bg_rules))
+        self.bg_rules.insert(i, rule)
+
+    def bg_select(self):
+        for _, cond, deff_id, music in self.bg_rules:
+            if cond():
+                return deff_id, music
+        return 19, self.os.base_music()
+
+    def bg_refresh(self):
+        """Rules refresh: a change of the selected rule starts its music and its background deff."""
+        os_ = self.os
+        if not os_.in_play:
+            return
+        deff_id, music = self.bg_select()
+        changed = deff_id != self.bg and (self.bg is not None or deff_id != 19)
+        if changed:
+            self.start(deff_id, refresh=False)
+        if music and music != self.music:
+            if not changed and deff_id == 19:
+                self.start(19, refresh=False)       # the ROM restarts the score display with new music
+            self.music = music
+            os_.sound(music)
 
     def clear(self):
         """Ball end / game end: drop the queue and the foreground deff (no trace event)."""
@@ -224,7 +271,7 @@ class Display:
         if not self.shows:
             return
         first = self.shows[0]
-        if self.fg is None or self.fg_prio() < first.threshold:
+        if self.fg is None or self.prio.get(self.fg, 0) < first.threshold:
             self.shows.pop(0)
             self.show = first
             self.start(first.deff_id, refresh=False, **first.deff_args)
@@ -289,6 +336,7 @@ class Tubes:
 
     def _ended(self, show_id):
         self.running.pop(show_id, None)
+        self.os.request_refresh()
 
     def stop(self, show_id, log=True):
         handle = self.running.pop(show_id, "absent")
@@ -301,3 +349,73 @@ class Tubes:
     def clear(self):
         for show_id in list(self.running):
             self.stop(show_id)
+
+
+UNCLAIMED = {76}     # leff_076 [0x01006660] pulses the red/blue disc flasher itself (coil_pulse), no coil group
+
+
+class Leffs:
+    """Flasher ownership of lamp-matrix effects (assets/mpf_package/lamp_effects.csv: flashers, priority).
+
+    Lamps are drawn in priority layers, so they never conflict (leff 99 starts under leff 52), but a
+    leff start is refused while a running leff with a higher priority uses one of its flashers (a
+    running lower one keeps running). When an effect ends or stops, the lamp rules start a refused rule
+    leff that can run now (logged again; traces/recognizer_and_disc_battle.jsonl: leff 107 behind leff
+    108; disc_multiball_restart.jsonl: leff 54 behind leff 52). Rule leffs run until the rule stops them.
+    """
+
+    def __init__(self, os_):
+        self.os = os_
+        self.info = {}
+        path = os.path.join(os_.machine.machine_path, "..", "assets", "mpf_package", "lamp_effects.csv")
+        with open(path) as f:
+            for row in csv.DictReader(f):
+                outputs = frozenset(row["flashers"].split()) if int(row["leff"]) not in UNCLAIMED else frozenset()
+                length = float(row["length_ms"]) / 1000 if row["loops"] == "0" and row["length_ms"] else None
+                self.info[int(row["leff"])] = (outputs, int(row["priority"] or 0), length)
+        self.running = {}           # leff id -> end handle (or None)
+        self.pending = []           # refused lamp-rule leffs, started when an effect ends
+
+    def is_running(self, leff_id):
+        return leff_id in self.running
+
+    def blocked(self, leff_id):
+        outputs, prio, _ = self.info.get(leff_id, (frozenset(), 0, None))
+        return any(other != leff_id and o_out & outputs and o_prio > prio
+                   for other in self.running for o_out, o_prio, _ in (self.info.get(other, (frozenset(), 0, None)),))
+
+    def start(self, leff_id, loop=False):
+        if self.blocked(leff_id):
+            if loop and leff_id not in self.pending:
+                self.pending.append(leff_id)
+            return False
+        self.stop(leff_id)
+        length = self.info.get(leff_id, (None, None, None))[2]
+        handle = None
+        if length and not loop:
+            handle = self.os.machine.clock.schedule_once(lambda: self._ended(leff_id), length)
+        self.running[leff_id] = handle
+        return True
+
+    def _ended(self, leff_id):
+        self.running.pop(leff_id, None)
+        self._retry()
+
+    def _retry(self):
+        """Outputs were freed: the lamp rules run again and start a refused rule leff that can run now."""
+        if any(not self.blocked(p) for p in self.pending):
+            from tron.os_layer import TICK
+            self.os.machine.clock.schedule_once(lambda: self.os.rules_refresh(leffs_only=True), TICK / 2)
+
+    def retry_due(self, leff_id):
+        return leff_id in self.pending and not self.blocked(leff_id)
+
+    def stop(self, leff_id):
+        if leff_id in self.pending:
+            self.pending.remove(leff_id)
+        if leff_id not in self.running:
+            return
+        handle = self.running.pop(leff_id)
+        if handle:
+            self.os.machine.clock.unschedule(handle)
+        self._retry()
