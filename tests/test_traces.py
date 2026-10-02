@@ -17,7 +17,7 @@ TRACES = {
     "bonus": "multiball_start,mark",
     "bonus_skip": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "skill_shots": "leff_start,tube_show_start,audit,multiball_start,mark",
-    "skill_shots_b": "score,sound,tube_show_start,audit,multiball_start,mark",
+    "skill_shots_b": "score,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "skill_shots_c": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "switches_and_shots": "audit,multiball_start,mark",
     "find_flynn_and_items": "score,sound,audit,multiball_start,mark",
@@ -30,7 +30,7 @@ TRACES = {
     "tron_targets": "audit,multiball_start,mark",
     "zen_rollover": "score,deff_start,sound,leff_start,audit,multiball_start,mark",
     "recognizer_and_disc_battle": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark",
-    "disc_multiball": "multiball_start,mark",
+    "disc_multiball": "tube_show_start,multiball_start,mark",
     "disc_multiball_restart": "score,deff_start,audit,multiball_start,mark",
     # End of Line: the other kinds differ only through features not built yet (Flynn's Arcade
     # Recognizer/GEM awards at the VUK, Light Cycle progress deff 83, combo arrows leff 159)
