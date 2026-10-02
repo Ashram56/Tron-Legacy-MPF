@@ -104,6 +104,7 @@ class TronOS(CustomCode):
         self.ball_scored = False
         self.serve_type = 0
         self.coins = 0
+        self._mb_pending = 0
         self.rules = []
         self._refresh_pending = False
         self._score_pending = {}
@@ -337,8 +338,50 @@ class TronOS(CustomCode):
         return self.state == 0
 
     def balls_in_play(self):
+        """MPF's live ball count (includes a ball held in the VUK)."""
         game = self.machine.game
         return game.balls_in_play if game else 0
+
+    def rom_balls_in_play(self):
+        """The ROM's count: a ball held in the VUK is not in play."""
+        return max(0, self.balls_in_play() - (1 if self.ball_held else 0))
+
+    # ------------------------------------------------------------------ multiball (0x0001ed7c)
+
+    def multiball_start(self, balls, save_ticks=0, grace_ticks=0):
+        """multiball_start(balls, 0, save_ticks, grace_ticks): bring the number of balls in play up to
+        `balls` (counting the VUK ball, capped at the 4 installed), kill the single-ball save and run the
+        multiball save (leff 13 while it runs, then the grace). A larger pending request wins."""
+        self.trace.log("multiball_start", balls=balls, save_ticks=save_ticks, grace_ticks=grace_ticks)
+        self.machine.events.post("tron_multiball_start", balls=balls)
+        self.kill_ball_save()
+        target = min(balls, 4)
+        add = target - self.balls_in_play() - self._mb_pending
+        if add > 0:
+            self._mb_pending += add
+            self.game.balls_in_play += add
+
+            def launch():
+                self._mb_pending = max(0, self._mb_pending - add)
+                self.machine.playfield.add_ball(balls=add, player_controlled=False)
+            self.after(SAVE_EJECT_TICKS, launch)
+        if save_ticks > self.task_ticks_left(0x34):
+            self.task_kill(0x35)
+            self.leff_start(13)
+            self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
+
+    def _mb_save_grace(self, grace_ticks):
+        self.leff_stop(13)
+        if grace_ticks:
+            self.task_start(0x35, grace_ticks)
+
+    def mb_save_running(self):
+        return self.task_running(0x34) or self.task_running(0x35)
+
+    def kill_mb_save(self):
+        if self.task_kill(0x34):
+            self.leff_stop(13)
+        self.task_kill(0x35)
 
     def score_add(self, points):
         """score_add [0x0002340c]: x playfield multiplier (always 1); nothing while tilted or out of game."""
@@ -527,7 +570,17 @@ class TronOS(CustomCode):
             return {"balls": balls}
         self.vuk_ejecting = False
         if self.balls_in_play() - balls > 0:
+            if self.mb_save_running() and not self.tilted:
+                # multiball save: the ball comes back, auto-launched (serve type 6)
+                self.audit(0x2b)
+                self.hook("ball_saved")
+                self.after(SAVE_EJECT_TICKS,
+                           lambda: self.machine.playfield.add_ball(balls=balls, player_controlled=False))
+                return {"balls": 0}
             self.hook("ball_drained", balls)
+            if self.balls_in_play() - balls < 2:
+                self.kill_mb_save()
+                self.hook("multiball_end")           # 0x0101bcec: fewer than 2 balls in play
             return {"balls": balls}
         if self.tilted:
             return {"balls": balls}
@@ -656,6 +709,8 @@ class TronOS(CustomCode):
     def _ball_ending_go(self, queue):
         self.state |= ST_END_BALL
         self.kill_ball_save()
+        self.kill_mb_save()
+        self._mb_pending = 0
         self.display.clear()
         self.hook("ball_end")                        # event 0x1d: every mode stops
         for flipper in self.machine.flippers.values():
