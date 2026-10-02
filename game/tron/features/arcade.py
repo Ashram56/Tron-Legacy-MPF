@@ -28,6 +28,15 @@ class Arcade(Feature):
     name = "arcade"
     HOOKS = ("player_first_ball", "ball_start", "arcade_light", "arcade_collect", "arcade_lit")
 
+    def __init__(self, os_):
+        super().__init__(os_)
+        os_.lamp_update(self.lamp_rule)
+
+    def lamp_rule(self):
+        """arcade_lamp_rule [0x0100df3c]: lamp 45 flashes while the arcade is lit and no multiball runs."""
+        lit = not self.os.any_multiball() and self.pd.get("arcade_lit")
+        self.os.lamps.lamp_set(45, 2 if lit else 0)
+
     def player_first_ball(self):
         self.pd.arcade_lit = 0                    # 0x0100dd38
 

@@ -21,6 +21,24 @@ class Scoop(Feature):
         for k, bit in enumerate(BITS):
             os_.register_poke(BASE + 4 * k, (lambda b: lambda p, v: self._set(p, b, v))(bit))
 
+        os_.lamp_update(self.eject_lamps)
+
+    def eject_lamps(self):
+        """vuk_eject_lamps_rule [0x0102f024] (lamp rule): an EJECT insert flashes while its award is lit at
+        the scoop and could start there now, else it is off."""
+        os_ = self.os
+        lit = self.pd.get("vuk_lit")
+        if not lit:
+            return
+        f = os_.features_by_name
+        all_lit, all_collected = bool(os_.hook("items_all_lit")), bool(os_.hook("items_all_collected"))
+        checks = ((39, 2, lambda: f["quorra"].can_start(all_lit, all_collected)),
+                  (38, 4, lambda: f["light_cycle"].can_start(all_lit, all_collected)),
+                  (40, 8, lambda: f["portal"].can_start(all_collected)),
+                  (28, 0x10, lambda: f["clu"].start_allowed(all_lit, all_collected)))
+        for lamp, bit, can_start in checks:
+            os_.lamps.lamp_set(lamp, 2 if lit[bit] and can_start() else 0)
+
     def _set(self, p, bit, value):
         self.os.players[p].vuk_lit[bit] = value
 

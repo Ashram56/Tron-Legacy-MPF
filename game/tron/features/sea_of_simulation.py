@@ -231,7 +231,7 @@ class SeaOfSimulation(Feature):
             os_.leff_start(142)
         if self.helmets & HELMET_BITS == HELMET_BITS:
             self.helmets = 0
-            os_.leff_start(143)
+            os_.leff_start(143, lamp="rom_group_50")
             return self.next_needed(2) or bit
         return bit
 

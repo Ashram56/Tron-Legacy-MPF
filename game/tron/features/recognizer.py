@@ -130,7 +130,7 @@ class Recognizer(Feature):
         os_, pd = self.os, self.pd
         if not self.recog_targets_count_active():
             if not silent:
-                os_.leff_start(100)
+                os_.leff_start(100, lamp=lamp)
                 os_.sound(0x0ce)
             os_.score_add(1000)
             return False

@@ -462,16 +462,20 @@ class Tubes:
         if kind == "once" and length:
             handle = os_.machine.clock.schedule_once(lambda: self._ended(show_id), length)
         self.running[show_id] = handle
+        os_.lamps.tube_play(show_id)                # the show on the two RGB tube lights (lamps.py)
         return True
 
     def _ended(self, show_id):
         self.running.pop(show_id, None)
+        self.os.lamps.tube_end(show_id)
         self.os.request_refresh()
 
     def stop(self, show_id, log=True):
         handle = self.running.pop(show_id, "absent")
         if handle != "absent" and handle:
             self.os.machine.clock.unschedule(handle)
+        if handle != "absent":
+            self.os.lamps.tube_end(show_id)
         if log and handle != "absent":
             self.os.trace.log("tube_show_stop", id=show_id)
             self.os.machine.events.post("tron_tube_{}_stop".format(show_id))
@@ -514,7 +518,8 @@ class Leffs:
         return any(other != leff_id and o_out & outputs and o_prio > prio
                    for other in self.running for o_out, o_prio, _ in (self.info.get(other, (frozenset(), 0, None)),))
 
-    def start(self, leff_id, loop=False):
+    def start(self, leff_id, loop=False, lamp=None):
+        """lamp: the lamp(s) a token effect draws (tron.lamps: the show's "(lamp)" token)."""
         if self.blocked(leff_id):
             if loop and leff_id not in self.pending:
                 self.pending.append(leff_id)
@@ -522,13 +527,15 @@ class Leffs:
         self.stop(leff_id)
         length = self.info.get(leff_id, (None, None, None))[2]
         handle = None
-        if length and not loop:
+        if length and not loop and leff_id not in self.os.lamps.code_leffs:   # a code leff ends itself
             handle = self.os.machine.clock.schedule_once(lambda: self._ended(leff_id), length)
         self.running[leff_id] = handle
+        self.os.lamps.leff_play(leff_id, lamp)      # its captured lamp show, on a layer at its priority
         return True
 
     def _ended(self, leff_id):
         self.running.pop(leff_id, None)
+        self.os.lamps.leff_end(leff_id)
         self._retry()
 
     def _retry(self):
@@ -536,6 +543,15 @@ class Leffs:
         if any(not self.blocked(p) for p in self.pending):
             from tron.os_layer import TICK
             self.os.machine.clock.schedule_once(lambda: self.os.rules_refresh(leffs_only=True), TICK / 2)
+
+    def kill_all(self):
+        """Every leff task killed with the other tasks (game start): no leff_stop is logged."""
+        for handle in self.running.values():
+            if handle:
+                self.os.machine.clock.unschedule(handle)
+        self.running.clear()
+        self.pending = []
+        self.os.lamps.leff_lamps_end()
 
     def retry_due(self, leff_id):
         return leff_id in self.pending and not self.blocked(leff_id)
@@ -548,4 +564,5 @@ class Leffs:
         handle = self.running.pop(leff_id)
         if handle:
             self.os.machine.clock.unschedule(handle)
+        self.os.lamps.leff_end(leff_id)
         self._retry()

@@ -403,7 +403,7 @@ class SwitchLayer:
                 os_.display.extend(43)
             else:
                 os_.deff_start(43, hits_left=hits_left - 1, value=value, mult=mult, points=points)
-            os_.leff_start(41)
+            os_.leff_start(41, lamp=POP_LAMP[sw])
             os_.sound(0x50 if mult == 1 else 0x51)
             pd.pop_hits_left = hits_left - 1
         else:

@@ -56,6 +56,8 @@ BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank 
                                 # resumes (traces/tron_targets.jsonl: searches 33.88 s and 48.79 s)
 BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)
 OUTLANE_TASK_TICKS = 625    # drain-side tasks 0x37 / 0x38 (0x271)
+SHOOT_AGAIN_LAMP = 26        # gf_shoot_again_lamp
+START_LAMP = 65              # DAT_00036f64
 SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane (switches_and_shots.md 8)
 SPECIAL_OVER_LIMIT_SCORE = 5000000
 
@@ -122,12 +124,13 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4  # extra balls collected per player (0x3d470)
         self.specials_lit = [0] * 4  # 0x3d4ef
         self.specials_collected = [0] * 4  # 0x3d4f3
-        self.lamps = set()          # inserts the rules read back: the outlane special lamps 8 / 32
+        self.lamps = None           # tron.lamps.Lamps: the lamp matrix (game image, flash mask, leff layers)
         self.replays_awarded = {}
         self.shoot_again = False    # game flag 9: this ball is a shoot-again ball
         self.ball_scored = False
         self.serve_type = 0
         self.coins = 0
+        self.credits = 0            # credits (start button lamp)
         self._mb_pending = 0
         self._mb_save = (0, 0)
         self._mb_balls = 0          # balls requested from the running multiball task (rom_balls_in_play)
@@ -162,6 +165,7 @@ class TronOS(CustomCode):
         ev.add_handler("game_ending", self._game_ending, priority=1000)
         ev.add_handler("game_ended", self._game_ended, priority=1000)
         ev.add_handler("mode_attract_started", self._attract_started)
+        ev.add_handler("tron_award_credit", self._credit)
         ev.add_handler("tron_vuk_release", self._vuk_eject_confirmed, unconfirmed=True)
         ev.add_handler("balldevice_bd_vuk_ball_eject_success", self._vuk_eject_confirmed)
         ev.add_handler("balldevice_bd_shooter_lane_ejecting_ball", self._shooter_ejecting)
@@ -177,6 +181,10 @@ class TronOS(CustomCode):
         self.display = Display(self)
         self.tubes = Tubes(self)
         self.leffs = Leffs(self)
+        from tron.lamps import Lamps                # noqa: E402
+        self.lamps = Lamps(self)
+        self.lamps.leff_code(13, self._leff_save_lamp, priority=0x81)
+        self.lamps.leff_code(14, self._leff_save_lamp, priority=0x80)
         from tron import switches                   # noqa: E402
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
@@ -320,7 +328,28 @@ class TronOS(CustomCode):
                     self.tube_stop(tube)
             rule[3] = want
         self.display.rules_refresh()                 # list 2: background deff rules and their music
+        if self.game and (self.state == 0 or self.state & 0x20):
+            # list 5: the lamp rules (mode mask 0x20, FUN_000196e4) redraw the inserts from game state
+            self.lamps.run_rules()
+            self.shoot_again_lamp_update()
         self.machine.events.post("tron_rules_refresh")
+
+    def lamp_update(self, fn, priority=0):
+        """rule_obj_init(obj, 5, fn, 0x20, 0, priority): a lamp rule, fn() redraws its inserts from game
+        state (lamps.lamp_set / lamp_flash / ...) on every rules refresh during the game. Higher priority
+        runs first; equal priorities run newest first (FUN_00019578 inserts at the head)."""
+        self.lamps.add_rule(fn, priority)
+
+    def shoot_again_lamp_update(self):
+        """shoot_again_lamp_update [0x0001a014] (game_flow.md 8): lamp 26 flashes while this ball is a
+        shoot-again ball (flag 9), is solid while an extra ball is pending, off otherwise. The ROM calls
+        it when these change; here it also runs with the lamp rules."""
+        if self.flag(9):
+            self.lamps.lamp_flash(SHOOT_AGAIN_LAMP)
+        elif self.game and self.game.player and self.game.player.extra_balls:
+            self.lamps.lamp_on_solid(SHOOT_AGAIN_LAMP)
+        else:
+            self.lamps.lamp_off(SHOOT_AGAIN_LAMP)
 
     def register(self, name, fn):
         self.hooks.setdefault(name, []).append(fn)
@@ -404,10 +433,11 @@ class TronOS(CustomCode):
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=0, arg=arg, caller="0x2c97c")
         self.machine.events.post("tron_sound_{:03x}".format(call), arg=arg)
 
-    def leff_start(self, leff_id, loop=False):
-        """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs."""
+    def leff_start(self, leff_id, loop=False, lamp=None):
+        """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs.
+        lamp: the lamp (number, light name or tag, or a list) a token effect draws (lamps.py)."""
         self.trace.log("leff_start", id=leff_id)
-        if not self.leffs.start(leff_id, loop):
+        if not self.leffs.start(leff_id, loop, lamp):
             return False
         self.machine.events.post("tron_leff_{}".format(leff_id))
         return True
@@ -690,12 +720,33 @@ class TronOS(CustomCode):
         self.audit(4)
         self.audit(7)
         if self.coins % 3 == 0:
+            self.credits += 1
             self.audit(1)
             self.sound(0x0f1)
             self.flag_set(47)
         else:
             self.sound(0x0f0)
         self.deff_start(10)
+        self.start_button_lamp()
+
+    def start_button_lamp(self):
+        """FUN_00020448 (game_flow.md 8): with credit, the START BUTTON blinks in attract (task 0x2d,
+        FUN_0002032c: 8 ticks on, 8 off) and is solid otherwise (a credit won at the match lights it at
+        once); without credit it is off."""
+        if self.state & ST_ATTRACT and not self.state & 0x08:      # attract proper, not the game's end
+            if self.credits and not self.task_running(0x2d):
+                self._start_blink(True)
+            return
+        self.task_kill(0x2d)
+        self.lamps.lamp_set(START_LAMP, 1 if self.credits else 0)
+
+    def _credit(self, n=1, **kwargs):
+        self.credits = max(0, self.credits + n)
+        self.start_button_lamp()
+
+    def _start_blink(self, on):
+        (self.lamps.lamp_on if on else self.lamps.lamp_off)(START_LAMP)
+        self.task_start(0x2d, 8, lambda: self._start_blink(not on))
 
     def _vuk_eject_confirmed(self, unconfirmed=False, **kwargs):
         """The VUK device task runs from the release until MPF confirms the eject (a playfield switch or
@@ -711,6 +762,7 @@ class TronOS(CustomCode):
 
     def _attract_started(self, **kwargs):
         self.state = ST_ATTRACT
+        self.start_button_lamp()
 
     # ------------------------------------------------------------------ game start (4.1)
 
@@ -721,11 +773,13 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4
         self.specials_lit = [0] * 4
         self.specials_collected = [0] * 4
-        self.lamps = set()
+        self.lamps.clear()                           # FUN_00007eb8: lamp images cleared for the new game
+        self.leffs.kill_all()                        # the attract leff tasks die with the other tasks
         self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
+        self._credit(-1)                             # the game used a credit (FUN_00020448: lamp update)
         self.audit(0x11)
         self.display.clear()
         self._new_game = True
@@ -807,6 +861,23 @@ class TronOS(CustomCode):
         self.leff_stop(14)
         self.ball_save = "grace"
         self.task_start(0x32, BALL_SAVE_GRACE, self._ball_save_end)
+
+    def _leff_save_lamp(self, task):
+        """leff_013 [0x0002fd60] / leff_014 [0x0002fe1c]: the multiball / ball save blinks SHOOT AGAIN on
+        its own layer, every (save ticks left / 31) ticks (2-10). Leff 14 first waits for the valid
+        playfield and ends with the ball save task 0x31; leff 13 runs until it is stopped."""
+        if task.leff_id == 14:
+            if not self.pf_valid:
+                task.sleep(2, self._leff_save_lamp)
+                return
+            if not self.task_running(0x31):
+                task.end()
+                return
+            left = self.ball_save_left
+        else:
+            left = self.task_ticks_left(0x34)
+        task.toggle(SHOOT_AGAIN_LAMP)
+        task.sleep(max(2, left // 31) if left < 0x138 else 10, self._leff_save_lamp)
 
     def _ball_save_end(self):
         self.ball_save = None
@@ -934,6 +1005,7 @@ class TronOS(CustomCode):
             self.eb_collected[p] += 1
             self.game.player.extra_balls += 1
             self.audit(9)
+            self.shoot_again_lamp_update()
             return True
         self.score_add(3000000)
         return False

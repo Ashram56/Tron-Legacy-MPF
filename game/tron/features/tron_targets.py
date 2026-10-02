@@ -16,6 +16,8 @@ SW_NAME = {1: "s_tron_t", 2: "s_tron_r", 3: "s_tron_o", 4: "s_tron_n"}
 STEPS = 10                                       # 10 x 6 ticks = one award "second"
 STEP_TICKS = 6
 PAUSE_SHOWS = (0xa0, 0xa2)                       # Sea of Simulation start / skip shows pause the clocks
+LETTER_LAMPS = {1: 4, 2: 3, 4: 2, 8: 1}         # letter bit -> insert (table 0x040d3c90: T R O N)
+AWARD_LAMPS = {1: 5, 2: 6, 4: 7}                 # DOUBLE SCORING, BUMPERS, SPINNERS
 BANK_RESET_TICKS = 15
 BANK_RESET_TRIES = 3
 
@@ -40,6 +42,43 @@ class TronTargets(Feature):
         self.drops_up = {sw: 1 for sw in SWITCHES}
         self.repeat_sound = 0                    # tron_repeat_sound_flag 0x3b740
         os_.lamp_rule(lambda: os_.task_running(0xc6), leff=132, order=0x0100c734)
+        os_.lamp_update(self.bumper_spinner_lamps)
+        os_.lamp_update(self.letter_lamps)
+
+    # ------------------------------------------------------------------ lamps
+
+    def letter_lamps(self):
+        """tron_letter_lamps [0x0102c3f0] (lamp rule): a collected letter is solid, the others flash."""
+        letters = self.pd.get("tron_letters", 0)
+        for bit, lamp in LETTER_LAMPS.items():
+            self.os.lamps.lamp_set(lamp, 1 if letters & bit else 2)
+
+    def award_lamps(self):
+        """tron_award_lamps [0x0100c2a0]: a running award's insert is solid, the lit one flashes."""
+        lamps, pd = self.os.lamps, self.pd
+        for bit, lamp in AWARD_LAMPS.items():
+            if pd.get("tron_running", 0) & bit:
+                lamps.lamp_on_solid(lamp)
+            else:
+                lamps.lamp_off(lamp)
+            if pd.get("tron_lit", 0) & bit:
+                lamps.lamp_flash(lamp)
+            else:
+                lamps.flash.discard(lamp)
+                lamps.changed()
+
+    def bumper_spinner_lamps(self):
+        """tron_award_bumper_spinner_lamps [0x0100d20c] (lamp rule): the two spinner arrows (64, 33)
+        flash during SUPER SPINNERS (task 200), arrows 16, 49, 57, 56 are off underneath the combo
+        arrows (leff 159); the pop inserts are solid unless SUPER POPS (task 199) chases them."""
+        lamps = self.os.lamps
+        spinners = self.os.task_running(200)
+        for lamp, on in ((16, 0), (49, 0), (64, spinners), (57, 0), (56, 0), (33, spinners)):
+            lamps.lamp_set(lamp, 2 if on else 0)
+        pops = self.os.task_running(199)
+        lamps.lamp_on_solid(46)
+        lamps.lamp_set(47, 0 if pops else 1)
+        lamps.lamp_set(48, 0 if pops else 1)
 
     # ------------------------------------------------------------------ resets
 
@@ -69,6 +108,7 @@ class TronTargets(Feature):
         DOUBLE SCORING doubles it: traces/zen_rollover.jsonl), so they are killed at the next ball start."""
         for task, _, _ in AWARDS.values():
             self.os.task_kill(task)
+        self.award_lamps()
 
     def letters_reset(self):
         """tron_letters_reset [0x0102c358]: letters = the mask of disabled targets (none here)."""
@@ -108,7 +148,7 @@ class TronTargets(Feature):
         letters = pd.tron_letters
         if letters & bit and letters & 0xf != 0xf:
             # letter already collected
-            os_.leff_start(39)
+            os_.leff_start(39, lamp=lamp)
             os_.sound(0x04b if self.repeat_sound else 0x04a)
             self.repeat_sound ^= 1
             os_.score_add(450)
@@ -117,7 +157,7 @@ class TronTargets(Feature):
         if new & 0xf != 0xf and not os_.hook("zen_use_charge"):
             pd.tron_letters = new
             os_.deff_start(107, old=letters, new=bit)
-            os_.leff_start(38)
+            os_.leff_start(38, lamp=lamp)
             os_.sound(0x04c)
             os_.score_add(10000)
             return
@@ -138,7 +178,7 @@ class TronTargets(Feature):
             os_.task_start(0x9f, 5 if waited else 2, lambda: self._completed_show(count, award, waited + 5))
             return
         os_.deff_start(106, count=count, award=award)
-        os_.leff_start(40)
+        os_.leff_start(40, lamp="rom_group_31")
         os_.sound(0x04e if award == 2 else 0x04d)
 
     # ------------------------------------------------------------------ awards
@@ -149,6 +189,7 @@ class TronTargets(Feature):
             return
         pd = self.pd
         pd.tron_lit = rotate(pd.tron_running, pd.tron_lit)
+        self.award_lamps()
 
     def pop_lamp_pattern(self):
         self.rotate_lit()
@@ -216,6 +257,7 @@ class TronTargets(Feature):
         pd.tron_running &= ~award
         if not pd.tron_lit:
             pd.tron_lit = award
+        self.award_lamps()
         self.os.request_refresh()
 
     # ------------------------------------------------------------------ OS and arcade hooks
