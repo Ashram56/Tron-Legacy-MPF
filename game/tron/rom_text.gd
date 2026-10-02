@@ -5,6 +5,9 @@ extends MPFVariable
 ## With fit_fonts the first font whose text width is at most fit_width is used (text_draw_msg_fit),
 ## at the matching fit_ys row. With alt_when_empty the line moves to alt_x/alt_y while that other
 ## line ("lineN") is blank (the ROM draws a shorter layout when a value is not shown).
+## Timed lines (deff frames in ms from the slide start): shown from show_after_ms, hidden from
+## hide_after_ms (0 = never), and with level_steps the brightness (palette level 0-15 of the ROM's
+## colour table) steps every step_ms; with blink_ms the line shows blink_ms, hides blink_ms, ... Seekable for scripts/render_diff.py (seek_ms).
 
 @export var rom_font: int = 12
 @export var rom_x: int = 84
@@ -16,11 +19,18 @@ extends MPFVariable
 @export var alt_x: int = 0
 @export var alt_y: int = 0
 @export var alt_when_empty: String = ""
+@export var show_after_ms: int = 0
+@export var hide_after_ms: int = 0
+@export var level_steps: PackedInt32Array = PackedInt32Array()
+@export var step_ms: int = 0
+@export var blink_ms: int = 0
 
 static var _metrics: Dictionary = {}
 static var _font_files: Dictionary = {}
 
 var _use_alt := false
+var _elapsed_ms := 0.0
+var _seeked := false
 
 
 static func font_metrics(font_id: int) -> Dictionary:
@@ -57,7 +67,39 @@ func _ready() -> void:
 	autowrap_mode = TextServer.AUTOWRAP_OFF
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	if _timed():
+		add_to_group("rom_timed")
+		set_process(true)
+	else:
+		set_process(false)
 	_layout()
+	_apply_time()
+
+
+func _timed() -> bool:
+	return show_after_ms or hide_after_ms or blink_ms or level_steps.size()
+
+
+func seek_ms(t: float) -> void:
+	_seeked = true
+	_elapsed_ms = t
+	_apply_time()
+
+
+func _process(delta: float) -> void:
+	if not _seeked:
+		_elapsed_ms += delta * 1000.0
+		_apply_time()
+
+
+func _apply_time() -> void:
+	if not _timed():
+		return
+	visible = _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
+		and (blink_ms == 0 or int(_elapsed_ms / blink_ms) % 2 == 0)
+	if level_steps.size() and step_ms > 0:
+		var level := level_steps[mini(int(_elapsed_ms / step_ms), level_steps.size() - 1)] / 15.0
+		modulate = Color(level, level, level, 1)
 
 
 func update(settings: Dictionary, kwargs: Dictionary = {}) -> void:

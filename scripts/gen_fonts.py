@@ -168,13 +168,13 @@ def is_outline(get, glyphs):
 # Spacing the images do not tell, read off the reference captures:
 # - the tron digit fonts (27-32, glyphs padded to the font height) draw their outlined digits with the
 #   borders side by side (spacing 0; deff 38 match number "00", font 30);
-# - the plain fonts with the 3-row comma ("of/of/fo") draw it one dot to the left (glyph x offset -1:
-#   deff 25 bonus "50,000", font 15); font 0's 2-row comma has no offset (deff 19 "REPLAY AT 20,000,000").
+# - the plain fonts draw the comma one dot to the left (glyph x offset -1: deff 25 bonus "50,000" in
+#   font 15, deff 19 "REPLAY AT 20,000,000" in font 0).
 SPACING = {27: 0, 28: 0, 29: 0, 30: 0, 31: 0, 32: 0}
 
 
-def x_offset(c, img, outline):
-    if c == "," and not outline and len(img) == 3:
+def x_offset(c, outline):
+    if c == "," and not outline:
         return -1
     return 0
 
@@ -202,7 +202,7 @@ def decode_all():
                       "ascent": max(index[i]["h"] - place[c] for c, i in glyphs.items()),
                       "descent": max(0, max(place.values())),
                       "glyphs": {c: {"image": i, "w": index[i]["w"], "h": index[i]["h"], "below": place[c],
-                                     "xoff": x_offset(c, get(i), outline)}
+                                     "xoff": x_offset(c, outline)}
                                  for c, i in glyphs.items()}})
     return index, get, fonts
 
