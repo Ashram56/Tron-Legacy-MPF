@@ -18,11 +18,7 @@ OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
-SETTLE = 0.1                        # every hit is followed by 100 ms settle
-# The reference harness lets a little more emulated time pass per command than it asks for (mean over
-# the 405 hit-to-hit intervals of all reference traces: +7 ms per hit, +8.6 ms per wait). Without this
-# the rebuild drifts ~0.6 s ahead over a 100 s scenario, past the 0.25 s comparison tolerance.
-HIT_EXTRA, WAIT_EXTRA = 0.007, 0.0086
+SETTLE = 0.113                      # every hit is followed by ~113 ms settle (reference traces: hit + wait 1 = 1.17-1.18 s)
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -56,7 +52,33 @@ def forced_picks(name):
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
                     forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
                     break
+    for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
+        forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
     return forced
+
+
+# Deffs that play a random film clip first, so their length varies: the ROM's length is read from the
+# stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
+# same deff keeps the recorded length (None).
+CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+
+
+def clip_lengths(evs, deff_id, stop_ev, stop_id):
+    out = []
+    for i, e in enumerate(evs):
+        if e.get("ev") != "deff_start" or e["id"] != deff_id:
+            continue
+        length = None
+        for n in evs[i + 1:]:
+            if n["t"] < e["t"] + 0.005:
+                continue                    # the previous run's effect stops as this one starts
+            if n.get("ev") == "deff_start" and n["id"] == deff_id:
+                break                       # replaced by its next start
+            if n.get("ev") == stop_ev and n.get("id") == stop_id:
+                length = n["t"] - e["t"]
+                break
+        out.append(length)
+    return out
 
 
 class ScenarioRun(TronTestCase):
@@ -134,18 +156,18 @@ class ScenarioRun(TronTestCase):
         self.wait(SCRIPT_START_TIME - 0.1 * n)
 
     def cmd_wait(self, s):
-        self.wait(float(s) + WAIT_EXTRA)
+        self.wait(float(s))
 
     def cmd_hit(self, sw, ms="60"):
         name = switch_name(sw)
         self.log("switch", sw=int(sw))
         self.sw(name, 1 if int(sw) != 41 else 0)
         if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
-            self.wait(float(ms) / 1000 + SETTLE + HIT_EXTRA)
+            self.wait(float(ms) / 1000 + SETTLE)
             return
         self.wait(float(ms) / 1000)
         self.sw(name, 0 if int(sw) != 41 else 1)
-        self.wait(SETTLE + HIT_EXTRA)
+        self.wait(SETTLE)
 
     def cmd_hold(self, sw):
         self.log("switch_hold", sw=int(sw))
