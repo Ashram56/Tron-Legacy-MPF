@@ -107,6 +107,7 @@ class TronOS(CustomCode):
         self._mb_pending = 0
         self.rules = []
         self._refresh_pending = False
+        self._full_refresh = False
         self._score_pending = {}
         self.forced = {}             # name -> list of forced pick results (tests)
         self.random = random.Random()
@@ -198,6 +199,21 @@ class TronOS(CustomCode):
         """FUN_0100f918: End of Line, Disc, Light Cycle, Quorra or Portal multiball running."""
         return any(f in self.flags for f in MULTIBALL_FLAGS)
 
+    def timed_mode_paused(self):
+        """timed_mode_paused [0x0100ff64] (developer_guide 2.1): mode clocks hold while the playfield is
+        not validated, while a show task 0x81-0xa7 waits or plays, or for 156 ticks after a pop bumper
+        (task 0x40). The Light Cycle video mode test (0x0102e608) is dead code in 1.74."""
+        return not self.pf_valid or self.show_running() or self.task_running(0x40)
+
+    def display_busy(self):
+        """FUN_000287a4: a display effect other than the background one is running."""
+        return self.display.fg is not None
+
+    def deff_rule(self, cond, deff, music=0, prio=0):
+        """Deff rule (lamp_rule_init list 2, FUN_000198a8): while cond() holds, background deff `deff`
+        and music call `music` are (re)started at each rules refresh. Rules are tried by priority."""
+        return self.display.add_rule(cond, deff, music, prio)
+
     def pick(self, name, weights):
         """Weighted random pick (index into weights). A test can force the results per name through
         self.forced[name] (a list of indexes, used in order), e.g. from a ROM reference trace."""
@@ -225,15 +241,29 @@ class TronOS(CustomCode):
         self.rules.append([cond, leff, tube, False, order])
         self.rules.sort(key=lambda r: r[4])
 
-    def request_refresh(self, *_):
-        """rules_refresh_request: evaluate the lamp rules once the current handler has finished."""
+    def request_refresh(self, *_, full=True):
+        """rules_refresh_request: evaluate the rules once the current handler has finished.
+        full=False is the switch layer's refresh after every handler, a rebuild convenience and not a
+        ROM rules_refresh_request: it only applies lamp/tube rule changes (condition on/off). A full
+        refresh also restarts what a rule wants but is not running (a mode background deff refused
+        under a foreground deff, a tube show taken over by a higher one), as the ROM does at each
+        real refresh, which the traces log."""
+        self._full_refresh = self._full_refresh or full
         if not self._refresh_pending:
             self._refresh_pending = True
             self.machine.clock.schedule_once(self.rules_refresh, TICK / 2)
 
     def rules_refresh(self):
         self._refresh_pending = False
+        if self.display.show_task_running(0x97):
+            # FUN_0100f164: the rules are not evaluated while the Flynn's Arcade show task 0x97 waits or
+            # plays; the show's end requests a refresh (traces/clu_hurryup.jsonl: CLU started under the
+            # arcade reel at 15.2 s, its rules ran at 18.0 s)
+            return
         active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
+        full, self._full_refresh = self._full_refresh, False
+        if full:
+            self.display.rules_eval()                # list 2 (deff rules) runs before the lamp rules
         for rule in self.rules:
             cond, leff, tube, on = rule[:4]
             want = bool(active_game and cond())
@@ -243,7 +273,7 @@ class TronOS(CustomCode):
                 self.leff_stop(leff)
             # a tube rule restarts its show whenever it is not running (refused or taken over before)
             if tube is not None:
-                if want and not self.tubes.is_running(tube):
+                if want and not self.tubes.is_running(tube) and (full or not on):
                     self.tube_start(tube)
                 elif not want and self.tubes.is_running(tube):
                     self.tube_stop(tube)
@@ -442,6 +472,7 @@ class TronOS(CustomCode):
     def _validate(self):
         self.pf_valid = True
         self.flag_set(0x1c)                          # event 0x6a handler [0x0100f25c]
+        self.request_refresh()                       # ... which also requests a rules refresh
         self.hook("playfield_valid")
         if self.serve_type == 3:
             self.after(1, lambda: self.in_play and self.sound(0x01b))   # main play music

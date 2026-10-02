@@ -19,6 +19,10 @@ OUT = os.path.join(ROOT, "captures", "traces")
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
 SETTLE = 0.1                        # every hit is followed by 100 ms settle
+# The reference harness lets a little more emulated time pass per command than it asks for (mean over
+# the 405 hit-to-hit intervals of all reference traces: +7 ms per hit, +8.6 ms per wait). Without this
+# the rebuild drifts ~0.6 s ahead over a 100 s scenario, past the 0.25 s comparison tolerance.
+HIT_EXTRA, WAIT_EXTRA = 0.007, 0.0086
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -130,18 +134,18 @@ class ScenarioRun(TronTestCase):
         self.wait(SCRIPT_START_TIME - 0.1 * n)
 
     def cmd_wait(self, s):
-        self.wait(float(s))
+        self.wait(float(s) + WAIT_EXTRA)
 
     def cmd_hit(self, sw, ms="60"):
         name = switch_name(sw)
         self.log("switch", sw=int(sw))
         self.sw(name, 1 if int(sw) != 41 else 0)
         if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
-            self.wait(float(ms) / 1000 + SETTLE)
+            self.wait(float(ms) / 1000 + SETTLE + HIT_EXTRA)
             return
         self.wait(float(ms) / 1000)
         self.sw(name, 0 if int(sw) != 41 else 1)
-        self.wait(SETTLE)
+        self.wait(SETTLE + HIT_EXTRA)
 
     def cmd_hold(self, sw):
         self.log("switch_hold", sw=int(sw))

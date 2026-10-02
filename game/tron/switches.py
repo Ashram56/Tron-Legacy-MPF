@@ -58,7 +58,8 @@ class SwitchLayer:
         def on_close():
             if not self.os.game or (not self.os.in_play and num != 11):
                 return
-            self.os.after(1, lambda: (handler(), self.os.request_refresh()))
+            # lamp/tube rules only: the ROM's own rules_refresh_request calls are in the hooks
+            self.os.after(1, lambda: (handler(), self.os.request_refresh(full=False)))
         return on_close
 
     # ------------------------------------------------------------------ per player / ball state
@@ -169,6 +170,9 @@ class SwitchLayer:
         if not os_.state & 0x310:
             os_.sound(0x0fd)
             os_.leff_start(35)
+            # observed, source not located: the rules run again as the kickout starts (traces/
+            # clu_hurryup.jsonl 20.03 / 42.92 / 65.33 s: a background deff restart right after 0x0fd)
+            os_.request_refresh()
             os_.after(46, self.vuk_eject)
         else:
             self.vuk_eject()
@@ -481,6 +485,7 @@ class SwitchLayer:
         os_.playfield_switch(36)
         if os_.task_running(0x65):
             self.rspin["pending"] += 1
+            os_.after(0, self._rspin_now)
         else:
             self.rspin.update(total=0, pending=0)
             self._score_rspin()
@@ -509,6 +514,14 @@ class SwitchLayer:
             if state["idle"] < 93:
                 os_.task_start(0x65, 1, tick)
         os_.task_start(0x65, 1, tick)
+
+    def _rspin_now(self):
+        """Task 0x65 runs after the switch task in the same tick, so a pending spin scores at once
+        (traces/gem_hurryup.jsonl: one 10,090 score per repeated spin)."""
+        if self.rspin["pending"] and self.os.task_running(0x65):
+            self.rspin["pending"] -= 1
+            self._score_rspin()
+            self._rspin_task()
 
     def _score_rspin(self):
         value = self._spin_value("rspin_value")
