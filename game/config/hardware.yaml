@@ -43,3 +43,11 @@ ball_devices:
 coils:
   c_orbit_up_down_post:     # held up for about 2 s after a plunge (switches_and_shots.md sw23)
     default_hold_power: 1.0
+
+ball_holds:
+  hold_vuk:                 # the VUK keeps its ball until the rules release it (switches.vuk_kickout)
+    hold_devices: bd_vuk
+    balls_to_hold: 1
+    enable_events: game_started
+    disable_events: game_ended
+    release_one_events: tron_vuk_release

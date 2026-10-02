@@ -10,6 +10,12 @@ class Bonus(Feature):
     name = "bonus"
     HOOKS = ("player_first_ball", "ball_start", "bonus_x_add")
 
+    def __init__(self, os_):
+        super().__init__(os_)
+        os_.register_poke(0x21115d4, lambda p, v: self.os.players[p].__setitem__("bonus_x", v))
+        os_.register_poke(0x2111800, lambda p, v: self.os.players[p].__setitem__("sos_count", v))
+        os_.register_poke(0x21118b8, lambda p, v: self.os.players[p].__setitem__("portal_count", v))
+
     def player_first_ball(self):
         pd = self.pd
         pd.items = [[0, 0] for _ in range(9)]     # [times lit, times collected] per item (3.4)
@@ -49,7 +55,7 @@ class Bonus(Feature):
         os_ = self.os
         lines = self.lines()
         steps = list(range(2, self.pd.bonus_x + 1))
-        os_.deff_start(25)
+        os_.deff_start(25, hold=True)        # this feature drives the bonus media
         os_.leff_start(20)
         self._skip = False
         state = {"i": 0, "running": 0}
@@ -76,7 +82,7 @@ class Bonus(Feature):
                 show_total()
 
         def show_total():
-            os_.sound(0x0ba)
+            os_.sound(0x0ba, in_deff=25)
             os_.tube_start(105)
             os_.after(TOTAL_TICKS, finish)
 

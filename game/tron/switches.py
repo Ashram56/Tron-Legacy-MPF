@@ -56,9 +56,9 @@ class SwitchLayer:
     def _dispatch(self, num, handler):
         """The ROM runs a playfield handler as a task about one tick after the switch closes."""
         def on_close():
-            if not self.os.game or not self.os.in_play:
+            if not self.os.game or (not self.os.in_play and num != 11):
                 return
-            self.os.after(1, handler)
+            self.os.after(1, lambda: (handler(), self.os.request_refresh()))
         return on_close
 
     # ------------------------------------------------------------------ per player / ball state
@@ -147,20 +147,65 @@ class SwitchLayer:
     # ------------------------------------------------------------------ VUK 11 (device settles first)
 
     def sw_11(self):
-        self.os.playfield_switch(11)
-        # The ball device settles about 0.76 s before on_vuk runs (section 5, sw11).
-        self.os.after(47, self.on_vuk)
+        os_ = self.os
+        if os_.in_play:
+            os_.playfield_switch(11)
+        os_.ball_held = True
+        # The ball device settles about 0.76 s before on_vuk runs (section 5, sw11), then the eject
+        # sequence (device events 7 and 4, FUN_0101bdd0) runs.
+        os_.after(47, self.vuk_settled)
+
+    def vuk_settled(self):
+        if self.os.in_play:
+            self.on_vuk()
+        self.vuk_kickout()
+
+    def vuk_kickout(self):
+        """Device event 7: wait for the show deffs, then 0x0fd + leff 35, 46 ticks, leff 36 + 0x0fe, eject."""
+        os_ = self.os
+        if os_.show_running():
+            os_.after(6, self.vuk_kickout)
+            return
+        if not os_.state & 0x310:
+            os_.sound(0x0fd)
+            os_.leff_start(35)
+            os_.after(46, self.vuk_eject)
+        else:
+            self.vuk_eject()
+
+    def vuk_eject(self):
+        os_ = self.os
+        if not os_.state & 0x312:
+            os_.leff_start(36)
+            os_.sound(0x0fe)
+        os_.ball_held = False
+        os_.vuk_ejecting = True
+        os_.ball_search_reload()
+        self.machine.events.post("tron_vuk_release")
 
     def on_vuk(self):
-        """on_vuk [0x0102eddc]."""
+        """on_vuk [0x0102eddc]: every VUK award in ROM order; lit states are read before any award."""
         os_ = self.os
         os_.audit(0x66)
-        self.h("vuk_skill_shot")
+        all_lit = bool(self.h("items_all_lit"))
+        all_collected = bool(self.h("items_all_collected"))
+        lit = {bit: bool(self.h("vuk_lit_test", bit)) for bit in (1, 2, 4, 0x10)}
+        self.h("vuk_skill_shot")                      # skill shot C
         self.h("simulation_shot", 0)
         self.h("clu_hurryup_awards", 0x100)
         self.h("eol_combo_jackpot")
-        self.h("vuk_features")                        # arcade, portal, SoS, CLU, LC, Quorra, EOL (3.2)
-        self.h("vuk_extra")
+        if lit[1] and self.h("vuk_lit_test", 1):
+            self.h("vuk_extra_ball")                  # eb_collect_game 0x01012228
+        self.h("arcade_collect")
+        self.h("portal_vuk", all_collected)
+        self.h("sos_vuk", all_lit)
+        if lit[0x10] and self.h("vuk_lit_test", 0x10):
+            self.h("clu_vuk", all_lit, all_collected)
+        if lit[4] and self.h("vuk_lit_test", 4):
+            self.h("light_cycle_vuk", all_lit, all_collected)
+        if lit[2] and self.h("vuk_lit_test", 2):
+            self.h("quorra_vuk", all_lit, all_collected)
+        self.h("eol_vuk")
         self.z4_eol()
         os_.base_score(350)
 
@@ -441,7 +486,7 @@ class SwitchLayer:
             self._score_rspin()
             os_.deff_start(42)
             self._rspin_task()
-            if (os_.task_running(199) and not self.h("any_multiball")
+            if (os_.task_running(199) and not os_.any_multiball()
                     and not self.h("combo_lit", 5)):
                 self.raise_orbit_post()
             if self.orbit_post == 1:

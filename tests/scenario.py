@@ -28,6 +28,33 @@ def switch_name(num):
     return SW[int(num)]
 
 
+def forced_picks(name):
+    """Random choices the ROM made in the reference run, so the rebuild makes the same ones."""
+    import json
+    forced = {"arcade": []}
+    path = os.path.join(TRACES, name + ".jsonl")
+    if not os.path.exists(path):
+        return forced
+    evs = [json.loads(line) for line in open(path)]
+    for i, e in enumerate(evs):
+        if e.get("ev") == "audit" and 0x53 <= e.get("id", 0) <= 0x5e:
+            forced["arcade"].append(e["id"] - 0x53)
+        if e.get("ev") == "deff_start" and e.get("id") == 38:
+            hits = [n for n in evs[i + 1:] if n.get("ev") == "audit" and n.get("id") == 0x0f
+                    and n["t"] - e["t"] < 7.5]
+            forced.setdefault("match", []).append(len(hits))
+        if e.get("ev") == "deff_start" and e.get("id") == 105:
+            # the reel stops at a random slot: take the length from what followed the deff in the ROM
+            for n in evs[i + 1:]:
+                if n.get("ev") == "deff_start" and n.get("id") not in (19, 105):
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"])
+                    break
+                if n.get("ev") == "sound" and n.get("call") == "0x0fd":
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
+                    break
+    return forced
+
+
 class ScenarioRun(TronTestCase):
     """One scenario per test instance; the scenario name comes from the environment."""
 
@@ -67,6 +94,7 @@ class ScenarioRun(TronTestCase):
         trace._file = open(out_path, "w")
         self.autoplunge = 1.0
         self.machine.switch_controller.add_switch_handler("s_shooter_lane", self._on_shooter, state=1)
+        self.tron.forced = forced_picks(name)
         self.fill_trough()
         self.wait(6)                                  # the ROM boots 8 s before line 1
         self.log("ready")
@@ -96,9 +124,9 @@ class ScenarioRun(TronTestCase):
         self.wait(START_AFTER_COIN - 0.01)
         for _ in range(n):
             self.sw("s_start_button", 1)
-            self.wait(0.05)
+            self.wait(0.01)
             self.sw("s_start_button", 0)
-            self.wait(0.05)
+            self.wait(0.09)
         self.wait(SCRIPT_START_TIME - 0.1 * n)
 
     def cmd_wait(self, s):

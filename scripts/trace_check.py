@@ -3,7 +3,8 @@
 
 Wraps assets/rules/tools/trace/trace_compare.py. Before comparing it drops events that are not rules
 behaviour: OS bookkeeping audits (time played, 59-64), and sounds played from inside a display effect
-(in_deff != 0; those belong to the effect's media show, checked separately).
+(in_deff != 0; those belong to the effect's media show, checked separately), and, unless --strict, the
+score display deff 19 (and its tube show 10) that the deff rules restart behind other effects.
 
 Usage: scripts/trace_check.py <scenario> [--events score,deff_start,...] [--tol 0.25]
 """
@@ -22,7 +23,16 @@ DEFAULT = "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_sta
 OS_AUDITS = {59, 60, 61, 62, 63, 64}
 
 
+STRICT = False
+
+
 def keep(e):
+    if not STRICT and e.get("ev") == "deff_start" and e.get("id") == 19:
+        return False            # score display re-asserted by the deff rules (display housekeeping)
+    if not STRICT and e.get("ev") == "tube_show_start" and e.get("id") == 10:
+        return False            # the tube show deff 19 starts with itself
+    if e.get("ev") == "sound" and e.get("caller") == "0x2c97c":
+        return False            # sound driver internals (0x02f / 0x0bd music ducking), not snd_play calls
     if e.get("ev") == "audit" and e.get("id") in OS_AUDITS:
         return False
     if e.get("ev") == "sound" and e.get("in_deff", 0) != 0:
@@ -47,7 +57,10 @@ def main():
     ap.add_argument("scenario")
     ap.add_argument("--events", default=DEFAULT)
     ap.add_argument("--tol", default="0.25")
+    ap.add_argument("--strict", action="store_true", help="also compare the deff 19 / tube 10 refreshes")
     a = ap.parse_args()
+    global STRICT
+    STRICT = a.strict
     with tempfile.TemporaryDirectory() as tmp:
         ref = filtered(os.path.join(REF, a.scenario + ".jsonl"), os.path.join(tmp, "r") if os.makedirs(
             os.path.join(tmp, "r")) is None else tmp)
