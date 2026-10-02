@@ -31,6 +31,8 @@ CLU_INDEX = {25: 0, 14: 1, 28: 2}
 BANK_BIT = {49: 1, 50: 2, 51: 4}
 BANK_LAMP = {49: 53, 50: 52, 51: 51}
 POP_LAMP = {30: 46, 31: 47, 32: 48}
+LANE_CHANGE_LAMPS = (32,)       # lamp list 0x040e39b4 after lamp 8 (assumed: the right outlane insert)
+INSULT_COOLDOWN_TICKS = 37500   # timer 9 (0x927c)
 
 
 class SwitchLayer:
@@ -54,11 +56,13 @@ class SwitchLayer:
         os_.register("ball_start", self.ball_start)
 
     def _dispatch(self, num, handler):
-        """The ROM runs a playfield handler as a task about one tick after the switch closes."""
+        """The ROM runs a playfield handler as a task about one tick after the switch closes. A handler
+        does not refresh the lamp rules by itself: the hooks that change rule state call
+        rules_refresh_request (os.request_refresh) as the ROM does."""
         def on_close():
             if not self.os.game or (not self.os.in_play and num != 11):
                 return
-            self.os.after(1, lambda: (handler(), self.os.request_refresh()))
+            self.os.after(1, handler)
         return on_close
 
     # ------------------------------------------------------------------ per player / ball state
@@ -220,6 +224,7 @@ class SwitchLayer:
         self.h("eol_vuk")
         self.z4_eol()
         os_.base_score(350)
+        os_.request_refresh()
 
     # ------------------------------------------------------------------ ZEN 12
 
@@ -290,21 +295,66 @@ class SwitchLayer:
     # ------------------------------------------------------------------ outlanes 24, 29
 
     def _outlane(self, sw, lamp):
+        """sw24_left_outlane / sw29_right_outlane: ball save try, insult speech (left only), special
+        collect at a lit outlane insert, z4, eol, then 100,000."""
         os_ = self.os
         os_.playfield_switch(sw)
-        self.h("outlane_ball_save", 1 if sw == 24 else 2)
+        # FUN_0000c6d4(0x19), drawn at every left outlane hit so a reference run's picks line up
+        lucky = sw == 24 and os_.pick("insult", [1, 3]) == 0
+        save_running = bool(os_.ball_save)                     # FUN_00019b1c
+        saved = os_.ball_save_try(1 if sw == 24 else 2)
         insult = False
-        if sw == 24 and os_.pf_valid and os_.balls_in_play() == 1 and not os_.ball_save:
-            insult = bool(self.h("insult_speech"))
-        if self.h("outlane_special", lamp):
-            os_.deff_start(82)
-            os_.leff_start(90)
-            if not insult:
-                os_.sound(0x09e)
-            os_.score_add(100000)
-        elif not insult:
-            os_.sound(0x0a2)
+        # FUN_0001e454 (balls still being served) is covered by the ball count: a served ball counts
+        if (sw == 24 and not save_running and not saved and os_.pf_valid
+                and os_.rom_balls_in_play() == 1):
+            insult = self.insult_speech(lucky)
+        self.outlane_special(lamp, insult)
         self.z4_eol()
+        os_.base_score(100000)
+
+    def insult_speech(self, lucky):
+        """outlane_insult_speech [0x010127c0]: speech 0x129 (25 %) with no multiball, adj 82 INSULT LEVEL
+        above 0 and timer 9 idle; timer 9 then runs 37,500 ticks."""
+        os_ = self.os
+        if os_.any_multiball() or os_.adj_value(82) <= 0 or not lucky or os_.task_running("timer_9"):
+            return False
+        os_.sound(0x129)
+        os_.task_start("timer_9", INSULT_COOLDOWN_TICKS)
+        return True
+
+    def outlane_special(self, lamp, insult):
+        """outlane_special_collect [0x01016e58]: at a lit outlane insert with a special lit, collect it
+        (the insert goes off while fewer than 2 remain): deff 82, leff 90, sound 0x9e unless the insult
+        played, 100,000. Otherwise sound 0xa2 unless the insult played."""
+        os_ = self.os
+        if lamp not in os_.lamps or not os_.special_collect():
+            if lamp not in os_.lamps and not insult:
+                os_.sound(0x0a2)
+            return False
+        if os_.specials_lit[os_.player_num - 1] < 2:
+            os_.lamps.discard(lamp)
+        os_.deff_start(82)
+        os_.leff_start(90)
+        if not insult:
+            os_.sound(0x09e)
+        os_.score_add(100000)
+        os_.request_refresh()
+        return True
+
+    def lane_change(self):
+        """sling_lamp_rotate [0x01017128]: stops leffs 89 / 90 and rotates the lamp 8 state through the
+        lamp list 0x040e39b4 and back to lamp 8 (assumed (32,), the other outlane insert: the list is not
+        in the decompile)."""
+        os_ = self.os
+        if os_.state & 0x311:
+            return
+        os_.leff_stop(90)
+        os_.leff_stop(89)
+        carry = 8 in os_.lamps
+        for lamp in LANE_CHANGE_LAMPS:
+            carry, lit = lamp in os_.lamps, carry
+            (os_.lamps.add if lit else os_.lamps.discard)(lamp)
+        (os_.lamps.add if carry else os_.lamps.discard)(8)
 
     def sw_24(self):
         self._outlane(24, 8)
@@ -315,9 +365,9 @@ class SwitchLayer:
     # ------------------------------------------------------------------ slings 26, 27
 
     def _sling(self, sw):
-        self.h("counting_switch", sw)                 # posts 0x6b but does not validate the playfield
+        self.os.playfield_switch(sw)                  # posts 0x6b itself
         self.z4_eol()
-        self.h("lane_change")
+        self.lane_change()
         self.os.sound(0x0e8 if sw == 26 else 0x0e9)
         self.os.base_score(440)
 
@@ -338,25 +388,31 @@ class SwitchLayer:
         os_.base_score(170)
 
     def pop_value(self, sw):
+        """pop_bumper_hit [0x0101c3a4]."""
         os_, pd = self.os, self.os.pd
         mult = 3 if os_.task_running(199) else 1
+        level = pd.pop_value_level
         self.h("pop_lamp_pattern")
         if os_.task_running(0xcb):
             self.h("big_bumps_hit")
-        if pd.pop_hits_left not in (0, 1):
-            points = min(10000 + 2500 * pd.pop_value_level, 50000) * mult
-            os_.score_add(points)
-            os_.deff_start(43, hits_left=pd.pop_hits_left - 1, value=points)
+        hits_left = pd.pop_hits_left
+        if hits_left not in (0, 1):
+            value = min(10000 + 2500 * level, 50000)
+            points = os_.score_add(value * mult)
+            if os_.display.running(43):               # a running deff 43 takes the new values
+                os_.display.extend(43)
+            else:
+                os_.deff_start(43, hits_left=hits_left - 1, value=value, mult=mult, points=points)
             os_.leff_start(41)
             os_.sound(0x50 if mult == 1 else 0x51)
-            pd.pop_hits_left -= 1
+            pd.pop_hits_left = hits_left - 1
         else:
-            points = min(100000 + 25000 * pd.pop_value_level, 500000) * mult
-            os_.score_add(points)
+            value = min(100000 + 25000 * level, 500000)
             pd.pop_levels_done = min(pd.pop_levels_done + 1, 0xff)
             pd.pop_value_level = min(pd.pop_value_level + 1, 0xff)
-            os_.deff_start(44, level=pd.pop_levels_done, value=points, mult=mult)
-            os_.leff_start(42)
+            points = os_.score_add(value * mult)
+            if os_.deff_start(44, level=pd.pop_levels_done, value=value, mult=mult, points=points):
+                os_.leff_start(42)
             os_.sound(0x50)
             pd.pop_hits_left = self.pop_hits_needed()
 
@@ -438,8 +494,7 @@ class SwitchLayer:
         os_ = self.os
         os_.playfield_switch(44)
         if os_.task_running(0x64):
-            self.lspin["pending"] += 1
-            os_.task_start(0x64, 62, None)
+            self.lspin["pending"] += 1                # scored by the session task
         else:
             self.lspin.update(total=0, pending=0)
             self._score_lspin()
@@ -569,8 +624,7 @@ class SwitchLayer:
         self.h("eol_disc_jackpot", 2)
         self.h("disc_battle", 2, 0)
         os_.leff_start(75)
-        os_.sound(0x52)
-        os_.sound(0x53)
+        os_.sound_chain(0x53, os_.sound(0x52))       # 0x53 plays when the 0x52 sample ends
         os_.base_score(2310)
 
     # ------------------------------------------------------------------ orbits 43, 46

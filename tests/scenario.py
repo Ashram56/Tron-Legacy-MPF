@@ -63,9 +63,52 @@ def forced_picks(name):
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
                     forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045 + hold)
                     break
+    # left outlane hits (task 0x37 starts, logged twice per hit): insult speech 0x129 or not
+    lefts = sorted({e["t"] for e in evs if e.get("ev") == "task_start" and e.get("task") == "0x37"})
+    forced["insult"] = [0 if any(n.get("ev") == "sound" and n.get("call") == "0x129" and 0 <= n["t"] - t < 0.1
+                                 for n in evs) else 1 for t in lefts]
     for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
         forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
+    forced.update(forced_samples(evs))
     return forced
+
+
+def forced_samples(evs):
+    """Sample picks of sound calls that a chained sound (snd_play_chain, caller 0x2ccb8) waited for: the
+    gap from the call to the chained sound tells which sample the ROM played."""
+    import csv
+    base = os.path.join(ROOT, "assets", "callouts")
+    dur = {}
+    with open(os.path.join(base, "samples_index.csv")) as f:
+        for row in csv.DictReader(f):
+            dur[int(row["sample_id"], 16)] = float(row["duration_s"] or 0)
+    lengths = {}
+    with open(os.path.join(base, "sound_calls.csv")) as f:
+        for row in csv.DictReader(f):
+            lengths[int(row["call_id"], 16)] = [dur.get(int(x, 16), 0)
+                                                for x in row["sample_ids (one picked per play)"].split()]
+    sounds = [e for e in evs if e.get("ev") == "sound" and not e.get("in_deff")]
+    picks, index = {}, {}
+    for e in sounds:
+        call = int(e["call"], 16)
+        if e.get("caller") == "0x2ccb8":
+            continue
+        if len(lengths.get(call, [])) > 1:
+            index[id(e)] = (call, len(picks.setdefault(call, [])))
+            picks[call].append(None)
+    for i, e in enumerate(sounds):
+        if e.get("caller") != "0x2ccb8":
+            continue
+        for prev in reversed(sounds[:i]):
+            if id(prev) not in index:
+                continue
+            call, n = index[id(prev)]
+            gap = e["t"] - prev["t"]
+            best = min(range(len(lengths[call])), key=lambda k: abs(lengths[call][k] - gap))
+            if abs(lengths[call][best] - gap) < 0.05:
+                picks[call][n] = best
+                break
+    return {"sample_0x{:03x}".format(c): p for c, p in picks.items() if any(x is not None for x in p)}
 
 
 # Deffs that play a random film clip first, so their length varies: the ROM's length is read from the
@@ -168,8 +211,12 @@ class ScenarioRun(TronTestCase):
             self.wait(0.09)
         self.wait(SCRIPT_START_TIME - 0.1 * n)
 
+    def step(self, seconds):
+        """One tron_ref step_to(): the requested time plus the average overshoot."""
+        self.wait(seconds + STEP_OVERSHOOT)
+
     def cmd_wait(self, s):
-        self.wait(float(s))
+        self.wait(float(s))                            # plain waits do not drift (see STEP_OVERSHOOT)
 
     def cmd_hit(self, sw, ms="60"):
         name = switch_name(sw)
@@ -207,12 +254,11 @@ class ScenarioRun(TronTestCase):
             name = "s_left_outlane" if side == "left" else "s_right_outlane"
             self.log("switch", sw=24 if side == "left" else 29)
             self.sw(name, 1)
-            self.wait(0.06)
+            self.step(0.06)                           # tron_ref pulses the outlane, then drains at once
             self.sw(name, 0)
-            self.wait(SETTLE)
         self.log("sim", what="drain")
         self.machine.default_platform.add_ball_to_device(self.machine.ball_devices["bd_trough"])
-        self.wait(0.12)
+        self.step(0.1)
 
     def cmd_adj(self, num, value):
         self.tron.adj[int(num)] = int(value)
@@ -230,8 +276,9 @@ class ScenarioRun(TronTestCase):
             self.sw(name, 1)
         else:
             self.sw(name, 1)
-            self.wait(ms / 1000)
+            self.step(ms / 1000)
             self.sw(name, 0)
+            self.step(0.05)                           # tron_ref: 50 ms settle after a button pulse
 
     def cmd_mark(self, *text):
         self.log("mark", text=" ".join(text))

@@ -181,6 +181,15 @@ class Display:
         """Show task task_id is waiting in the queue (not playing yet)."""
         return any(s.task_id == task_id for s in self.shows)
 
+    def extend(self, deff_id):
+        """A running deff that takes new values (e.g. deff 43 on every pop hit) shows its full length again."""
+        info = self.media.get(deff_id)
+        if self.fg != deff_id or not self.fg_handle or not info or not info.seconds:
+            return False
+        self.os.machine.clock.unschedule(self.fg_handle)
+        self.fg_handle = self.os.machine.clock.schedule_once(lambda: self._ended(deff_id), info.seconds)
+        return True
+
     def running(self, deff_id):
         return deff_id in (self.fg, self.bg)
 

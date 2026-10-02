@@ -12,6 +12,10 @@ class GameOver(Feature):
 
     def run(self, done):
         os_ = self.os
+        if os_.hook("slammed"):                   # a slam tilt resets the machine: straight to attract
+            os_.hook("attract_start")
+            done()
+            return
         os_.deff_start(38)
         number = random.randrange(0, 100, 10)
         forced = os_.forced.get("match")
@@ -35,10 +39,9 @@ class GameOver(Feature):
 
     def _attract(self, done):
         os_ = self.os
-        os_.deff_start(1)                         # attract score display
-        os_.sound(0x001)
-        os_.sound(0x01d)
-        os_.leff_start(133)
+        os_.hook("attract_start")                 # event 0x08: deff 1, leff 1, attract tube rule
+        # task 0x45 [0x0100f29c], one tick later: game-over music 0x01d with leff 133
+        os_.after(1, lambda: (os_.sound(0x01d), os_.leff_start(133)))
         done()
 
 
