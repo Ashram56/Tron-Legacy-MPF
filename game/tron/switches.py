@@ -194,6 +194,7 @@ class SwitchLayer:
             os_.leff_start(36)
             os_.sound(0x0fe)
         os_.ball_held = False
+        os_.vuk_released_at = os_.now     # the multiball task waits a fixed time after the kick
         os_.vuk_ejecting = True
         os_.ball_search_reload()
         self.machine.events.post("tron_vuk_release")
@@ -494,6 +495,7 @@ class SwitchLayer:
         os_.playfield_switch(44)
         if os_.task_running(0x64):
             self.lspin["pending"] += 1                # scored by the session task
+            os_.display.extend(41)                    # the spinner deff stays up (see sw_36)
         else:
             self.lspin.update(total=0, pending=0)
             self._score_lspin()
@@ -547,6 +549,11 @@ class SwitchLayer:
         os_.playfield_switch(36)
         if os_.task_running(0x65):
             self.rspin["pending"] += 1
+            # the spinner deff stays up for its length after the last spin (inferred from
+            # traces/gem_hurryup.jsonl: the GEM countdown restarted by the last spin waits for the
+            # display until 1.68 s, deff 42's length, after that spin)
+            os_.display.extend(42)
+            os_.after(0, self._rspin_now)
         else:
             self.rspin.update(total=0, pending=0)
             self._score_rspin()
@@ -575,6 +582,14 @@ class SwitchLayer:
             if state["idle"] < 93:
                 os_.task_start(0x65, 1, tick)
         os_.task_start(0x65, 1, tick)
+
+    def _rspin_now(self):
+        """Task 0x65 runs after the switch task in the same tick, so a pending spin scores at once
+        (traces/gem_hurryup.jsonl: one 10,090 score per repeated spin)."""
+        if self.rspin["pending"] and self.os.task_running(0x65):
+            self.rspin["pending"] -= 1
+            self._score_rspin()
+            self._rspin_task()
 
     def _score_rspin(self):
         value = self._spin_value("rspin_value")
