@@ -15,6 +15,9 @@ class TestHurryUps(TronTestCase):
         self.advance_time_and_run(1)
         return self.tron
 
+    def total_waiting(self, task_id):
+        return any(w[0] == task_id for w in self.tron.display.idle_waits)
+
     def feature(self, name):
         return self.tron.features_by_name[name]
 
@@ -101,7 +104,7 @@ class TestHurryUps(TronTestCase):
         self.assertTrue(clu.start())
         clu.total = 0                                         # nothing scored: no total
         os_.hook("ball_end")
-        self.assertFalse(os_.task_running(0x53))
+        self.assertFalse(self.total_waiting(0x53))
 
     # ------------------------------------------------------------------ GEM
 
@@ -123,7 +126,7 @@ class TestHurryUps(TronTestCase):
         self.assertEqual(40, gem.clock.seconds)
         os_.hook("ball_end")
         self.assertFalse(gem.clock.running())
-        self.assertTrue(os_.task_running(0x54))
+        self.assertTrue(self.total_waiting(0x54))
         self.assertGreater(gem.ball_end_wait(), 2)
         self.assertFalse(os_.hook("gem_spin"))
         self.assertFalse(gem.end_now())
@@ -136,7 +139,7 @@ class TestHurryUps(TronTestCase):
         os_.hook("gem_qualify")
         os_.state |= 0x200
         gem.end_now()
-        self.assertFalse(os_.task_running(0x54))
+        self.assertFalse(self.total_waiting(0x54))
 
     # ------------------------------------------------------------------ ZUSE
 
@@ -185,8 +188,7 @@ class TestHurryUps(TronTestCase):
         self.advance_time_and_run(1)
         zuse._show_total()
         zuse._show_total()                                    # queued once (task 0x55)
-        os_.display.cancel(0x55)
-        os_.task_kill(0x55)
+        os_.display.idle_waits = []                          # drop it again
         zuse.clock.seconds = 1                                # the pause ends ~1.5 s from now, then 0, then the grace
         self.advance_time_and_run(4.5)
         self.assertTrue(os_.task_running(0x5b))               # grace
@@ -202,7 +204,7 @@ class TestHurryUps(TronTestCase):
         os_.hook("arcade_zuse")
         os_.state |= 0x200
         zuse.end_now()
-        self.assertFalse(os_.task_running(0x55))
+        self.assertFalse(self.total_waiting(0x55))
 
     # ------------------------------------------------------------------ shared display / spinner pieces
 
@@ -221,10 +223,3 @@ class TestHurryUps(TronTestCase):
         self.assertFalse(os_.display.running(42))
         os_.display.extend(42)                                # not running: nothing to extend
         self.assertFalse(os_.display.running(42))
-
-    def test_hold_of_a_replaced_deff_does_nothing(self):
-        os_ = self.start_game()
-        os_.deff_start(73)
-        os_.deff_start(74)                                    # higher priority: 73 is gone before its hold
-        self.advance_time_and_run(3)
-        self.assertFalse(os_.display.fg_hold)

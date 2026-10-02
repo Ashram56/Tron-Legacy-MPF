@@ -3,7 +3,7 @@
 Not a feature itself (no `feature` attribute). The modes use:
 - Countdown: the ROM countdown task (task_c0 CLU [0x01001e08], task_c2 GEM [0x01013b88],
   task_59 ZUSE [0x01031730]) run as os tasks, so os.task_running(<ROM id>) works for the other rules.
-- show_total(): the queued TOTAL display (flag-0x2000 tasks 0x53 / 0x54 / 0x55).
+- show_total(): the queued TOTAL display (flag-0x2000 tasks 0x53 / 0x54 / 0x55, display.when_idle).
 
 The pause rule itself is os.timed_mode_paused() [0x0100ff64]. Flynn's Arcade MORE TIME reaches the
 modes through the hooks "timed_feature_running" (any_timed_mode_running 0x0100f930: a countdown task,
@@ -142,25 +142,20 @@ class Countdown:
         self.os.request_refresh()
 
 
+def total_waiting(os_, task_id):
+    """The TOTAL task task_id waits for the display (display.when_idle)."""
+    return any(w[0] == task_id for w in os_.display.idle_waits)
+
+
 def show_total(os_, task_id, deff_id, **args):
     """task_create_unique(task_id, ..., 0x2002) running FUN_0100f7f0(deff, 3750): wait until no show
     task runs and the display is idle (at most 3750 ticks), then start the TOTAL deff."""
-    if os_.task_running(task_id):
-        return
-    state = {"n": 0}
-
-    def poll():
-        if not os_.show_running() and not os_.display_busy():
-            os_.deff_start(deff_id, **args)
-            return
-        state["n"] += 1
-        if state["n"] < TOTAL_WAIT:
-            os_.task_start(task_id, 1, poll)
-    os_.task_start(task_id, 1, poll)
+    if not total_waiting(os_, task_id):
+        os_.display.when_idle(task_id, deff_id, TOTAL_WAIT, **args)
 
 
 def total_wait_ticks(os_, task_id, deff_id):
-    """ball_end_wait: ticks the end of ball waits for a TOTAL display still queued or running."""
+    """ball_end_wait: ticks the end of ball waits for a TOTAL display still queued."""
     from tron.os_layer import TICK
     length = round(os_.display.media[deff_id].seconds / TICK)
-    return 2 + length if os_.task_running(task_id) else None
+    return 2 + length if total_waiting(os_, task_id) else None

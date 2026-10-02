@@ -698,9 +698,8 @@ class TronOS(CustomCode):
         self.vuk_ejecting = False
         if self.balls_in_play() - balls > 0:
             if self.mb_save_running() and not self.tilted:
-                # multiball save: the ball comes back, auto-launched (serve type 6)
-                self.audit(0x2b)
-                self.hook("ball_saved")
+                # multiball save: the ball comes back, auto-launched (serve type 6); no "ball saved"
+                # audit or hook (no reference trace has audit 0x2b for a multiball save)
                 self.after(SAVE_EJECT_TICKS,
                            lambda: self.machine.playfield.add_ball(balls=balls, player_controlled=False))
                 return {"balls": 0}
