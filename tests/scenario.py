@@ -18,7 +18,7 @@ OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
-SETTLE = 0.1                        # every hit is followed by 100 ms settle
+SETTLE = 0.113                      # every hit is followed by ~113 ms settle (reference traces: hit + wait 1 = 1.17-1.18 s)
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -52,7 +52,33 @@ def forced_picks(name):
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
                     forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
                     break
+    for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
+        forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
     return forced
+
+
+# Deffs that play a random film clip first, so their length varies: the ROM's length is read from the
+# stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
+# same deff keeps the recorded length (None).
+CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+
+
+def clip_lengths(evs, deff_id, stop_ev, stop_id):
+    out = []
+    for i, e in enumerate(evs):
+        if e.get("ev") != "deff_start" or e["id"] != deff_id:
+            continue
+        length = None
+        for n in evs[i + 1:]:
+            if n["t"] < e["t"] + 0.005:
+                continue                    # the previous run's effect stops as this one starts
+            if n.get("ev") == "deff_start" and n["id"] == deff_id:
+                break                       # replaced by its next start
+            if n.get("ev") == stop_ev and n.get("id") == stop_id:
+                length = n["t"] - e["t"]
+                break
+        out.append(length)
+    return out
 
 
 class ScenarioRun(TronTestCase):
