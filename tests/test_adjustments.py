@@ -497,18 +497,20 @@ class TestFeatureAdjustments(AdjCase):
         os_ = self.start_game()
         shaker = self.machine.coils["c_shaker_motor_optional"]
         os_.deff_start(71)                                       # shaker_run(2, 2), MAXIMAL USE
+        self.advance_time_and_run(0.01)                          # in the deff's function, once it runs
         self.assertEqual("enabled", shaker.hw_driver.state)
         self.advance_time_and_run(1)
         self.assertEqual("disabled", shaker.hw_driver.state)
         os_.adj[86] = 1                                          # MINIMAL USE: only min-setting-1 calls
         os_.deff_start(71)
+        self.advance_time_and_run(0.01)
         self.assertEqual("disabled", shaker.hw_driver.state)
         self.assertFalse(os_.shaker_run(2, 2))
         self.assertTrue(os_.shaker_run(3, 1))
         os_.adj[86] = 0                                          # NONE
         self.advance_time_and_run(2)
         self.assertFalse(os_.shaker_run(3, 1))
-        self.assertEqual(1, len(os_.trace.of("shaker")) - 1)
+        self.assertEqual(2, sum(1 for e in os_.trace.of("coil") if e["coil"] == 8 and e["on"]))
 
     def test_77_disc_motor_and_76_bank_motor(self):
         os_ = self.start_game()

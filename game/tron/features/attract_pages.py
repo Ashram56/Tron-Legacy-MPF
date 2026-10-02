@@ -48,7 +48,7 @@ class AttractPages(Feature):
     def page_list(self, first_pass):
         os_ = self.os
         pages = [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
-        pages.append(("CREDITS", lambda: [os_.credits.text()], PAGE_SECONDS))
+        pages.append(("CREDITS", lambda: [os_.credit_model.text()], PAGE_SECONDS))
         if self.last_scores:
             for n, score in enumerate(self.last_scores, 1):
                 pages.append(("PLAYER {}".format(n), ["PLAYER {}".format(n), "{:,}".format(score)], PAGE_SECONDS))

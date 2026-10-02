@@ -5,9 +5,12 @@ pd.items[i] = [times lit, times collected] (also read by the bonus). Other featu
 item_light(i), item_collect(i), items_all_lit(), items_all_collected(), items_clear(lit_only).
 """
 from tron.features import Feature
+from tron.lamps import ARROWS
 
 ORDER = 15
 FLYNN = 0
+# item -> its center insert (table 0x040d2dd0 +6; lamps.csv CENTER <item>)
+ITEM_LAMPS = (27, 25, 24, 23, 22, 21, 20, 19, 18)
 POSITIONS = 6          # 0 left orbit, 1 left ramp, 2 left inner loop, 3 right inner loop, 4 right ramp, 5 right orbit
 
 
@@ -21,6 +24,8 @@ class FindFlynn(Feature):
         self.pos = self.next = self.prev = 0
         self.direction = 1
         os_.lamp_rule(lambda: os_.task_running(0xd1), leff=157, tube=14, order=0x0100d5b4)
+        os_.lamp_update(self.item_lamps, priority=1)
+        os_.lamps.leff_code(157, self._leff_arrow)
         for i in range(9):
             os_.register_poke(0x2111694 + 0x10 * i, (lambda i_: lambda p, v: self._poke_item(p, i_, v))(i), stride=4)
             os_.register_poke(0x2111695 + 0x10 * i, (lambda i_: lambda p, v: self._poke_item(p, i_, v << 8, 1))(i),
@@ -44,6 +49,24 @@ class FindFlynn(Feature):
             pd.items = [[0, 0] for _ in range(9)]
 
     # ------------------------------------------------------------------ items [0x01016188]
+
+    def _leff_arrow(self, task):
+        """leff_157_roving_arrow [0x0100da04]: every 3 ticks the arrow at Flynn's position is on, the
+        other arrows are released."""
+        for pos, lamp in enumerate(ARROWS):
+            if pos == self.pos:
+                task.set(lamp, True)
+            else:
+                task.release(lamp)
+        task.sleep(3, self._leff_arrow)
+
+    def item_lamps(self):
+        """item_lamps [0x010164a0] (lamp rule, priority 1): collected -> solid, lit -> flashing, else off."""
+        items = self.pd.get("items")
+        if not items:
+            return
+        for (lit, collected), lamp in zip(items, ITEM_LAMPS):
+            self.os.lamps.lamp_set(lamp, 1 if collected else 2 if lit else 0)
 
     def item_light(self, i):
         self.pd.items[i][0] = min(self.pd.items[i][0] + 1, 0xff)
@@ -89,11 +112,18 @@ class FindFlynn(Feature):
         self.os.task_start(0xd1, 125, self._rove_choose)
 
     def _rove_choose(self):
-        """Bounce back and forth over 0..5."""
-        nxt = self.pos + self.direction
-        if nxt < 0 or nxt >= POSITIONS:
-            self.direction = -self.direction
-            nxt = self.pos + self.direction
+        """task_d1 [0x0100d5c8]: bounce over 0..5. Going up, past 5 the arrow stays one more round at 5
+        and turns; going down, at 0 it turns and moves to 1 at once."""
+        if self.direction > 0:
+            nxt = self.pos + 1
+            if nxt >= POSITIONS:
+                self.direction = -1
+                nxt = self.pos
+        elif self.pos == 0:
+            self.direction = 1
+            nxt = 1
+        else:
+            nxt = self.pos - 1
         self.next = nxt
         self.os.task_start(0xd1, 15, self._rove_move)
 

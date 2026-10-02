@@ -46,6 +46,7 @@ class Quorra(Feature):
         os_.deff_rule(self.rule_active, 65, 0x066, 7)
         os_.lamp_rule(self.rule_active, leff=68, tube=35, order=0x0101f0ac)
         os_.lamp_rule(self.add_ball_available, leff=69, order=0x0101ce90)
+        os_.lamp_update(self.advance_lamp)
         # deff_hold_frames(n, 0x20): the award deffs drop to priority 0x20 before they end, so the next
         # award replaces them (measured in traces/quorra_multiball: the hold starts 1.50 s into deff 67,
         # 2.78 s into deff 68 and 2.87 s into deff 69, where the deff rules run again)
@@ -84,6 +85,14 @@ class Quorra(Feature):
     def wizard_takes_vuk(self, ready):
         os_ = self.os
         return bool(ready) and not os_.any_multiball() and not os_.task_running(0xad) and not os_.flag(0x34)
+
+    def advance_lamp(self):
+        """quorra_advance_lamp_rule [0x0101f85c] (lamp rule): ADVANCE QUORRA (60) flashes while Quorra
+        could start but is not lit at the scoop yet."""
+        os_ = self.os
+        on = (self.can_start(bool(os_.hook("items_all_lit")), bool(os_.hook("items_all_collected")))
+              and not os_.hook("vuk_lit_test", VUK_BIT))
+        os_.lamps.lamp_set(60, 2 if on else 0)
 
     def can_start(self, all_lit, all_collected):
         """quorra_can_start [0x0101f2f8]."""

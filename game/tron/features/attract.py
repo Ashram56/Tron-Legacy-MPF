@@ -17,6 +17,8 @@ CHASE_SECONDS = 29.885      # phase 1 (1,860 ticks at 16.0 ms, plus the task sta
 GROUP_SECONDS = 1.536       # one phase-2 group (96 ticks at 16.0 ms)
 GROUPS = 24
 FLASH_SECONDS = 8.033       # phase 3 (500 ticks)
+ATTRACT_TICK = 0.016
+OS_LAMPS = (65, 66)         # lamps 0x36f64 / 0x36f65 (start buttons), left to the OS
 
 
 class Attract(Feature):
@@ -41,6 +43,32 @@ class Attract(Feature):
         if self.handle:
             self.machine.clock.unschedule(self.handle)
             self.handle = None
+        self._flash_end()
+
+    def _flash_start(self):
+        """Phase 3 of leff 1: every matrix lamp but the OS-owned ones (start buttons) flashes, the
+        periods slowing from 24 to 6 ticks, then 10 x 4 and 5 x 12 ticks. The captured attract show
+        (lampfx_001) has only the named lamps; this layer also drives the unused matrix positions."""
+        lamps = self.os.lamps
+        self.flash_layer = lamps.layer_create(1, [n for n in range(1, 81) if n not in OS_LAMPS])
+        self.flash_steps = list(range(24, 5, -2)) * 2 + [4] * 10 + [12] * 5
+        self._flash_step()
+
+    def _flash_step(self):
+        layer = getattr(self, "flash_layer", None)
+        if layer is None or not self.flash_steps:
+            return
+        layer.image = set() if layer.image else set(layer.mask)
+        self.os.lamps.changed()
+        ticks = self.flash_steps.pop(0) if len(self.flash_steps) > 1 else self.flash_steps[0]
+        self.flash_handle = self.machine.clock.schedule_once(lambda: self._flash_step(), ticks * ATTRACT_TICK)
+
+    def _flash_end(self):
+        layer = getattr(self, "flash_layer", None)
+        if layer is not None:
+            self.machine.clock.unschedule(self.flash_handle)
+            self.os.lamps.layer_free(layer)
+            self.flash_layer = None
 
     def attract_start(self):
         self.start()
@@ -60,6 +88,7 @@ class Attract(Feature):
         self.os.tube_start(1)
 
     def chase(self):
+        self._flash_end()
         self.group = 0
         self._later(CHASE_SECONDS, self.next_group)
 
@@ -72,6 +101,7 @@ class Attract(Feature):
                 os_.tube_stop(show)
             self.tube_rule()
             self._later(FLASH_SECONDS, self.chase)
+            self._flash_start()
             return
         os_.tube_start(2 + self.group % 8)
         self.group += 1

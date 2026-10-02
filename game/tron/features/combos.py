@@ -9,6 +9,7 @@ Shots use the switch layer's numbering 0-5: left orbit, left ramp, left inner lo
 right ramp, right orbit.
 """
 from tron.features import Feature
+from tron.lamps import ARROWS
 
 STARTERS = 0x36                 # combo_starters at every ball start [0x010031ac]
 WINDOW = 0x138                  # combo_timer at window open (312), -7 every 7 ticks
@@ -55,7 +56,22 @@ class Combos(Feature):
         # leff 159, the combo arrows [FUN_01003bf0]: no multiball and (starters or task 0xcd)
         os_.lamp_rule(lambda: not os_.any_multiball() and (self.starters or os_.task_running(0xcd)),
                       leff=159, order=0x01003bf0)
+        os_.lamps.leff_code(159, self._leff_arrows)
         os_.register_poke(0x2111608, lambda p, v: setattr(os_.players[p], "eol_combo_jackpot", v), stride=4)
+
+    def _leff_arrows(self, task):
+        """leff159_combo_arrows [0x01003a74]: while the window (task 0xcd) runs, the lit shots' arrows
+        alternate on / off every combo_timer / 31 ticks (2-10); the other arrows are released."""
+        phase = task.data.setdefault("phase", True)
+        window = self.os.task_running(0xcd)
+        for shot, lamp in enumerate(ARROWS):
+            if window and self.lit & SHOTS[shot][0]:
+                task.set(lamp, phase)
+            else:
+                task.release(lamp)
+        task.data["phase"] = not phase
+        ticks = 6 if not window else 10 if self.timer >= 0x138 else max(2, self.timer // 31)
+        task.sleep(ticks, self._leff_arrows)
 
     # ------------------------------------------------------------------ resets
 

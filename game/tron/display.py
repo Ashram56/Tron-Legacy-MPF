@@ -82,6 +82,7 @@ class Display:
     def start(self, deff_id, hold=False, refresh=True, run_seconds=None, **args):
         """run_seconds: the run length when this call's variant differs from the recorded one."""
         os_ = self.os
+        os_.shaker_deff(deff_id)        # the deffs that run the shaker (shaker_run in the deff function)
         if deff_id in self.background:
             if self.bg not in (None, deff_id):
                 os_.media.deff_stop(self.bg)
@@ -110,7 +111,6 @@ class Display:
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
-        os_.deff_shown(deff_id)                    # the deff's own shaker_run (adj 86)
         info = self.media.get(deff_id)
         if info:
             if not hold:
@@ -463,16 +463,20 @@ class Tubes:
         if kind == "once" and length:
             handle = os_.machine.clock.schedule_once(lambda: self._ended(show_id), length)
         self.running[show_id] = handle
+        os_.lamps.tube_play(show_id)                # the show on the two RGB tube lights (lamps.py)
         return True
 
     def _ended(self, show_id):
         self.running.pop(show_id, None)
+        self.os.lamps.tube_end(show_id)
         self.os.request_refresh()
 
     def stop(self, show_id, log=True):
         handle = self.running.pop(show_id, "absent")
         if handle != "absent" and handle:
             self.os.machine.clock.unschedule(handle)
+        if handle != "absent":
+            self.os.lamps.tube_end(show_id)
         if log and handle != "absent":
             self.os.trace.log("tube_show_stop", id=show_id)
             self.os.machine.events.post("tron_tube_{}_stop".format(show_id))
@@ -515,7 +519,14 @@ class Leffs:
         return any(other != leff_id and o_out & outputs and o_prio > prio
                    for other in self.running for o_out, o_prio, _ in (self.info.get(other, (frozenset(), 0, None)),))
 
-    def start(self, leff_id, loop=False):
+    def flasher_outranked(self, leff_id, flasher):
+        """A running leff with a higher priority than `leff_id` uses `flasher` (lamp_effects.csv)."""
+        prio = self.info.get(leff_id, (frozenset(), 0, None))[1]
+        return any(other != leff_id and flasher in self.info.get(other, (frozenset(), 0, None))[0]
+                   and self.info[other][1] > prio for other in self.running)
+
+    def start(self, leff_id, loop=False, lamp=None):
+        """lamp: the lamp(s) a token effect draws (tron.lamps: the show's "(lamp)" token)."""
         if self.blocked(leff_id):
             if loop and leff_id not in self.pending:
                 self.pending.append(leff_id)
@@ -523,13 +534,15 @@ class Leffs:
         self.stop(leff_id)
         length = self.info.get(leff_id, (None, None, None))[2]
         handle = None
-        if length and not loop:
+        if length and not loop and leff_id not in self.os.lamps.code_leffs:   # a code leff ends itself
             handle = self.os.machine.clock.schedule_once(lambda: self._ended(leff_id), length)
         self.running[leff_id] = handle
+        self.os.lamps.leff_play(leff_id, lamp)      # its captured lamp show, on a layer at its priority
         return True
 
     def _ended(self, leff_id):
         self.running.pop(leff_id, None)
+        self.os.lamps.leff_end(leff_id)
         self._retry()
 
     def _retry(self):
@@ -537,6 +550,15 @@ class Leffs:
         if any(not self.blocked(p) for p in self.pending):
             from tron.os_layer import TICK
             self.os.machine.clock.schedule_once(lambda: self.os.rules_refresh(leffs_only=True), TICK / 2)
+
+    def kill_all(self):
+        """Every leff task killed with the other tasks (game start): no leff_stop is logged."""
+        for handle in self.running.values():
+            if handle:
+                self.os.machine.clock.unschedule(handle)
+        self.running.clear()
+        self.pending = []
+        self.os.lamps.leff_lamps_end()
 
     def retry_due(self, leff_id):
         return leff_id in self.pending and not self.blocked(leff_id)
@@ -549,4 +571,5 @@ class Leffs:
         handle = self.running.pop(leff_id)
         if handle:
             self.os.machine.clock.unschedule(handle)
+        self.os.lamps.leff_end(leff_id)
         self._retry()

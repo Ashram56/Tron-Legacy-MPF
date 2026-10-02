@@ -866,7 +866,7 @@ class ServiceMode(Mode):
     # ------------------------------------------------------------------ resets
 
     def reset_credits(self):
-        self.os.credits.reset()
+        self.os.credit_model.reset()
 
     def reset_high_scores(self, mask):
         """RESET GRAND CHAMPION (1) / RESET HIGH SCORES (2) [0x0001a9f4]; 3 = both and the reset counter."""

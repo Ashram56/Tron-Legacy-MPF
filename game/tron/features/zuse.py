@@ -18,6 +18,9 @@ REMIND_TICKS = 0x271            # task 0x5a sleeps 625 ticks between reminders
 REMIND_PLAY_TICKS = 11          # call 0xb5 plays ~11 ticks (traces/zuse_fast_scoring.jsonl: 636-tick period)
 
 
+LETTER_LAMPS = (12, 10, 43, 29)        # Z U S E inserts (table 0x040d7024)
+
+
 class Zuse(Feature):
     name = "zuse"
     HOOKS = ("player_first_ball", "ball_start", "ball_end", "tilt", "ball_end_wait", "zuse_letter",
@@ -34,6 +37,7 @@ class Zuse(Feature):
         os_.lamp_rule(self.clock.counting, leff=125, order=0x01031b5c)
         os_.lamp_rule(self.clock.counting, leff=124, tube=30, order=0x01031b5d)
         os_.deff_rule(self._background, 95, 0x0aa, 5)
+        os_.lamp_update(self.letter_lamps)
 
     def player_first_ball(self):
         """zfs_player_init 0x010315d8 and zuse_player_init 0x01033680."""
@@ -59,6 +63,14 @@ class Zuse(Feature):
 
     # ------------------------------------------------------------------ qualifying (Z-U-S-E letters)
 
+    def letter_lamps(self):
+        """zuse_letter_lamps_rule [0x01033efc] (lamp rule): off while qualifying is disabled, else a lit
+        letter is solid and the others flash."""
+        enabled = self.qualify_enabled()
+        letters = self.pd.get("zuse_letters", 0)
+        for idx, lamp in enumerate(LETTER_LAMPS):
+            self.os.lamps.lamp_set(lamp, 0 if not enabled else 1 if letters & (1 << idx) else 2)
+
     def qualify_enabled(self):
         """0x01033744: FS not running, no Sea of Simulation, Portal or End of Line."""
         return not self.clock.running() and not any(self.os.flag(f) for f in (0x34, 0x37, 0x27))
@@ -68,7 +80,7 @@ class Zuse(Feature):
         os_, pd = self.os, self.pd
         bit = 1 << idx
         if not self.qualify_enabled():
-            os_.leff_start(119)
+            os_.leff_start(119, lamp=LETTER_LAMPS[idx])
             os_.sound(0x0a4)
             os_.score_add(5000)
             return True
@@ -81,13 +93,13 @@ class Zuse(Feature):
                 os_.task_start(0x4c, 10)
             else:
                 pd.zuse_letters = letters | bit
-                os_.leff_start(120)
+                os_.leff_start(120, lamp=LETTER_LAMPS[idx])
                 os_.sound(0x0a6)
                 os_.task_start(0x4a, 62)
                 os_.deff_start(91, lit=letters, new=bit)
                 os_.score_add(75000)
         else:
-            os_.leff_start(121)
+            os_.leff_start(121, lamp=LETTER_LAMPS[idx])
             os_.sound(0x0a5)
             os_.score_add(10000)
         os_.request_refresh()
@@ -100,7 +112,7 @@ class Zuse(Feature):
         pd.zuse_completions = min(pd.zuse_completions + 1, 0xff)
         pd.zuse_letters = 0
         if not silent:
-            os_.leff_start(122)
+            os_.leff_start(122, lamp="rom_group_54")
             os_.sound(0x0a8)
         os_.score_add(min(250000 + 25000 * before, 750000))
         if pd.zuse_completions < pd.zuse_needed:
@@ -162,9 +174,9 @@ class Zuse(Feature):
                     self.add_time(10)
                 else:
                     self.value_raise()
-                    os_.leff_start(120)
+                    os_.leff_start(120, lamp=LETTER_LAMPS[target])
             else:
-                os_.leff_start(121)
+                os_.leff_start(121, lamp=LETTER_LAMPS[target])
         if not os_.task_running(0x80):
             self.queue = 0
             self.score_hit()
@@ -204,6 +216,7 @@ class Zuse(Feature):
         points = os_.score_add(self.value)
         self.total += points
         pd.zfs_switch_hits = min(pd.zfs_switch_hits + 1, 0xffff)
+        os_.shaker_handler("tron_shaker_zuse_score")         # every hit (shaker.yaml)
         if os_.display.running(94) or os_.display.task_running(0x9b):
             return
         if not os_.display.running(96) and not os_.any_multiball():

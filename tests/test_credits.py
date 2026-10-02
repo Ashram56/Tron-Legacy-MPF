@@ -32,7 +32,7 @@ class TestCoins(CreditCase):
 
     def test_28_usa_10_pricing_and_credit_text(self):
         os_ = self.tron
-        cr = os_.credits
+        cr = os_.credit_model
         shown = self.deff_args(10)
         texts = []
         for _ in range(4):
@@ -54,14 +54,14 @@ class TestCoins(CreditCase):
         os_.adj[28] = 64                                      # CUSTOM: 2 units a coin, a credit every 2 units
         shown = self.deff_args(10)
         self.coins(1)
-        self.assertEqual((1, 2, 1, 2), (os_.credits.credits, os_.audits[7], os_.audits[1], len(shown)))
+        self.assertEqual((1, 2, 1, 2), (os_.credit_model.credits, os_.audits[7], os_.audits[1], len(shown)))
         self.machine.variables.set_machine_var("custom_coin_units", 1)
         self.coins(1)
-        self.assertEqual("CREDITS 1 1/2", os_.credits.text())
+        self.assertEqual("CREDITS 1 1/2", os_.credit_model.text())
         self.machine.variables.set_machine_var("custom_units_per_credit", 4)
-        os_.credits.counter = -1
+        os_.credit_model.counter = -1
         self.coins(2)                                         # 2 of 4 units: shown reduced
-        self.assertEqual("CREDITS 1 1/2", os_.credits.text())
+        self.assertEqual("CREDITS 1 1/2", os_.credit_model.text())
 
     def test_62_coin_input_delay(self):
         os_ = self.tron
@@ -91,24 +91,24 @@ class TestCoins(CreditCase):
         os_.adj[33] = 4
         os_.adj[62] = 61
         self.coins(15, gap=0.05)                              # 5 credits paid
-        self.assertEqual((4, 5), (os_.credits.credits, os_.audits[1]))
-        self.assertEqual(0, os_.credits.award(1))             # a free game cannot pass the limit either
+        self.assertEqual((4, 5), (os_.credit_model.credits, os_.audits[1]))
+        self.assertEqual(0, os_.credit_model.award(1))             # a free game cannot pass the limit either
         os_.adj[33] = 30
         self.coins(3, gap=0.05)
-        self.assertEqual(5, os_.credits.credits)
+        self.assertEqual(5, os_.credit_model.credits)
 
     def test_service_credit_and_power_cycle(self):
         os_ = self.tron
         shown = self.deff_args(17)
         self.hit_and_release_switch("s_service_back")         # outside the service menu: a service credit
         self.advance_time_and_run(0.1)
-        self.assertEqual((1, 1, ["CREDITS 1"]), (os_.credits.credits, os_.audits[0x24],
+        self.assertEqual((1, 1, ["CREDITS 1"]), (os_.credit_model.credits, os_.audits[0x24],
                                                  [kw["credits"] for kw in shown]))
         os_.adj[33] = 4
-        os_.credits.add(10)
+        os_.credit_model.add(10)
         self.hit_and_release_switch("s_service_back")         # at the limit: no audit, deff 17 still
         self.advance_time_and_run(0.1)
-        self.assertEqual((4, 1, 2), (os_.credits.credits, os_.audits[0x24], len(shown)))
+        self.assertEqual((4, 1, 2), (os_.credit_model.credits, os_.audits[0x24], len(shown)))
         self.hit_and_release_switch("s_service_select")       # BACK inside the menu leaves it, no credit
         self.advance_time_and_run(0.1)
         self.hit_and_release_switch("s_service_back")
@@ -123,7 +123,7 @@ class TestCreditsKept(CreditCase):
         return {"tron_credits": {"credits": 2, "counter": 1}}
 
     def test_credits_survive_power_cycle(self):
-        cr = self.tron.credits
+        cr = self.tron.credit_model
         self.assertEqual(("CREDITS 2 2/3", 2), (cr.text(), cr.credits))
 
 
@@ -137,7 +137,7 @@ class TestGameStart(CreditCase):
         self.assertIsNone(self.machine.game)                  # no credit: event 0x2d, deff 15
         self.assertEqual((1, "CREDITS 0"), (len(refused), shown[0]["credits"]))
         os_.adj[34] = 1                                       # FREE PLAY
-        self.assertEqual("FREE PLAY", os_.credits.text())
+        self.assertEqual("FREE PLAY", os_.credit_model.text())
         self.press_start(2)
         self.assertIsNotNone(self.machine.game)
         self.assertEqual(1, os_.audits[0x11])
@@ -145,14 +145,14 @@ class TestGameStart(CreditCase):
     def test_start_takes_a_credit_and_players_need_credits(self):
         os_ = self.tron
         self.fill_trough()
-        os_.credits.add(1)
+        os_.credit_model.add(1)
         self.press_start(2)
-        self.assertEqual((0, 1), (os_.credits.credits, os_.audits[0x11]))
+        self.assertEqual((0, 1), (os_.credit_model.credits, os_.audits[0x11]))
         self.press_start()                                    # ball 1, no credit: no player 2
         self.assertEqual(1, len(self.machine.game.player_list))
-        os_.credits.add(1)
+        os_.credit_model.add(1)
         self.press_start()
-        self.assertEqual((2, 0, 2), (len(self.machine.game.player_list), os_.credits.credits, os_.audits[0x11]))
+        self.assertEqual((2, 0, 2), (len(self.machine.game.player_list), os_.credit_model.credits, os_.audits[0x11]))
 
     def test_36_game_restart(self):
         os_ = self.tron
@@ -175,13 +175,13 @@ class TestGameStart(CreditCase):
         self.release_switch_and_run("s_start_button", 0.1)
         self.assertEqual(2, self.machine.game.player.ball)
         os_.adj[36] = 1
-        os_.credits.add(1)
+        os_.credit_model.add(1)
         self.hit_switch_and_run("s_start_button", 0.9)       # held 0.9 s: not yet
         self.assertEqual(2, self.machine.game.player.ball)
         self.advance_time_and_run(0.2)                        # 62 ticks: a new game, no game over
         self.release_switch_and_run("s_start_button", 3)
         self.assertEqual((1, 1, 3, 0), (self.machine.game.player.ball, len(self.machine.game.player_list),
-                                        os_.audits[0x11], os_.credits.credits))
+                                        os_.audits[0x11], os_.credit_model.credits))
         self.assertNotIn(38, self.deffs())                    # no match
 
 
@@ -196,7 +196,7 @@ class TestFreeGames(CreditCase):
         self.advance_time_and_run(0.1)
         os_.replay_award(2)                                   # over the limit: no credit, no knocker
         self.advance_time_and_run(0.1)
-        self.assertEqual((1, 1), (os_.credits.credits, self.sounds().count("0x019")))
+        self.assertEqual((1, 1), (os_.credit_model.credits, self.sounds().count("0x019")))
         os_.adj[25] = 0                                       # NO FREE GAMES
         self.assertEqual(0, os_.award_credit())
         os_.adj[25] = 10                                      # UNLIMITED
@@ -295,7 +295,7 @@ class TestHighScores(HsCase):
         self.assertEqual(("CAX", hs.scores[0]), (hs.entries[1]["name"], hs.entries[1]["score"]))
         self.assertEqual(("L R", 55000000), (hs.entries[2]["name"], hs.entries[2]["score"]))
         self.assertEqual([0x33, 0x34, 0x35, 0x36, 0x37, 0x38], [s["stage"] for s in stages])
-        self.assertEqual((1, 1), (os_.credits.credits, os_.audits[0x10]))
+        self.assertEqual((1, 1), (os_.credit_model.credits, os_.audits[0x10]))
         self.assertIn("0x019", self.sounds())                 # credit award: knocker
         self.assertEqual([31, 32, 33, 38], [d for d in self.deffs() if d in (31, 32, 33, 38)])
         self.assertEqual(0, os_.audits.get(0x2c, 0))          # the flipper buttons were not flipper audits
@@ -320,7 +320,7 @@ class TestHighScores(HsCase):
         self.assertEqual([2, 1], names)
         self.assertEqual([("BBB", p2), ("G S", 75000000), ("AAA", p1), ("L R", 55000000)],
                          [(e["name"], e["score"]) for e in hs.entries[:4]])
-        self.assertEqual((2, 2, 0), (len(tickets), os_.audits[0x10], os_.credits.credits))   # #2: adj 57 = 0
+        self.assertEqual((2, 2, 0), (len(tickets), os_.audits[0x10], os_.credit_model.credits))   # #2: adj 57 = 0
 
     def test_60_ten_letters_timeout_and_57_59_awards(self):
         os_ = self.tron
@@ -359,7 +359,7 @@ class TestHighScores(HsCase):
             self.advance_time_and_run(5)
         hs = os_.features_by_name["high_scores"]
         self.assertEqual(["AAA", "AAA"], [e["name"] for e in hs.entries[3:]])
-        self.assertEqual((1, 1), (os_.credits.credits, os_.audits[0x10]))   # #3 pays 1, #4 nothing (adj 59 = 0)
+        self.assertEqual((1, 1), (os_.credit_model.credits, os_.audits[0x10]))   # #3 pays 1, #4 nothing (adj 59 = 0)
 
     def test_61_reset_count(self):
         os_ = self.tron

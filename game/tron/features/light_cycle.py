@@ -19,6 +19,8 @@ VUK_BIT = 4
 ITEM = 6                                  # LIGHT CYCLE in the wizard items
 SHOT_ORDER = (0x01, 0x02, 0x04, 0x08, 0x40, 0x80)   # Flynn's Arcade "ADV." order [table 0x040d2978]
 ALL_SHOTS = 0xcf
+# shot bit -> LIGHT CYCLE insert (table 0x040d3134): L orbit, L ramp, L inner, R inner, R ramp, R orbit
+PROGRESS_LAMPS = {0x01: 14, 0x02: 11, 0x04: 62, 0x08: 59, 0x40: 42, 0x80: 35}
 # award level -> (points, deff, audit) [0x01018804]
 AWARDS = {1: (350000, 87, 0x4b), 2: (750000, 88, 0x4c), 3: (1500000, 89, 0x4d)}
 TIMER_TICKS = 315                         # 312 counted down by 7 every 7 ticks (task 0xba / 0xbc)
@@ -59,6 +61,8 @@ class LightCycle(Feature):
         # rules [0x0101b5b4]: background deff 86 + music 0x0c2 (priority 7), leff 94, tube show 54
         os_.deff_rule(self.rule_active, 86, 0x0c2, 7)
         os_.lamp_rule(self.rule_active, leff=94, tube=54, order=0x0101ac3c)
+        os_.lamp_update(self.progress_lamps)
+        os_.lamps.leff_code(94, self._leff_mb)
         for addr, key in ((0x2111744, "lc_remaining"), (0x2111754, "lc_collected"), (0x2111764, "lc_starts")):
             os_.register_poke(addr, (lambda k: lambda p, v: setattr(os_.players[p], k, v))(key))
 
@@ -93,6 +97,40 @@ class LightCycle(Feature):
         os_ = self.os
         return not (self.running() or os_.flag(0x24) or os_.task_running(0xad) or os_.flag(0x34)
                     or os_.flag(0x37) or os_.hook("vuk_lit_test", VUK_BIT) or os_.flag(0x27))
+
+    def _leff_mb(self, task):
+        """leff_094 [0x0101aff0]: three children, one per award chain [0x0101ac84 / 0x0101ada8 /
+        0x0101aecc], each on its own layer (priority + 2) toggling the inserts of its chain's lit shots,
+        every 6 ticks, or every timer / 31 ticks (2-10) while the chain's timer task runs."""
+        prio = task.layer.prio + 2
+        for get_lit, timer_task in ((lambda: self.a.lit, self.a.timer_task),
+                                    (lambda: self.b.lit, self.b.timer_task),
+                                    (lambda: self.c_lit, 0xbe)):
+            task.spawn(lambda child, g=get_lit, t=timer_task: self._leff_chain(child, g, t), prio)
+
+    def _leff_chain(self, task, get_lit, timer_task):
+        phase = task.data.setdefault("phase", True)
+        lit = get_lit()
+        for bit, lamp in PROGRESS_LAMPS.items():
+            if lit & bit:
+                task.set(lamp, phase)
+            else:
+                task.release(lamp)
+        task.data["phase"] = not phase
+        if self.os.task_running(timer_task):
+            left = self.os.task_ticks_left(timer_task)
+            ticks = 10 if left >= 0x138 else max(2, left // 31)
+        else:
+            ticks = 6
+        task.sleep(ticks, lambda t: self._leff_chain(t, get_lit, timer_task))
+
+    def progress_lamps(self):
+        """lc_progress_lamps_rule [0x0101b4fc] (lamp rule): while progress counts, the shots still to make
+        flash; everything else is off."""
+        allowed = self.progress_allowed()
+        remaining = self.pd.get("lc_remaining", 0)
+        for bit, lamp in PROGRESS_LAMPS.items():
+            self.os.lamps.lamp_set(lamp, 2 if allowed and remaining & bit else 0)
 
     def can_start(self, all_lit, all_collected):
         """lc_can_start [0x0101b0dc]."""

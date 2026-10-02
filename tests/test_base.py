@@ -29,14 +29,18 @@ class BaseCase(TronTestCase):
 
 class TestOutlanes(BaseCase):
 
+    def outlanes(self):
+        """The outlane special inserts that are on (os.lamps is the whole lamp matrix)."""
+        return {n for n in (8, 32) if n in self.tron.lamps}
+
     def test_special_lane_change_and_collect(self):
         self.start_game()
         self.validate()
         tron = self.tron
         tron.light_special()
-        self.assertEqual({8}, tron.lamps)                # the special insert: left outlane
+        self.assertEqual({8}, self.outlanes())           # the special insert: left outlane
         self.hit("s_left_slingshot")                     # lane change: lamp 8 -> 32
-        self.assertEqual({32}, tron.lamps)
+        self.assertEqual({32}, self.outlanes())
         tron.kill_ball_save()
         tron.forced["insult"] = [1]
         before = self.score
@@ -51,7 +55,7 @@ class TestOutlanes(BaseCase):
         self.assertIn(82, [e["id"] for e in tron.trace.of("deff_start")])
         self.assertIn("0x09e", self.sounds())
         self.assertEqual(0, tron.specials_lit[0])
-        self.assertEqual(set(), tron.lamps)
+        self.assertEqual(set(), self.outlanes())
         self.assertEqual(1, tron.audits.get(0x0e))
         self.assertEqual(1, tron.specials_collected[0])
 

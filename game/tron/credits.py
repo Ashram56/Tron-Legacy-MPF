@@ -98,7 +98,7 @@ class Credits:
         if n:
             self.credits += n
             self.save()
-            self.machine.events.post("tron_credits_changed", credits=self.credits)
+            self.changed()
         return n
 
     def take(self, n=1):
@@ -107,7 +107,7 @@ class Credits:
         if n:
             self.credits -= n
             self.save()
-            self.machine.events.post("tron_credits_changed", credits=self.credits)
+            self.changed()
         return n
 
     def award(self, n=1):
@@ -131,7 +131,12 @@ class Credits:
         """RESET CREDITS (FUN_00004e88): no credits, unit counter -1."""
         self.credits, self.counter = 0, -1
         self.save()
-        self.machine.events.post("tron_credits_changed", credits=0)
+        self.changed()
+
+    def changed(self):
+        """FUN_00020448 after every credit change: the start button lamp."""
+        self.machine.events.post("tron_credits_changed", credits=self.credits)
+        self.os.start_button_lamp()
 
     def fraction(self):
         """FUN_00004d48: (units since the last credit, units of the step that gives the next credit), or None."""

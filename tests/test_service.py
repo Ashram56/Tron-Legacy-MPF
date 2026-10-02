@@ -335,12 +335,12 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.assertTrue(all(os_.adj[n] == os_.adj.default(n) for n in os_.adj))
         os_.adj[31] = 4
         os_.audit(8)
-        os_.credits.add(2)
+        os_.credit_model.add(2)
         self.press("back")
         self.goto("RETURN TO UTILITIES MENU", "GO TO RESETS MENU", "RESET FACTORY SETTINGS")
         self.press("select")
-        self.assertEqual((3, None, 0, -1), (os_.adj[31], os_.audits.get(8), os_.credits.credits,
-                                            os_.credits.counter))
+        self.assertEqual((3, None, 0, -1), (os_.adj[31], os_.audits.get(8), os_.credit_model.credits,
+                                            os_.credit_model.counter))
 
     def test_custom_message_date_time_and_usb(self):
         os_ = self.tron

@@ -57,19 +57,14 @@ BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank 
                                 # resumes (traces/tron_targets.jsonl: searches 33.88 s and 48.79 s)
 BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)
 OUTLANE_TASK_TICKS = 625    # drain-side tasks 0x37 / 0x38 (0x271)
+SHOOT_AGAIN_LAMP = 26        # gf_shoot_again_lamp
+START_LAMP = 65              # DAT_00036f64
+EB_LAMP = 37                 # DAT_00036f61
 SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane (switches_and_shots.md 8)
 SPECIAL_OVER_LIMIT_SCORE = 5000000
 LOST_BALL_SEARCH = 5        # ball_search_start(5) with adj 63 LOST BALL RECOVERY: a lost ball is fed [0x0001f79c]
 COINDOOR_SAVE_TICKS, COINDOOR_GRACE_TICKS = 0x138, 0xbb     # coin door opened in play, adj 41 [0x0001ff74]
 DYNAMIC_REPLAY_MIN = 5000000                                # dynamic replay floor [0x000231a4]
-# shaker_run(strength, min_setting) calls inside these deffs (adj 86 SHAKER MOTOR >= min_setting) [0x010289b8]
-SHAKER_DEFFS = {71: (2, 2), 73: (2, 2), 138: (2, 3), 139: (2, 3), 58: (2, 2), 59: (2, 2), 60: (2, 2), 46: (2, 2),
-                48: (2, 2), 49: (2, 2), 50: (3, 1), 54: (2, 2), 112: (2, 2), 136: (2, 3), 137: (2, 3), 76: (2, 2),
-                78: (2, 2), 87: (2, 2), 88: (2, 2), 89: (2, 2), 68: (2, 2), 69: (3, 1), 66: (1, 3), 67: (2, 2),
-                109: (2, 2), 113: (3, 2), 115: (3, 2), 116: (3, 2), 117: (3, 2), 118: (3, 2), 119: (3, 2),
-                120: (3, 2), 121: (3, 2), 122: (3, 2), 123: (3, 2), 124: (3, 2), 125: (3, 2), 126: (3, 2),
-                140: (3, 1), 142: (2, 2), 143: (3, 1), 144: (3, 1), 93: (2, 2), 94: (2, 2), 97: (2, 2), 98: (2, 2)}
-SHAKER_SECONDS = {1: 0.25, 2: 0.5, 3: 1.0}                  # run length by strength (FUN_01028924, inferred)
 
 
 def adjustment_defaults(settings_path):
@@ -88,6 +83,32 @@ def adjustment_defaults(settings_path):
                 out[num][1] = int(m.group(1))
                 key = None
     return {n: tuple(v) for n, v in out.items()}
+
+
+# shaker_run(strength, min_setting): strength 1/2/3 runs the motor (coil 8) about 75/265/1100 ms
+# (assets/mpf_package/config/shaker.yaml, observed on coil 8 in emulated play)
+SHAKER_MS = {1: 75, 2: 265, 3: 1100}
+SHAKER_ADJ = 86              # adjustment 86 SHAKER MOTOR: 0 none, 1 minimal, 2 moderate, 3 maximal
+
+
+def shaker_table(shaker_path):
+    """Read the shaker_run calls from the asset package's shaker.yaml:
+    -> ({deff id: (strength, min_setting)}, {switch handler event: (strength, min_setting)})."""
+    deffs, handlers = {}, {}
+    if not os.path.exists(shaker_path):
+        return deffs, handlers
+    with open(shaker_path) as f:
+        for line in f:
+            m = re.match(r"\s+(\w+)\{settings\.shaker_motor>=(\d)\}: shaker_strength_(\d)\s*(?:# effect (\d+))?",
+                         line)
+            if not m:
+                continue
+            entry = (int(m.group(3)), int(m.group(2)))
+            if m.group(4):
+                deffs[int(m.group(4))] = entry
+            else:
+                handlers[m.group(1)] = entry
+    return deffs, handlers
 
 
 class Task:
@@ -133,7 +154,7 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4  # extra balls collected per player (0x3d470)
         self.specials_lit = [0] * 4  # 0x3d4ef
         self.specials_collected = [0] * 4  # 0x3d4f3
-        self.lamps = set()          # inserts the rules read back: the outlane special lamps 8 / 32
+        self.lamps = None           # tron.lamps.Lamps: the lamp matrix (game image, flash mask, leff layers)
         self.replays_awarded = {}
         self.shoot_again = False    # game flag 9: this ball is a shoot-again ball
         self.ball_scored = False
@@ -164,12 +185,14 @@ class TronOS(CustomCode):
         self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
         self.audits = Audits(self.machine)                     # ROM audit counters, persisted
         from tron.credits import Credits             # noqa: E402
-        self.credits = Credits(self)                           # credits and pricing, persisted
+        self.credit_model = Credits(self)                      # credits and pricing, persisted
         self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
         self.game_seconds = 0.0     # validated play time of the running game
         self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
         self._coindoor_save = False  # the running multiball save is the coin door ball saver's (adj 41)
+        self.shaker_deffs, self.shaker_handlers = shaker_table(os.path.join(os.path.dirname(settings),
+                                                                            "shaker.yaml"))
         self.machine.tron = self
 
         ev = self.machine.events
@@ -188,7 +211,7 @@ class TronOS(CustomCode):
         ev.add_handler("balldevice_bd_vuk_ball_eject_success", self._vuk_eject_confirmed)
         ev.add_handler("balldevice_bd_shooter_lane_ejecting_ball", self._shooter_ejecting)
         sw = self.machine.switch_controller
-        sw.add_switch_handler("s_coin", lambda: self.credits.coin("s_coin"))
+        sw.add_switch_handler("s_coin", lambda: self.credit_model.coin("s_coin"))
         sw.add_switch_handler("s_start_button", self._start_held, ms=START_HOLD_TICKS * TICK * 1000)
         sw.add_switch_handler("s_service_back", self._service_back)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
@@ -206,6 +229,10 @@ class TronOS(CustomCode):
         self.display = Display(self)
         self.tubes = Tubes(self)
         self.leffs = Leffs(self)
+        from tron.lamps import Lamps                # noqa: E402
+        self.lamps = Lamps(self)
+        self.lamps.leff_code(13, self._leff_save_lamp, priority=0x81)
+        self.lamps.leff_code(14, self._leff_save_lamp, priority=0x80)
         from tron import switches                   # noqa: E402
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
@@ -349,7 +376,37 @@ class TronOS(CustomCode):
                     self.tube_stop(tube)
             rule[3] = want
         self.display.rules_refresh()                 # list 2: background deff rules and their music
+        if self.game and (self.state == 0 or self.state & 0x20):
+            # list 5: the lamp rules (mode mask 0x20, FUN_000196e4) redraw the inserts from game state
+            self.lamps.run_rules()
+            self.shoot_again_lamp_update()
         self.machine.events.post("tron_rules_refresh")
+
+    def lamp_update(self, fn, priority=0):
+        """rule_obj_init(obj, 5, fn, 0x20, 0, priority): a lamp rule, fn() redraws its inserts from game
+        state (lamps.lamp_set / lamp_flash / ...) on every rules refresh during the game. Higher priority
+        runs first; equal priorities run newest first (FUN_00019578 inserts at the head)."""
+        self.lamps.add_rule(fn, priority)
+
+    def shoot_again_lamp_update(self):
+        """shoot_again_lamp_update [0x0001a014] (game_flow.md 8): lamp 26 flashes while this ball is a
+        shoot-again ball (flag 9), is solid while an extra ball is pending, off otherwise. The ROM calls
+        it when these change; here it also runs with the lamp rules."""
+        self.eb_lamp_update()
+        if self.flag(9):
+            self.lamps.lamp_flash(SHOOT_AGAIN_LAMP)
+        elif self.game and self.game.player and self.game.player.extra_balls:
+            self.lamps.lamp_on_solid(SHOOT_AGAIN_LAMP)
+        else:
+            self.lamps.lamp_off(SHOOT_AGAIN_LAMP)
+
+    def eb_lamp_update(self):
+        """FUN_0001a2a4: EJECT: EXTRA BALL (37) flashes while the player has an extra ball lit."""
+        p = self.player_num - 1
+        if p >= 0 and self.eb_lit[p]:
+            self.lamps.lamp_flash(EB_LAMP)
+        else:
+            self.lamps.lamp_off(EB_LAMP)
 
     def register(self, name, fn):
         self.hooks.setdefault(name, []).append(fn)
@@ -433,10 +490,11 @@ class TronOS(CustomCode):
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=0, arg=arg, caller="0x2c97c")
         self.machine.events.post("tron_sound_{:03x}".format(call), arg=arg)
 
-    def leff_start(self, leff_id, loop=False):
-        """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs."""
+    def leff_start(self, leff_id, loop=False, lamp=None):
+        """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs.
+        lamp: the lamp (number, light name or tag, or a list) a token effect draws (lamps.py)."""
         self.trace.log("leff_start", id=leff_id)
-        if not self.leffs.start(leff_id, loop):
+        if not self.leffs.start(leff_id, loop, lamp):
             return False
         self.machine.events.post("tron_leff_{}".format(leff_id))
         return True
@@ -488,6 +546,37 @@ class TronOS(CustomCode):
     @property
     def tilted(self):
         return bool(self.state & ST_TILT)
+
+    def shaker_run(self, strength, min_setting):
+        """shaker_run(strength, min_setting): run the shaker motor (coil 8) when adjustment 86 is at least
+        min_setting, never while tilted or in game over (gf_state & 0x310). Returns True when it ran."""
+        if self.adj[SHAKER_ADJ] < min_setting or self.state & 0x310 or not self.game:
+            return False
+        ms = SHAKER_MS.get(strength, SHAKER_MS[1])
+        coil = self.machine.coils.get("c_shaker_motor_optional")
+        if coil is not None:
+            try:
+                coil.enable()
+                self.machine.clock.schedule_once(lambda: coil.disable(), ms / 1000.0)
+            except Exception:       # noqa: BLE001 (a disabled driver in a test machine)
+                pass
+        self.lamps.coil_log(8, ms)
+        return True
+
+    def shaker_deff(self, deff_id):
+        """The display effects that call shaker_run (shaker.yaml, by effect number). The call is in the
+        deff's own function, which runs once the deff has the display: a deff replaced in the same tick
+        (e.g. by a higher priority one) does not run it."""
+        if deff_id in self.shaker_deffs:
+            def run():
+                if self.display.running(deff_id):
+                    self.shaker_run(*self.shaker_deffs[deff_id])
+            self.machine.clock.schedule_once(run, 0)
+
+    def shaker_handler(self, event):
+        """A switch handler's shaker_run (shaker.yaml: tron_shaker_drop_target, tron_shaker_zuse_score)."""
+        if event in self.shaker_handlers:
+            self.shaker_run(*self.shaker_handlers[event])
 
     @property
     def in_play(self):
@@ -683,7 +772,7 @@ class TronOS(CustomCode):
 
     def award_credit(self, n=1):
         """A free game: credits.award (adj 33, adj 25); event tron_award_credit per credit added."""
-        added = self.credits.award(n)
+        added = self.credit_model.award(n)
         for _ in range(added):
             self.machine.events.post("tron_award_credit")
         return added
@@ -695,23 +784,6 @@ class TronOS(CustomCode):
             self.machine.coils["c_optional_coil"].pulse()
         if self.adj_value(35) or forced:
             self.sound(0x019)
-
-    def shaker_run(self, strength, min_setting):
-        """shaker_run [0x010289b8]: the shaker motor (coil 8) runs if adj 86 SHAKER MOTOR is not NONE and at
-        least min_setting. Returns True when it ran."""
-        level = self.adj_value(86)
-        if not level or level < min_setting:
-            return False
-        coil = self.machine.coils["c_shaker_motor_optional"]
-        coil.enable()
-        self.machine.clock.schedule_once(lambda: coil.disable(), SHAKER_SECONDS.get(strength, 0.5))
-        self.trace.log("shaker", strength=strength)
-        return True
-
-    def deff_shown(self, deff_id):
-        """A deff took the display (display.Display.start): its own shaker_run call."""
-        if deff_id in SHAKER_DEFFS:
-            self.shaker_run(*SHAKER_DEFFS[deff_id])
 
     def _score_flush(self):
         pending, self._score_pending = self._score_pending, {}
@@ -766,21 +838,21 @@ class TronOS(CustomCode):
     def _request_start(self, **kwargs):
         """start_button_handler [0x00020d14] in attract: a game needs a credit or free play; otherwise event
         0x2d and deff 15 (credit text, PRESS START / INSERT COINS) unless it already runs."""
-        if self.credits.can_start():
+        if self.credit_model.can_start():
             return True
         self.machine.events.post("tron_start_refused")    # event 0x2d
         if not self.display.running(15):
-            self.deff_start(15, credits=self.credits.text())
+            self.deff_start(15, credits=self.credit_model.text())
         return False
 
     def _player_add_request(self, **kwargs):
         """START on ball 1 adds a player when a credit (or free play) allows it [0x00020d14]."""
         game = self.machine.game
-        return not (game and game.player_list) or self.credits.can_start()   # player 1 paid at game start
+        return not (game and game.player_list) or self.credit_model.can_start()   # player 1 paid at game start
 
     def _player_added(self, num=1, **kwargs):
         if num > 1:
-            self.credits.take(1)
+            self.credit_model.take(1)
             self.audit(0x11)
 
     def _start_held(self):
@@ -789,10 +861,42 @@ class TronOS(CustomCode):
         high-score entry, match or game audits) and a new game starts."""
         game = self.game
         if (not game or game.ending or not game.player or game.player.ball < 2 or self.adj_value(36) != 1
-                or self.state & 0x40 or not self.credits.can_start()):
+                or self.state & 0x40 or not self.credit_model.can_start()):
             return
         self._restart = True
         game.end_game()
+
+    def start_button_lamp(self):
+        """FUN_00020448 (game_flow.md 8): with credit, the START BUTTON blinks in attract (task 0x2d,
+        FUN_0002032c: 8 ticks on, 8 off) and is solid otherwise (a credit won at the match lights it at
+        once); without credit it is off."""
+        if self.state & ST_ATTRACT and not self.state & 0x08:      # attract proper, not the game's end
+            if self.has_credit() and not self.task_running(0x2d):
+                self._start_blink(True)
+            return
+        self.task_kill(0x2d)
+        self.lamps.lamp_set(START_LAMP, 1 if self.has_credit() else 0)
+
+    def has_credit(self):
+        """A credit is left (the start button lamp's only question): credits or free play."""
+        return self.credits > 0 or self.free_play
+
+    # the credit state as the score display reads it (media_bridge.credits_text)
+    @property
+    def credits(self):
+        return self.credit_model.credits
+
+    @property
+    def credit_fraction(self):
+        return self.credit_model.fraction()
+
+    @property
+    def free_play(self):
+        return self.credit_model.free_play()
+
+    def _start_blink(self, on):
+        (self.lamps.lamp_on if on else self.lamps.lamp_off)(START_LAMP)
+        self.task_start(0x2d, 8, lambda: self._start_blink(not on))
 
     def _vuk_eject_confirmed(self, unconfirmed=False, **kwargs):
         """The VUK device task runs from the release until MPF confirms the eject (a playfield switch or
@@ -808,6 +912,7 @@ class TronOS(CustomCode):
 
     def _attract_started(self, **kwargs):
         self.state = ST_ATTRACT
+        self.start_button_lamp()
 
     # ------------------------------------------------------------------ game start (4.1)
 
@@ -818,7 +923,8 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4
         self.specials_lit = [0] * 4
         self.specials_collected = [0] * 4
-        self.lamps = set()
+        self.lamps.clear()                           # FUN_00007eb8: lamp images cleared for the new game
+        self.leffs.kill_all()                        # the attract leff tasks die with the other tasks
         self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
         self.replayed = False
         self.game_seconds = 0.0
@@ -826,8 +932,8 @@ class TronOS(CustomCode):
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
-        self.credits.take(1)                         # FUN_00004e9c: the game's credit
-        self.credits.free_games = 0
+        self.credit_model.take(1)                         # FUN_00004e9c: the game's credit
+        self.credit_model.free_games = 0
         self.audit(0x11)
         hs = self.features_by_name.get("high_scores")
         if hs:
@@ -914,6 +1020,23 @@ class TronOS(CustomCode):
         self.leff_stop(14)
         self.ball_save = "grace"
         self.task_start(0x32, BALL_SAVE_GRACE, self._ball_save_end)
+
+    def _leff_save_lamp(self, task):
+        """leff_013 [0x0002fd60] / leff_014 [0x0002fe1c]: the multiball / ball save blinks SHOOT AGAIN on
+        its own layer, every (save ticks left / 31) ticks (2-10). Leff 14 first waits for the valid
+        playfield and ends with the ball save task 0x31; leff 13 runs until it is stopped."""
+        if task.leff_id == 14:
+            if not self.pf_valid and not self.ball_scored:     # FUN_00023638 (a switch scored) or valid
+                task.sleep(2, self._leff_save_lamp)
+                return
+            if not self.task_running(0x31):
+                task.end()
+                return
+            left = self.ball_save_left
+        else:
+            left = self.task_ticks_left(0x34)
+        task.toggle(SHOOT_AGAIN_LAMP)
+        task.sleep(max(2, left // 31) if left < 0x138 else 10, self._leff_save_lamp)
 
     def _ball_save_end(self):
         self.ball_save = None
@@ -1028,7 +1151,7 @@ class TronOS(CustomCode):
     def _service_back(self):
         """Coin-door BACK outside the service menu: a service credit [0x0000fc20]."""
         if not self.in_service:
-            self.credits.service_credit()
+            self.credit_model.service_credit()
 
     def _service_select(self):
         """Coin-door SELECT in attract mode (no game): the service menu (tron/service.py)."""
@@ -1103,15 +1226,18 @@ class TronOS(CustomCode):
     def light_extra_ball(self):
         """OS part of 0x01012190: lit count +1 for the current player."""
         self.eb_lit[self.player_num - 1] += 1
+        self.eb_lamp_update()
 
     def collect_extra_ball(self):
         """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points."""
         p = self.player_num - 1
         self.eb_lit[p] = max(0, self.eb_lit[p] - 1)
+        self.eb_lamp_update()
         if self.eb_collected[p] < self.adj_value(26):
             self.eb_collected[p] += 1
             self.game.player.extra_balls += 1
             self.audit(9)
+            self.shoot_again_lamp_update()
             return True
         self.score_add(3000000)
         return False

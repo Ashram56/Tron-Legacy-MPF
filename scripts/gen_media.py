@@ -7,10 +7,12 @@ Generated (all git-ignored, rebuilt by scripts/setup_workspace.sh):
 - game/slides/deffs/deff_NNN.tscn     one GMC slide per display effect (AnimatedSprite2D with the
                                       ROM frame timing, plus text labels for effects with values)
 - game/tron/media_data.json           sound pools and slide facts for tron/media_bridge.py
+- game/fonts/                         the ROM fonts (scripts/gen_fonts.py)
 
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
-graphics layer and draw their text lines with the slide's font (the ROM fonts are not exported).
+graphics layer and draw each text line with tron/rom_text.gd: the ROM font, position and alignment of
+the deff's draw call in the decompiled code (scripts/rom_layout.py).
 
 Usage: .venv/bin/python scripts/gen_media.py [--only-data]
 """
@@ -93,7 +95,65 @@ def text_lines(rom_text):
     return [t.strip() for t in rom_text.split(" / ")] if rom_text else []
 
 
-def write_slide(deff_id, frames, lines, loop, folder_rel):
+def text_node(i, lay, name=None, var=None):
+    """A tron/rom_text.gd label for text line i (lay from rom_layout.line_layouts)."""
+    out = ['', '[node name="{}" type="Label" parent="."]'.format(name or "Line%d" % i), 'layout_mode = 0',
+           'theme_override_colors/font_color = {}'.format(DMD_COLOR),
+           'script = ExtResource("text")', 'variable_type = 1', 'variable_name = "{}"'.format(var or "line%d" % i),
+           'rom_font = {}'.format(lay["font"]), 'rom_x = {}'.format(lay["x"]),
+           'rom_y = {}'.format(lay["y"]), 'rom_flags = {}'.format(lay["flags"])]
+    if "fit_fonts" in lay:
+        out += ['fit_fonts = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_fonts"]))),
+                'fit_ys = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_ys"]))),
+                'fit_width = {}'.format(lay["fit_width"])]
+    if "alt_when_empty" in lay:
+        out += ['alt_x = {}'.format(lay["alt_x"]), 'alt_y = {}'.format(lay["alt_y"]),
+                'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
+    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms"):
+        if lay.get(key):
+            out.append('{} = {}'.format(key, lay[key]))
+    if lay.get("level_steps"):
+        out.append('level_steps = PackedInt32Array({})'.format(", ".join(map(str, lay["level_steps"]))))
+    return out
+
+
+def level_color(level):
+    """DMD_COLOR at palette level 0-15 (the slide tint keeps the level in the red channel)."""
+    r, g, b = (float(v) for v in DMD_COLOR[6:-4].split(", "))
+    return "Color({:.4g}, {:.4g}, {:.4g}, 1)".format(r * level / 15, g * level / 15, b * level / 15)
+
+
+def rect_node(name, x, y, w, h, level):
+    return ['', '[node name="{}" type="ColorRect" parent="."]'.format(name), 'layout_mode = 0',
+            'offset_left = {}.0'.format(x), 'offset_top = {}.0'.format(y), 'offset_right = {}.0'.format(x + w),
+            'offset_bottom = {}.0'.format(y + h), 'color = {}'.format(level_color(level))]
+
+
+def score_display_nodes(score_lines=True, match=False):
+    """deff 19 beyond its two text lines (ROM deff_019 0x01023a98, deff_draw_status_panel 0x010230ec):
+    credits and replay lines (font 0, row 30), player scores and last points in the status panel (font 0
+    right-aligned at x 38), the panel's separator (x 40) and dashes (row 31) at level 1, the timer bars
+    at level 15, and tron/score_display.gd driving rotation, blink, dimming and bars."""
+    import rom_layout
+    out = []
+    for name, var, x, y, flags in rom_layout.SCORE_PANEL:
+        if score_lines or name not in ("Credits", "Replay"):
+            out += text_node(0, {"font": 0, "x": x, "y": y, "flags": flags}, name, var)
+    out += rect_node("Separator", 40, 0, 1, 32, 1)
+    for k, (name, x) in enumerate((("BarDs", 4), ("BarBumpers", 16), ("BarSpinners", 28))):
+        out += rect_node("Dash%d" % k, x, 31, 10, 1, 1)
+        out += rect_node(name, x, 31, 0, 1, 15)
+    for name in ("BarZfs", "BarClu", "BarGem"):
+        out += rect_node(name, 40, 0, 1, 0, 15)
+    out += ['', '[node name="ScoreDisplay" type="Node" parent="."]', 'script = ExtResource("score")']
+    if score_lines:
+        out.append('score_lines = true')
+    if match:
+        out.append('match_panel = true')
+    return out
+
+
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -108,8 +168,10 @@ def write_slide(deff_id, frames, lines, loop, folder_rel):
         entries.append('{{"duration": {:.1f}, "texture": ExtResource("{}")}}'.format(ms, seen[digest]))
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + (3 if frames else 2)), '',
              '[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]']
-    if lines:
-        parts.append('[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_variable.gd" id="var"]')
+    if any(layouts) or panel:
+        parts.append('[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]')
+    if panel:
+        parts.append('[ext_resource type="Script" path="res://tron/score_display.gd" id="score"]')
     parts += ext
     if frames:
         parts += ['', '[sub_resource type="SpriteFrames" id="frames"]',
@@ -123,24 +185,22 @@ def write_slide(deff_id, frames, lines, loop, folder_rel):
         parts += ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
                   'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
                   'autoplay = "default"', 'centered = false']
-    n = len(lines)
-    for i in range(n):
-        top = round(32 * i / n)
-        parts += ['', '[node name="Line{}" type="Label" parent="."]'.format(i), 'layout_mode = 0',
-                  'offset_top = {}.0'.format(top), 'offset_right = 128.0',
-                  'offset_bottom = {}.0'.format(round(32 * (i + 1) / n)),
-                  'theme_override_colors/font_color = {}'.format(DMD_COLOR),
-                  'theme_override_font_sizes/font_size = {}'.format(8 if n > 2 else 10),
-                  'horizontal_alignment = 1', 'vertical_alignment = 1',
-                  'script = ExtResource("var")', 'variable_type = 1',
-                  'variable_name = "line{}"'.format(i)]
+    for i, lay in enumerate(layouts):
+        if lay:
+            parts += text_node(i, lay)
+    if panel:
+        parts += score_display_nodes(deff_id == 19, panel == "match")
     with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w") as f:
         f.write("\n".join(parts) + "\n")
     return name
 
 
 def build_deffs(only_data):
+    import rom_layout
     rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv")))}
+    fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json")))["fonts"]
+    calls = rom_layout.deff_calls()
+    panels = rom_layout.status_panel_deffs()
     out = {}
     os.makedirs(os.path.join(GAME, "slides", "deffs"), exist_ok=True)
     for folder in sorted(glob.glob(os.path.join(PKG, "media", "dmd", "deff_*"))):
@@ -155,7 +215,11 @@ def build_deffs(only_data):
             source, lines = ("graphics" if has_graphics else "none"), text_lines(rom_text)
         else:
             source, lines = "reference", []
-        info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop}
+        layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
+        panel = panels.get(deff_id) if source != "reference" else None   # captures show their panel
+        info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
+                "panel": panel,
+                "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
             continue
@@ -163,12 +227,21 @@ def build_deffs(only_data):
         shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
         os.makedirs(os.path.join(GAME, rel))
         frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
-        write_slide(deff_id, frames, lines, loop, rel)
+        end = rom_layout.GRAPHICS_END.get(deff_id)
+        if end and source == "graphics" and len(frames) >= end:  # the ROM stops drawing bitmaps at frame `end`
+            from PIL import Image
+            last_ms = frames[end - 1][1]
+            frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
+                                         (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        write_slide(deff_id, frames, layouts, loop, rel, panel)
     return out
 
 
 def main():
+    import gen_fonts
     only_data = "--only-data" in sys.argv
+    if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
+        gen_fonts.build()
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
     with open(os.path.join(GAME, "tron", "media_data.json"), "w") as f:
         json.dump(data, f, indent=0, sort_keys=True)

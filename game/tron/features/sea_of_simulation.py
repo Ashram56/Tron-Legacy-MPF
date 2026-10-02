@@ -41,6 +41,15 @@ STAGES = (
     (2, 3, 4, 5),
 )
 RECOGNIZER_HITS = 6
+# simulation shot id -> the inserts the stage lamps draw for it. The stage lamp functions (stage table
+# +0x10, spawned by leff_136 [0x01026f74]) use lamp groups 0x4c-0x50 that are not readable here; these
+# are the shot's inserts (lamps.csv), checked against traces/sea_of_simulation.jsonl (GEM: 57-59,
+# ZUSE: 10 12 29 43, QUORRA: 60-64) and the captured show of leff 136 (CLU: 9 30 31 and the ejects).
+SHOT_LAMPS = {VUK: (37, 38, 39, 40), 2: (4,), 3: (3,), 4: (2,), 5: (1,), 6: (9,), 7: (30,), 8: (31,),
+              9: (12,), 10: (10,), 11: (43,), 12: (29,), 13: (54,),
+              14: (16, 15, 14, 13), 15: (49, 50, 11), 16: (64, 63, 62, 61), 17: (57, 58, 59),
+              18: (56, 55, 42), 19: (33, 34, 35, 36)}
+STAGE_LAMPS = {4: (60,)}        # QUORRA stage: ADVANCE QUORRA blinks with the left inner loop
 HELMET_BITS = 0x1c0
 # deff 116+k "stage complete" variant (FUN_01027478): its animation and speech 0x111 take 2.105 s, then
 # the deff drops to priority 0x20 for a 10-frame hold (traces/sea_of_simulation: 22.208 -> 24.318,
@@ -69,9 +78,31 @@ class SeaOfSimulation(Feature):
         self.end_wait = 0
         os_.lamp_rule(self.lit_rule, leff=134, tube=64, order=0x010267fc)
         os_.lamp_rule(self.running_rule, leff=136, tube=66, order=0x01026dbc)
+        os_.lamps.leff_code(136, self._leff_stage)
         os_.deff_rule(self.running_rule, 114, music=0x108, priority=9, on_start=self._status_started)
 
     # ------------------------------------------------------------------ state
+
+    def _leff_stage(self, task):
+        """leff_136 [0x01026f74]: the current stage's lamp function on its own layer. A stage with one
+        shot chases / blinks its inserts (FUN_010247d0 / FUN_01024a94: 6-tick steps); a stage with several
+        toggles the needed shots' inserts every 3 ticks (FUN_01024d68 / FUN_0102522c, solid in the
+        traces). Inserts of shots already made are released."""
+        phase = task.data.setdefault("phase", True)
+        shots = STAGES[self.stage] if 0 <= self.stage < len(STAGES) else ()
+        wanted = set()
+        for shot in shots:
+            if self.needed & (1 << shot):
+                wanted.update(SHOT_LAMPS.get(shot, ()))
+        if wanted:
+            wanted.update(STAGE_LAMPS.get(self.stage, ()))
+        for lamp in set(task.layer.mask) | wanted:
+            if lamp in wanted:
+                task.set(lamp, phase)
+            else:
+                task.release(lamp)
+        task.data["phase"] = not phase
+        task.sleep(6 if len(shots) == 1 else 3, self._leff_stage)
 
     def player_first_ball(self):
         """Event 0x26 [0x01024640]: SOS starts and skip bonuses given, per player."""
@@ -231,7 +262,7 @@ class SeaOfSimulation(Feature):
             os_.leff_start(142)
         if self.helmets & HELMET_BITS == HELMET_BITS:
             self.helmets = 0
-            os_.leff_start(143)
+            os_.leff_start(143, lamp="rom_group_50")
             return self.next_needed(2) or bit
         return bit
 

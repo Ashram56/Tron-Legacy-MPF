@@ -11,6 +11,7 @@ from tron.features import Feature
 ORDER = 40
 # moving lit target steps (table 0x040d32b4): target mask per step, L C R C
 STEP_MASK = (1, 2, 4, 2)
+TARGET_LAMPS = {1: 53, 2: 52, 4: 51}   # the step table lamps (L C R = RECOGNIZER POS. 3, 2, 1; traces)
 STEP_TICKS = 93           # task 0x7d: one step
 PREV_TICKS = 11           # the previous lit target still counts until here
 NEXT_TICKS = 47           # the next step is chosen here (head motor target)
@@ -36,6 +37,29 @@ class Recognizer(Feature):
         os_.lamp_rule(self.bank_motor_rule, order=0x0102227c)
         os_.lamp_rule(lambda: (self.dbattle_can_progress() or bool(os_.hook("dmb_disc_is_target"))
                                or bool(os_.hook("portal_mb_super_lit"))), leff=76, order=0x01006610)
+        os_.lamps.leff_code(76, self._leff_disc_flasher)
+        os_.lamps.leff_code(99, self._leff_moving_target)
+
+    def _leff_moving_target(self, task):
+        """leff_099 [0x01020ff8]: over the recognizer target inserts, the moving lit target blinks every
+        3 ticks, the previous one stays on (plane 1) and the others are off. No target is ever disabled
+        here (module docstring), so the disabled-target branch (always on) does not occur."""
+        phase = task.data.setdefault("phase", True)
+        lit, prev = STEP_MASK[self.lit], STEP_MASK[self.prev]
+        for mask, lamp in TARGET_LAMPS.items():
+            if mask == lit:
+                task.set(lamp, phase)
+            else:
+                task.set(lamp, mask == prev)
+        task.data["phase"] = not phase
+        task.sleep(3, self._leff_moving_target)
+
+    def _leff_disc_flasher(self, task):
+        """leff_076 [0x01006660]: coil_pulse(31 red disc, or 32 blue disc while a multiball runs
+        [0x01006648], 64 ms) every 12 ticks."""
+        os_ = self.os
+        os_.lamps.flasher("f_blue_disc" if os_.any_multiball() else "f_red_disc", 64)   # direct coil_pulse: no leff ownership
+        task.sleep(12, self._leff_disc_flasher)
 
     # ------------------------------------------------------------------ state
 
@@ -130,7 +154,7 @@ class Recognizer(Feature):
         os_, pd = self.os, self.pd
         if not self.recog_targets_count_active():
             if not silent:
-                os_.leff_start(100)
+                os_.leff_start(100, lamp=lamp)
                 os_.sound(0x0ce)
             os_.score_add(1000)
             return False

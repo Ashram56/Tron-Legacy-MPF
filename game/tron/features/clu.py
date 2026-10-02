@@ -13,7 +13,11 @@ CLU_ITEM = 2
 # lane index -> (bit, lamp, sound when newly lit, sound when already lit) [table 0x040d2ea8]
 LANES = ((1, 9, 0x099, 0x096), (2, 30, 0x09a, 0x097), (4, 31, 0x09b, 0x098))
 SHOT_ORDER = (0x001, 0x004, 0x080, 0x100)       # table 0x040d22dc
+# the CLU insert of each shot in SHOT_ORDER (the lamp groups of table 0x040d22e0; the inserts leff 78
+# draws in traces/clu_hurryup.jsonl: left orbit 13, left inner loop 61, right orbit 36, VUK eject 28)
+SHOT_LAMPS = (13, 61, 36, 28)
 ALL_SHOTS = 0x185
+OUTLANE_LAMPS = (8, 32)                         # special inserts [table 0x040d2ecc]
 MAX_AWARD = 1500000
 
 
@@ -28,10 +32,22 @@ class Clu(Feature):
         self.clock = Countdown(os_, "clu_timer", 0xc0, 0xc1, self._tick, self._show_total, intro=0x93)
         self.hits = self.shots = self.base = self.total = 0
         os_.lamp_rule(self.clock.counting, leff=78, tube=23, order=0x01001d40)
+        os_.lamps.leff_code(78, self._leff_shot_lamps)
         os_.deff_rule(self._background, 72, 0x086, 5)
+        os_.lamp_update(self.lane_lamps)
         sc = self.machine.switch_controller
         sc.add_switch_handler("s_left_flipper", self.rotate_toward_c)
         sc.add_switch_handler("s_right_flipper", self.rotate_toward_u)
+
+    def _leff_shot_lamps(self, task):
+        """leff_078_clu_shot_lamps [0x010028ec]: the CLU insert of each shot still to make toggles every
+        3 ticks (reads solid in the traces), the others are held off."""
+        for bit, lamp in zip(SHOT_ORDER, SHOT_LAMPS):
+            if self.shots & bit:
+                task.toggle(lamp)
+            else:
+                task.set(lamp, False)
+        task.sleep(3, self._leff_shot_lamps)
 
     def player_first_ball(self):
         """clu_player_init 0x01001c2c and clu_lanes_player_init 0x010167f4."""
@@ -54,6 +70,25 @@ class Clu(Feature):
         """0x0101688c: no Sea of Simulation (0x34), Portal (0x37) or End of Line (0x27)."""
         return not any(self.os.flag(f) for f in (0x34, 0x37, 0x27))
 
+    def lane_lamps(self):
+        """clu_lane_lamps_rule [0x010168d0] (lamp rule): a lit lane is solid (off while the lanes are
+        inactive). Then as many outlane inserts (table 0x040d2ecc: 8, 32) are on as specials are lit
+        (FUN_00023fc8): the missing ones are turned on in table order, extra ones off."""
+        os_ = self.os
+        active = self.lanes_active()
+        bits = self.pd.get("clu_lane_bits", 0)
+        for bit, lamp, _, _ in LANES:
+            os_.lamps.lamp_set(lamp, 1 if active and bits & bit else 0)
+        want = os_.specials_lit[os_.player_num - 1] if os_.player_num else 0
+        have = sum(1 for lamp in OUTLANE_LAMPS if lamp in os_.lamps)
+        for lamp in OUTLANE_LAMPS:
+            if have < want and lamp not in os_.lamps:
+                os_.lamps.lamp_on(lamp)
+                have += 1
+            elif have > want and lamp in os_.lamps:
+                os_.lamps.lamp_off(lamp)
+                have -= 1
+
     def clu_letter(self, idx):
         """clu_lane_hit 0x01016b0c."""
         os_, pd = self.os, self.pd
@@ -63,11 +98,11 @@ class Clu(Feature):
         if not pd.clu_lane_bits & bit:
             pd.clu_lane_bits |= bit
             os_.score_add(10000)
-            os_.leff_start(86)
+            os_.leff_start(86, lamp=LANES[idx][1])
             os_.sound(snd_new)
         else:
             os_.score_add(1000)
-            os_.leff_start(87)
+            os_.leff_start(87, lamp=LANES[idx][1])
             os_.sound(snd_lit)
         if pd.clu_lane_bits == 7:
             pd.clu_lane_bits = 0

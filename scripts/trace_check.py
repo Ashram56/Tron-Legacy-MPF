@@ -7,6 +7,11 @@ behaviour: OS bookkeeping audits (time played, 59-64), and sounds played from in
 score display deff 19 (and its tube show 10) and the mode background deffs that the deff rules restart
 behind other effects (ROM caller 0x19944, rebuild "rule": 1).
 
+"lamp" in --events adds the lamp comparison of scripts/lamp_state.py (steady lamp states at every mark
+and every second, outside the lamps a running leff draws); it prints the differing lamps.
+"coil" adds the flasher / shaker comparison of scripts/coil_state.py (bursts of each flasher and the
+shaker matched by start time); it prints the coils with missing or extra bursts.
+
 Usage: scripts/trace_check.py <scenario> [--events score,deff_start,...] [--tol 0.25]
 """
 import argparse
@@ -20,7 +25,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 REF = os.path.join(ROOT, "assets", "rules", "traces")
 CAND = os.path.join(ROOT, "captures", "traces")
 COMPARE = os.path.join(ROOT, "assets", "rules", "tools", "trace", "trace_compare.py")
-DEFAULT = "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark"
+DEFAULT = "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil"
 OS_AUDITS = {59, 60, 61, 62, 63, 64}
 
 
@@ -69,7 +74,35 @@ def main():
             os.path.join(tmp, "r")) is None else tmp)
         os.makedirs(os.path.join(tmp, "c"))
         cand = filtered(os.path.join(CAND, a.scenario + ".jsonl"), os.path.join(tmp, "c"))
-        return subprocess.run([sys.executable, COMPARE, ref, cand, "--tol", a.tol, "--events", a.events]).returncode
+        kinds = [k for k in a.events.split(",") if k not in ("lamp", "coil")]
+        rc = 0
+        if kinds:
+            sys.stdout.flush()
+            rc = subprocess.run([sys.executable, COMPARE, ref, cand, "--tol", a.tol, "--events",
+                                 ",".join(kinds)]).returncode
+        if "lamp" in a.events.split(","):
+            sys.stdout.flush()
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import lamp_state
+            good, total, _ = lamp_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+                                                os.path.join(CAND, a.scenario + ".jsonl"))
+            if good == total:
+                print("{:16s} OK   {} samples".format("lamp", total))
+            else:
+                print("{:16s} DIFF {}/{} samples match".format("lamp", good, total))
+                rc = rc or 1
+        if "coil" in a.events.split(","):
+            sys.stdout.flush()
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import coil_state
+            good, total, _ = coil_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+                                                os.path.join(CAND, a.scenario + ".jsonl"))
+            if good == total:
+                print("{:16s} OK   {} bursts".format("coil", total))
+            else:
+                print("{:16s} DIFF {}/{} bursts match".format("coil", good, total))
+                rc = rc or 1
+        return rc
 
 
 if __name__ == "__main__":
