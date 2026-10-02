@@ -12,12 +12,21 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 TRACES = {
     "game_flow": "score,deff_start,sound,audit,mark",
+    "sea_of_simulation": "deff_start,audit,multiball_start,mark",
+    "portal_multiball": "multiball_start,mark",
+    "portal_multiball_shots": "mark",
+    "combos": "audit,multiball_start,mark",
+    "combos_eol_jackpot": "multiball_start,mark",
+    "tron_targets": "multiball_start,mark",
+    "zen_rollover": "score,deff_start,audit,multiball_start,mark",
+    "recognizer_and_disc_battle": "score,deff_start,tube_show_start,audit,multiball_start,mark",
+    "disc_multiball": "multiball_start,mark",
+    "disc_multiball_restart": "score,audit,multiball_start,mark",
     # End of Line: the other kinds differ only through features not built yet (Flynn's Arcade
     # Recognizer/GEM awards at the VUK, Light Cycle progress deff 83, combo arrows leff 159)
-    "end_of_line_multiball": "multiball_start,mark",
+    "end_of_line_multiball": "score,multiball_start,mark",
     "end_of_line_multiball_scoring": "multiball_start,mark",
     "daft_punk_multiball": "multiball_start,mark",
-    "combos_eol_jackpot": "multiball_start,mark",
 }
 
 

@@ -63,6 +63,7 @@ class TestEndOfLine(TronTestCase):
         self.assertFalse(os_.flag(0x26))
         self.assertTrue(eol.eol_running())
         self.assertTrue(eol.eol_running_or_grace_a())
+        self.assertTrue(os_.hook("eol_running_or_grace"))
         self.assertFalse(eol.eol_letter(0))                   # no letters while it runs
         self.assertFalse(eol.eol_vuk())                       # not lit any more
         self.advance_time_and_run(8)
@@ -130,8 +131,8 @@ class TestEndOfLine(TronTestCase):
     def test_combo_jackpot_hooks(self):
         eol = self.start_game()
         os_ = self.tron
-        self.assertEqual(os_.hook("eol_combo_jackpot_value"), 500000)
-        self.assertEqual(os_.hook("eol_combo_jackpot_add", 350000), 850000)
+        self.assertEqual(os_.hook("eol_combo_jackpot_value"), 500000)    # the combos feature's value
+        os_.pd.eol_combo_jackpot = 850000
         self.assertFalse(eol.eol_combo_jackpot())             # not lit
         eol.eol_combo_jackpot_light()
         self.advance_time_and_run(200 * TICK)                 # 0xcf over, 0xd0 still collectable
@@ -152,18 +153,15 @@ class TestMultiballAndDisplayModel(TronTestCase):
         self.hit_and_release_switch("s_zen_rollover")
         self.advance_time_and_run(1)
 
-    def test_multiball_task(self):
+    def test_multiball_save_drain_not_audited(self):
         self.start_game()
         os_ = self.tron
         self.assertTrue(os_.multiball_start(2, 625, 125))
-        # a second request before the first eject keeps the larger save and grace
-        self.assertTrue(os_.multiball_start(3, 312, 187))
-        self.assertEqual(os_._mb_save, [625, 187])
-        self.advance_time_and_run(3)
-        self.assertTrue(os_.task_running(0x34))
+        self.advance_time_and_run(4)
         self.assertTrue(os_.mb_save_running())
-        os_.kill_mb_save()
-        self.assertFalse(os_.mb_save_running())
+        audits = os_.audits.get(0x2b, 0)
+        self.assertEqual(os_._ball_drain(balls=1), {"balls": 0})       # saved, no "ball saved" audit
+        self.assertEqual(os_.audits.get(0x2b, 0), audits)
         os_.state |= 0x200                                    # tilted: refused
         self.assertFalse(os_.multiball_start(4, 312, 187))
         os_.state &= ~0x200
@@ -185,6 +183,20 @@ class TestMultiballAndDisplayModel(TronTestCase):
         display.when_idle(0x50, 60)                           # idle display: plays at once
         self.advance_time_and_run(0.1)
         self.assertEqual(display.fg, 60)
-        os_.state |= 0x04
-        display.refresh()                                     # no deff rules outside normal play
-        os_.state &= ~0x04
+        # a show ends at the start of its deff's hold, and the mode's background deff restarts
+        eol = self.tron.features_by_name["end_of_line"]
+        os_.flag_set(0x27)
+        display.clear()
+        display.queue(0xa6, 56)
+        self.advance_time_and_run(display.media[56].seconds - 5 * TICK)
+        self.assertIsNone(display.show)
+        self.assertEqual(display.fg, 56)
+        self.assertEqual(display.fg_prio, 0x20)
+        self.assertTrue(eol.background_on())
+        self.assertEqual(self.last("deff_start", id=57)["rule"], 1)
+        os_.flags.discard(0x27)
+
+    def last(self, ev, **match):
+        found = [e for e in self.tron.trace.events if e["ev"] == ev
+                 and all(e.get(k) == v for k, v in match.items())]
+        return found[-1] if found else None

@@ -11,9 +11,9 @@ jackpot, the right ramp a double jackpot, the disc 200,000 + level + add-a-balls
 
 Hooks called by the switch layer: eol_shot_score, eol_ramp_jackpot(shot), eol_disc_jackpot(shot),
 eol_letter(side), eol_vuk, eol_combo_jackpot (collect), eol_combo_jackpot_light.
-Hooks for the combos feature: eol_combo_jackpot_add(value) (a named combo grows the jackpot),
-eol_combo_jackpot_value() (the "JACKPOT=" shown in deff 138). For others: eol_running() (flag 0x27),
-eol_running_or_grace_a() (Recognizer bank motor, 0x0102227c).
+The jackpot value itself (pd.eol_combo_jackpot, 500,000 at each ball start, grown by named combos)
+belongs to the combos feature. For others: eol_running() (flag 0x27), eol_running_or_grace()
+(0x01004c30, Disc/Recognizer), eol_running_or_grace_a() (Recognizer bank motor, 0x0102227c).
 """
 from tron.features import Feature
 
@@ -23,7 +23,6 @@ LIT, RUNNING, EB_GIVEN = 0x26, 0x27, 0x28
 SHOT_BITS = (1, 2, 4)                 # table 0x040d25a8: 0 left ramp, 1 right ramp, 2 disc
 INTRO_TASK, GRACE_A, GRACE_B, TOTAL_TASK = 0xa6, 0xb0, 0xb1, 0x4f
 COMBO_JACKPOT_LIT_A, COMBO_JACKPOT_LIT_B, COMBO_JACKPOT_SHOW = 0xcf, 0xd0, 0x87
-COMBO_JACKPOT_START = 500000
 # deff 56 chains its speech with snd_play_chain: 0x025 after sample 0x320 (2.56 s), 0x026 after 0x321
 # (2.33 s) (callouts/samples_index.csv; traces/end_of_line_multiball.jsonl 58.01 -> 60.57 -> 62.92)
 INTRO_SPEECH_CHAIN = ((2.56, 0x025), (2.33, 0x026))
@@ -33,10 +32,10 @@ MUSIC_PRIORITY = 7                    # background rule priority [eol_init_rules
 
 class EndOfLine(Feature):
     name = "end_of_line"
-    HOOKS = ("player_first_ball", "ball_start", "ball_end", "ball_end_wait", "multiball_end",
-             "background_rule", "eol_shot_score", "eol_ramp_jackpot", "eol_disc_jackpot", "eol_letter",
-             "eol_vuk", "eol_combo_jackpot", "eol_combo_jackpot_light", "eol_combo_jackpot_add",
-             "eol_combo_jackpot_value", "eol_running", "eol_running_or_grace_a")
+    HOOKS = ("player_first_ball", "ball_end", "ball_end_wait", "multiball_end",
+             "eol_shot_score", "eol_ramp_jackpot", "eol_disc_jackpot", "eol_letter",
+             "eol_vuk", "eol_combo_jackpot", "eol_combo_jackpot_light", "eol_running",
+             "eol_running_or_grace", "eol_running_or_grace_a")
 
     def __init__(self, os_):
         super().__init__(os_)
@@ -49,6 +48,8 @@ class EndOfLine(Feature):
         os_.lamp_rule(self.background_on, leff=60, order=0x010055d8)
         os_.lamp_rule(self.background_on, leff=59, order=0x010055d8)
         os_.lamp_rule(self.background_on, tube=88, order=0x010055d8)
+        # deff + music rule [0x01005610]: deff 57, music 0x20 + (level & 3), priority 7
+        os_.deff_rule(self.background_on, 57, music=lambda: 0x20 + (self.level & 3), priority=MUSIC_PRIORITY)
         # End of Line combo jackpot lit (task 0xcf) [leff rule 0x01003914]
         os_.lamp_rule(lambda: os_.task_running(COMBO_JACKPOT_LIT_A), leff=161, order=0x01003914)
 
@@ -61,11 +62,6 @@ class EndOfLine(Feature):
         pd.eol_times_lit = pd.eol_sets = pd.eol_sets_total = 0
         pd.eol_starts = 0
 
-    def ball_start(self):
-        """combo_ball_start_reset 0x010031ac: End of Line combo jackpot back to 500,000."""
-        self.pd.eol_combo_jackpot = COMBO_JACKPOT_START
-        self.pd.eol_jackpot_collected = 0
-
     # ------------------------------------------------------------------ conditions
 
     def can_start(self):
@@ -75,6 +71,9 @@ class EndOfLine(Feature):
     def active(self):
         """eol_running_or_grace 0x01004c30."""
         return self.os.flag(RUNNING) or self.os.task_running(GRACE_A) or self.os.task_running(GRACE_B)
+
+    def eol_running_or_grace(self):
+        return self.active()
 
     def eol_running(self):
         """eol_multiball_running 0x01004be8."""
@@ -93,12 +92,6 @@ class EndOfLine(Feature):
         if not self.os.flag(RUNNING):
             return False
         return not any(s.task_id == INTRO_TASK for s in self.os.display.shows)
-
-    def background_rule(self):
-        """Deff + music rule [0x01005610]: deff 57, music 0x20 + (level & 3), priority 7."""
-        if self.background_on():
-            return (MUSIC_PRIORITY, 57, 0x20 + (self.level & 3))
-        return None
 
     # ------------------------------------------------------------------ DAFT / PUNK letters
 
@@ -309,14 +302,6 @@ class EndOfLine(Feature):
         os_.task_kill(COMBO_JACKPOT_LIT_B)
         os_.request_refresh()
         return True
-
-    def eol_combo_jackpot_add(self, value):
-        """A named combo adds its value to the jackpot (on_combo_awards 0x01003714 step 6)."""
-        self.pd.eol_combo_jackpot += value
-        return self.pd.eol_combo_jackpot
-
-    def eol_combo_jackpot_value(self):
-        return self.pd.eol_combo_jackpot
 
 
 feature = EndOfLine
