@@ -114,6 +114,7 @@ class TronOS(CustomCode):
         self._search_handle = None
         self.ball_search_count = 0
         self.ball_held = False       # a ball sits in the VUK waiting for its kickout
+        self.ball_validated = False  # the playfield was validated on this ball (base music 0x01b)
         self.vuk_ejecting = False    # VUK eject not yet confirmed by a playfield switch (no ball search)
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
                                 "settings.yaml")
@@ -136,9 +137,10 @@ class TronOS(CustomCode):
 
         self.register("rules_refresh", self.request_refresh)
         self.register_poke(0x3d46c, lambda p, v: self.eb_lit.__setitem__(p, v))
-        from tron.display import Display, Tubes     # noqa: E402 (import after machine setup)
+        from tron.display import Display, Leffs, Tubes     # noqa: E402 (import after machine setup)
         self.display = Display(self)
         self.tubes = Tubes(self)
+        self.leffs = Leffs(self)
         from tron import switches                   # noqa: E402
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
@@ -231,14 +233,21 @@ class TronOS(CustomCode):
             self._refresh_pending = True
             self.machine.clock.schedule_once(self.rules_refresh, TICK / 2)
 
-    def rules_refresh(self):
+    def rules_refresh(self, leffs_only=False):
+        """leffs_only: only start refused rule leffs whose flashers were freed (display.Leffs)."""
+        if leffs_only:
+            active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
+            for rule in self.rules:
+                if rule[3] and rule[1] is not None and self.leffs.retry_due(rule[1]) and active_game and rule[0]():
+                    self.leff_start(rule[1], loop=True)
+            return
         self._refresh_pending = False
         active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
         for rule in self.rules:
             cond, leff, tube, on = rule[:4]
             want = bool(active_game and cond())
-            if want and not on and leff is not None:
-                self.leff_start(leff)
+            if want and leff is not None and (not on or self.leffs.retry_due(leff)):
+                self.leff_start(leff, loop=True)     # also a refused one whose outputs are free now
             elif on and not want and leff is not None:
                 self.leff_stop(leff)
             # a tube rule restarts its show whenever it is not running (refused or taken over before)
@@ -248,6 +257,7 @@ class TronOS(CustomCode):
                 elif not want and self.tubes.is_running(tube):
                     self.tube_stop(tube)
             rule[3] = want
+        self.display.bg_refresh()                    # background deff rules and their music
         self.machine.events.post("tron_rules_refresh")
 
     def register(self, name, fn):
@@ -278,15 +288,38 @@ class TronOS(CustomCode):
     def show_running(self):
         return self.display.show_running()
 
+    def base_music(self):
+        """Music of the score-display deff rules [0x0100f594 / 0x0100f5c8]: 0x01a until the playfield is
+        validated on this ball, then 0x01b; 0x029 while Disc Battle is lit (hook dbattle_is_lit)."""
+        if self.hook("dbattle_is_lit"):
+            return 0x029
+        return 0x01b if self.ball_validated else 0x01a
+
+    def music(self, call):
+        """Play a background music call and remember it (display.bg_refresh plays it again on a change)."""
+        self.display.music = call
+        self.sound(call)
+
     def sound(self, call, in_deff=0):
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
 
-    def leff_start(self, leff_id):
+    def sound2(self, call, arg):
+        """snd_play2(call, arg) [0x0002c950]: a sound call with an argument (e.g. a spoken number). The
+        ROM traces log these from inside snd_play2 (caller 0x2c97c), which trace_check leaves out."""
+        self.trace.log("sound", call="0x{:03x}".format(call), in_deff=0, arg=arg, caller="0x2c97c")
+        self.machine.events.post("tron_sound_{:03x}".format(call), arg=arg)
+
+    def leff_start(self, leff_id, loop=False):
+        """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs."""
         self.trace.log("leff_start", id=leff_id)
+        if not self.leffs.start(leff_id, loop):
+            return False
         self.machine.events.post("tron_leff_{}".format(leff_id))
+        return True
 
     def leff_stop(self, leff_id):
+        self.leffs.stop(leff_id)
         self.trace.log("leff_stop", id=leff_id)
         self.machine.events.post("tron_leff_{}_stop".format(leff_id))
 
@@ -353,6 +386,8 @@ class TronOS(CustomCode):
         `balls` (counting the VUK ball, capped at the 4 installed), kill the single-ball save and run the
         multiball save (leff 13 while it runs, then the grace). A larger pending request wins."""
         self.trace.log("multiball_start", balls=balls, save_ticks=save_ticks, grace_ticks=grace_ticks)
+        if self.state & 0x214:                       # tilt, end of ball or attract: refused (returns 0)
+            return False
         self.machine.events.post("tron_multiball_start", balls=balls)
         self.kill_ball_save()
         target = min(balls, 4)
@@ -367,13 +402,14 @@ class TronOS(CustomCode):
             self.after(SAVE_EJECT_TICKS, launch)
         if save_ticks > self.task_ticks_left(0x34):
             self.task_kill(0x35)
-            self.leff_start(13)
+            self.after(1, lambda: self.task_running(0x34) and self.leff_start(13))   # from the multiball task
             self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
+        return True
 
     def _mb_save_grace(self, grace_ticks):
         self.leff_stop(13)
-        if grace_ticks:
-            self.task_start(0x35, grace_ticks)
+        # the ball search waits for the end of the multiball task (save, then grace) [0x0001ea60]
+        self.task_start(0x35, grace_ticks, self.ball_search_reload)
 
     def mb_save_running(self):
         return self.task_running(0x34) or self.task_running(0x35)
@@ -450,8 +486,9 @@ class TronOS(CustomCode):
         self.pf_valid = True
         self.flag_set(0x1c)                          # event 0x6a handler [0x0100f25c]
         self.hook("playfield_valid")
-        if self.serve_type == 3:
-            self.after(1, lambda: self.in_play and self.sound(0x01b))   # main play music
+        self.ball_validated = True
+        # the base music rule switches to the main play music (0x01b) one tick later
+        self.after(1, lambda: self.in_play and self.display.bg_refresh())
 
     # ------------------------------------------------------------------ coins and start
 
@@ -509,7 +546,8 @@ class TronOS(CustomCode):
             self.deff_start(26, player=self.player_num)   # speech 0x11b comes with the deff
             self.leff_start(16)
         self.deff_start(19)
-        self.sound(0x01a)
+        self.ball_validated = False
+        self.music(self.base_music())
         self.hook("ball_start_media")                # leffs/tube shows the features start with the ball
         self.deff_stop(27)                           # instant info off
         if self._new_game:
@@ -620,8 +658,9 @@ class TronOS(CustomCode):
         self._search_handle = None
         if not self.game:
             return
+        # no search while the multiball task (save and grace, FUN_0001ea60) runs: it reloads at its end
         if (self.pf_valid and not self.state & (ST_END_BALL | ST_BONUS | 0x18) and not self.ball_held
-                and not self.vuk_ejecting):
+                and not self.vuk_ejecting and not self.mb_save_running()):
             self.ball_search_count += 1
             self.task_start(0x2b, BALL_SEARCH_TICKS)
             self.audit(0x25)

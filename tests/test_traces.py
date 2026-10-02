@@ -16,6 +16,9 @@ TRACES = {
     "combos_eol_jackpot": "multiball_start,mark",
     "tron_targets": "multiball_start,mark",
     "zen_rollover": "score,deff_start,audit,multiball_start,mark",
+    "recognizer_and_disc_battle": "score,deff_start,tube_show_start,audit,multiball_start,mark",
+    "disc_multiball": "multiball_start,mark",
+    "disc_multiball_restart": "score,audit,multiball_start,mark",
 }
 
 
