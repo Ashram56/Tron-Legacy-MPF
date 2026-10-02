@@ -10,6 +10,9 @@ as *steady states* over a short window ending at a sample time:
   "F"  flashing: >= 2 changes, every gap 0.10-0.20 s (the ROM flash rate, 146 ms per phase)
   "f"  fast/other blinking (a feature's own blink task, a leff frame loop, ...): anything else
        that changed inside the window; compared only as "changing" ("f" equals "F")
+  "~"  changed once inside the window (in transition): not compared
+  Up to two isolated pulses shorter than BLIP (one-frame glitches when a layer is handed over) do not
+  count as changes.
 
 Comparison (compare(), used by scripts/trace_check.py when "lamp" is in --events): the lamps are
 sampled at every `mark` (the scenario's own checkpoints, the n-th mark of each trace) and every
@@ -32,6 +35,7 @@ SAMPLE_EVERY = 1.0
 LAMPS = range(1, 81)          # 101+ are other outputs (not the lamp matrix)
 WINDOW = 0.75                 # s: >= 2 flash periods (2 x 0.29 s)
 FLASH = (0.10, 0.20)          # s between two changes of a flashing lamp
+BLIP = 0.03                   # s: shorter isolated pulses are ignored
 
 
 def load(path):
@@ -58,6 +62,13 @@ def state(lamps, lamp, t, window=WINDOW):
     changes = ts[j:i]
     if not changes:
         return str(cur)
+    if len(changes) <= 4:
+        # isolated blips (a layer or leff hand-over leaves a lamp off for one frame): steady, not blinking
+        k = j
+        blips = all(ss[x] != cur and x + 1 < len(ts) and ts[x + 1] - ts[x] < BLIP
+                    for x in range(k, i) if ss[x] != cur)
+        if blips and ss[i - 1] == cur and (i - j) % 2 == 0:
+            return str(cur)
     gaps = [b - a for a, b in zip(changes, changes[1:])]
     if len(changes) >= 3 and all(FLASH[0] <= g <= FLASH[1] for g in gaps):
         return "F"

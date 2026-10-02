@@ -48,9 +48,7 @@ class Zen(Feature):
 
     def _flash_task(self):
         def pulse():
-            coil = self.machine.coils.get("f_zen_flasher") if hasattr(self.machine, "coils") else None
-            if coil:
-                coil.pulse(18)
+            self.os.lamps.flasher("f_zen_flasher", 18)      # coil 17, logged as the ROM's coil events
             self._flash_task()
         self.os.task_start(0xcc, FLASH_TICKS, pulse)
 

@@ -18,6 +18,8 @@ STEP_TICKS = 6
 PAUSE_SHOWS = (0xa0, 0xa2)                       # Sea of Simulation start / skip shows pause the clocks
 LETTER_LAMPS = {1: 4, 2: 3, 4: 2, 8: 1}         # letter bit -> insert (table 0x040d3c90: T R O N)
 AWARD_LAMPS = {1: 5, 2: 6, 4: 7}                 # DOUBLE SCORING, BUMPERS, SPINNERS
+POP_LAMPS = (46, 47, 48)
+TRON_LETTER_LAMP = {1: 4, 2: 3, 3: 2, 4: 1}       # drop switch -> insert (table 0x040d3d08)
 BANK_RESET_TICKS = 15
 BANK_RESET_TRIES = 3
 
@@ -42,6 +44,9 @@ class TronTargets(Feature):
         self.drops_up = {sw: 1 for sw in SWITCHES}
         self.repeat_sound = 0                    # tron_repeat_sound_flag 0x3b740
         os_.lamp_rule(lambda: os_.task_running(0xc6), leff=132, order=0x0100c734)
+        # registered before the letters, so it runs after them (newest first): an up drop flashes its
+        # letter even when the letter is collected (traces/tron_targets.jsonl, ball 2)
+        os_.lamp_update(self.drop_bank_lamps)
         os_.lamp_update(self.bumper_spinner_lamps)
         os_.lamp_update(self.letter_lamps)
 
@@ -52,6 +57,11 @@ class TronTargets(Feature):
         letters = self.pd.get("tron_letters", 0)
         for bit, lamp in LETTER_LAMPS.items():
             self.os.lamps.lamp_set(lamp, 1 if letters & bit else 2)
+
+    def drop_bank_lamps(self):
+        """drop_bank_lamp_rule [0x0100b1dc] (lamp rule): a drop that is down is solid, an up one flashes."""
+        for sw in SWITCHES:
+            self.os.lamps.lamp_set(TRON_LETTER_LAMP[sw], 2 if self.drops_up.get(sw) else 1)
 
     def award_lamps(self):
         """tron_award_lamps [0x0100c2a0]: a running award's insert is solid, the lit one flashes."""
@@ -138,6 +148,7 @@ class TronTargets(Feature):
             self.os.task_start(0x76, BANK_RESET_TICKS, lambda: self.bank_reset(tries - 1))
             return
         self.drops_up = {sw: 0 if sw in down else 1 for sw in SWITCHES}
+        self.os.request_refresh()                # FUN_0100b1cc: switches read, rules refresh (lamps)
 
     # ------------------------------------------------------------------ letters [0x0102c588]
 
@@ -235,7 +246,17 @@ class TronTargets(Feature):
         self._timer_wait(award, STEPS)
 
     def _timer_wait(self, award, steps):
+        if award == 2:
+            self.pops_chase()
         self.os.task_start(AWARDS[award][0], STEP_TICKS, lambda: self._timer_step(award, steps))
+
+    def pops_chase(self):
+        """super_pops_lamp_chase(2) [0x0100c514], every step of the SUPER POPS task: the pop inserts'
+        states rotate 46 -> 47 -> 48 -> 46."""
+        lamps = self.os.lamps
+        states = [lamps.lamp_test(n) for n in POP_LAMPS]
+        for n, on in zip(POP_LAMPS, states[-1:] + states[:-1]):
+            (lamps.lamp_on if on else lamps.lamp_off)(n)
 
     def _paused(self):
         display = self.os.display

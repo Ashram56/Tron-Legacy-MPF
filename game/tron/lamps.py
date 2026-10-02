@@ -145,6 +145,14 @@ class LeffTask:
         self.layer = layer
         self.handle = None
         self.data = {}
+        self.children = []
+
+    def spawn(self, fn, priority):
+        """task_spawn_child: a child task with its own layer (freed with the leff)."""
+        child = LeffTask(self.lamps, self.leff_id, self.lamps.layer_create(priority, name=self.layer.name))
+        self.children.append(child)
+        fn(child)
+        return child
 
     def sleep(self, ticks, fn):
         def run():
@@ -179,6 +187,10 @@ class LeffTask:
         if self.handle:
             self.lamps.clock.unschedule(self.handle)
             self.handle = None
+        for child in self.children:
+            child.stop()
+            self.lamps.layer_free(child.layer)
+        self.children = []
 
 
 class Lamps:
@@ -222,6 +234,7 @@ class Lamps:
                 for tag in light.tags:
                     self.groups.setdefault(tag, []).append(int(num))
         self.coil_numbers = {}
+        self._coil_until = {}       # flasher coil -> end of its current pulse
         for coil in getattr(self.machine, "coils", {}).values():
             num = str(coil.config.get("number", ""))
             if num.isdigit():
@@ -376,6 +389,8 @@ class Lamps:
         # leff's own length for the priority bookkeeping)
         entry = self.leff_players.pop(leff_id, None)
         if entry:
+            if isinstance(entry[0], LeffTask):
+                entry[0].stop()
             self.layer_free(entry[1])
 
     def leff_end(self, leff_id):
@@ -418,15 +433,30 @@ class Lamps:
                 coil.pulse(int(ms))
             except Exception:       # noqa: BLE001 (a disabled driver in a test machine)
                 pass
-        if num is not None:
+        if num is None:
+            return
+        # the driver stays on through back-to-back pulses: one on/off pair, as the traces log the driver
+        now = self.clock.get_time()
+        until = now + ms / 1000.0
+        if self._coil_until.get(num, 0) <= now:
             self.os.trace.log("coil", coil=num, on=1)
-            self.clock.schedule_once(lambda: self.os.trace.log("coil", coil=num, on=0), ms / 1000.0)
+            self._coil_until[num] = until
+            self.clock.schedule_once(lambda: self._coil_off(num), ms / 1000.0)
+        else:
+            self._coil_until[num] = max(self._coil_until[num], until)
+
+    def _coil_off(self, num):
+        left = self._coil_until.get(num, 0) - self.clock.get_time()
+        if left > 0.0005:
+            self.clock.schedule_once(lambda: self._coil_off(num), left)
+            return
+        self.os.trace.log("coil", coil=num, on=0)
 
     # ------------------------------------------------------------------ list-5 lamp rules
 
     def add_rule(self, fn, priority=0):
         self._seq += 1
-        self.rules.append((-priority, self._seq, fn))
+        self.rules.append((-priority, -self._seq, fn))       # equal priority: newest first
         self.rules.sort(key=lambda r: (r[0], r[1]))
 
     def run_rules(self):

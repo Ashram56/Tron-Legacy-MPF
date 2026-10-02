@@ -21,6 +21,8 @@ SHOTS = (
     (0x80, 0, 0, 0),                   # spinning disc
 )
 PHASE_MASK = (0xbf, 0x40, 0x80)
+# (DISC) inserts of the SHOTS masks (lamp groups 0x62-0x68 of table 0x040d26c0; the disc has none)
+DISC_LAMPS = (15, 50, 63, 58, 55, 34, 54, None)
 END_TICKS = (156, 62)              # task 0xab, then 0xac, then the Total
 COUNT_TICKS = 68                   # restart countdown, one count
 WINDOW_TAIL = (187, 93)            # task 0xae, then 0xaf after the count reached 0
@@ -47,11 +49,26 @@ class DiscMultiball(Feature):
         os_.deff_rule(self.status_display_cond, 47, music=0x02a, priority=7)
         os_.deff_rule(self.restart_display_cond, 53, music=0x02b, priority=7)
         os_.lamp_rule(self.status_display_cond, leff=45, tube=43, order=0x010081c0)
+        os_.lamps.leff_code(45, self._leff_status)
         os_.lamp_rule(lambda: self.running_or_ending() and self.phase == 1, leff=47, order=0x01006e14)
         os_.lamp_rule(lambda: os_.flag(0x24) and self.phase == 2, leff=46, order=0x010083b8)
         # same condition: the ROM starts leff 54 before leff 53 (traces/disc_multiball_restart.jsonl)
         os_.lamp_rule(self.restart_display_cond, leff=54, tube=49, order=0x010097ec)
         os_.lamp_rule(self.restart_display_cond, leff=53, order=0x010097ec)
+
+    def _leff_status(self, task):
+        """leff_045 [0x01008208]: the inserts of the lit shots (dmb_lit_mask) toggle every 3 ticks (reads
+        solid in the traces), the others are released."""
+        phase = task.data.setdefault("phase", True)
+        for (mask, _, _, _), lamp in zip(SHOTS, DISC_LAMPS):
+            if lamp is None:
+                continue
+            if self.mask & mask:
+                task.set(lamp, phase)
+            else:
+                task.release(lamp)
+        task.data["phase"] = not phase
+        task.sleep(3, self._leff_status)
 
     def player_first_ball(self):
         """Event 0x26 [0x01006d84]."""

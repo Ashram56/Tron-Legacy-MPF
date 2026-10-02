@@ -58,6 +58,7 @@ BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball 
 OUTLANE_TASK_TICKS = 625    # drain-side tasks 0x37 / 0x38 (0x271)
 SHOOT_AGAIN_LAMP = 26        # gf_shoot_again_lamp
 START_LAMP = 65              # DAT_00036f64
+EB_LAMP = 37                 # DAT_00036f61
 SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane (switches_and_shots.md 8)
 SPECIAL_OVER_LIMIT_SCORE = 5000000
 
@@ -344,12 +345,21 @@ class TronOS(CustomCode):
         """shoot_again_lamp_update [0x0001a014] (game_flow.md 8): lamp 26 flashes while this ball is a
         shoot-again ball (flag 9), is solid while an extra ball is pending, off otherwise. The ROM calls
         it when these change; here it also runs with the lamp rules."""
+        self.eb_lamp_update()
         if self.flag(9):
             self.lamps.lamp_flash(SHOOT_AGAIN_LAMP)
         elif self.game and self.game.player and self.game.player.extra_balls:
             self.lamps.lamp_on_solid(SHOOT_AGAIN_LAMP)
         else:
             self.lamps.lamp_off(SHOOT_AGAIN_LAMP)
+
+    def eb_lamp_update(self):
+        """FUN_0001a2a4: EJECT: EXTRA BALL (37) flashes while the player has an extra ball lit."""
+        p = self.player_num - 1
+        if p >= 0 and self.eb_lit[p]:
+            self.lamps.lamp_flash(EB_LAMP)
+        else:
+            self.lamps.lamp_off(EB_LAMP)
 
     def register(self, name, fn):
         self.hooks.setdefault(name, []).append(fn)
@@ -867,7 +877,7 @@ class TronOS(CustomCode):
         its own layer, every (save ticks left / 31) ticks (2-10). Leff 14 first waits for the valid
         playfield and ends with the ball save task 0x31; leff 13 runs until it is stopped."""
         if task.leff_id == 14:
-            if not self.pf_valid:
+            if not self.pf_valid and not self.ball_scored:     # FUN_00023638 (a switch scored) or valid
                 task.sleep(2, self._leff_save_lamp)
                 return
             if not self.task_running(0x31):
@@ -996,11 +1006,13 @@ class TronOS(CustomCode):
     def light_extra_ball(self):
         """OS part of 0x01012190: lit count +1 for the current player."""
         self.eb_lit[self.player_num - 1] += 1
+        self.eb_lamp_update()
 
     def collect_extra_ball(self):
         """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points."""
         p = self.player_num - 1
         self.eb_lit[p] = max(0, self.eb_lit[p] - 1)
+        self.eb_lamp_update()
         if self.eb_collected[p] < self.adj_value(26):
             self.eb_collected[p] += 1
             self.game.player.extra_balls += 1
