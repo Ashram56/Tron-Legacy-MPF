@@ -15,4 +15,4 @@ class TestBoot(TronTestCase):
         self.hit_and_release_switch("s_zen_rollover")         # force switch: playfield valid
         self.advance_time_and_run(1)
         self.assertTrue(self.tron.pf_valid)
-        self.assertEqual(1090, self.machine.game.player.score)
+        self.assertEqual(42000 + 1090, self.machine.game.player.score)    # ZEN charge + switch score
