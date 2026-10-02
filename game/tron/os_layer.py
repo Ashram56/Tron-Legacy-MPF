@@ -29,13 +29,21 @@ ST_BONUS, ST_END_BALL, ST_ATTRACT, ST_TILT = 0x01, 0x04, 0x10, 0x200
 
 # valid playfield (game_flow.md 4.3): "force" switches validate at once, 3 distinct "counting" ones do
 FORCE_SWITCHES = {11, 12, 14, 24, 25, 28, 29, 34, 37, 39, 43, 46}
-COUNTING_SWITCHES = {7, 8, 13, 48, 35, 36, 38, 41, 44, 49, 50, 51, 30, 31, 32}
+# (pops, slings and TRON targets post 0x6b from their handlers; it counts the same: traces/switches_and_shots
+# validates at sling L, sling R, bumper; traces/tron_targets at T, R, O)
+COUNTING_SWITCHES = {7, 8, 13, 48, 35, 36, 38, 41, 44, 49, 50, 51, 30, 31, 32, 26, 27, 1, 2, 3, 4}
 
 MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
-BALL_SAVE_GRACE = 218
+BALL_SAVE_GRACE = 218        # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
 SERVE_EJECT_TICKS = 32
+LATER_SERVE_EXTRA_TICKS = 6     # every later ball start: trough eject 0.645 s after the ball start, not 0.545 s
 SAVE_EJECT_TICKS = 39
-BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)   # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
+SAVE_SERVE_TICKS = 48           # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
+BALL_SEARCH_EVENT_TICKS = 36
+BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)
+OUTLANE_TASK_TICKS = 625    # drain-side tasks 0x37 / 0x38 (0x271)
+SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane (switches_and_shots.md 8)
+SPECIAL_OVER_LIMIT_SCORE = 5000000
 
 
 def adjustment_defaults(settings_path):
@@ -100,6 +108,8 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4  # extra balls collected per player (0x3d470)
         self.specials_lit = [0] * 4  # 0x3d4ef
         self.specials_collected = [0] * 4  # 0x3d4f3
+        self.lamps = set()          # inserts the rules read back: the outlane special lamps 8 / 32
+        self.replays_awarded = {}
         self.shoot_again = False    # game flag 9: this ball is a shoot-again ball
         self.ball_scored = False
         self.serve_type = 0
@@ -111,6 +121,7 @@ class TronOS(CustomCode):
         self.forced = {}             # name -> list of forced pick results (tests)
         self.random = random.Random()
         self._new_game = False
+        self._new_game_ball = False
         self._search_handle = None
         self.ball_search_count = 0
         self.ball_held = False       # a ball sits in the VUK waiting for its kickout
@@ -203,7 +214,9 @@ class TronOS(CustomCode):
         self.forced[name] (a list of indexes, used in order), e.g. from a ROM reference trace."""
         forced = self.forced.get(name)
         if forced:
-            return forced.pop(0)
+            choice = forced.pop(0)
+            if choice is not None:              # None: the reference run does not tell, pick freely
+                return choice
         if max(weights) >= 1000:
             return weights.index(max(weights))
         total = sum(weights)
@@ -233,6 +246,8 @@ class TronOS(CustomCode):
 
     def rules_refresh(self):
         self._refresh_pending = False
+        if self.game and self.state & ST_TILT:
+            return          # FUN_000196e4: a rule runs only when gf_state is 0 or matches its mode mask
         active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
         for rule in self.rules:
             cond, leff, tube, on = rule[:4]
@@ -274,13 +289,43 @@ class TronOS(CustomCode):
     def show(self, task_id, deff_id, **kwargs):
         """queue_fullscreen_deff [0x0100fbb0] run as show task task_id (0x81-0xa7)."""
         self.display.queue(task_id, deff_id, **kwargs)
+        self.request_refresh()
 
     def show_running(self):
         return self.display.show_running()
 
     def sound(self, call, in_deff=0):
+        """snd_play(call): returns the time the picked sample ends (for sound_chain), or None."""
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
+        lengths = self.sample_lengths(call)
+        if not lengths:
+            return None
+        i = self.pick("sample_0x{:03x}".format(call), [1] * len(lengths)) if len(lengths) > 1 else 0
+        return self.now + lengths[i or 0]
+
+    def sound_chain(self, call, after):
+        """snd_play_chain [0x0002ca1c]: play `call` when the sample started by an earlier sound() ends."""
+        if after is None or after <= self.now:
+            return self.sound(call)
+        self.machine.clock.schedule_once(lambda: self.sound(call), after - self.now)
+        return None
+
+    def sample_lengths(self, call):
+        """Durations (s) of the samples a sound call picks from (assets/callouts sound_calls/samples_index)."""
+        if not hasattr(self, "_sample_lengths"):
+            import csv
+            base = os.path.join(self.machine.machine_path, "..", "assets", "callouts")
+            dur = {}
+            with open(os.path.join(base, "samples_index.csv")) as f:
+                for row in csv.DictReader(f):
+                    dur[int(row["sample_id"], 16)] = float(row["duration_s"] or 0)
+            self._sample_lengths = {}
+            with open(os.path.join(base, "sound_calls.csv")) as f:
+                for row in csv.DictReader(f):
+                    ids = [int(x, 16) for x in row["sample_ids (one picked per play)"].split()]
+                    self._sample_lengths[int(row["call_id"], 16)] = [dur.get(i, 0) for i in ids]
+        return self._sample_lengths.get(call, [])
 
     def leff_start(self, leff_id):
         self.trace.log("leff_start", id=leff_id)
@@ -404,6 +449,50 @@ class TronOS(CustomCode):
         if not self._score_pending:
             self.machine.clock.schedule_once(self._score_flush, 0)
         self._score_pending[self.player_num] = self._score_pending.get(self.player_num, 0) + points
+        self.replay_check(self.player_num, player.score)
+
+    # ------------------------------------------------------------------ replay (game_flow.md 5.5)
+
+    def replay_level(self, n):
+        """FUN_00022998(n): replay level n (1-4) by adj 11 REPLAY TYPE (0 none, 1 fixed adj 17-20, 2 dynamic
+        adj 16, 3 auto n x adj 15). The replay boost count (NVRAM 0x0211097c) is 0 on a fresh machine."""
+        if n > self.adj_value(14):
+            return 0
+        kind = self.adj_value(11)
+        if kind == 1:
+            return self.adj_value(16 + n)
+        if kind == 2:
+            return self.adj_value(16) if n == 1 else 0
+        if kind == 3:
+            return n * self.adj_value(15)
+        return 0
+
+    def replay_check(self, player, score):
+        """replay_check [0x00022f18], on every score change: each level reached and not yet awarded."""
+        awarded = self.replays_awarded.setdefault(player, set())
+        for n in range(1, 5):
+            level = self.replay_level(n)
+            if level and score >= level and n not in awarded:
+                awarded.add(n)
+                self.replay_award(n)
+
+    def replay_award(self, n):
+        """replay_award [0x00022d2c]: award per adj 13 (0 = credit + knocker 0x019), audit 9 + n, then task
+        0x33 (an end-of-ball wait task) shows deff 28 REPLAY with leff 17 until the deff ends."""
+        if self.adj_value(13) == 0:
+            self.machine.events.post("tron_award_credit")
+        self.audit(9 + n)
+        self.after(1, lambda: self.sound(0x019))     # knocker, fired by the OS knocker queue
+
+        def show():
+            if self.display.fg is not None and self.display.prio.get(self.display.fg, 0) > self.display.prio.get(28, 0):
+                self.task_start(0x33, 1, show)       # wait for a higher display effect to finish
+                return
+            if self.deff_start(28):
+                self.leff_start(17)
+                self.task_start(0x33, round(self.display.media[28].seconds / TICK) if 28 in self.display.media
+                                else 160)
+        self.task_start(0x33, 1, show)
 
     def _score_flush(self):
         pending, self._score_pending = self._score_pending, {}
@@ -442,6 +531,7 @@ class TronOS(CustomCode):
     def _validate(self):
         self.pf_valid = True
         self.flag_set(0x1c)                          # event 0x6a handler [0x0100f25c]
+        self.request_refresh()
         self.hook("playfield_valid")
         if self.serve_type == 3:
             self.after(1, lambda: self.in_play and self.sound(0x01b))   # main play music
@@ -473,12 +563,15 @@ class TronOS(CustomCode):
         self.eb_collected = [0] * 4
         self.specials_lit = [0] * 4
         self.specials_collected = [0] * 4
+        self.lamps = set()
+        self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
         self.audit(0x11)
         self.display.clear()
         self._new_game = True
+        self._new_game_ball = True
         self.hook("game_start")                      # event 0x2e
 
     def tasks_kill_all(self):
@@ -510,12 +603,15 @@ class TronOS(CustomCode):
             self.sound(0x0f5)
         self.ball_search_count = 0
         self.ball_search_reload()
+        later_ball = not self._new_game_ball
+        self._new_game_ball = False
         self.serve(3)
         # The trough eject task kicks the ball about 32 ticks after the serve (traces/game_flow.jsonl
         # ball start 1.90 s, trough eject 2.42 s); MPF ejects when the ball_starting queue clears.
         if queue:
             queue.wait()
-            self.after(SERVE_EJECT_TICKS, queue.clear)
+            # (all reference traces: 0.545 s for the game's first ball, 0.645 s for every later one)
+            self.after(SERVE_EJECT_TICKS + (LATER_SERVE_EXTRA_TICKS if later_ball else 0), queue.clear)
 
     def _ball_started(self, **kwargs):
         pass
@@ -594,10 +690,12 @@ class TronOS(CustomCode):
             self.deff_start(20)
             self.leff_start(15)
             self.audit(0x2b)
+            self.ball_scored = False                 # traces/game_flow_tilt: ball_scored 0 at BALL SAVED
+            self.request_refresh()                   # the save re-runs the lamp rules (game_flow.jsonl 7.96)
             self.hook("ball_saved")
             self.serve(1)
             # trough eject task, then the auto-launch (traces/game_flow.jsonl: save 7.96 s, eject 8.60 s)
-            self.after(SAVE_EJECT_TICKS, lambda: self.machine.playfield.add_ball(player_controlled=False))
+            self.after(SAVE_SERVE_TICKS, lambda: self.machine.playfield.add_ball(player_controlled=False))
             return {"balls": 0}
         return {"balls": balls}
 
@@ -617,6 +715,9 @@ class TronOS(CustomCode):
                 and not self.vuk_ejecting):
             self.ball_search_count += 1
             self.task_start(0x2b, BALL_SEARCH_TICKS)
+            # 36 ticks in, the search posts its events and the lamp rules run (game_flow 88.70 -> 89.29,
+            # bonus_skip 15.35 -> 15.93)
+            self.after(BALL_SEARCH_EVENT_TICKS, lambda: self.task_running(0x2b) and self.request_refresh())
             self.audit(0x25)
             self.hook("ball_search")
             self.machine.events.post("tron_ball_search", count=self.ball_search_count)
@@ -669,32 +770,63 @@ class TronOS(CustomCode):
         return False
 
     def light_special(self):
-        """0x00024014(1): special lit (collected at a lit outlane), deff 81 "SPECIAL IS LIT"."""
+        """special_light(0) [0x00024014]: special lit for the current player, lamp update; deff 81
+        "SPECIAL IS LIT" (the caller's display)."""
         self.specials_lit[self.player_num - 1] += 1
+        self.special_lamp_update()
         self.deff_start(81)
 
-    def collect_special(self):
-        """Outlane with special lit [0x000240ac]: deff 82, 100,000, then the award per adj 23 (or 5 M
-        over the adj 22 limit). Audit 0x0e."""
+    def special_lamp_update(self):
+        """FUN_00024298: the special insert (SPECIAL_LAMP) is on while the player has a special lit, off
+        otherwise. self.lamps holds the inserts the rules read back (lamp_test), not the lamp matrix."""
+        if self.specials_lit[self.player_num - 1]:
+            self.lamps.add(SPECIAL_LAMP)
+        else:
+            self.lamps.discard(SPECIAL_LAMP)
+
+    def special_collect(self):
+        """special_collect [0x00024218] + special_award [0x000240ac]: use one lit special and award it per
+        adj 23 (0 credit, 3 points, 4 extra ball), or the over-limit points past the adj 22 limit. Returns
+        True when a special was lit. The outlane shows deff 82 and scores 100,000 itself."""
         p = self.player_num - 1
         if not self.specials_lit[p]:
             return False
         self.specials_lit[p] -= 1
-        self.deff_start(82)
-        self.sound(0x09e)
-        self.score_add(100000)
         if self.specials_collected[p] >= self.adj_value(22):
-            self.score_add(5000000)
+            self.score_add(SPECIAL_OVER_LIMIT_SCORE)
         else:
-            self.specials_collected[p] += 1
-            self.audit(0x0e)
             award = self.adj_value(23)
-            if award == 3:
-                self.score_add(5000000)
+            if award == 0:
+                self.machine.events.post("tron_award_credit")
+            elif award == 3:
+                self.score_add(SPECIAL_OVER_LIMIT_SCORE)
             elif award == 4:
                 self.collect_extra_ball()
-            elif award == 0:
-                self.machine.events.post("tron_award_credit")
+            self.specials_collected[p] += 1
+            self.audit(0x0e)
+        self.special_lamp_update()
+        return True
+
+    # ------------------------------------------------------------------ outlane ball save
+
+    def ball_save_try(self, side):
+        """ball_save_try [0x00019b34] from the outlanes (side 1 left, 2 right): (re)start the drain-side
+        task 0x37/0x38 for 625 ticks (read at end of ball for the LEFT/RIGHT DRAINS audits). While the
+        ball save runs, the replacement ball is served at once (FUN_0001f368: serve type 2,
+        auto-launched) and the save ends: deff 20 (leff 15 when it shows), audit 0x2b. Returns True then."""
+        self.task_kill(0x37)
+        self.task_kill(0x38)
+        self.task_start(0x36 + side, OUTLANE_TASK_TICKS)
+        if not self.ball_save or self.tilted:
+            return False
+        self.serve(2)
+        self.game.balls_in_play += 1                 # the outlane ball still drains later
+        self.after(SAVE_EJECT_TICKS, lambda: self.machine.playfield.add_ball(player_controlled=False))
+        self.kill_ball_save()
+        if self.deff_start(20):
+            self.leff_start(15)
+        self.audit(0x2b)
+        self.hook("ball_saved")
         return True
 
     # ------------------------------------------------------------------ end of ball (6.1)
@@ -716,6 +848,10 @@ class TronOS(CustomCode):
         for flipper in self.machine.flippers.values():
             flipper.disable()
         self.audit(8)
+        if self.task_running(0x37):                  # end_of_ball [0x00020764]: last outlane drain side
+            self.audit(0x28)
+        if self.task_running(0x38):
+            self.audit(0x29)
         wait_ticks = self.hook("ball_end_wait") or 0  # mode TOTAL displays (flag-0x2000 tasks)
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
@@ -735,6 +871,13 @@ class TronOS(CustomCode):
             self._add_score(total)                   # event 0x16, multiplier 1, not a score_add
             self.hook("score_changed")
         self.state &= ~ST_BONUS
+        self._wait_award_tasks(queue)
+
+    def _wait_award_tasks(self, queue):
+        """End of ball step 7: wait for the replay / award tasks 0x33-0x34."""
+        if self.task_running(0x33) or self.task_running(0x34):
+            self.after(1, lambda: self._wait_award_tasks(queue))
+            return
         self._ball_ending_done(queue)
 
     def _ball_ending_done(self, queue):
