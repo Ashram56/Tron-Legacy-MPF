@@ -15,6 +15,22 @@ switches:
     number: D4
   s_start_button:     # number comes from the asset package
     tags: start
+  # Coin door (SAM dedicated switches; numbers are placeholders like the ones above). The four service
+  # buttons drive the service menu (tron/service.py); the tags are MPF's service-button tags.
+  s_service_back:
+    number: D9
+    tags: service_esc
+  s_service_minus:
+    number: D10
+    tags: service_down
+  s_service_plus:
+    number: D11
+    tags: service_up
+  s_service_select:
+    number: D12
+    tags: service_enter
+  s_coin_door_open:   # active while the coin door is open (ROM 0x3727c bits clear): adj 41, adj 64
+    number: D13
 
 playfields:
   playfield:

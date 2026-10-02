@@ -20,7 +20,12 @@ class GameOver(Feature):
         number = random.randrange(0, 100, 10)
         forced = os_.forced.get("match")
         matched = 0
-        if os_.adj_value(30) < 11:
+        # match [0x0001b660]: adj 30 MATCH PERCENTAGE (11 = OFF). The number can match only while the
+        # machine's match rate (TOTAL MATCHES 0x0f x 100 / games 0x11, persistent audits) is below adj 30;
+        # otherwise the ROM picks a number no player has.
+        audits = os_.audits
+        rate = audits[0x0f] * 100 // audits[0x11] if audits[0x11] else 0
+        if os_.adj_value(30) < 11 and rate < os_.adj_value(30):
             matched = sum(1 for p in self.machine.game.player_list if p.score % 100 == number)
         if forced:
             matched = forced.pop(0)
@@ -34,8 +39,10 @@ class GameOver(Feature):
         for _ in range(matched):
             os_.audit(0x0f)
             if os_.adj_value(29) == 0:
-                os_.sound(0x019)
+                os_.knock()
                 self.machine.events.post("tron_award_credit")
+            else:
+                self.machine.events.post("tron_award_ticket" if os_.adj_value(29) == 1 else "tron_award_token")
 
     def _attract(self, done):
         os_ = self.os

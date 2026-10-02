@@ -1,0 +1,9 @@
+#config_version=6
+
+# The ROM's operator service menu (tron/service.py). Started by SELECT on the coin door in attract mode
+# (TronOS._service_select); BACK out of the main menu or EXIT SERVICE MENU stops it.
+mode:
+  code: tron.service.ServiceMode
+  priority: 1000000
+  game_mode: false
+  stop_on_ball_end: false

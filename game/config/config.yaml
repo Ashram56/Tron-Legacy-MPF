@@ -8,6 +8,7 @@ config:
   - rom/switches.yaml
   - rom/coils.yaml
   - rom/lights.yaml
+  - rom/settings.yaml   # the 88 operator adjustments as MPF settings (persisted machine vars)
   - hardware.yaml
 
 hardware:
@@ -16,12 +17,17 @@ hardware:
 modes:
   - attract
   - game
+  - tron_service       # the ROM's service menu (tron/service.py), coin-door buttons
 
 custom_code: tron.os_layer.TronOS
 
 game:
-  balls_per_game: 3
+  balls_per_game: machine.balls_per_game   # adj 31 BALLS PER GAME (tron/settings.py keeps the var set)
   max_players: 4
+
+mpf:
+  paths:
+    tron_audits: data/tron_audits.yaml    # the ROM's audit counters (tron/settings.py)
 
 machine:
   balls_installed: 4

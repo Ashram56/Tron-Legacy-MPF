@@ -24,6 +24,13 @@ AWARDS = (
 )
 
 
+def award_percentage_ok(rate, adj, margin):
+    """arcade_weight_extra_ball / arcade_weight_special [0x0100e2dc / 0x0100e354]: the award stays in the bag
+    while the machine's award percentage (audit 16 EXTRA BALL PERCENTAGE / 24 SPECIAL PERCENTAGE) equals the
+    operator's adj 27 / 24, or is more than `margin` below it."""
+    return rate == adj or rate + margin < adj
+
+
 class Arcade(Feature):
     name = "arcade"
     HOOKS = ("player_first_ball", "ball_start", "arcade_light", "arcade_collect", "arcade_lit")
@@ -60,9 +67,11 @@ class Arcade(Feature):
             elif name == "more_time":
                 w = default if os_.hook("timed_feature_running") and not os_.flag(0x2c) else 0
             elif name == "extra_ball":
-                w = default if os_.eb_collected[os_.player_num - 1] < os_.adj_value(26) else 0
+                w = default if (os_.eb_collected[os_.player_num - 1] < os_.adj_value(26)
+                                and award_percentage_ok(os_.audits.value(16), os_.adj_value(27), 3)) else 0
             elif name == "special":
-                w = default if os_.specials_collected[os_.player_num - 1] < os_.adj_value(22) else 0
+                w = default if (os_.specials_collected[os_.player_num - 1] < os_.adj_value(22)
+                                and award_percentage_ok(os_.audits.value(24), os_.adj_value(24), 2)) else 0
             else:
                 w = os_.hook("arcade_{}_weight".format(name), default) if os_.has_hook(
                     "arcade_{}_weight".format(name)) else 0

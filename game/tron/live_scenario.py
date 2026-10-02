@@ -109,7 +109,7 @@ class LiveScenario:
         self.t += 0.12
 
     def cmd_adj(self, num, value):
-        self.at(0, lambda: self.os.adj.__setitem__(int(num), int(value)))
+        self.at(0, lambda: self.os.adj.override(int(num), int(value)))     # not stored as the operator's
 
     def cmd_poke(self, addr, value, size="1"):
         self.at(0, lambda: self.os.poke(int(addr, 16), int(value)))

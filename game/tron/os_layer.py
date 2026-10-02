@@ -58,6 +58,17 @@ BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball 
 OUTLANE_TASK_TICKS = 625    # drain-side tasks 0x37 / 0x38 (0x271)
 SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane (switches_and_shots.md 8)
 SPECIAL_OVER_LIMIT_SCORE = 5000000
+LOST_BALL_SEARCH = 5        # ball_search_start(5) with adj 63 LOST BALL RECOVERY: a lost ball is fed [0x0001f79c]
+COINDOOR_SAVE_TICKS, COINDOOR_GRACE_TICKS = 0x138, 0xbb     # coin door opened in play, adj 41 [0x0001ff74]
+DYNAMIC_REPLAY_MIN = 5000000                                # dynamic replay floor [0x000231a4]
+# shaker_run(strength, min_setting) calls inside these deffs (adj 86 SHAKER MOTOR >= min_setting) [0x010289b8]
+SHAKER_DEFFS = {71: (2, 2), 73: (2, 2), 138: (2, 3), 139: (2, 3), 58: (2, 2), 59: (2, 2), 60: (2, 2), 46: (2, 2),
+                48: (2, 2), 49: (2, 2), 50: (3, 1), 54: (2, 2), 112: (2, 2), 136: (2, 3), 137: (2, 3), 76: (2, 2),
+                78: (2, 2), 87: (2, 2), 88: (2, 2), 89: (2, 2), 68: (2, 2), 69: (3, 1), 66: (1, 3), 67: (2, 2),
+                109: (2, 2), 113: (3, 2), 115: (3, 2), 116: (3, 2), 117: (3, 2), 118: (3, 2), 119: (3, 2),
+                120: (3, 2), 121: (3, 2), 122: (3, 2), 123: (3, 2), 124: (3, 2), 125: (3, 2), 126: (3, 2),
+                140: (3, 1), 142: (2, 2), 143: (3, 1), 144: (3, 1), 93: (2, 2), 94: (2, 2), 97: (2, 2), 98: (2, 2)}
+SHAKER_SECONDS = {1: 0.25, 2: 0.5, 3: 1.0}                  # run length by strength (FUN_01028924, inferred)
 
 
 def adjustment_defaults(settings_path):
@@ -106,7 +117,6 @@ class TronOS(CustomCode):
         self.trace = Trace(self.machine)
         self.tasks = {}
         self.flags = set()
-        self.audits = {}
         self.state = ST_ATTRACT
         self.hooks = {}             # hook name -> [functions], called in registration order
         self.pokes = {}             # ROM RAM address -> setter(value), for the scenarios' "poke"
@@ -150,7 +160,13 @@ class TronOS(CustomCode):
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
                                 "settings.yaml")
         self.adj_table = adjustment_defaults(settings)
-        self.adj = {n: d for n, (_, d) in self.adj_table.items()}
+        from tron.settings import Adjustments, Audits   # noqa: E402
+        self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
+        self.audits = Audits(self.machine)                     # ROM audit counters, persisted
+        self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
+        self.game_seconds = 0.0     # validated play time of the running game
+        self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
+        self._coindoor_save = False  # the running multiball save is the coin door ball saver's (adj 41)
         self.machine.tron = self
 
         ev = self.machine.events
@@ -168,6 +184,11 @@ class TronOS(CustomCode):
         sw = self.machine.switch_controller
         sw.add_switch_handler("s_coin", self._coin)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
+        sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
+        sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
+        sw.add_switch_handler("s_coin_door_open", self._coin_door_opened)
+        sw.add_switch_handler("s_service_select", self._service_select)
+        self.in_service = False     # the service menu (mode tron_service) is running
 
         self.register("rules_refresh", self.request_refresh)
         self.register_poke(0x3d46c, lambda p, v: self.eb_lit.__setitem__(p, v))
@@ -424,7 +445,8 @@ class TronOS(CustomCode):
         self.tubes.stop(show_id)
 
     def audit(self, audit_id, n=1):
-        self.audits[audit_id] = self.audits.get(audit_id, 0) + n
+        """audit_add(counter, n): the persistent audit counter (tron/settings.Audits) and the trace."""
+        self.audits.add(audit_id, n)
         self.trace.log("audit", id=audit_id, n=n)
 
     def flag_set(self, flag):
@@ -488,6 +510,7 @@ class TronOS(CustomCode):
         if not self.game:
             return False
         self.trace.log("multiball_start", balls=balls, save_ticks=save_ticks, grace_ticks=grace_ticks)
+        self._coindoor_save = False
         if self.state & 0x214:                       # tilt, end of ball or attract: refused (returns 0)
             return False
         self.machine.events.post("tron_multiball_start", balls=balls)
@@ -597,17 +620,20 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ replay (game_flow.md 5.5)
 
     def replay_level(self, n):
-        """FUN_00022998(n): replay level n (1-4) by adj 11 REPLAY TYPE (0 none, 1 fixed adj 17-20, 2 dynamic
-        adj 16, 3 auto n x adj 15). The replay boost count (NVRAM 0x0211097c) is 0 on a fresh machine."""
+        """FUN_00022998(n): replay level n (1-4) by adj 11 REPLAY TYPE (0 none, 1 fixed adj 17-20, 2 dynamic:
+        level 1 only, the machine's dynamic level that starts at adj 16, 3 auto n x adj 15). With adj 21
+        REPLAY BOOST the fixed and auto levels are multiplied by (boost count + 1) (NVRAM 0x0211097c, 0 on a
+        fresh machine; see _replay_statistics)."""
         if n > self.adj_value(14):
             return 0
         kind = self.adj_value(11)
+        boost = self.audits.extra.get("replay_boost", 0) + 1 if self.adj_value(21) == 1 else 1
         if kind == 1:
-            return self.adj_value(16 + n)
+            return int(boost * self.adj_value(16 + n))
         if kind == 2:
-            return self.adj_value(16) if n == 1 else 0
+            return int(self.audits.extra.get("dynamic_replay", self.adj_value(16))) if n == 1 else 0
         if kind == 3:
-            return n * self.adj_value(15)
+            return int(n * boost * self.adj_value(15))
         return 0
 
     def replay_check(self, player, score):
@@ -623,10 +649,19 @@ class TronOS(CustomCode):
         """replay_award [0x00022d2c]: award per adj 13 (0 = credit + knocker 0x019), audit 9 + n, then task
         0x33 (an end-of-ball wait task) shows deff 28 REPLAY with leff 17 once no show runs (traces/
         portal_multiball.jsonl: replay 16.53 s, deff 28 at 25.09 s when show deff 140 ends), until it ends."""
-        if self.adj_value(13) == 0:
+        award = self.adj_value(13)                   # 0 credit, 1 ticket, 2 token, 3 extra ball
+        if award == 0:
             self.machine.events.post("tron_award_credit")
+            self.after(1, self.knock)                # knocker, fired by the OS knocker queue
+        elif award == 3:
+            self.collect_extra_ball()                # eb_award(0) [0x0001a168]
+        else:
+            self.machine.events.post("tron_award_ticket" if award == 1 else "tron_award_token")
+        self.replayed = True
+        if self.adj_value(11) == 2:                  # dynamic replay: the level rises by adj 16 per replay
+            self.audits.extra["dynamic_replay"] = self.replay_level(1) + self.adj_value(16)
+        self.audits.add_extra("boost_replays", 1)    # DAT_0211097e
         self.audit(9 + n)
-        self.after(1, lambda: self.sound(0x019))     # knocker, fired by the OS knocker queue
 
         def show():
             if self.display.show_running():
@@ -637,6 +672,31 @@ class TronOS(CustomCode):
                 self.task_start(0x33, round(self.display.media[28].seconds / TICK) if 28 in self.display.media
                                 else 160)
         self.task_start(0x33, 1, show)
+
+    def knock(self, forced=False):
+        """Knocker queue [0x0001b370 / 0x0001b418]: sound 0x019 unless adj 35 KNOCKER VOLUME is OFF (a forced
+        knock still sounds); with adj 44 Q24 OPTION = KNOCKER the Q24 output (coil 24) fires too."""
+        if self.adj_value(44) == 2:
+            self.machine.coils["c_optional_coil"].pulse()
+        if self.adj_value(35) or forced:
+            self.sound(0x019)
+
+    def shaker_run(self, strength, min_setting):
+        """shaker_run [0x010289b8]: the shaker motor (coil 8) runs if adj 86 SHAKER MOTOR is not NONE and at
+        least min_setting. Returns True when it ran."""
+        level = self.adj_value(86)
+        if not level or level < min_setting:
+            return False
+        coil = self.machine.coils["c_shaker_motor_optional"]
+        coil.enable()
+        self.machine.clock.schedule_once(lambda: coil.disable(), SHAKER_SECONDS.get(strength, 0.5))
+        self.trace.log("shaker", strength=strength)
+        return True
+
+    def deff_shown(self, deff_id):
+        """A deff took the display (display.Display.start): its own shaker_run call."""
+        if deff_id in SHAKER_DEFFS:
+            self.shaker_run(*SHAKER_DEFFS[deff_id])
 
     def _score_flush(self):
         pending, self._score_pending = self._score_pending, {}
@@ -659,6 +719,8 @@ class TronOS(CustomCode):
         """Called by switch handlers: force switches validate at once, 3 distinct counting ones do."""
         if num != 11:
             self.vuk_ejecting = False                # a playfield switch confirms the VUK eject
+        if not self.task_running(0x2b):
+            self.ball_search_count = 0               # ball_search_reset [0x00019d58]: the ball was seen
         self.ball_search_reload()
         if num in COUNTING_SWITCHES:
             self.hook("counting_switch", num)        # event 0x6b
@@ -675,6 +737,8 @@ class TronOS(CustomCode):
 
     def _validate(self):
         self.pf_valid = True
+        if self._valid_at is None:
+            self._valid_at = self.now                # validated play time (game-time / ball-time audits)
         self.flag_set(0x1c)                          # event 0x6a handler [0x0100f25c]
         self.request_refresh()                       # ... which also requests a rules refresh
         self.hook("playfield_valid")
@@ -723,6 +787,9 @@ class TronOS(CustomCode):
         self.specials_collected = [0] * 4
         self.lamps = set()
         self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
+        self.replayed = False
+        self.game_seconds = 0.0
+        self._valid_at = None
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
@@ -783,6 +850,8 @@ class TronOS(CustomCode):
         self.hook("ball_served", serve_type)         # event 0x0f
         if serve_type == 3:
             self._arm_ball_save()
+        if self.adj_value(39):                       # FUN_0001e614: timed plunger task 0x17
+            self.task_start(0x17, self.adj_value(39) * SECOND, self._timed_plunger)
 
     # ------------------------------------------------------------------ ball save (5.1)
 
@@ -824,6 +893,12 @@ class TronOS(CustomCode):
         if not balls or not self.game:
             return {"balls": balls}
         self.vuk_ejecting = False
+        if self._coindoor_save and self.mb_save_running() and not self.tilted:
+            # the coin door ball saver's save (adj 41) re-serves even the last ball [0x0001ff74]
+            self._mb_pending += balls
+            if not self.task_running(MB_TASK):
+                self._mb_request(start_save=False)
+            return {"balls": 0}
         if self.balls_in_play() - balls > 0:
             if self.mb_save_running() and not self.tilted:
                 # multiball save: the multiball task launches a replacement. Unlike the single-ball save
@@ -881,6 +956,10 @@ class TronOS(CustomCode):
         if (self.pf_valid and not self.state & (ST_END_BALL | ST_BONUS | 0x18) and not self.ball_held
                 and not self.vuk_ejecting and not self.mb_save_running()):
             self.ball_search_count += 1
+            if self.ball_search_count == LOST_BALL_SEARCH and self.adj_value(63) == 1:
+                self._lost_ball_feed()
+                self.ball_search_reload(15 if self.tilted else 10)
+                return
             self.task_start(0x2b, BALL_SEARCH_TICKS)
             self.task_start("search_run", BALL_SEARCH_RUN_TICKS)
             # 36 ticks in, the search posts its events and the lamp rules run (game_flow 88.70 -> 89.29,
@@ -891,6 +970,60 @@ class TronOS(CustomCode):
             self.machine.events.post("tron_ball_search", count=self.ball_search_count)
         self.ball_search_reload(15 if self.tilted else 10)
 
+    def _lost_ball_feed(self):
+        """ball_search_start(5) with adj 63 LOST BALL RECOVERY [0x0001f79c]: the balls missing from the
+        playfield count are declared lost: deff 13 "PINBALL MISSING", a new ball is served (type 2, auto-
+        launched) and the LOST BALL FEEDS record (counter 0x26) counts it (written directly, no audit_add)."""
+        missing = max(1, self.rom_balls_in_play())
+        self.deff_start(13)
+        self.serve(2)
+        for _ in range(missing):
+            self.machine.playfield.add_ball(player_controlled=False)
+        self.audits.add(0x26, missing)
+        self.machine.events.post("tron_lost_ball_feed", balls=missing)
+
+    # ------------------------------------------------------------------ coin door, flipper launch, plunger
+
+    def coin_door_open(self):
+        return bool(self.machine.switch_controller.is_active(self.machine.switches["s_coin_door_open"]))
+
+    def _service_select(self):
+        """Coin-door SELECT in attract mode (no game): the service menu (tron/service.py)."""
+        if not self.game and not self.in_service:
+            self.machine.modes["tron_service"].start()
+
+    def _coin_door_opened(self):
+        """Coin door opened [0x0001ffac]: with adj 41 COINDOOR BALL SAVER, in play, every ball in play is
+        saved: multiball_start(balls in play, 0, 312, 187) [0x0001ff74 / 0x0001ea28]."""
+        if self.adj_value(41) == 1 and self.game and not self.state & 0x214:
+            self.multiball_start(max(1, self.rom_balls_in_play()), COINDOOR_SAVE_TICKS, COINDOOR_GRACE_TICKS)
+            self._coindoor_save = True
+
+    def _flipper_launch(self, side):
+        """Flipper button with a ball waiting in the shooter lane [0x0002dcc0]: adj 40 FLIPPER BALL LAUNCH
+        (1 left, 2 right, 3 either, 4 both: this button with the other one held) launches it."""
+        mode = self.adj_value(40)
+        if not mode or not self.game or self.state & 0x214:
+            return
+        other = "s_right_flipper" if side == 1 else "s_left_flipper"
+        if (mode == side or mode == 3
+                or (mode == 4 and self.machine.switch_controller.is_active(self.machine.switches[other]))):
+            self._launch_shooter_lane()
+
+    def _launch_shooter_lane(self):
+        """FUN_0001fa5c(1): fire the auto-launch for a ball sitting in the shooter lane."""
+        if self.machine.ball_devices["bd_shooter_lane"].balls:
+            self.machine.coils["c_auto_launch"].pulse()
+            self.task_start(0x3c, AUTO_LAUNCH_TICKS)     # as for every auto-launch (_shooter_ejecting)
+            return True
+        return False
+
+    def _timed_plunger(self):
+        """task_17 [0x0001e58c]: adj 39 TIMED PLUNGER seconds after a serve, a ball still waiting in the
+        shooter lane is launched."""
+        if self.game and not self.state & 0x214:
+            self._launch_shooter_lane()
+
     # ------------------------------------------------------------------ tilt (5.3)
 
     def _plumb_bob(self):
@@ -899,6 +1032,8 @@ class TronOS(CustomCode):
         if self.now - self._last_bob < SECOND * TICK:
             return
         self._last_bob = self.now
+        if self.adj_value(64) and self.coin_door_open():
+            return                                   # FUN_00024344: adj 64 ignores the tilt with the door open
         if self.tilt_warnings < self.adj_value(32):
             self.tilt_warnings += 1
             self.deff_start(23)
@@ -1019,6 +1154,11 @@ class TronOS(CustomCode):
         for flipper in self.machine.flippers.values():
             flipper.disable()
         self.audit(8)
+        if self._valid_at is not None:               # play time of this ball (AVERAGE BALL / GAME TIME)
+            played = self.now - self._valid_at
+            self._valid_at = None
+            self.game_seconds += played
+            self.audits.add_extra("ball_seconds", played)
         if self.task_running(0x37):                  # end_of_ball [0x00020764]: last outlane drain side
             self.audit(0x28)
         if self.task_running(0x38):
@@ -1070,8 +1210,15 @@ class TronOS(CustomCode):
 
     def _game_ending(self, queue=None, **kwargs):
         self.state |= 0x18
-        self.audit(47)
-        self.audit(19)
+        # game-time audit (audits 59-71, by the game's validated play time) and the score-range audits
+        # (audits 30-46, one per player) [0x00023774]
+        players = self.game.player_list if self.game else []
+        self.audit(self.audits.game_time_counter(self.game_seconds))
+        for player in players:
+            self.audit(self.audits.score_range_counter(player.score))
+        self.audits.add_extra("game_seconds", self.game_seconds)
+        self.audits.add_extra("score_total", sum(p.score for p in players))
+        self._replay_statistics(len(players))
         self.hook("game_over")
         queue.wait()
         match = self.features_by_name.get("match")
@@ -1079,6 +1226,26 @@ class TronOS(CustomCode):
             match.run(queue.clear)
         else:
             queue.clear()
+
+    def _replay_statistics(self, players):
+        """Game-over replay bookkeeping [0x000231a4]. Dynamic replay (adj 11 = 2): the level drops by
+        adj 12 % x players (less the one that replayed) x adj 16 each game, never below 5,000,000 (a replay
+        raised it by adj 16). Replay boost: a game with a replay boosts the levels once more; the boost ends
+        when the games played since reach the replays won."""
+        extra = self.audits.extra
+        if self.adj_value(11) == 2:
+            level = extra.get("dynamic_replay", self.adj_value(16))
+            dec = (self.adj_value(12) * (players - (1 if self.replayed else 0)) * self.adj_value(16)) // 1000 * 10
+            level = max(DYNAMIC_REPLAY_MIN, level - dec) if dec <= level else DYNAMIC_REPLAY_MIN
+            extra["dynamic_replay"] = level
+        if extra.get("replay_boost"):
+            extra["boost_games"] = extra.get("boost_games", 0) + players
+        if self.replayed:
+            extra["replay_boost"] = extra.get("replay_boost", 0) + 1
+        elif extra.get("boost_replays", 0) <= extra.get("boost_games", 0):
+            for key in ("replay_boost", "boost_replays", "boost_games"):
+                extra.pop(key, None)
+        self.audits.save()
 
     def _game_ended(self, **kwargs):
         self.state = ST_ATTRACT

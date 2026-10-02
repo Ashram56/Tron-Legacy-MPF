@@ -110,6 +110,7 @@ class Display:
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
+        os_.deff_shown(deff_id)                    # the deff's own shaker_run (adj 86)
         info = self.media.get(deff_id)
         if info:
             if not hold:

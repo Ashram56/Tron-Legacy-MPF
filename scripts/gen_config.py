@@ -10,7 +10,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC = os.path.join(ROOT, "assets", "mpf_package", "config")
 DST = os.path.join(ROOT, "game", "config", "rom")
-FILES = ["switches.yaml", "coils.yaml", "lights.yaml"]
+FILES = ["switches.yaml", "coils.yaml", "lights.yaml", "settings.yaml"]
 
 
 def main():
@@ -20,6 +20,8 @@ def main():
             body = f.read()
         # MPF 0.80 has no "flashers:" section; flashers are plain coils there.
         body = body.replace("\nflashers:\n", "\n# (flashers, as coils for MPF 0.80)\n")
+        # the package writes the setting group as "setting_type"; MPF 0.80's settings spec calls it "settingType"
+        body = body.replace("    setting_type: ", "    settingType: ")
         out = "#config_version=6\n# GENERATED from assets/mpf_package/config/{} by scripts/gen_config.py\n{}".format(
             name, body)
         path = os.path.join(DST, name)

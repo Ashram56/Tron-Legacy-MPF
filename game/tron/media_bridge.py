@@ -14,6 +14,7 @@ import os
 import re
 
 CONTEXT = "tron_media"
+SERVICE_PRIORITY = 1000         # the service slide covers every deff (ROM priorities are 0-255)
 SPEC = re.compile(r"%(P\d/[^%]*%|[-+ #0,]*\d*l?[dus])")
 
 
@@ -60,14 +61,14 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ transport
 
-    def connected(self):
+    def connected(self, need_data=True):
         bcp = getattr(self.machine, "bcp", None)
-        if not self.data or not bcp or not getattr(bcp, "transport", None):
+        if (need_data and not self.data) or not bcp or not getattr(bcp, "transport", None):
             return False
         return bool(bcp.transport.get_named_client("local_display"))
 
-    def _send(self, name, settings, priority=0, **kwargs):
-        if not self.connected():
+    def _send(self, name, settings, priority=0, need_data=True, **kwargs):
+        if not self.connected(need_data):
             return
         self.machine.bcp.interface.bcp_trigger(name=name, settings=settings, context=CONTEXT,
                                                calling_context=CONTEXT, priority=priority, **kwargs)
@@ -112,6 +113,22 @@ class MediaBridge:
         if self.os.display.bg == 19:
             self._send("slides_play", {"deff_019": {"action": "update", "key": "deff_019", "expire": None}},
                        **self.deff_lines(19, {}))
+
+    # ------------------------------------------------------------------ service menu
+
+    def service_show(self, lines):
+        """Service menu text (tron/service.py) on the generic slide game/slides/service.tscn, above every
+        deff; needs no generated media."""
+        lines = {"line{}".format(i): text for i, text in enumerate(lines)}
+        self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
+                   need_data=False)
+        self._send("slides_play", {"service": {"action": "play", "key": "service", "expire": None,
+                                               "priority": SERVICE_PRIORITY}},
+                   priority=SERVICE_PRIORITY, need_data=False, **lines)
+
+    def service_hide(self):
+        self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
+                   need_data=False)
 
     # ------------------------------------------------------------------ sounds
 
