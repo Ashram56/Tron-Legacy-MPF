@@ -58,9 +58,12 @@ class Display:
     def start(self, deff_id, hold=False, refresh=True, **args):
         os_ = self.os
         if deff_id in self.background:
+            if self.bg not in (None, deff_id):
+                os_.media.deff_stop(self.bg)
             self.bg = deff_id
             os_.trace.log("deff_start", id=deff_id)
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+            os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
             if deff_id == 19:
                 os_.tube_start(10)
             return True
@@ -68,9 +71,12 @@ class Display:
         if self.fg is not None and self.prio.get(self.fg, 0) > self.prio.get(deff_id, 0):
             return False                           # a higher priority deff keeps the display
         self._end_fg(stopped=True)
+        if self.bg is not None:
+            os_.media.deff_stop(self.bg)
         self.fg = deff_id
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+        os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
         info = self.media.get(deff_id)
         if info:
             if not hold:
@@ -122,6 +128,8 @@ class Display:
         for handle in self._sound_handles:
             self.os.machine.clock.unschedule(handle)
         self._sound_handles = []
+        if self.fg is not None:
+            self.os.media.deff_stop(self.fg)
         self.fg = None
 
     def _ended(self, deff_id):

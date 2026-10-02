@@ -55,7 +55,7 @@ class Bonus(Feature):
         os_ = self.os
         lines = self.lines()
         steps = list(range(2, self.pd.bonus_x + 1))
-        os_.deff_start(25, hold=True)        # this feature drives the bonus media
+        os_.deff_start(25, hold=True, total=self.total())   # this feature drives the bonus media
         os_.leff_start(20)
         self._skip = False
         state = {"i": 0, "running": 0}

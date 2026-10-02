@@ -26,3 +26,6 @@ game:
 machine:
   balls_installed: 4
   min_balls: 1
+
+# Balls in the trough at power-on on the virtual platforms (live render checks with -X)
+virtual_platform_start_active_switches: s_trough_1_r, s_trough_2, s_trough_3, s_trough_4_l

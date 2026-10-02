@@ -136,13 +136,18 @@ class TronOS(CustomCode):
 
         self.register("rules_refresh", self.request_refresh)
         self.register_poke(0x3d46c, lambda p, v: self.eb_lit.__setitem__(p, v))
-        from tron.display import Display, Tubes     # noqa: E402 (import after machine setup)
+        from tron.media_bridge import MediaBridge   # noqa: E402 (import after machine setup)
+        self.media = MediaBridge(self)
+        from tron.display import Display, Tubes     # noqa: E402
         self.display = Display(self)
         self.tubes = Tubes(self)
         from tron import switches                   # noqa: E402
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
         self.features = load_features(self)
+        if os.environ.get("TRON_LIVE_SCENARIO"):
+            from tron.live_scenario import LiveScenario  # noqa: E402
+            self.live = LiveScenario(self, os.environ["TRON_LIVE_SCENARIO"])
 
     # ------------------------------------------------------------------ infrastructure
 
@@ -281,6 +286,7 @@ class TronOS(CustomCode):
     def sound(self, call, in_deff=0):
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
+        self.media.sound(call)
 
     def leff_start(self, leff_id):
         self.trace.log("leff_start", id=leff_id)
@@ -410,6 +416,7 @@ class TronOS(CustomCode):
         for num, delta in pending.items():
             total = self.game.player_list[num - 1].score if self.game else 0
             self.trace.log("score", player=num, delta=delta, total=total)
+        self.media.score_changed()
 
     def base_score(self, points):
         """FUN_0102a188: base switch score, nothing while tilted."""

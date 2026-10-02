@@ -3,14 +3,19 @@
 # (Xvfb), captures the DMD in real time and checks that a slide was drawn.
 # Output: captures/frames/*.png, captures/dmd_latest.png (128x32) and
 # captures/dmd_latest_x8.png (1024x256 preview), plus godot.log and mpf.log.
-# Usage: scripts/render_check.sh [seconds]   (default 15)
+# Usage: scripts/render_check.sh [seconds] [scenario]   (default 15 s, attract only)
+# With a scenario (assets/rules/traces/<name>.txt) MPF plays it in real time on the smart_virtual
+# platform (balls move), so the rules drive the display and sounds as in a game.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SECONDS_TO_RUN="${1:-15}"
+SCENARIO="${2:-}"
 OUT="$ROOT/captures"
-rm -rf "$OUT" && mkdir -p "$OUT/frames"
+rm -rf "$OUT/frames" && mkdir -p "$OUT/frames"
+MPF_ARGS=(-t)
+if [ -n "$SCENARIO" ]; then MPF_ARGS=(-t -X); fi
 
 # Godot is the BCP server, so it starts first; MPF connects to it on localhost:5050.
 xvfb-run -a -s "-screen 0 1280x720x24" \
@@ -19,7 +24,8 @@ xvfb-run -a -s "-screen 0 1280x720x24" \
   > "$OUT/godot.log" 2>&1 &
 GODOT_PID=$!
 sleep 3
-(cd game && timeout "$((SECONDS_TO_RUN + 5))" ../.venv/bin/mpf game . -t > "$OUT/mpf.log" 2>&1) &
+(cd game && TRON_LIVE_SCENARIO="$SCENARIO" TRON_TRACE="$OUT/live_trace.jsonl" \
+  timeout "$((SECONDS_TO_RUN + 5))" ../.venv/bin/mpf game . "${MPF_ARGS[@]}" > "$OUT/mpf.log" 2>&1) &
 MPF_PID=$!
 wait "$GODOT_PID" || true
 wait "$MPF_PID" || true

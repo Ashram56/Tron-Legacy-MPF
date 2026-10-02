@@ -9,3 +9,7 @@ game/data/
 captures/
 __pycache__/
 game/config/rom/
+game/sounds/
+game/media/
+game/slides/deffs/
+game/tron/media_data.json
