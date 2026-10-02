@@ -1,6 +1,6 @@
 .godot/
 .venv/
-tools/
+/tools/
 game/addons/mpf-gmc/
 game/logs/
 game/.godot/
