@@ -3,7 +3,8 @@ extends Node
 ##   godot --path game res://tools/slide_capture.tscn -- --job=/abs/job.json
 ## job.json: [{"slide": "deff_025", "kwargs": {"line1": "50,000"}, "times_ms": [0, 49, ...],
 ##             "out": "/abs/dir"}, ...]. For each time the slide's animation is put on the frame
-## showing at that time and the 128x32 viewport is saved as out/frame_NNNNN.png. Quits when done.
+## showing at that time, timed nodes (group "rom_timed": tron/rom_text.gd, tron/score_display.gd) are
+## put at that time, and the 128x32 viewport is saved as out/frame_NNNNN.png. Quits when done.
 
 func _ready() -> void:
 	var job_path := ""
@@ -28,6 +29,7 @@ func _run(jobs: Array) -> void:
 		for t in job["times_ms"]:
 			if anim:
 				anim.frame = _frame_at(anim, float(t))
+			get_tree().call_group("rom_timed", "seek_ms", float(t))
 			await RenderingServer.frame_post_draw
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("%s/frame_%05d.png" % [job["out"], n])

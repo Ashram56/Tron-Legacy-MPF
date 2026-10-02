@@ -50,10 +50,20 @@ class TestFontDecoding(unittest.TestCase):
     def test_rom_text_matches_reference(self):
         """TOTAL BONUS / 50,000 drawn like the ROM equals the emulator capture of deff 25."""
         ref, _ = render_diff.reference(25)
-        lines = ["TOTAL BONUS", "%,02lu"]
-        dots = render_diff.text_dots(25, lines, render_diff.line_values(25, lines), self.fonts, self.get)
+        canvas = [[None] * 128 for _ in range(32)]
+        gen_fonts.render(self.get, self.fonts[12], "TOTAL BONUS", 84, 12, 2, canvas)
+        gen_fonts.render(self.get, self.fonts[15], "50,000", 84, 26, 2, canvas)
+        dots = {(x, y): v for y in range(32) for x in range(128) if (v := canvas[y][x]) is not None}
         best = max(sum(r[y][x] == v for (x, y), v in dots.items()) for r in ref)
         self.assertEqual(len(dots), best)
+
+    def test_font0_comma(self):
+        """Score display replay line: font 0's comma also sits one dot left (deff 19 capture)."""
+        ref, _ = render_diff.reference(19)
+        canvas = [[None] * 128 for _ in range(32)]
+        gen_fonts.render(self.get, self.fonts[0], "REPLAY AT 20,000,000", 84, 30, 2, canvas)
+        dots = {(x, y): v for y in range(32) for x in range(128) if (v := canvas[y][x]) is not None}
+        self.assertEqual(len(dots), max(sum(r[y][x] == v for (x, y), v in dots.items()) for r in ref))
 
 
 class TestLayout(unittest.TestCase):
@@ -68,6 +78,21 @@ class TestLayout(unittest.TestCase):
         fonts = gen_fonts.decode_all()[2]
         lays = rom_layout.line_layouts(133, ["EXTRA", "BALL", "%,02lu"], fonts)
         self.assertEqual((127, 14, "line2"), (lays[0]["alt_x"], lays[0]["alt_y"], lays[0]["alt_when_empty"]))
+
+    def test_timed_lines(self):
+        fonts = gen_fonts.decode_all()[2]
+        match = rom_layout.line_layouts(38, ["MATCH", "%,02lu", "%,02lu"], fonts)
+        self.assertEqual((37, 0, 15), (match[0]["font"], match[0]["level_steps"][0], match[0]["level_steps"][-1]))
+        self.assertEqual(rom_layout.frame_ms(38, 64), match[1]["show_after_ms"])   # number at loop frame 0x40
+        self.assertGreater(match[1]["show_after_ms"], match[0]["hide_after_ms"])
+        up = rom_layout.line_layouts(40, ["PLAYER %d", "YOU'RE UP"], fonts)
+        self.assertEqual(round(6 * rom_layout.TICK_MS), up[1]["blink_ms"])
+
+    def test_panels(self):
+        panels = rom_layout.status_panel_deffs()
+        self.assertEqual("status", panels[19])
+        self.assertEqual("status", panels[133])
+        self.assertEqual("match", panels[38])
 
     def test_dynamic_slides_use_rom_fonts(self):
         path = os.path.join(ROOT, "game", "tron", "media_data.json")
@@ -84,3 +109,8 @@ class TestLayout(unittest.TestCase):
                     body = f.read()
                 self.assertIn("res://tron/rom_text.gd", body, d)
                 self.assertNotIn("font_sizes/font_size", body, d)
+        with open(os.path.join(ROOT, "game", "slides", "deffs", "deff_019.tscn")) as f:
+            body = f.read()
+        for node in ("Credits", "Replay", "P1", "P4", "Award", "Separator", "BarGem", "ScoreDisplay"):
+            self.assertIn('[node name="%s"' % node, body)
+        self.assertIn("score_lines = true", body)

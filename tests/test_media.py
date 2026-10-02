@@ -52,8 +52,32 @@ class TestBridge(TronTestCase):
             self.tron.media.sound(0x001)                  # channel stop: stops the music
             self.assertEqual({"action": "stop", "key": key}, trig.call_args_list[-1].kwargs["settings"][key])
 
+    def test_score_display_args(self):
+        bridge = self.tron.media
+        if not bridge.data:
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        self.assertEqual("CREDITS 0", bridge.credits_text())
+        self.tron.coins = 1
+        self.assertEqual("CREDITS 1/3", bridge.credits_text())
+        self.tron.credits = 2
+        self.assertEqual("CREDITS 2 1/3", bridge.credits_text())
+        self.fill_trough()
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        args = bridge.deff_lines(19, {})
+        self.assertEqual("BALL 1", args["line0"])
+        self.assertEqual("REPLAY AT 20,000,000", args["replay"])      # auto replay, first level
+        self.assertEqual((1, 1, "00", ""), (args["players"], args["player"], args["p1"], args["p2"]))
+        self.machine.game.player.score += 5000
+        bridge.score_changed()
+        args = bridge.score_display_args()
+        self.assertEqual(("5,000", 0), (args["award"], args["award_age"]))
+        for key in ("bar_ds", "bar_bumpers", "bar_spinners", "bar_zfs", "bar_clu", "bar_gem"):
+            self.assertEqual(0, args[key])
+
     def test_missing_value_is_blank(self):
         bridge = self.tron.media
         if not bridge.data:
             self.skipTest("media data not generated (scripts/gen_media.py)")
-        self.assertEqual({"line0": "EXTRA", "line1": "BALL", "line2": ""}, bridge.deff_lines(133, {}))
+        lines = {k: v for k, v in bridge.deff_lines(133, {}).items() if k.startswith("line")}
+        self.assertEqual({"line0": "EXTRA", "line1": "BALL", "line2": ""}, lines)
