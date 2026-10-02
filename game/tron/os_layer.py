@@ -123,6 +123,7 @@ class TronOS(CustomCode):
         self._mb_save = (0, 0)
         self.rules = []
         self._refresh_pending = False
+        self.refresh_count = 0       # rules refreshes run so far (display._hold)
         self._score_pending = {}
         self.forced = {}             # name -> list of forced pick results (tests)
         self.random = random.Random()
@@ -281,6 +282,7 @@ class TronOS(CustomCode):
                     self.leff_start(rule[1], loop=True)
             return
         self._refresh_pending = False
+        self.refresh_count += 1
         if self.game and self.state & ST_TILT:
             return          # FUN_000196e4: a rule runs only when gf_state is 0 or matches its mode mask
         if self.display.task_running(0x97):

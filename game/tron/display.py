@@ -144,8 +144,12 @@ class Display:
         held deff (traces/end_of_line_multiball.jsonl: deff 57 at the hold of deff 56 and at its end)."""
         self.fg_prio = HOLD_PRIORITY
         if self.show:
-            # the show's rules refresh request is served after the deff exits (_ended; traces/
-            # gem_hurryup.jsonl: one tube 18 start as deff 76 ends)
+            # the show's rules refresh request is served a tick later, unless a refresh ran meanwhile
+            # (one pending request; traces/gem_hurryup.jsonl: one tube 18 start as deff 76 ends 1 tick
+            # into its hold; clu_hurryup.jsonl: the music 0x01b just before the VUK kickout as the
+            # reel's show ends at 42.89 s, one tube 23 start as the CLU intro follows the reel at 18.0 s)
+            count = self.os.refresh_count
+            self.os.after(1, lambda: self.os.refresh_count == count and self.os.request_refresh())
             show, self.show = self.show, None
             if show.on_end:
                 show.on_end()
@@ -201,10 +205,7 @@ class Display:
         self.fg_handle = None
         if self.fg != deff_id:
             return
-        held = self.fg_prio == HOLD_PRIORITY
         self._end_fg()
-        if held:
-            self.os.request_refresh()              # the request of a show that ended in the hold (_hold)
         # the deff rules restart a mode's background deff when the effect in front of it ends
         # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
         if self.mode_bg():
@@ -453,6 +454,8 @@ class Leffs:
     running lower one keeps running). When an effect ends or stops, the lamp rules start a refused rule
     leff that can run now (logged again; traces/recognizer_and_disc_battle.jsonl: leff 107 behind leff
     108; disc_multiball_restart.jsonl: leff 54 behind leff 52). Rule leffs run until the rule stops them.
+    A higher effect on a running rule leff's flashers takes them over: the rule leff waits like a refused
+    one (traces/zuse_fast_scoring.jsonl: leff 125 again as each leff 120 / 128 on f_backpanel ends).
     """
 
     def __init__(self, os_):
@@ -466,6 +469,7 @@ class Leffs:
                 self.info[int(row["leff"])] = (outputs, int(row["priority"] or 0), length)
         self.running = {}           # leff id -> end handle (or None)
         self.pending = []           # refused lamp-rule leffs, started when an effect ends
+        self.rule_leffs = set()     # running leffs started by a lamp rule (loop=True)
 
     def is_running(self, leff_id):
         return leff_id in self.running
@@ -481,6 +485,14 @@ class Leffs:
                 self.pending.append(leff_id)
             return False
         self.stop(leff_id)
+        outputs, prio, _ = self.info.get(leff_id, (frozenset(), 0, None))
+        for other in [o for o in self.rule_leffs if o in self.running]:
+            o_out, o_prio, _ = self.info.get(other, (frozenset(), 0, None))
+            if o_out & outputs and o_prio < prio:
+                self.running.pop(other)
+                self.pending.append(other)
+        if loop:
+            self.rule_leffs.add(leff_id)
         length = self.info.get(leff_id, (None, None, None))[2]
         handle = None
         if length and not loop:

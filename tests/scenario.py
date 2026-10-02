@@ -52,13 +52,15 @@ def forced_picks(name):
                     and n["t"] - e["t"] < 7.5]
             forced.setdefault("match", []).append(len(hits))
         if e.get("ev") == "deff_start" and e.get("id") == 105:
-            # the reel stops at a random slot: take the length from what followed the deff in the ROM
+            # the reel stops at a random slot: take the length from what followed the deff in the ROM.
+            # What follows starts as the reel's show ends, at the start of the deff's 10-tick hold.
+            hold = 10 * 0.01626
             for n in evs[i + 1:]:
                 if n.get("ev") == "deff_start" and n.get("id") not in (19, 105):
-                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"])
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] + hold)
                     break
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
-                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045 + hold)
                     break
     # left outlane hits (task 0x37 starts, logged twice per hit): insult speech 0x129 or not
     lefts = sorted({e["t"] for e in evs if e.get("ev") == "task_start" and e.get("task") == "0x37"})
