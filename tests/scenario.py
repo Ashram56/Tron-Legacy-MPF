@@ -18,11 +18,15 @@ OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
-SETTLE = 0.1                        # every hit is followed by 100 ms settle
-# tron_ref advances the emulator in steps that end at the first ROM task_sleep after the target time, so
-# every timed step of a script command lasts a little longer than asked: 5.7 ms on average (measured over
-# the marks of traces/switches_and_shots.jsonl: +17 ms per hit + wait).
-STEP_OVERSHOOT = 0.0057
+# every hit is followed by 100 ms settle; with STEP_OVERSHOOT on both phases a hit lasts ~173 ms past
+# its ms (reference traces: hit + wait 1 = 1.17-1.18 s)
+SETTLE = 0.1
+TROUGH_SWITCHES = (18, 19, 20, 21)  # tron_ref's 4-ball trough
+VUK_HIT = 0.05                      # tron_ref closes sw11 for 50 ms (whatever ms says), then settles
+# tron_ref's step_to() runs the emulator in 5 ms slices and stops at the first slice past the target, so
+# each switch phase of a hit lasts about 6.5 ms longer (fit over the reference traces; plain waits do not
+# drift: clu_hurryup's 51 waits stay on time).
+STEP_OVERSHOOT = 0.00655
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -174,7 +178,9 @@ class ScenarioRun(TronTestCase):
         with open(os.path.join(TRACES, name + ".txt")) as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
-                if line:
+                if line.startswith("mark "):
+                    self.command(["mark", line[5:].strip()])     # free text (may hold quotes)
+                elif line:
                     self.command(shlex.split(line))
         self.log("end")
         trace.close()
@@ -207,26 +213,31 @@ class ScenarioRun(TronTestCase):
         self.wait(seconds + STEP_OVERSHOOT)
 
     def cmd_wait(self, s):
-        self.step(float(s))
+        self.wait(float(s))                            # plain waits do not drift (see STEP_OVERSHOOT)
 
     def cmd_hit(self, sw, ms="60"):
         name = switch_name(sw)
         self.log("switch", sw=int(sw))
         self.sw(name, 1 if int(sw) != 41 else 0)
         if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
-            self.step(0.05)                           # (tron_ref: 50 ms, not the pulse length)
-            self.step(SETTLE)
+            self.wait(VUK_HIT + STEP_OVERSHOOT)
+            self.wait(SETTLE + STEP_OVERSHOOT)
             return
-        self.step(float(ms) / 1000)
+        self.wait(float(ms) / 1000 + STEP_OVERSHOOT)
         self.sw(name, 0 if int(sw) != 41 else 1)
-        self.step(SETTLE)
+        self.wait(SETTLE + STEP_OVERSHOOT)
 
     def cmd_hold(self, sw):
         self.log("switch_hold", sw=int(sw))
+        if int(sw) in TROUGH_SWITCHES:              # a ball arriving in the trough is a drain
+            self.cmd_drain()
+            return
         self.sw(switch_name(sw), 1)
 
     def cmd_release(self, sw):
         self.log("switch_release", sw=int(sw))
+        if int(sw) in TROUGH_SWITCHES:              # MPF's trough device owns its ball switches
+            return
         self.sw(switch_name(sw), 0)
 
     def cmd_plunge(self):
