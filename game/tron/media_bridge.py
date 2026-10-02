@@ -39,7 +39,11 @@ def format_rom_text(line, args):
         except (TypeError, ValueError):
             return str(value)
         last[0] = value
-        return "{:,}".format(value) if "," in spec else str(value)
+        text = "{:,}".format(value) if "," in spec else str(value)
+        flags, width = re.match(r"([-+ #0,]*)(\d*)", spec).groups()
+        if width:                                  # %,02lu: score 0 shows "00"; %06d zero-padded
+            text = text.rjust(int(width), "0" if "0" in flags or width.startswith("0") else " ")
+        return text
     return SPEC.sub(sub, line)
 
 

@@ -14,6 +14,8 @@ class TestRomText(unittest.TestCase):
     def test_printf(self):
         self.assertEqual("BALL 2", format_rom_text("BALL %d", [2]))
         self.assertEqual("1,234,560", format_rom_text("%,02lu", [1234560]))
+        self.assertEqual("00", format_rom_text("%,02lu", [0]))      # score 0 as the ROM shows it
+        self.assertEqual("000042", format_rom_text("%06d", [42]))
         self.assertEqual("PLAYER 3", format_rom_text("PLAYER %u", [3]))
         self.assertEqual("ZUSE", format_rom_text("%s", ["ZUSE"]))
 
