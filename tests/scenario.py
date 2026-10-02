@@ -60,6 +60,8 @@ def forced_picks(name):
     lefts = sorted({e["t"] for e in evs if e.get("ev") == "task_start" and e.get("task") == "0x37"})
     forced["insult"] = [0 if any(n.get("ev") == "sound" and n.get("call") == "0x129" and 0 <= n["t"] - t < 0.1
                                  for n in evs) else 1 for t in lefts]
+    for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
+        forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
     forced.update(forced_samples(evs))
     return forced
 
@@ -100,6 +102,30 @@ def forced_samples(evs):
                 picks[call][n] = best
                 break
     return {"sample_0x{:03x}".format(c): p for c, p in picks.items() if any(x is not None for x in p)}
+
+
+# Deffs that play a random film clip first, so their length varies: the ROM's length is read from the
+# stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
+# same deff keeps the recorded length (None).
+CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+
+
+def clip_lengths(evs, deff_id, stop_ev, stop_id):
+    out = []
+    for i, e in enumerate(evs):
+        if e.get("ev") != "deff_start" or e["id"] != deff_id:
+            continue
+        length = None
+        for n in evs[i + 1:]:
+            if n["t"] < e["t"] + 0.005:
+                continue                    # the previous run's effect stops as this one starts
+            if n.get("ev") == "deff_start" and n["id"] == deff_id:
+                break                       # replaced by its next start
+            if n.get("ev") == stop_ev and n.get("id") == stop_id:
+                length = n["t"] - e["t"]
+                break
+        out.append(length)
+    return out
 
 
 class ScenarioRun(TronTestCase):

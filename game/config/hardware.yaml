@@ -34,7 +34,7 @@ ball_devices:
     ball_switches: s_shooter_lane
     eject_coil: c_auto_launch
     mechanical_eject: true
-    eject_timeouts: 3s
+    eject_timeouts: 1s
   bd_vuk:
     ball_switches: s_video_game_eject
     eject_coil: c_video_game_eject
