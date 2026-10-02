@@ -35,6 +35,13 @@ MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
 BALL_SAVE_GRACE = 218
 SERVE_EJECT_TICKS = 32
 SAVE_EJECT_TICKS = 39
+# Multiball task trough ejects (ROM traces: trough coil 33 ticks after an add-a-ball request, or 131 ticks
+# after the VUK kick, eject 8 ticks later, then 105 ticks between balls). The two delays include 10
+# ticks because MPF's shooter lane launches 0.16 s faster than the emulator, so that the launched ball
+# leaves the shooter lane (sound 0x0ea) when the ROM's does.
+MB_EJECT_TICKS = 51
+VUK_EJECT_CONFIRM_TICKS = 149
+MB_EJECT_GAP_TICKS = 105
 BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)   # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
 
 
@@ -105,7 +112,15 @@ class TronOS(CustomCode):
         self.serve_type = 0
         self.coins = 0
         self._mb_pending = 0
+        self._mb_balls = 0          # balls requested by the running multiball task (0x3d4c2)
+        self._mb_next_eject = 0.0   # earliest time of the multiball task's next trough eject
+        self._mb_eject_handle = None
+        self._mb_leff_handle = None
+        self._vuk_kicked_at = -999.0     # when the VUK last let its ball go (None: holding one)
         self.rules = []
+        self.deff_rules = []        # [cond, deff, music, priority] (lamp_rule_init list 2), first wins
+        self._deff_rule_won = None
+        self.music = None           # music call last started (snd_play of a rule / play music)
         self._refresh_pending = False
         self._score_pending = {}
         self.forced = {}             # name -> list of forced pick results (tests)
@@ -225,6 +240,51 @@ class TronOS(CustomCode):
         self.rules.append([cond, leff, tube, False, order])
         self.rules.sort(key=lambda r: r[4])
 
+    def deff_rule(self, cond, deff, music=0, priority=0):
+        """Display/music rule (lamp_rule_init list 2 [0x0001982c], run by 0x000198a8): while cond() is
+        true the background deff `deff` and the music `music` play. Rules are kept by priority (highest
+        first); the first active one wins. Returns the rule (for deff_rule_raise)."""
+        rule = [cond, deff, music, priority]
+        i = next((k for k, r in enumerate(self.deff_rules) if r[3] < priority), len(self.deff_rules))
+        self.deff_rules.insert(i, rule)
+        return rule
+
+    def deff_rule_raise(self, rule):
+        """Re-insert a rule before the others of its priority (a mode start, e.g. FUN_0101ac74), so the
+        mode started last shows its background deff when several are active."""
+        self.deff_rules.remove(rule)
+        i = next((k for k, r in enumerate(self.deff_rules) if r[3] <= rule[3]), len(self.deff_rules))
+        self.deff_rules.insert(i, rule)
+
+    def deff_rule_winner(self):
+        if not self.in_play:
+            return None
+        return next((r for r in self.deff_rules if r[0]()), None)
+
+    def deff_rule_music(self, rule):
+        """snd_play(music) unless that music is already playing (FUN_0002ccd4)."""
+        music = rule[2] if rule else (0x01b if self.pf_valid else 0x01a)
+        if music and self.music != music:
+            self.sound(music)
+
+    def _deff_rules_refresh(self):
+        """Deff rules [0x000198a8], run with every rules refresh: the winning rule starts its deff when it
+        is not running (also behind a foreground deff or a show, where it is logged again each time)
+        and its music when that is not playing. When the last mode rule goes, the score display and the
+        main play music come back."""
+        won = self.deff_rule_winner()
+        changed = won is not self._deff_rule_won
+        self._deff_rule_won = won
+        if not self.in_play:
+            return
+        if won:
+            if self.display.bg != won[1]:
+                self.display.start(won[1])
+            self.deff_rule_music(won)
+        elif changed:
+            self.display.start(19)
+            self.deff_rule_music(None)
+
     def request_refresh(self, *_):
         """rules_refresh_request: evaluate the lamp rules once the current handler has finished."""
         if not self._refresh_pending:
@@ -233,6 +293,7 @@ class TronOS(CustomCode):
 
     def rules_refresh(self):
         self._refresh_pending = False
+        self._deff_rules_refresh()
         active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
         for rule in self.rules:
             cond, leff, tube, on = rule[:4]
@@ -280,6 +341,8 @@ class TronOS(CustomCode):
 
     def sound(self, call, in_deff=0):
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
+        if call in (0x01a, 0x01b) or any(call == r[2] for r in self.deff_rules):
+            self.music = call                        # a play music (also from inside a deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
 
     def leff_start(self, leff_id):
@@ -343,32 +406,73 @@ class TronOS(CustomCode):
         return game.balls_in_play if game else 0
 
     def rom_balls_in_play(self):
-        """The ROM's count: a ball held in the VUK is not in play."""
+        """The ROM's balls_in_play [0x0001e4a8]: while the multiball task runs (balls still to eject, or its
+        ball save / grace) it is the requested count; otherwise the balls not in a device (a ball held in
+        the VUK is not in play)."""
+        if self.mb_task_running():
+            return self._mb_balls
         return max(0, self.balls_in_play() - (1 if self.ball_held else 0))
 
     # ------------------------------------------------------------------ multiball (0x0001ed7c)
 
+    def mb_task_running(self):
+        """The multiball task FUN_0001ea60: balls still to launch, or its save / grace still running."""
+        return bool(self._mb_pending) or self.mb_save_running()
+
     def multiball_start(self, balls, save_ticks=0, grace_ticks=0):
         """multiball_start(balls, 0, save_ticks, grace_ticks): bring the number of balls in play up to
         `balls` (counting the VUK ball, capped at the 4 installed), kill the single-ball save and run the
-        multiball save (leff 13 while it runs, then the grace). A larger pending request wins."""
+        multiball save (leff 13 while it runs, then the grace). While the multiball task still runs, the
+        larger ball count / timers win. Refused (returns False) at end of ball, in attract or tilted
+        (game state bits 0x214)."""
+        if not self.game or self.state & 0x214:
+            return False
         self.trace.log("multiball_start", balls=balls, save_ticks=save_ticks, grace_ticks=grace_ticks)
         self.machine.events.post("tron_multiball_start", balls=balls)
         self.kill_ball_save()
         target = min(balls, 4)
-        add = target - self.balls_in_play() - self._mb_pending
+        self._mb_balls = max(target, self._mb_balls) if self.mb_task_running() else target
+        add = target - self.balls_in_play()          # MPF count already holds the balls still to eject
         if add > 0:
-            self._mb_pending += add
             self.game.balls_in_play += add
-
-            def launch():
-                self._mb_pending = max(0, self._mb_pending - add)
-                self.machine.playfield.add_ball(balls=add, player_controlled=False)
-            self.after(SAVE_EJECT_TICKS, launch)
+            self._mb_eject(add)
         if save_ticks > self.task_ticks_left(0x34):
             self.task_kill(0x35)
-            self.leff_start(13)
             self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
+            if not self._mb_leff_handle:             # the (re)created task starts leff 13 when it runs
+                def leff13():
+                    self._mb_leff_handle = None
+                    if self.task_running(0x34):
+                        self.leff_start(13)
+                self._mb_leff_handle = self.after(1, leff13)
+        return True
+
+    def _mb_eject(self, balls):
+        """The multiball task FUN_0001ea60 ejects missing balls one at a time from the trough, once no
+        ball device is busy: not while the VUK holds a ball, nor until its eject is confirmed."""
+        self._mb_pending += balls
+        self._mb_next_eject = max(self._mb_next_eject, self.now + MB_EJECT_TICKS * TICK)
+        if not self._mb_eject_handle:
+            self._mb_eject_handle = self.after(1, self._mb_eject_poll)
+
+    def _mb_eject_poll(self):
+        self._mb_eject_handle = None
+        if not self._mb_pending or not self.game:
+            self._mb_pending = 0
+            return
+        if self.ball_held:
+            self._vuk_kicked_at = None               # the VUK device is busy until after its kick
+        elif self._vuk_kicked_at is None:
+            self._vuk_kicked_at = self.now
+        busy_until = max(self._mb_next_eject, (self._vuk_kicked_at or -999.0) + VUK_EJECT_CONFIRM_TICKS * TICK)
+        if self.ball_held or self.now < busy_until - TICK / 2:
+            self._mb_eject_handle = self.after(1, self._mb_eject_poll)
+            return
+        self._mb_pending -= 1
+        self._mb_next_eject = self.now + MB_EJECT_GAP_TICKS * TICK
+        self.machine.playfield.add_ball(balls=1, player_controlled=False)
+        if self._mb_pending:
+            self._mb_eject_handle = self.after(1, self._mb_eject_poll)
 
     def _mb_save_grace(self, grace_ticks):
         self.leff_stop(13)
@@ -571,14 +675,13 @@ class TronOS(CustomCode):
         self.vuk_ejecting = False
         if self.balls_in_play() - balls > 0:
             if self.mb_save_running() and not self.tilted:
-                # multiball save: the ball comes back, auto-launched (serve type 6)
-                self.audit(0x2b)
-                self.hook("ball_saved")
-                self.after(SAVE_EJECT_TICKS,
-                           lambda: self.machine.playfield.add_ball(balls=balls, player_controlled=False))
+                # multiball save: the multiball task ejects a replacement, auto-launched. Unlike the
+                # single-ball save (ball_save_try 0x00019b34) it shows nothing and audits nothing.
+                self._mb_eject(balls)
                 return {"balls": 0}
             self.hook("ball_drained", balls)
-            if self.balls_in_play() - balls < 2:
+            # trough entry (0x0101bbc0 case 0xe): installed - balls in devices (the VUK counts) < 2
+            if self.balls_in_play() - balls - (1 if self.ball_held else 0) < 2:
                 self.kill_mb_save()
                 self.hook("multiball_end")           # 0x0101bcec: fewer than 2 balls in play
             return {"balls": balls}
