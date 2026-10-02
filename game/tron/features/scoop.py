@@ -8,11 +8,13 @@ from tron.features import Feature
 ORDER = 10
 BITS = (1, 2, 4, 8, 0x10)
 BASE = 0x2111894
+EB_REMIND_TICKS = 2500      # task 0xc9: the extra ball must stay lit this long (0x9c3 + 1 ticks) ...
+EB_REMIND_WAIT = 1875       # ... then the speech waits up to 0x752 ticks for no show to run
 
 
 class Scoop(Feature):
     name = "scoop"
-    HOOKS = ("player_first_ball", "vuk_lit_add", "vuk_lit_take", "vuk_lit_test", "vuk_extra_ball")
+    HOOKS = ("player_first_ball", "vuk_lit_add", "vuk_lit_take", "vuk_lit_test", "vuk_extra_ball", "ball_end")
 
     def __init__(self, os_):
         super().__init__(os_)
@@ -65,7 +67,24 @@ class Scoop(Feature):
         os_.light_extra_ball()
         if not os_.state & 0x305:
             os_.show(0x82, 132)
+            self.eb_remind(0)
         return True
+
+    def eb_remind(self, ticks):
+        """task_c9 [0x010120d8]: when the extra ball is still lit 2,500 ticks later, speech 0x118 (EXTRA
+        BALL IS LIT) as soon as no show runs (FUN_000287a4), within 1,875 more ticks."""
+        os_ = self.os
+        if ticks < EB_REMIND_TICKS and not os_.eb_lit[os_.player_num - 1]:
+            return                                   # collected (or lost): no reminder
+        if ticks >= EB_REMIND_TICKS and os_.eb_lit[os_.player_num - 1] and not os_.display.show_running():
+            os_.sound(0x118)
+            return
+        if ticks < EB_REMIND_TICKS + EB_REMIND_WAIT:
+            os_.task_start(0xc9, 1, lambda: self.eb_remind(ticks + 1))
+
+    def ball_end(self):
+        """End of ball kills the ball's tasks (task flag 0x100), task 0xc9 among them."""
+        self.os.task_kill(0xc9)
 
     def vuk_extra_ball(self):
         """eb_collect_game 0x01012228: the scoop collects one lit extra ball; deff 133 (show task 0x83)."""

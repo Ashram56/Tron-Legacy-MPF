@@ -28,13 +28,13 @@ ball_devices:
     eject_coil: c_trough_up_kicker
     eject_targets: bd_shooter_lane
     tags: trough, home, drain
-    entrance_count_delay: 500ms
+    entrance_count_delay: 530ms   # ROM: drain to drain handling 0.53-0.54 s (game_flow, game_flow_tilt)
     debug: false
   bd_shooter_lane:
     ball_switches: s_shooter_lane
     eject_coil: c_auto_launch
     mechanical_eject: true
-    eject_timeouts: 3s
+    eject_timeouts: 1s
   bd_vuk:
     ball_switches: s_video_game_eject
     eject_coil: c_video_game_eject

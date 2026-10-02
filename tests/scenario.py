@@ -18,7 +18,15 @@ OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
-SETTLE = 0.1                        # every hit is followed by 100 ms settle
+# every hit is followed by 100 ms settle; with STEP_OVERSHOOT on both phases a hit lasts ~173 ms past
+# its ms (reference traces: hit + wait 1 = 1.17-1.18 s)
+SETTLE = 0.1
+TROUGH_SWITCHES = (18, 19, 20, 21)  # tron_ref's 4-ball trough
+VUK_HIT = 0.05                      # tron_ref closes sw11 for 50 ms (whatever ms says), then settles
+# tron_ref's step_to() runs the emulator in 5 ms slices and stops at the first slice past the target, so
+# each switch phase of a hit lasts about 6.5 ms longer (fit over the reference traces; plain waits do not
+# drift: clu_hurryup's 51 waits stay on time).
+STEP_OVERSHOOT = 0.00655
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -52,7 +60,76 @@ def forced_picks(name):
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
                     forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
                     break
+    # left outlane hits (task 0x37 starts, logged twice per hit): insult speech 0x129 or not
+    lefts = sorted({e["t"] for e in evs if e.get("ev") == "task_start" and e.get("task") == "0x37"})
+    forced["insult"] = [0 if any(n.get("ev") == "sound" and n.get("call") == "0x129" and 0 <= n["t"] - t < 0.1
+                                 for n in evs) else 1 for t in lefts]
+    for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
+        forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
+    forced.update(forced_samples(evs))
     return forced
+
+
+def forced_samples(evs):
+    """Sample picks of sound calls that a chained sound (snd_play_chain, caller 0x2ccb8) waited for: the
+    gap from the call to the chained sound tells which sample the ROM played."""
+    import csv
+    base = os.path.join(ROOT, "assets", "callouts")
+    dur = {}
+    with open(os.path.join(base, "samples_index.csv")) as f:
+        for row in csv.DictReader(f):
+            dur[int(row["sample_id"], 16)] = float(row["duration_s"] or 0)
+    lengths = {}
+    with open(os.path.join(base, "sound_calls.csv")) as f:
+        for row in csv.DictReader(f):
+            lengths[int(row["call_id"], 16)] = [dur.get(int(x, 16), 0)
+                                                for x in row["sample_ids (one picked per play)"].split()]
+    sounds = [e for e in evs if e.get("ev") == "sound" and not e.get("in_deff")]
+    picks, index = {}, {}
+    for e in sounds:
+        call = int(e["call"], 16)
+        if e.get("caller") == "0x2ccb8":
+            continue
+        if len(lengths.get(call, [])) > 1:
+            index[id(e)] = (call, len(picks.setdefault(call, [])))
+            picks[call].append(None)
+    for i, e in enumerate(sounds):
+        if e.get("caller") != "0x2ccb8":
+            continue
+        for prev in reversed(sounds[:i]):
+            if id(prev) not in index:
+                continue
+            call, n = index[id(prev)]
+            gap = e["t"] - prev["t"]
+            best = min(range(len(lengths[call])), key=lambda k: abs(lengths[call][k] - gap))
+            if abs(lengths[call][best] - gap) < 0.05:
+                picks[call][n] = best
+                break
+    return {"sample_0x{:03x}".format(c): p for c, p in picks.items() if any(x is not None for x in p)}
+
+
+# Deffs that play a random film clip first, so their length varies: the ROM's length is read from the
+# stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
+# same deff keeps the recorded length (None).
+CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+
+
+def clip_lengths(evs, deff_id, stop_ev, stop_id):
+    out = []
+    for i, e in enumerate(evs):
+        if e.get("ev") != "deff_start" or e["id"] != deff_id:
+            continue
+        length = None
+        for n in evs[i + 1:]:
+            if n["t"] < e["t"] + 0.005:
+                continue                    # the previous run's effect stops as this one starts
+            if n.get("ev") == "deff_start" and n["id"] == deff_id:
+                break                       # replaced by its next start
+            if n.get("ev") == stop_ev and n.get("id") == stop_id:
+                length = n["t"] - e["t"]
+                break
+        out.append(length)
+    return out
 
 
 class ScenarioRun(TronTestCase):
@@ -101,7 +178,9 @@ class ScenarioRun(TronTestCase):
         with open(os.path.join(TRACES, name + ".txt")) as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
-                if line:
+                if line.startswith("mark "):
+                    self.command(["mark", line[5:].strip()])     # free text (may hold quotes)
+                elif line:
                     self.command(shlex.split(line))
         self.log("end")
         trace.close()
@@ -129,26 +208,36 @@ class ScenarioRun(TronTestCase):
             self.wait(0.09)
         self.wait(SCRIPT_START_TIME - 0.1 * n)
 
+    def step(self, seconds):
+        """One tron_ref step_to(): the requested time plus the average overshoot."""
+        self.wait(seconds + STEP_OVERSHOOT)
+
     def cmd_wait(self, s):
-        self.wait(float(s))
+        self.wait(float(s))                            # plain waits do not drift (see STEP_OVERSHOOT)
 
     def cmd_hit(self, sw, ms="60"):
         name = switch_name(sw)
         self.log("switch", sw=int(sw))
         self.sw(name, 1 if int(sw) != 41 else 0)
         if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
-            self.wait(float(ms) / 1000 + SETTLE)
+            self.wait(VUK_HIT + STEP_OVERSHOOT)
+            self.wait(SETTLE + STEP_OVERSHOOT)
             return
-        self.wait(float(ms) / 1000)
+        self.wait(float(ms) / 1000 + STEP_OVERSHOOT)
         self.sw(name, 0 if int(sw) != 41 else 1)
-        self.wait(SETTLE)
+        self.wait(SETTLE + STEP_OVERSHOOT)
 
     def cmd_hold(self, sw):
         self.log("switch_hold", sw=int(sw))
+        if int(sw) in TROUGH_SWITCHES:              # a ball arriving in the trough is a drain
+            self.cmd_drain()
+            return
         self.sw(switch_name(sw), 1)
 
     def cmd_release(self, sw):
         self.log("switch_release", sw=int(sw))
+        if int(sw) in TROUGH_SWITCHES:              # MPF's trough device owns its ball switches
+            return
         self.sw(switch_name(sw), 0)
 
     def cmd_plunge(self):
@@ -162,12 +251,11 @@ class ScenarioRun(TronTestCase):
             name = "s_left_outlane" if side == "left" else "s_right_outlane"
             self.log("switch", sw=24 if side == "left" else 29)
             self.sw(name, 1)
-            self.wait(0.06)
+            self.step(0.06)                           # tron_ref pulses the outlane, then drains at once
             self.sw(name, 0)
-            self.wait(SETTLE)
         self.log("sim", what="drain")
         self.machine.default_platform.add_ball_to_device(self.machine.ball_devices["bd_trough"])
-        self.wait(0.12)
+        self.step(0.1)
 
     def cmd_adj(self, num, value):
         self.tron.adj[int(num)] = int(value)
@@ -185,8 +273,9 @@ class ScenarioRun(TronTestCase):
             self.sw(name, 1)
         else:
             self.sw(name, 1)
-            self.wait(ms / 1000)
+            self.step(ms / 1000)
             self.sw(name, 0)
+            self.step(0.05)                           # tron_ref: 50 ms settle after a button pulse
 
     def cmd_mark(self, *text):
         self.log("mark", text=" ".join(text))

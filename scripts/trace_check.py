@@ -4,7 +4,8 @@
 Wraps assets/rules/tools/trace/trace_compare.py. Before comparing it drops events that are not rules
 behaviour: OS bookkeeping audits (time played, 59-64), and sounds played from inside a display effect
 (in_deff != 0; those belong to the effect's media show, checked separately), and, unless --strict, the
-score display deff 19 (and its tube show 10) that the deff rules restart behind other effects.
+score display deff 19 (and its tube show 10) and the mode background deffs that the deff rules restart
+behind other effects (ROM caller 0x19944, rebuild "rule": 1).
 
 Usage: scripts/trace_check.py <scenario> [--events score,deff_start,...] [--tol 0.25]
 """
@@ -29,6 +30,8 @@ STRICT = False
 def keep(e):
     if not STRICT and e.get("ev") == "deff_start" and e.get("id") == 19:
         return False            # score display re-asserted by the deff rules (display housekeeping)
+    if not STRICT and e.get("ev") == "deff_start" and (e.get("caller") == "0x19944" or e.get("rule")):
+        return False            # mode background deffs (re)started by the deff rules [0x000198a8], same reason
     if not STRICT and e.get("ev") == "tube_show_start" and e.get("id") == 10:
         return False            # the tube show deff 19 starts with itself
     if e.get("ev") == "sound" and e.get("caller") == "0x2c97c":

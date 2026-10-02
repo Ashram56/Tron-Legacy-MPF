@@ -115,7 +115,7 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ sounds
 
-    def sound(self, call):
+    def sound(self, call, index=None):
         if not self.data:
             return
         if 1 <= call <= 8:                             # channel stop
@@ -127,7 +127,9 @@ class MediaBridge:
         if not pool:
             return
         samples = pool["samples"]
-        if pool["type"].startswith("random"):
+        if index is not None and index < len(samples):  # the rules picked the sample (sound lengths)
+            sample = samples[index]
+        elif pool["type"].startswith("random"):
             sample = samples[self.os.random.randrange(len(samples))]
         else:                                          # sequence
             n = self.counters.get(call, 0)
