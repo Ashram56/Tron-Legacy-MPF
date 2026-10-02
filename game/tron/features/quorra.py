@@ -25,7 +25,9 @@ JACKPOT_MAX = 500000
 SUPER_BASE, SUPER_STEP, SUPER_RESET_MAX = 1000000, 250000, 2500000
 END_WINDOW = (312, 125)                   # tasks 0xb3 then 0xb4
 SAVE_TICKS, SAVE_GRACE = 625, 125
-HOLD_TAILS = {67: 2.053 - 1.50, 68: 3.844 - 2.78, 69: 4.377 - 2.87}   # deff run_seconds - hold start
+# deff run_seconds - hold start; the intro deff 64 (deff_hold_frames(1, 0x20)) holds one tick only: its
+# show ends 3.84 s after it starts (traces/quorra_multiball 24.18 -> 28.02)
+HOLD_TAILS = {64: TICK, 67: 2.053 - 1.50, 68: 3.844 - 2.78, 69: 4.377 - 2.87}
 AAB_SAVE_TICKS, AAB_SAVE_GRACE = 312, 187
 
 

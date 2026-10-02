@@ -8,11 +8,13 @@ Model of the SAM OS deff system as the Tron rules use it:
   foreground deff is not shown.
 - What a deff starts by itself comes from the asset package (media_table): its lamp-matrix effects
   at once, its sounds at their offsets (logged with in_deff = the deff).
-- Show queue, queue_fullscreen_deff [0x0100fbb0]: "show" tasks (ids 0x81-0xa7) wait until the running
-  deff's priority is below their threshold (0x9f for every caller) and they are the first show task
-  in the task list, i.e. the oldest one waiting (FUN_0000c2b8 scans the list from its head; a
-  re-created task goes to the end), then play their deff to the end. While a show task runs, mode
-  clocks pause and the VUK holds its ball.
+- A foreground deff spends its last 10 ticks in a hold at priority 0x20 (deff_hold_frames): any deff
+  can replace it then.
+- Show queue, queue_fullscreen_deff [0x0100fbb0]: "show" tasks (ids 0x81-0xa7) first run once their
+  caller has finished, wait until the running deff's priority is below their threshold (0x9f for every
+  caller) and they are the oldest show task waiting, then play their deff until its hold. While a show
+  task runs, mode clocks pause and the VUK holds its ball.
+- Mode TOTAL tasks (when_idle, FUN_0100fd88) wait for no show and no foreground deff.
 - After an effect ends, and after a show ends, the deff rules re-assert the background deff (deff rule
   0x000198a8): deff 19, or the deff of the true mode rule, restarts in the background during normal play.
 - Mode deff rules (lamp_rule_init list 2, os.deff_rule -> add_rule): on each rules refresh the true rule
@@ -28,6 +30,8 @@ from tron import media_table
 
 SHOW_THRESHOLD = 0x9f
 SHOW_TIMEOUT = 0xea6
+HOLD_TICKS = 10             # deffs end with deff_hold_frames(10, 0x20): priority 0x20 for the last 10 ticks
+HOLD_PRIORITY = 0x20
 
 
 class Show:
@@ -52,18 +56,19 @@ class Display:
                 if row["background_loop"] == "yes":
                     self.background.add(deff_id)
         self.fg = None              # running foreground deff id
+        self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
         self.bg = None              # running background deff id
         self.shows = []             # waiting Show entries
         self.show = None            # Show playing now
         self._sound_handles = []
         self._pump_handle = None
+        self.idle_waits = []        # [task_id, deff_id, deadline, on_end, deff_args] (when_idle)
         # Background deff rules (lamp_rule_init list 2, os.deff_rule): (priority, cond, deff, music, on_start).
         # The true rule with the highest priority owns the background deff and the music; without one, the
         # score display (deff 19) runs with the OS base music (os.base_music()).
         self.rules = []
-        self.fg_until = None        # when the foreground deff ends (None: held until stopped)
-        self.hold_tail = {}         # deff id -> seconds at its end shown at priority 0x20 (set_hold_tail)
+        self.hold_tail = {}         # deff id -> seconds of its hold when not HOLD_TICKS (set_hold_tail)
         self.music = None           # music call the background rules last played
 
     # ------------------------------------------------------------------ start / stop
@@ -82,7 +87,7 @@ class Display:
                 os_.tube_start(10)
             return True
         os_.trace.log("deff_start", id=deff_id)    # the ROM trace logs every start call
-        if self.fg is not None and self.fg_prio() > self.prio.get(deff_id, 0):
+        if self.fg is not None and self.fg_prio > self.prio.get(deff_id, 0):
             # a higher priority deff keeps the display; the deff rules still run and restart a mode's
             # background deff (traces/disc_multiball.jsonl: deff 48 refused behind deff 50, deff 47 again)
             if refresh and not self.show and self.bg not in (None, 19):
@@ -90,6 +95,7 @@ class Display:
             return False
         self._end_fg(stopped=True)
         self.fg = deff_id
+        self.fg_prio = self.prio.get(deff_id, 0)
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
         info = self.media.get(deff_id)
@@ -103,11 +109,10 @@ class Display:
                 seconds = forced.pop(0) or seconds   # random length (e.g. the arcade reel), from a test
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
-                self.fg_until = os_.now + seconds
-                tail = self.hold_tail.get(deff_id)
-                if tail:                             # the priority change runs the deff rules
-                    self._sound_handles.append(os_.machine.clock.schedule_once(
-                        lambda: self.fg == deff_id and self._hold_started(), max(0, seconds - tail)))
+                from tron.os_layer import TICK
+                self._sound_handles.append(os_.machine.clock.schedule_once(
+                    lambda: self._hold(deff_id),
+                    max(0.0, seconds - self.hold_tail.get(deff_id, HOLD_TICKS * TICK))))
         if refresh and not self.show:
             os_.after(1, self.refresh)
         return True
@@ -128,13 +133,26 @@ class Display:
             else:
                 self._sound_handles.append(os_.machine.clock.schedule_once(fire, offset))
 
-    def _deff_sound(self, call, deff_id):
-        """A deff's own sound. When it is a mode rule's music call (intro deff 64 plays the Quorra music
-        0x066), that music is playing, so the rule does not start it again (traces/quorra_multiball)."""
-        self.os.sound(call, in_deff=deff_id)
-        if any(r[3] == call for r in self.rules):
-            self.music = call
-        return True
+    def _hold(self, deff_id):
+        """Last 10 ticks of deff_id (cancelled with it when it is replaced): its priority drops to 0x20,
+        so any deff can replace it, and a show task (waiting for priority < 0x21) ends here
+        [queue_fullscreen_deff 0x0100fbb0]; its rules pass restarts a mode's background deff behind the
+        held deff (traces/end_of_line_multiball.jsonl: deff 57 at the hold of deff 56 and at its end)."""
+        self.fg_prio = HOLD_PRIORITY
+        if not self.show and deff_id in self.hold_tail:
+            # a measured hold (set_hold_tail): its rules pass restarts the mode's background deff behind
+            # it (traces/quorra_multiball: deff 65 again 2.78 s into deff 68)
+            if self.os.in_play and self.bg not in (None, 19):
+                self.start(self.bg, refresh=False)
+            self.os.request_refresh()
+        if self.show:
+            show, self.show = self.show, None
+            if show.on_end:
+                show.on_end()
+            deff_id, _, on_start = self.select()
+            if self.os.in_play and deff_id != 19:
+                self._start_rule(deff_id, on_start)
+            self._pump()
 
     def stop(self, deff_id):
         os_ = self.os
@@ -147,23 +165,17 @@ class Display:
             self.bg = None
 
     def set_hold_tail(self, deff_id, seconds):
-        """deff_hold_frames(n, 0x20) [0x01024460]: for its last `seconds` the deff runs at priority 0x20,
-        so any other deff may replace it; the priority change runs the deff rules once."""
+        """deff_hold_frames(n, 0x20) [0x01024460] when a deff's hold is not the usual 10 ticks: for its last
+        `seconds` the deff runs at priority 0x20, so any other deff may replace it (measured per deff)."""
         self.hold_tail[deff_id] = seconds
 
-    def _hold_started(self):
-        """The deff rules run at the priority drop and restart a mode's background deff behind it
-        (traces/quorra_multiball: deff 65 again 2.78 s into deff 68)."""
-        os_ = self.os
-        if os_.in_play and not self.show and self.bg not in (None, 19):
-            self.start(self.bg, refresh=False)
-        os_.request_refresh()
-
-    def fg_prio(self):
-        tail = self.hold_tail.get(self.fg)
-        if tail and self.fg_until is not None and self.os.now >= self.fg_until - tail:
-            return 0x20
-        return self.prio.get(self.fg, 0)
+    def _deff_sound(self, call, deff_id):
+        """A deff's own sound. When it is a mode rule's music call (intro deff 64 plays the Quorra music
+        0x066), that music is playing, so the rule does not start it again (traces/quorra_multiball)."""
+        self.os.sound(call, in_deff=deff_id)
+        if any((r[3]() if callable(r[3]) else r[3]) == call for r in self.rules):
+            self.music = call
+        return True
 
     def queued(self, task_id):
         """Show task task_id is waiting in the queue (not playing yet)."""
@@ -185,7 +197,6 @@ class Display:
             self.os.machine.clock.unschedule(handle)
         self._sound_handles = []
         self.fg = None
-        self.fg_until = None
 
     def _ended(self, deff_id):
         self.fg_handle = None
@@ -210,7 +221,7 @@ class Display:
 
     def add_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
         """lamp_rule_init(list 2): while cond() is true the background deff deff_id runs, with music
-        (None/0 = keep). on_start() is called when the rule (re)starts the deff (the deff's own code)."""
+        (None/0 = keep; a callable gives the call, e.g. music by mode level). on_start() is called when the rule (re)starts the deff (the deff's own code)."""
         self.rules.append((priority, cond, deff_id, music, on_start))
         self.rules.sort(key=lambda r: -r[0])
 
@@ -229,7 +240,7 @@ class Display:
         """The true rule with the highest priority: (deff, music, on_start), else the score display."""
         for _, cond, deff_id, music, on_start in self.rules:
             if cond():
-                return deff_id, music, on_start
+                return deff_id, music() if callable(music) else music, on_start
         return 19, self.os.base_music(), None
 
     def _start_rule(self, deff_id, on_start):
@@ -264,10 +275,41 @@ class Display:
         self.shows = []
         self.show = None
         self.music = None
+        self.idle_waits = []
         self._end_fg()
         if self._pump_handle:
             self.os.machine.clock.unschedule(self._pump_handle)
             self._pump_handle = None
+
+    # ------------------------------------------------------------------ mode totals (tasks 0x4d-0x58)
+
+    def when_idle(self, task_id, deff_id, timeout=SHOW_TIMEOUT, on_end=None, **deff_args):
+        """FUN_0100fd88, used by the mode TOTAL tasks 0x4d-0x58: wait until no show task runs, no
+        foreground deff is on screen and this is the oldest such task waiting, then play deff_id;
+        on_end() runs when it is over (or when the wait times out)."""
+        from tron.os_layer import TICK
+        self.idle_waits = [w for w in self.idle_waits if w[0] != task_id]
+        self.idle_waits.append([task_id, deff_id, self.os.now + timeout * TICK, on_end, deff_args])
+        if len(self.idle_waits) == 1:
+            self._idle_tick()
+
+    def _idle_tick(self):
+        from tron.os_layer import TICK
+        now = self.os.now
+        for w in [w for w in self.idle_waits if now > w[2]]:
+            self.idle_waits.remove(w)
+            if w[3]:
+                w[3]()
+        if not self.idle_waits:
+            return
+        if self.fg is None and not self.show_running():
+            task_id, deff_id, _, on_end, args = self.idle_waits.pop(0)
+            self.start(deff_id, **args)
+            info = self.media.get(deff_id)
+            if on_end:
+                self.os.machine.clock.schedule_once(lambda: on_end(), info.seconds if info else 0)
+        if self.idle_waits:
+            self.os.machine.clock.schedule_once(self._idle_tick, TICK)
 
     # ------------------------------------------------------------------ show queue
 
@@ -275,7 +317,12 @@ class Display:
               on_end=None, **deff_args):
         self.shows = [s for s in self.shows if s.task_id != task_id]
         self.shows.append(Show(task_id, deff_id, threshold, timeout, on_start, on_end, self.os.now, deff_args))
-        self._pump()
+        # FUN_0000c2b8 takes the first show task in the OS task list, i.e. the oldest one waiting
+        # (traces/end_of_line_multiball.jsonl: task 0x87 deff 139, then 0x83 deff 133, then 0x97).
+        # The show task first runs once its caller has finished (a deff the caller starts right after
+        # queueing, e.g. deff 55 after the extra ball show 0x82, is on screen first).
+        if self._pump_handle is None and not self.show:
+            self._pump_handle = self.os.machine.clock.schedule_once(self._pump_tick, 0)
 
     def cancel(self, task_id):
         self.shows = [s for s in self.shows if s.task_id != task_id]
@@ -300,7 +347,7 @@ class Display:
         if not self.shows:
             return
         first = self.shows[0]
-        if self.fg is None or self.prio.get(self.fg, 0) < first.threshold:
+        if self.fg is None or self.fg_prio < first.threshold:
             self.shows.pop(0)
             self.show = first
             self.start(first.deff_id, refresh=False, **first.deff_args)

@@ -52,13 +52,16 @@ def forced_picks(name):
                     and n["t"] - e["t"] < 7.5]
             forced.setdefault("match", []).append(len(hits))
         if e.get("ev") == "deff_start" and e.get("id") == 105:
-            # the reel stops at a random slot: take the length from what followed the deff in the ROM
+            # the reel stops at a random slot: take the length from what followed the deff in the ROM.
+            # That is the start of its 10-tick hold (deff_hold_frames(10, 0x20)), where the next deff may
+            # start, so the run length is 10 ticks longer.
+            hold = 10 * 0.01626
             for n in evs[i + 1:]:
                 if n.get("ev") == "deff_start" and n.get("id") not in (19, 105):
-                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"])
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] + hold)
                     break
                 if n.get("ev") == "sound" and n.get("call") == "0x0fd":
-                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045)
+                    forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] - 0.045 + hold)
                     break
     for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
         forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)

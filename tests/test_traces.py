@@ -25,6 +25,11 @@ TRACES = {
     "light_cycle_multiball": "multiball_start,mark",
     "light_cycle_multiball_repeat_and_stack": "multiball_start,mark",
     "quorra_multiball": "sound,audit,multiball_start,mark",
+    # End of Line: the other kinds differ only through features not built yet (Flynn's Arcade
+    # Recognizer/GEM awards at the VUK, Light Cycle progress deff 83, combo arrows leff 159)
+    "end_of_line_multiball": "score,multiball_start,mark",
+    "end_of_line_multiball_scoring": "multiball_start,mark",
+    "daft_punk_multiball": "multiball_start,mark",
 }
 
 
