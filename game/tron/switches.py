@@ -99,10 +99,15 @@ class SwitchLayer:
 
     def _tron(self, sw):
         os_ = self.os
+        # drop_bank_switch_handler [0x0100b4b8]: a target whose drop is already down is ignored
+        if self.h("drop_bank_hit", sw) is False:
+            return
         if os_.state & 0x312:
             return
         bit, letter = TRON_LETTER[sw]
-        self.h("counting_switch", sw)                 # posts 0x6b but does not validate the playfield
+        # posts 0x6b; TRON targets count toward the playfield validation (traces/tron_targets.jsonl:
+        # main play music 0x01b right after the third different target, T R O)
+        os_.playfield_switch(sw)
         self.z4_eol()
         self.h("simulation_shot", 1 + sw)
         self.h("tron_letter", bit, letter)
