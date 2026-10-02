@@ -12,6 +12,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 TRACES = {
     "game_flow": "score,deff_start,sound,audit,mark",
+    "sea_of_simulation": "deff_start,audit,multiball_start,mark",
+    "portal_multiball": "multiball_start,mark",
+    "portal_multiball_shots": "mark",
 }
 
 

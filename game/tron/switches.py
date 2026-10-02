@@ -163,6 +163,12 @@ class SwitchLayer:
     def vuk_kickout(self):
         """Device event 7: wait for the show deffs, then 0x0fd + leff 35, 46 ticks, leff 36 + 0x0fe, eject."""
         os_ = self.os
+        if not self.machine.switches[SW[11]].state:
+            # the ball left the VUK without a kick: nothing to eject, and as after an unconfirmed eject
+            # no ball search until a playfield switch (traces/sea_of_simulation.jsonl 7.4 -> 21.4)
+            os_.ball_held = False
+            os_.vuk_ejecting = True
+            return
         if os_.show_running():
             os_.after(6, self.vuk_kickout)
             return
