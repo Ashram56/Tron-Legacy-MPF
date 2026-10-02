@@ -136,7 +136,7 @@ class SkillShots(Feature):
             os_.show(show_task, deff, value=value)
         else:
             os_.deff_start(deff, value=value)
-        os_.sound(sound)
+        # the award sound is played by the deff itself (in_deff 101-103 in the ROM traces)
         self.kill_all()
         return True
 

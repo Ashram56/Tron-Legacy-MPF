@@ -41,7 +41,7 @@ class Quorra(Feature):
         self.mb_supers = self.aab_hits = self.aab_count = 0
         # rules [0x0101fb1c]: background deff 65 + music 0x066 (priority 7), leff 68 + tube show 35,
         # leff 69 while a ball can be added
-        self.deff_rule = os_.display.bg_rule(self.rule_active, 65, 0x066, 7)
+        os_.deff_rule(self.rule_active, 65, 0x066, 7)
         os_.lamp_rule(self.rule_active, leff=68, tube=35, order=0x0101f0ac)
         os_.lamp_rule(self.add_ball_available, leff=69, order=0x0101ce90)
         # deff_hold_frames(n, 0x20): the award deffs drop to priority 0x20 before they end, so the next
@@ -145,7 +145,7 @@ class Quorra(Feature):
         self.total = os_.score_add(200000)
         os_.show(0x8d, 64, on_start=os_.request_refresh)     # task 0x8d queues the intro
         os_.hook("lc_mb_resume_in_end_window")
-        os_.display.bg_rule_raise(self.deff_rule)
+        os_.display.raise_rule(65)
         os_.request_refresh()
         return True
 

@@ -57,7 +57,7 @@ class LightCycle(Feature):
         self.mb_super_points = 0
         self.total = 0
         # rules [0x0101b5b4]: background deff 86 + music 0x0c2 (priority 7), leff 94, tube show 54
-        self.deff_rule = os_.display.bg_rule(self.rule_active, 86, 0x0c2, 7)
+        os_.deff_rule(self.rule_active, 86, 0x0c2, 7)
         os_.lamp_rule(self.rule_active, leff=94, tube=54, order=0x0101ac3c)
         for addr, key in ((0x2111744, "lc_remaining"), (0x2111754, "lc_collected"), (0x2111764, "lc_starts")):
             os_.register_poke(addr, (lambda k: lambda p, v: setattr(os_.players[p], k, v))(key))
@@ -150,7 +150,7 @@ class LightCycle(Feature):
         os_.show(0x92, 85, on_start=os_.request_refresh)     # task 0x92 queues the intro
         os_.hook("dmb_cancel_restart_window")
         os_.hook("quorra_mb_resume_in_end_window")
-        os_.display.bg_rule_raise(self.deff_rule)
+        os_.display.raise_rule(86)
         os_.request_refresh()
         return True
 
