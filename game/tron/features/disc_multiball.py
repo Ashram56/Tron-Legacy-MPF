@@ -44,8 +44,8 @@ class DiscMultiball(Feature):
         self.intro_waiting = False      # task 0x88 queued, deff 46 not shown yet
         self.restart_waiting = False    # task 0x89 queued, deff 52 not shown yet
         self.total_wait = 0
-        os_.display.bg_rule(self.status_display_cond, 47, 0x02a, 7)
-        os_.display.bg_rule(self.restart_display_cond, 53, 0x02b, 7)
+        os_.deff_rule(self.status_display_cond, 47, music=0x02a, priority=7)
+        os_.deff_rule(self.restart_display_cond, 53, music=0x02b, priority=7)
         os_.lamp_rule(self.status_display_cond, leff=45, tube=43, order=0x010081c0)
         os_.lamp_rule(lambda: self.running_or_ending() and self.phase == 1, leff=47, order=0x01006e14)
         os_.lamp_rule(lambda: os_.flag(0x24) and self.phase == 2, leff=46, order=0x010083b8)

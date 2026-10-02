@@ -28,7 +28,7 @@ class Clu(Feature):
         self.clock = Countdown(os_, "clu_timer", 0xc0, 0xc1, self._tick, self._show_total, intro=0x93)
         self.hits = self.shots = self.base = self.total = 0
         os_.lamp_rule(self.clock.counting, leff=78, tube=23, order=0x01001d40)
-        self.rule = os_.display.bg_rule(self._background, 72, 0x086, 5)
+        self.rule = os_.deff_rule(self._background, 72, 0x086, 5)
         sc = self.machine.switch_controller
         sc.add_switch_handler("s_left_flipper", self.rotate_toward_c)
         sc.add_switch_handler("s_right_flipper", self.rotate_toward_u)
@@ -151,7 +151,7 @@ class Clu(Feature):
         pd.clu_starts = min(pd.clu_starts + 1, 0xff)
         os_.hook("item_light", CLU_ITEM)
         os_.audit(0x4e)
-        os_.display.bg_raise(self.rule)
+        os_.display.raise_rule(self.rule)
         os_.request_refresh()
         return True
 
@@ -159,7 +159,7 @@ class Clu(Feature):
         """FUN_010028a4: the countdown runs, and the intro is not still waiting for its turn."""
         os_ = self.os
         return self.clock.counting() and not (
-            os_.display.show_task_running(0x93) and not os_.display.running(71))
+            os_.display.task_running(0x93) and not os_.display.running(71))
 
     def _tick(self):
         self.clock.seconds -= 1

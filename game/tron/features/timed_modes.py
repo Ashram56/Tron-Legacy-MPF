@@ -69,7 +69,7 @@ class Countdown:
     # ------------------------------------------------------------------ lead-in
 
     def _intro_wait(self):
-        if self.intro is not None and self.os.display.show_task_running(self.intro):
+        if self.intro is not None and self.os.display.task_running(self.intro):
             self.os.task_start(self.task, 1, self._intro_wait)
             return
         self._n = 0

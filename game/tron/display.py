@@ -12,14 +12,16 @@ Model of the SAM OS deff system as the Tron rules use it:
   deff's priority is below their threshold (0x9f for every caller) and they are the lowest task id
   waiting, then play their deff to the end. While a show task runs, mode clocks pause and the VUK
   holds its ball.
-- After a plain foreground deff starts, and after a show ends, the deff rules re-assert the score
-  display (deff rule 0x000198a8): deff 19 is restarted in the background during normal play.
-- Mode background deffs (deff rules, lamp_rule_init list 2, e.g. deff 72 "TERMINATE CLU" with music
-  0x86) are evaluated at each rules refresh (os.request_refresh), highest priority first: the first
-  rule whose condition holds starts its deff unless it runs and its music unless it plays. A mode
-  background deff started under a higher foreground deff is refused (not running), so the next
-  refresh starts (and logs) it again, as the ROM traces show. When no mode rule holds any more, the
-  score display rule [0x0100f5c8] restarts deff 19 and the play music.
+- After an effect ends, and after a show ends, the deff rules re-assert the background deff (deff rule
+  0x000198a8): deff 19, or the deff of the true mode rule, restarts in the background during normal play.
+- Mode deff rules (lamp_rule_init list 2, os.deff_rule -> add_rule): on each rules refresh the true rule
+  with the highest priority starts its background deff (even behind a show) when it changed, and its
+  music call when that music is not already playing. With no mode rule true the score display rule runs
+  with os.base_music() (0x01a before the playfield is valid, then 0x01b; 0x029 while Disc Battle is lit)
+  [0x0100f594 / 0x0100f5c8]. Every start of a rule's deff is traced with rule=1 (ROM caller 0x19944).
+- A deff that ends with deff_hold_frames(n, 0x20) (HOLD_TICKS) keeps the display for its last n ticks at
+  priority 0x20; a show playing it ends there. A deff's exit handler stops the ramp tube show it
+  started, which re-runs the rules.
 """
 import csv
 import os
@@ -33,6 +35,7 @@ SHOW_TIMEOUT = 0xea6
 # show or a lower deff may start. Read from the deff code; deffs not listed hold 0 ticks.
 HOLD_TICKS = {71: 10, 73: 10, 76: 1, 78: 1, 94: 1}
 HOLD_PRIO = 0x20
+PREVALID_PRIO = 0x10        # priority of the score display rule that runs until the playfield is valid
 
 
 class Show:
@@ -64,22 +67,23 @@ class Display:
         self.show = None            # Show playing now
         self._sound_handles = []
         self._pump_handle = None
-        # Background deff rules (lamp_rule_init type 2): [prio, raise order, cond, deff, music]. The active
-        # rule with the highest priority owns the background deff and the music; without one, the score
-        # display (deff 19) runs with the OS base music (os.base_music()).
-        self.bg_rules = []
-        self._rule_seq = 0
+        # Background deff rules (lamp_rule_init list 2, os.deff_rule): (priority, cond, deff, music, on_start).
+        # The true rule with the highest priority owns the background deff and the music; without one, the
+        # score display (deff 19) runs with the OS base music (os.base_music()).
+        self.rules = []
         self.music = None           # music call the background rules last played
 
     # ------------------------------------------------------------------ start / stop
 
-    def start(self, deff_id, hold=False, refresh=True, **args):
+    def start(self, deff_id, hold=False, refresh=True, run_seconds=None, **args):
+        """run_seconds: the run length when this call's variant differs from the recorded one."""
         os_ = self.os
         if deff_id in self.background:
-            os_.trace.log("deff_start", id=deff_id)
-            if deff_id != 19 and self.fg is not None and self._fg_prio() > self.prio.get(deff_id, 0):
-                return False                       # a mode background deff under a foreground one: refused
             self.bg = deff_id
+            if self.is_rule_deff(deff_id):
+                os_.trace.log("deff_start", id=deff_id, rule=1)   # a deff rule's deff (ROM caller 0x19944)
+            else:
+                os_.trace.log("deff_start", id=deff_id)
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
             if deff_id == 19:
                 os_.tube_start(10)
@@ -100,7 +104,7 @@ class Display:
             if not hold:
                 # the deff's own code starts its media once it runs: nothing if it is replaced at once
                 self._sound_handles.append(os_.machine.clock.schedule_once(lambda: self._media(deff_id), 0))
-            seconds = info.seconds
+            seconds = run_seconds or info.seconds
             forced = os_.forced.get("deff_{}_seconds".format(deff_id))
             if forced:
                 seconds = forced.pop(0) or seconds   # random length (e.g. the arcade reel), from a test
@@ -210,50 +214,60 @@ class Display:
         self.refresh()
         self.os.request_refresh()                  # queue_fullscreen_deff: rules_refresh_request at the end
 
-    def refresh(self):
-        """Deff rules: restart the background deff (deff 19 or a mode's) behind whatever runs, in normal play."""
-        os_ = self.os
-        if os_.in_play and self.bg is None and not self.show:
-            self.start(self.bg_select()[0])
-
-    # ------------------------------------------------------------------ background deff rules
-
-    def bg_rule(self, cond, deff_id, music, prio):
-        """lamp_rule_init(obj, 2, cond, deff, music, ..., prio): while cond() is true, deff_id is the
-        background deff and `music` the music call (0 = keep). Returns the rule (for bg_raise)."""
-        rule = [prio, 0, cond, deff_id, music]
-        self.bg_rules.append(rule)
+    def add_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
+        """lamp_rule_init(list 2): while cond() is true the background deff deff_id runs, with music
+        (None/0 = keep). on_start() is called when the rule (re)starts the deff (the deff's own code).
+        Returns the rule (raise_rule)."""
+        rule = (priority, cond, deff_id, music, on_start)
+        self.rules.append(rule)
+        self.rules.sort(key=lambda r: -r[0])
         return rule
 
-    def bg_raise(self, rule):
+    def raise_rule(self, rule):
         """Re-insert a rule ahead of the rules of equal priority (FUN_010028dc at a mode start)."""
-        self._rule_seq += 1
-        rule[1] = self._rule_seq
+        self.rules.remove(rule)
+        at = next((i for i, r in enumerate(self.rules) if r[0] <= rule[0]), len(self.rules))
+        self.rules.insert(at, rule)
 
-    def bg_select(self):
-        os_ = self.os
-        if os_.flag(0x1c) or os_.pf_valid:         # before validation the prio 0x10 score rule wins [0x0100f564]
-            for _, _, cond, deff_id, music in sorted(self.bg_rules, key=lambda r: (-r[0], -r[1])):
-                if cond():
-                    return deff_id, music
-        return 19, os_.base_music()
+    def is_rule_deff(self, deff_id):
+        return any(r[2] == deff_id for r in self.rules)
+
+    def select(self):
+        """The true rule with the highest priority: (deff, music, on_start), else the score display."""
+        valid = self.os.flag(0x1c) or self.os.pf_valid
+        for prio, cond, deff_id, music, on_start in self.rules:
+            if prio < PREVALID_PRIO and not valid:
+                break                              # the score display rule before validation [0x0100f564]
+            if cond():
+                return deff_id, music, on_start
+        return 19, self.os.base_music(), None
+
+    def _start_rule(self, deff_id, on_start):
+        self.start(deff_id, refresh=False)
+        if on_start:
+            on_start()
+
+    def refresh(self):
+        """Deff rules [0x000198a8] after an effect ends: restart the background deff (deff 19 or a mode's)
+        behind whatever runs, in normal play."""
+        if self.os.in_play and self.bg is None and not self.show:
+            deff_id, _, on_start = self.select()
+            self._start_rule(deff_id, on_start)
 
     def mode_bg(self):
         """The mode background deff the rules select now (None: the score display)."""
-        deff_id = self.bg_select()[0] if self.os.in_play else 19
+        deff_id = self.select()[0] if self.os.in_play else 19
         return None if deff_id == 19 else deff_id
 
-    def bg_refresh(self):
-        """Rules refresh: the selected rule's background deff is started unless it runs (a mode deff refused
-        under a higher foreground deff is started, and logged, again at each refresh), and its music
-        unless it plays."""
+    def rules_refresh(self):
+        """Rules refresh: a change of the selected rule starts its background deff and its music."""
         os_ = self.os
         if not os_.in_play:
             return
-        deff_id, music = self.bg_select()
+        deff_id, music, on_start = self.select()
         changed = deff_id != self.bg and (self.bg is not None or deff_id != 19)
         if changed:
-            self.start(deff_id, refresh=False)
+            self._start_rule(deff_id, on_start)
         if music and music != self.music:
             if not changed and deff_id == 19:
                 self.start(19, refresh=False)       # the ROM restarts the score display with new music
@@ -264,6 +278,7 @@ class Display:
         """Ball end / game end: drop the queue and the foreground deff (no trace event)."""
         self.shows = []
         self.show = None
+        self.music = None
         self._end_fg(exit_handler=False)
         if self._pump_handle:
             self.os.machine.clock.unschedule(self._pump_handle)
@@ -281,13 +296,13 @@ class Display:
     def cancel(self, task_id):
         self.shows = [s for s in self.shows if s.task_id != task_id]
 
+    def task_running(self, task_id):
+        """task_running(id) for a show task: waiting in the queue or playing."""
+        return bool(self.show and self.show.task_id == task_id) or any(s.task_id == task_id for s in self.shows)
+
     def show_running(self):
         """task_running_range(0x81, 0xa7): a show task is waiting or playing."""
         return bool(self.show or self.shows)
-
-    def show_task_running(self, task_id):
-        """task_running(task_id) for one show task: waiting in the queue or playing."""
-        return bool(self.show and self.show.task_id == task_id) or any(s.task_id == task_id for s in self.shows)
 
     def _pump(self):
         if self._pump_handle:
@@ -307,7 +322,7 @@ class Display:
             self.start(first.deff_id, refresh=False, **first.deff_args)
             if first.on_start:
                 first.on_start()
-            self.os.request_refresh()              # queue_fullscreen_deff: rules_refresh_request at the start
+            self.os.request_refresh()            # rules that wait for this show's deff (e.g. a mode intro)
             if self.fg is None:                  # deff without a recorded length
                 self._after_fg()
             return

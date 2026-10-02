@@ -33,7 +33,7 @@ class Zuse(Feature):
         # leff rules are tried newest registration first (equal priority): leff 125, then leff 124
         os_.lamp_rule(self.clock.counting, leff=125, order=0x01031b5c)
         os_.lamp_rule(self.clock.counting, leff=124, tube=30, order=0x01031b5d)
-        self.rule = os_.display.bg_rule(self._background, 95, 0x0aa, 5)
+        self.rule = os_.deff_rule(self._background, 95, 0x0aa, 5)
 
     def player_first_ball(self):
         """zfs_player_init 0x010315d8 and zuse_player_init 0x01033680."""
@@ -130,7 +130,7 @@ class Zuse(Feature):
         pd.zfs_starts = min(pd.zfs_starts + 1, 0xff)
         os_.hook("item_light", ZUSE_ITEM)
         os_.audit(0x52)
-        os_.display.bg_raise(self.rule)
+        os_.display.raise_rule(self.rule)
         os_.request_refresh()
         return True
 
@@ -138,7 +138,7 @@ class Zuse(Feature):
         """zfs_background_rule_cond 0x01031fe0."""
         os_ = self.os
         return self.clock.counting() and not (
-            os_.display.show_task_running(0x9b) and not os_.display.running(94))
+            os_.display.task_running(0x9b) and not os_.display.running(94))
 
     def _tick(self):
         if not self.clock.seconds:
@@ -204,7 +204,7 @@ class Zuse(Feature):
         points = os_.score_add(self.value)
         self.total += points
         pd.zfs_switch_hits = min(pd.zfs_switch_hits + 1, 0xffff)
-        if os_.display.running(94) or os_.display.show_task_running(0x9b):
+        if os_.display.running(94) or os_.display.task_running(0x9b):
             return
         if not os_.display.running(96) and not os_.any_multiball():
             os_.deff_start(96, value=points)

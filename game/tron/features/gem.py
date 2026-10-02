@@ -21,7 +21,7 @@ class Gem(Feature):
         self.clock = Countdown(os_, "gem_timer", 0xc2, 0xc3, self._tick, self._show_total, intro=0x96)
         self.shots = self.total = 0
         os_.lamp_rule(self.clock.counting, leff=83, tube=18, order=0x01013b5c)
-        self.rule = os_.display.bg_rule(self.clock.counting, 77, 0x08f, 5)
+        self.rule = os_.deff_rule(self.clock.counting, 77, 0x08f, 5)
 
     def player_first_ball(self):
         """gem_player_init 0x010138f8."""
@@ -72,7 +72,7 @@ class Gem(Feature):
         os_.hook("item_light", GEM_ITEM)
         pd.gem_awards = pd.gem_snd_idx = 0
         os_.audit(0x50)
-        os_.display.bg_raise(self.rule)
+        os_.display.raise_rule(self.rule)
         os_.request_refresh()
         return True
 
