@@ -1,1 +1,10 @@
 .godot/
+.venv/
+tools/
+game/addons/mpf-gmc/
+game/logs/
+game/.godot/
+game/audits/
+game/data/
+captures/
+__pycache__/

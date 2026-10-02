@@ -1,0 +1,32 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="Tron Legacy MPF"
+run/main_scene="res://slides/window.tscn"
+config/features=PackedStringArray("4.5", "Mobile")
+
+[autoload]
+
+MPF="*res://addons/mpf-gmc/mpf_gmc.gd"
+DmdCapture="*res://tools/dmd_capture.gd"
+
+[display]
+
+window/size/viewport_width=128
+window/size/viewport_height=32
+window/size/window_width_override=1024
+window/size/window_height_override=256
+window/stretch/mode="viewport"
+window/stretch/scale_mode="integer"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/mpf-gmc/plugin.cfg")
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/canvas_textures/default_texture_filter=0

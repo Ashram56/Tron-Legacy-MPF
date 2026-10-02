@@ -1,0 +1,11 @@
+#config_version=6
+
+# Stern Tron Legacy LE v1.74, MPF machine config.
+# Phase 1: virtual platform only, enough to boot into attract mode and
+# drive the Godot media controller (GMC) over BCP.
+
+hardware:
+  platform: virtual
+
+modes:
+  - attract

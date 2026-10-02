@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="1_slide"]
+
+[node name="attract" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 128.0
+offset_bottom = 32.0
+script = ExtResource("1_slide")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 128.0
+offset_bottom = 32.0
+color = Color(0, 0, 0, 1)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 0
+offset_right = 128.0
+offset_bottom = 20.0
+theme_override_colors/font_color = Color(1, 0.55, 0.1, 1)
+theme_override_font_sizes/font_size = 12
+text = "TRON LEGACY"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="."]
+layout_mode = 0
+offset_top = 18.0
+offset_right = 128.0
+offset_bottom = 32.0
+theme_override_colors/font_color = Color(1, 0.55, 0.1, 1)
+theme_override_font_sizes/font_size = 8
+text = "MPF + GMC BOOT OK"
+horizontal_alignment = 1
+vertical_alignment = 1

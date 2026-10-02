@@ -1,0 +1,4 @@
+[submodule "assets"]
+	path = assets
+	url = https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption.git
+	shallow = true
