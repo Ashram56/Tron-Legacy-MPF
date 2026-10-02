@@ -35,6 +35,8 @@ MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
 BALL_SAVE_GRACE = 218
 SERVE_EJECT_TICKS = 32
 SAVE_EJECT_TICKS = 39
+MB_EJECT_TICKS = 41          # trough eject -> ball launched; the multiball save counts from there
+VUK_SETTLE_TICKS = 100       # VUK kickout -> device task done (+39 = trough eject 139 ticks later)
 BALL_SEARCH_TICKS = 104     # search task 0x2b; a drain during it ends the ball after it (game_flow.jsonl 88.70 -> 90.39)   # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
 
 
@@ -104,9 +106,12 @@ class TronOS(CustomCode):
         self.ball_scored = False
         self.serve_type = 0
         self.coins = 0
-        self._mb_pending = 0
+        self._mb_pending = 0         # balls the multiball task still has to eject
+        self._mb_save = None         # [save ticks, grace ticks] of the multiball task 0x19 while it runs
+        self.vuk_release_time = 0.0  # when the VUK last kicked its ball out
         self.rules = []
         self._refresh_pending = False
+        self._refresh_deffs = False
         self._score_pending = {}
         self.forced = {}             # name -> list of forced pick results (tests)
         self.random = random.Random()
@@ -226,7 +231,14 @@ class TronOS(CustomCode):
         self.rules.sort(key=lambda r: r[4])
 
     def request_refresh(self, *_):
-        """rules_refresh_request: evaluate the lamp rules once the current handler has finished."""
+        """rules_refresh_request: evaluate the deff/music, lamp and tube rules once the current handler
+        has finished."""
+        self._refresh_deffs = True
+        self.request_lamp_refresh()
+
+    def request_lamp_refresh(self):
+        """A pass over the lamp and tube rules only (the ROM's switch handlers do not request a full
+        rules refresh: a pop bumper during End of Line restarts no background deff)."""
         if not self._refresh_pending:
             self._refresh_pending = True
             self.machine.clock.schedule_once(self.rules_refresh, TICK / 2)
@@ -234,6 +246,10 @@ class TronOS(CustomCode):
     def rules_refresh(self):
         self._refresh_pending = False
         active_game = bool(self.game) and not self.state & (ST_ATTRACT | ST_END_BALL | ST_BONUS)
+        full = self._refresh_deffs
+        self._refresh_deffs = False
+        if full:
+            self.display.refresh()                   # the same pass runs the deff + music rules first
         for rule in self.rules:
             cond, leff, tube, on = rule[:4]
             want = bool(active_game and cond())
@@ -349,39 +365,72 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ multiball (0x0001ed7c)
 
     def multiball_start(self, balls, save_ticks=0, grace_ticks=0):
-        """multiball_start(balls, 0, save_ticks, grace_ticks): bring the number of balls in play up to
-        `balls` (counting the VUK ball, capped at the 4 installed), kill the single-ball save and run the
-        multiball save (leff 13 while it runs, then the grace). A larger pending request wins."""
+        """multiball_start(balls, 0, save_ticks, grace_ticks) [0x0001ed7c]: bring the number of balls in
+        play up to `balls` (counting the VUK ball, capped at the 4 installed) and (re)start the multiball
+        task 0x19 [FUN_0001ea60]: it kills the single-ball save, starts leff 13, waits until no ball
+        device works (a VUK ball held or being kicked out: the trough waits for the kickout to settle),
+        ejects the balls, and only then counts the save time down, then the grace (both kept at the
+        larger of the running and the new values). A drain while the save or grace runs comes back."""
         self.trace.log("multiball_start", balls=balls, save_ticks=save_ticks, grace_ticks=grace_ticks)
         self.machine.events.post("tron_multiball_start", balls=balls)
+        if not self.game or self.state & 0x214:
+            return False
         self.kill_ball_save()
-        target = min(balls, 4)
-        add = target - self.balls_in_play() - self._mb_pending
+        save_left, grace_left = self._mb_save_left()
+        self._mb_save = [max(save_left, save_ticks), max(grace_left, grace_ticks)]
+        self.task_kill(0x34)
+        self.task_kill(0x35)
+        self.leff_stop(13)
+        self.after(1, lambda: self._mb_save is not None and self.leff_start(13))
+        add = min(balls, 4) - self.balls_in_play()
         if add > 0:
             self._mb_pending += add
             self.game.balls_in_play += add
+        self.task_start(0x19, 1, self._mb_wait_devices)
+        return True
 
-            def launch():
-                self._mb_pending = max(0, self._mb_pending - add)
-                self.machine.playfield.add_ball(balls=add, player_controlled=False)
-            self.after(SAVE_EJECT_TICKS, launch)
-        if save_ticks > self.task_ticks_left(0x34):
-            self.task_kill(0x35)
-            self.leff_start(13)
-            self.task_start(0x34, save_ticks, lambda: self._mb_save_grace(grace_ticks))
+    def _mb_wait_devices(self):
+        """no_balldev_tasks(): the VUK device task runs while it holds a ball and until its kickout
+        settles (traces: trough eject 2.25-2.27 s after the scoop eject, ~139 ticks)."""
+        if self.ball_held or self.now - self.vuk_release_time < VUK_SETTLE_TICKS * TICK:
+            self.task_start(0x19, 1, self._mb_wait_devices)
+            return
+        self.task_start(0x19, SAVE_EJECT_TICKS, self._mb_launch)
 
-    def _mb_save_grace(self, grace_ticks):
+    def _mb_launch(self):
+        add, self._mb_pending = self._mb_pending, 0
+        if add > 0:
+            self.machine.playfield.add_ball(balls=add, player_controlled=False)
+        if self._mb_save is not None:
+            # the countdown starts once the eject loop has run (about when the ball leaves the shooter
+            # lane: traces/end_of_line_multiball_scoring.jsonl launch 72.01 + 312 ticks = save end 77.19)
+            self.task_start(0x34, self._mb_save[0] + MB_EJECT_TICKS, self._mb_save_grace)
+
+    def _mb_save_left(self):
+        """Save and grace ticks still to run (all of them while the task waits for its first eject)."""
+        if self._mb_save is None:
+            return 0, 0
+        if self.task_running(0x34):
+            return min(self.task_ticks_left(0x34), self._mb_save[0]), self._mb_save[1]
+        if self.task_running(0x35):
+            return 0, self.task_ticks_left(0x35)
+        return tuple(self._mb_save)
+
+    def _mb_save_grace(self):
         self.leff_stop(13)
-        if grace_ticks:
-            self.task_start(0x35, grace_ticks)
+        self.task_start(0x35, self._mb_save[1], self._mb_save_over)
+
+    def _mb_save_over(self):
+        self._mb_save = None
 
     def mb_save_running(self):
-        return self.task_running(0x34) or self.task_running(0x35)
+        return self._mb_save is not None
 
     def kill_mb_save(self):
         if self.task_kill(0x34):
             self.leff_stop(13)
         self.task_kill(0x35)
+        self._mb_save = None
 
     def score_add(self, points):
         """score_add [0x0002340c]: x playfield multiplier (always 1); nothing while tilted or out of game."""
@@ -571,9 +620,8 @@ class TronOS(CustomCode):
         self.vuk_ejecting = False
         if self.balls_in_play() - balls > 0:
             if self.mb_save_running() and not self.tilted:
-                # multiball save: the ball comes back, auto-launched (serve type 6)
-                self.audit(0x2b)
-                self.hook("ball_saved")
+                # multiball save: the multiball task ejects the ball again (no "ball saved" audit or
+                # display in any reference trace)
                 self.after(SAVE_EJECT_TICKS,
                            lambda: self.machine.playfield.add_ball(balls=balls, player_controlled=False))
                 return {"balls": 0}
@@ -711,6 +759,7 @@ class TronOS(CustomCode):
         self.kill_ball_save()
         self.kill_mb_save()
         self._mb_pending = 0
+        self.task_kill(0x19)
         self.display.clear()
         self.hook("ball_end")                        # event 0x1d: every mode stops
         for flipper in self.machine.flippers.values():

@@ -19,6 +19,7 @@ OUT = os.path.join(ROOT, "captures", "traces")
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
 SETTLE = 0.1                        # every hit is followed by 100 ms settle
+HIT_EXTRA = 0.015                   # each hit costs the emulator ~15 ms more (mean over all reference traces)
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -137,11 +138,11 @@ class ScenarioRun(TronTestCase):
         self.log("switch", sw=int(sw))
         self.sw(name, 1 if int(sw) != 41 else 0)
         if int(sw) == 11:                             # the VUK holds the ball until coil 4 fires
-            self.wait(float(ms) / 1000 + SETTLE)
+            self.wait(float(ms) / 1000 + SETTLE + HIT_EXTRA)
             return
         self.wait(float(ms) / 1000)
         self.sw(name, 0 if int(sw) != 41 else 1)
-        self.wait(SETTLE)
+        self.wait(SETTLE + HIT_EXTRA)
 
     def cmd_hold(self, sw):
         self.log("switch_hold", sw=int(sw))

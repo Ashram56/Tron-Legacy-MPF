@@ -58,7 +58,7 @@ class SwitchLayer:
         def on_close():
             if not self.os.game or (not self.os.in_play and num != 11):
                 return
-            self.os.after(1, lambda: (handler(), self.os.request_refresh()))
+            self.os.after(1, lambda: (handler(), self.os.request_lamp_refresh()))
         return on_close
 
     # ------------------------------------------------------------------ per player / ball state
@@ -180,6 +180,7 @@ class SwitchLayer:
             os_.sound(0x0fe)
         os_.ball_held = False
         os_.vuk_ejecting = True
+        os_.vuk_release_time = os_.now
         os_.ball_search_reload()
         self.machine.events.post("tron_vuk_release")
 
