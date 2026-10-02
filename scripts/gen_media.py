@@ -7,10 +7,12 @@ Generated (all git-ignored, rebuilt by scripts/setup_workspace.sh):
 - game/slides/deffs/deff_NNN.tscn     one GMC slide per display effect (AnimatedSprite2D with the
                                       ROM frame timing, plus text labels for effects with values)
 - game/tron/media_data.json           sound pools and slide facts for tron/media_bridge.py
+- game/fonts/                         the ROM fonts (scripts/gen_fonts.py)
 
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
-graphics layer and draw their text lines with the slide's font (the ROM fonts are not exported).
+graphics layer and draw each text line with tron/rom_text.gd: the ROM font, position and alignment of
+the deff's draw call in the decompiled code (scripts/rom_layout.py).
 
 Usage: .venv/bin/python scripts/gen_media.py [--only-data]
 """
@@ -93,7 +95,24 @@ def text_lines(rom_text):
     return [t.strip() for t in rom_text.split(" / ")] if rom_text else []
 
 
-def write_slide(deff_id, frames, lines, loop, folder_rel):
+def text_node(i, lay):
+    """A tron/rom_text.gd label for text line i (lay from rom_layout.line_layouts)."""
+    out = ['', '[node name="Line{}" type="Label" parent="."]'.format(i), 'layout_mode = 0',
+           'theme_override_colors/font_color = {}'.format(DMD_COLOR),
+           'script = ExtResource("text")', 'variable_type = 1', 'variable_name = "line{}"'.format(i),
+           'rom_font = {}'.format(lay["font"]), 'rom_x = {}'.format(lay["x"]),
+           'rom_y = {}'.format(lay["y"]), 'rom_flags = {}'.format(lay["flags"])]
+    if "fit_fonts" in lay:
+        out += ['fit_fonts = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_fonts"]))),
+                'fit_ys = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_ys"]))),
+                'fit_width = {}'.format(lay["fit_width"])]
+    if "alt_when_empty" in lay:
+        out += ['alt_x = {}'.format(lay["alt_x"]), 'alt_y = {}'.format(lay["alt_y"]),
+                'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
+    return out
+
+
+def write_slide(deff_id, frames, layouts, loop, folder_rel):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -108,8 +127,8 @@ def write_slide(deff_id, frames, lines, loop, folder_rel):
         entries.append('{{"duration": {:.1f}, "texture": ExtResource("{}")}}'.format(ms, seen[digest]))
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + (3 if frames else 2)), '',
              '[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]']
-    if lines:
-        parts.append('[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_variable.gd" id="var"]')
+    if any(layouts):
+        parts.append('[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]')
     parts += ext
     if frames:
         parts += ['', '[sub_resource type="SpriteFrames" id="frames"]',
@@ -123,24 +142,19 @@ def write_slide(deff_id, frames, lines, loop, folder_rel):
         parts += ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
                   'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
                   'autoplay = "default"', 'centered = false']
-    n = len(lines)
-    for i in range(n):
-        top = round(32 * i / n)
-        parts += ['', '[node name="Line{}" type="Label" parent="."]'.format(i), 'layout_mode = 0',
-                  'offset_top = {}.0'.format(top), 'offset_right = 128.0',
-                  'offset_bottom = {}.0'.format(round(32 * (i + 1) / n)),
-                  'theme_override_colors/font_color = {}'.format(DMD_COLOR),
-                  'theme_override_font_sizes/font_size = {}'.format(8 if n > 2 else 10),
-                  'horizontal_alignment = 1', 'vertical_alignment = 1',
-                  'script = ExtResource("var")', 'variable_type = 1',
-                  'variable_name = "line{}"'.format(i)]
+    for i, lay in enumerate(layouts):
+        if lay:
+            parts += text_node(i, lay)
     with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w") as f:
         f.write("\n".join(parts) + "\n")
     return name
 
 
 def build_deffs(only_data):
+    import rom_layout
     rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv")))}
+    fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json")))["fonts"]
+    calls = rom_layout.deff_calls()
     out = {}
     os.makedirs(os.path.join(GAME, "slides", "deffs"), exist_ok=True)
     for folder in sorted(glob.glob(os.path.join(PKG, "media", "dmd", "deff_*"))):
@@ -155,7 +169,9 @@ def build_deffs(only_data):
             source, lines = ("graphics" if has_graphics else "none"), text_lines(rom_text)
         else:
             source, lines = "reference", []
-        info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop}
+        layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
+        info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
+                "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
             continue
@@ -163,12 +179,15 @@ def build_deffs(only_data):
         shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
         os.makedirs(os.path.join(GAME, rel))
         frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
-        write_slide(deff_id, frames, lines, loop, rel)
+        write_slide(deff_id, frames, layouts, loop, rel)
     return out
 
 
 def main():
+    import gen_fonts
     only_data = "--only-data" in sys.argv
+    if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
+        gen_fonts.build()
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
     with open(os.path.join(GAME, "tron", "media_data.json"), "w") as f:
         json.dump(data, f, indent=0, sort_keys=True)
