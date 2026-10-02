@@ -39,8 +39,8 @@ class GameOver(Feature):
         for _ in range(matched):
             os_.audit(0x0f)
             if os_.adj_value(29) == 0:
+                os_.award_credit()                # FUN_00004cf0, then the knocker FUN_0001b370
                 os_.knock()
-                self.machine.events.post("tron_award_credit")
             else:
                 self.machine.events.post("tron_award_ticket" if os_.adj_value(29) == 1 else "tron_award_token")
 

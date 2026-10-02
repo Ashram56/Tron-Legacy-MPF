@@ -14,27 +14,20 @@ if GAME not in sys.path:
 
 TESTED = {3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 29, 30, 31, 32, 35, 38, 39, 40, 41,
           42, 44, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 76, 77, 78, 79, 82, 83, 84, 85, 86}
+# credits, game start / restart, high scores and attract pages: tests/test_credits.py
+TESTED |= {2, 25, 28, 33, 34, 36, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62}
 # adjustment -> why no behaviour test (where the effect was looked for)
 NO_EFFECT = {
     1: "COIL PULSE POWER: OS coil-driver strength (read through the OS driver tables); MPF owns pulse times",
-    2: "CUSTOM MESSAGE: attract page text (0x010002dc); the attract pages are not rendered by the rules",
     4: "FAST BOOT: boot sequence (0x0103703c)",
     5: "FLASH LAMP POWER: OS flasher-driver strength",
     6: "GAME ID: operator data", 7: "LANGUAGE: text language (0xa2dc); English only", 8: "LOCATION ID: data",
     9: "MUSIC VOLUME: sound board master volume", 10: "PLAYER LANGUAGE SELECT: start-button language menu (0xa258)",
-    25: "FREE GAME LIMIT: credit awards; the rebuild has no credit system (MPF starts games freely)",
-    28: "GAME PRICING: coin pricing (0x0103d8bc); no credit system", 33: "CREDIT LIMIT: no credit system",
-    34: "FREE PLAY: no credit system", 37: "BILL VALIDATOR: coin hardware", 62: "COIN INPUT DELAY: coin hardware",
-    36: "GAME RESTART: START held on ball 2+ (0x00020d14); needs the credit/start logic, not modelled",
+    37: "BILL VALIDATOR: no reader in the decompile (slot data only) and no bill acceptor switch in this machine",
     43: "CONSOLATION BALL: not read through adj_get in 1.74 (no call site found); not traced",
     45: "TICKET DISPENSER: only shows the REDEMPTION menu (tested in test_service)",
     46: "PLAYER COMPETITION: 0x00019ecc, multi-player tournament play; not modelled",
     47: "TEAM SCORES: team display, not read by the game code",
-    48: "ALLOW HIGH SCORES: high-score entry (0x0001a4f0); no high-score table in the rebuild",
-    49: "GRAND CHAMPION SCORE: high-score table defaults", 50: "HIGH SCORE #1", 51: "HIGH SCORE #2",
-    52: "HIGH SCORE #3", 53: "HIGH SCORE #4", 54: "HIGH SCORE AWARD", 55: "GRAND CHAMPION AWARDS",
-    56: "HIGH SCORE #1 AWARDS", 57: "HIGH SCORE #2 AWARDS", 58: "HIGH SCORE #3 AWARDS", 59: "HIGH SCORE #4 AWARDS",
-    60: "HSTD INITIALS: initials entry (0x0001a728)", 61: "HSTD RESET COUNT: table reset after N games (0x0001a458)",
     75: "ABORT ANIMATIONS: flipper abort of queued shows (0x0100fbb0 / 0x0100fd88); not modelled in display.py",
     80: "DISABLE DROP TARGETS: tron_targets.md open question; no adj_get(80) call site (inferred only)",
     81: "DISABLE RECOGNIZER MOTOR: head motor object parameter; the rebuild does not drive the head motor",

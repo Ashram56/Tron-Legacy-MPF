@@ -17,7 +17,11 @@ TRACES = os.path.join(ROOT, "assets", "rules", "traces")
 OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
-COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
+# the reference traces credit a coin 0.528 s after the script starts; the coin task waits adj 62 COIN INPUT
+# DELAY (30 ticks at factory settings) first, so the coin switch closes that much earlier, and START comes
+# 0.144 s after the credit
+COIN_DELAY = 30 * 0.01626
+COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528 - COIN_DELAY, 0.612, 0.144 + COIN_DELAY
 # every hit is followed by 100 ms settle; with STEP_OVERSHOOT on both phases a hit lasts ~173 ms past
 # its ms (reference traces: hit + wait 1 = 1.17-1.18 s)
 SETTLE = 0.1
@@ -140,6 +144,7 @@ class ScenarioRun(TronTestCase):
 
     scenario = None
     out_path = None
+    FREE_PLAY = False                 # factory settings: the script's coins pay for the game
 
     def runTest(self):
         self.run_scenario(self.scenario, self.out_path)

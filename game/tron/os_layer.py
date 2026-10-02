@@ -23,6 +23,7 @@ from tron.trace import Trace
 
 TICK = 0.01626          # seconds per ROM tick in play (game_flow.md section 0)
 SECOND = 62             # ticks the ROM treats as one second
+START_HOLD_TICKS = 62   # adj 36 GAME RESTART: START held this long (timer 4, 0x3e ticks)
 
 # game state word 0x37274 bits (game_flow.md section 3)
 ST_BONUS, ST_END_BALL, ST_ATTRACT, ST_TILT = 0x01, 0x04, 0x10, 0x200
@@ -137,7 +138,6 @@ class TronOS(CustomCode):
         self.shoot_again = False    # game flag 9: this ball is a shoot-again ball
         self.ball_scored = False
         self.serve_type = 0
-        self.coins = 0
         self._mb_pending = 0
         self._mb_save = (0, 0)
         self._mb_balls = 0          # balls requested from the running multiball task (rom_balls_in_play)
@@ -163,6 +163,9 @@ class TronOS(CustomCode):
         from tron.settings import Adjustments, Audits   # noqa: E402
         self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
         self.audits = Audits(self.machine)                     # ROM audit counters, persisted
+        from tron.credits import Credits             # noqa: E402
+        self.credits = Credits(self)                           # credits and pricing, persisted
+        self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
         self.game_seconds = 0.0     # validated play time of the running game
         self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
@@ -177,12 +180,17 @@ class TronOS(CustomCode):
         ev.add_handler("ball_ending", self._ball_ending, priority=1000)
         ev.add_handler("game_ending", self._game_ending, priority=1000)
         ev.add_handler("game_ended", self._game_ended, priority=1000)
+        ev.add_handler("request_to_start_game", self._request_start, priority=1000)
+        ev.add_handler("player_add_request", self._player_add_request, priority=1000)
+        ev.add_handler("player_added", self._player_added, priority=1000)
         ev.add_handler("mode_attract_started", self._attract_started)
         ev.add_handler("tron_vuk_release", self._vuk_eject_confirmed, unconfirmed=True)
         ev.add_handler("balldevice_bd_vuk_ball_eject_success", self._vuk_eject_confirmed)
         ev.add_handler("balldevice_bd_shooter_lane_ejecting_ball", self._shooter_ejecting)
         sw = self.machine.switch_controller
-        sw.add_switch_handler("s_coin", self._coin)
+        sw.add_switch_handler("s_coin", lambda: self.credits.coin("s_coin"))
+        sw.add_switch_handler("s_start_button", self._start_held, ms=START_HOLD_TICKS * TICK * 1000)
+        sw.add_switch_handler("s_service_back", self._service_back)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
         sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
@@ -651,8 +659,8 @@ class TronOS(CustomCode):
         portal_multiball.jsonl: replay 16.53 s, deff 28 at 25.09 s when show deff 140 ends), until it ends."""
         award = self.adj_value(13)                   # 0 credit, 1 ticket, 2 token, 3 extra ball
         if award == 0:
-            self.machine.events.post("tron_award_credit")
-            self.after(1, self.knock)                # knocker, fired by the OS knocker queue
+            if self.award_credit():                  # FUN_00004cf0: the knocker only when a credit was added
+                self.after(1, self.knock)            # knocker, fired by the OS knocker queue
         elif award == 3:
             self.collect_extra_ball()                # eb_award(0) [0x0001a168]
         else:
@@ -672,6 +680,13 @@ class TronOS(CustomCode):
                 self.task_start(0x33, round(self.display.media[28].seconds / TICK) if 28 in self.display.media
                                 else 160)
         self.task_start(0x33, 1, show)
+
+    def award_credit(self, n=1):
+        """A free game: credits.award (adj 33, adj 25); event tron_award_credit per credit added."""
+        added = self.credits.award(n)
+        for _ in range(added):
+            self.machine.events.post("tron_award_credit")
+        return added
 
     def knock(self, forced=False):
         """Knocker queue [0x0001b370 / 0x0001b418]: sound 0x019 unless adj 35 KNOCKER VOLUME is OFF (a forced
@@ -748,18 +763,36 @@ class TronOS(CustomCode):
 
     # ------------------------------------------------------------------ coins and start
 
-    def _coin(self):
-        """Coin switch: 3 coins make a credit (factory pricing), as the reference traces show."""
-        self.coins += 1
-        self.audit(4)
-        self.audit(7)
-        if self.coins % 3 == 0:
-            self.audit(1)
-            self.sound(0x0f1)
-            self.flag_set(47)
-        else:
-            self.sound(0x0f0)
-        self.deff_start(10)
+    def _request_start(self, **kwargs):
+        """start_button_handler [0x00020d14] in attract: a game needs a credit or free play; otherwise event
+        0x2d and deff 15 (credit text, PRESS START / INSERT COINS) unless it already runs."""
+        if self.credits.can_start():
+            return True
+        self.machine.events.post("tron_start_refused")    # event 0x2d
+        if not self.display.running(15):
+            self.deff_start(15, credits=self.credits.text())
+        return False
+
+    def _player_add_request(self, **kwargs):
+        """START on ball 1 adds a player when a credit (or free play) allows it [0x00020d14]."""
+        game = self.machine.game
+        return not (game and game.player_list) or self.credits.can_start()   # player 1 paid at game start
+
+    def _player_added(self, num=1, **kwargs):
+        if num > 1:
+            self.credits.take(1)
+            self.audit(0x11)
+
+    def _start_held(self):
+        """adj 36 GAME RESTART [0x00020d14]: START held 62 ticks (timer 4) on ball 2 or later restarts the game,
+        with the same credit check as a game start. The running game ends without its game-over (no
+        high-score entry, match or game audits) and a new game starts."""
+        game = self.game
+        if (not game or game.ending or not game.player or game.player.ball < 2 or self.adj_value(36) != 1
+                or self.state & 0x40 or not self.credits.can_start()):
+            return
+        self._restart = True
+        game.end_game()
 
     def _vuk_eject_confirmed(self, unconfirmed=False, **kwargs):
         """The VUK device task runs from the release until MPF confirms the eject (a playfield switch or
@@ -793,7 +826,12 @@ class TronOS(CustomCode):
         self.shoot_again = False
         self.flags.clear()
         self.tasks_kill_all()
+        self.credits.take(1)                         # FUN_00004e9c: the game's credit
+        self.credits.free_games = 0
         self.audit(0x11)
+        hs = self.features_by_name.get("high_scores")
+        if hs:
+            hs.game_started()                        # FUN_0001a4f0: adj 61 HSTD RESET COUNT
         self.display.clear()
         self._new_game = True
         self._new_game_ball = True
@@ -987,6 +1025,11 @@ class TronOS(CustomCode):
     def coin_door_open(self):
         return bool(self.machine.switch_controller.is_active(self.machine.switches["s_coin_door_open"]))
 
+    def _service_back(self):
+        """Coin-door BACK outside the service menu: a service credit [0x0000fc20]."""
+        if not self.in_service:
+            self.credits.service_credit()
+
     def _service_select(self):
         """Coin-door SELECT in attract mode (no game): the service menu (tron/service.py)."""
         if not self.game and not self.in_service:
@@ -1101,7 +1144,8 @@ class TronOS(CustomCode):
         else:
             award = self.adj_value(23)
             if award == 0:
-                self.machine.events.post("tron_award_credit")
+                self.award_credit()
+                self.knock()                         # FUN_0001b370(1, 1)
             elif award == 3:
                 self.score_add(SPECIAL_OVER_LIMIT_SCORE)
             elif award == 4:
@@ -1210,6 +1254,8 @@ class TronOS(CustomCode):
 
     def _game_ending(self, queue=None, **kwargs):
         self.state |= 0x18
+        if self._restart:                            # adj 36: straight into the new game
+            return
         # game-time audit (audits 59-71, by the game's validated play time) and the score-range audits
         # (audits 30-46, one per player) [0x00023774]
         players = self.game.player_list if self.game else []
@@ -1222,10 +1268,17 @@ class TronOS(CustomCode):
         self.hook("game_over")
         queue.wait()
         match = self.features_by_name.get("match")
-        if match:
-            match.run(queue.clear)
+        hs = self.features_by_name.get("high_scores")
+
+        def to_match():
+            if match:
+                match.run(queue.clear)
+            else:
+                queue.clear()
+        if hs and not self.hook("slammed"):
+            hs.run(to_match)                         # high_score_entry [0x0001ad4c], then match
         else:
-            queue.clear()
+            to_match()
 
     def _replay_statistics(self, players):
         """Game-over replay bookkeeping [0x000231a4]. Dynamic replay (adj 11 = 2): the level drops by
@@ -1253,3 +1306,6 @@ class TronOS(CustomCode):
         if self._search_handle:
             self.machine.clock.unschedule(self._search_handle)
             self._search_handle = None
+        if self._restart:                            # adj 36: the new game starts at once
+            self._restart = False
+            self.after(1, lambda: self.machine.events.post("game_start"))

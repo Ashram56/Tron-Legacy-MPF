@@ -7,7 +7,11 @@ scripts in virtual time for the trace comparisons.
 import os
 import shlex
 
-COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528, 0.612, 0.144
+# the reference traces credit a coin 0.528 s after the script starts; the coin task waits adj 62 COIN INPUT
+# DELAY (30 ticks at factory settings) first, so the coin switch closes that much earlier, and START comes
+# 0.144 s after the credit
+COIN_DELAY = 30 * 0.01626
+COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528 - COIN_DELAY, 0.612, 0.144 + COIN_DELAY
 SCRIPT_START_TIME = 2.745 - 1.896
 SETTLE = 0.1
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",

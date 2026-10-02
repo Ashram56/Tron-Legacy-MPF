@@ -33,6 +33,8 @@ class Flippers(Feature):
 
     def pressed(self, audit):
         os_ = self.os
+        if os_.state & 0x40:                             # high-score entry owns the buttons
+            return
         if not os_.game:
             os_.after(PRESS_TICKS, lambda: os_.deff_stop(14))    # attract: the button also steps the pages
             return

@@ -28,6 +28,8 @@ game:
 mpf:
   paths:
     tron_audits: data/tron_audits.yaml    # the ROM's audit counters (tron/settings.py)
+    tron_credits: data/tron_credits.yaml  # credits and the pricing unit counter (tron/credits.py)
+    tron_high_scores: data/tron_high_scores.yaml  # high-score table (tron/features/high_scores.py)
 
 machine:
   balls_installed: 4

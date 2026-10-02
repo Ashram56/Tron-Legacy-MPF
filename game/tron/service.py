@@ -24,6 +24,7 @@ CYCLE_SECONDS = 1.0          # cycling coil / flash lamp tests: one output per s
 BLINK_SECONDS = 0.5          # lamp tests blink
 CHARSET = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,'-&"
 CUSTOM_MESSAGE_LEN = 16
+CUSTOM_PRICING_MAX = 10
 LOCK_KEY = "service"
 LIGHT_PRIORITY = 1000000
 
@@ -581,6 +582,41 @@ class CustomMessageScreen(Screen):
         self.refresh()
 
 
+class CustomPricingScreen(Screen):
+    """SET CUSTOM PRICING: the CUSTOM pricing (adj 28 = 64, tron/credits.py) as coin units of the coin slot and
+    units per credit (machine vars custom_coin_units, custom_units_per_credit, persisted). SELECT steps to the
+    next value and stores both after the last one and sets adj 28 to CUSTOM; MINUS / PLUS change the value.
+    The ROM's own editor is not in the decompile."""
+
+    FIELDS = (("COIN UNITS", "custom_coin_units", 1), ("UNITS PER CREDIT", "custom_units_per_credit", 3))
+
+    def __init__(self, svc):
+        super().__init__(svc, "SET CUSTOM PRICING")
+        var = self.machine.variables.get_machine_var
+        self.values = [int(var(key) or default) for _, key, default in self.FIELDS]
+        self.field = 0
+
+    def lines(self):
+        return [self.title, self.FIELDS[self.field][0], "> {}".format(self.values[self.field])]
+
+    def button(self, name):
+        if name in ("minus", "plus"):
+            v = self.values[self.field] + (1 if name == "plus" else -1)
+            self.values[self.field] = min(CUSTOM_PRICING_MAX, max(1, v))
+        elif name == "select":
+            self.field += 1
+            if self.field == len(self.FIELDS):
+                for (_, key, _), value in zip(self.FIELDS, self.values):
+                    persist_var(self.machine, key, value)
+                self.os.adj[28] = 64
+                self.svc.pop()
+                return
+        else:
+            super().button(name)
+            return
+        self.refresh()
+
+
 def clock_now(machine):
     """The game clock: the host clock plus the operator's SET DATE/TIME offset (machine var clock_offset)."""
     offset = machine.variables.get_machine_var("clock_offset") or 0
@@ -777,8 +813,8 @@ class ServiceMode(Mode):
         resets = {
             "RESET COIN AUDITS": audits.reset_coin,
             "RESET GAME AUDITS": audits.reset_game,
-            "RESET GRAND CHAMPION": lambda: self.machine.events.post("tron_reset_grand_champion"),
-            "RESET HIGH SCORES": lambda: self.machine.events.post("high_scores_reset"),
+            "RESET GRAND CHAMPION": lambda: self.reset_high_scores(1),
+            "RESET HIGH SCORES": lambda: self.reset_high_scores(2),
             "RESET CREDITS": self.reset_credits,
             "RESET FACTORY SETTINGS": self.factory_reset,
         }
@@ -820,7 +856,7 @@ class ServiceMode(Mode):
             "FEATURE ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "feature"),
             "ENTER CUSTOM MESSAGE": lambda: CustomMessageScreen(self),
             "SET DATE/TIME": lambda: DateTimeScreen(self),
-            "SET CUSTOM PRICING": lambda: MessageScreen(self, text, "GAME PRICING: " + adj.label(28)),
+            "SET CUSTOM PRICING": lambda: CustomPricingScreen(self),
             "UPDATE GAME CODE": lambda: MessageScreen(self, text, "NO UPDATE FOUND"),
             "BACKUP TO USB MEMORY STICK": lambda: ActionScreen(
                 self, text, "PRESS SELECT TO BACKUP", lambda: dump_audits(os_, self.dump_path), "BACKUP DONE"),
@@ -830,14 +866,19 @@ class ServiceMode(Mode):
     # ------------------------------------------------------------------ resets
 
     def reset_credits(self):
-        self.os.coins = 0
-        self.machine.events.post("credits_reset")
+        self.os.credits.reset()
+
+    def reset_high_scores(self, mask):
+        """RESET GRAND CHAMPION (1) / RESET HIGH SCORES (2) [0x0001a9f4]; 3 = both and the reset counter."""
+        hs = self.os.features_by_name.get("high_scores")
+        if hs:
+            hs.reset_all() if mask == 3 else hs.reset(mask)
 
     def factory_reset(self):
         """RESET FACTORY SETTINGS: adjustments to their defaults, audits cleared, high scores and credits."""
         self.os.adj.factory_reset()
         self.os.audits.reset_all()
-        self.machine.events.post("high_scores_reset")
+        self.reset_high_scores(3)
         self.reset_credits()
 
 

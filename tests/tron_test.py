@@ -11,6 +11,7 @@ subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "gen_config.py")],
 
 
 class TronTestCase(MpfTestCase):
+    FREE_PLAY = True    # unit tests start games without coins (adj 34 FREE PLAY, not persisted)
 
     def get_config_file(self):
         return "config.yaml"
@@ -31,6 +32,8 @@ class TronTestCase(MpfTestCase):
         if GAME not in sys.path:
             sys.path.insert(0, GAME)
         super().setUp()
+        if self.FREE_PLAY:
+            self.machine.tron.adj.override(34, 1)
 
     @property
     def tron(self):

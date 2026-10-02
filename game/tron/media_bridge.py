@@ -116,19 +116,23 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ service menu
 
-    def service_show(self, lines):
-        """Service menu text (tron/service.py) on the generic slide game/slides/service.tscn, above every
-        deff; needs no generated media."""
+    def text_show(self, slide, lines, priority):
+        """Rules text on a generic slide (game/slides/<slide>.tscn, labels line0-line2); needs no generated
+        media: the service menu, the attract pages and the initials entry."""
         lines = {"line{}".format(i): text for i, text in enumerate(lines)}
-        self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
-                   need_data=False)
-        self._send("slides_play", {"service": {"action": "play", "key": "service", "expire": None,
-                                               "priority": SERVICE_PRIORITY}},
-                   priority=SERVICE_PRIORITY, need_data=False, **lines)
+        self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
+        self._send("slides_play", {slide: {"action": "play", "key": slide, "expire": None, "priority": priority}},
+                   priority=priority, need_data=False, **lines)
+
+    def text_hide(self, slide):
+        self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
+
+    def service_show(self, lines):
+        """Service menu text (tron/service.py), above every deff."""
+        self.text_show("service", lines, SERVICE_PRIORITY)
 
     def service_hide(self):
-        self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
-                   need_data=False)
+        self.text_hide("service")
 
     # ------------------------------------------------------------------ sounds
 

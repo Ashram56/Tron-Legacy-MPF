@@ -335,11 +335,12 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.assertTrue(all(os_.adj[n] == os_.adj.default(n) for n in os_.adj))
         os_.adj[31] = 4
         os_.audit(8)
-        os_.coins = 2
+        os_.credits.add(2)
         self.press("back")
         self.goto("RETURN TO UTILITIES MENU", "GO TO RESETS MENU", "RESET FACTORY SETTINGS")
         self.press("select")
-        self.assertEqual((3, None, 0), (os_.adj[31], os_.audits.get(8), os_.coins))
+        self.assertEqual((3, None, 0, -1), (os_.adj[31], os_.audits.get(8), os_.credits.credits,
+                                            os_.credits.counter))
 
     def test_custom_message_date_time_and_usb(self):
         os_ = self.tron
@@ -368,8 +369,18 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.assertRegex(self.shown[-1][2], r"^\d\d:\d\d$")
         self.press("back")
         self.goto("SET CUSTOM PRICING")
-        self.assertEqual("GAME PRICING: USA 10", self.shown[-1][1])
-        self.press("back")
+        self.assertEqual(("COIN UNITS", "> 1"), tuple(self.shown[-1][1:]))
+        self.press("minus")                                       # never below 1
+        self.press("select")
+        self.assertEqual(("UNITS PER CREDIT", "> 3"), tuple(self.shown[-1][1:]))
+        self.press("minus")
+        self.press("select")                                      # stored, CUSTOM pricing
+        self.assertEqual((64, 1, 2), (os_.adj[28], self.machine.variables.get_machine_var("custom_coin_units"),
+                                      self.machine.variables.get_machine_var("custom_units_per_credit")))
+        self.goto("SET CUSTOM PRICING")
+        self.press("plus")
+        self.press("back")                                        # dropped
+        self.assertEqual(1, self.machine.variables.get_machine_var("custom_coin_units"))
         self.goto("GO TO USB MENU", "UPDATE GAME CODE")
         self.assertEqual("NO UPDATE FOUND", self.shown[-1][1])
 
