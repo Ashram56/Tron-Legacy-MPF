@@ -184,9 +184,6 @@ class SwitchLayer:
         if not os_.state & 0x310:
             os_.sound(0x0fd)
             os_.leff_start(35)
-            # observed, source not located: the rules run again as the kickout starts (traces/
-            # clu_hurryup.jsonl 20.03 / 42.92 / 65.33 s: a background deff restart right after 0x0fd)
-            os_.request_refresh()
             os_.after(46, self.vuk_eject)
         else:
             self.vuk_eject()

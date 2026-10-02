@@ -23,7 +23,7 @@ Model of the SAM OS deff system as the Tron rules use it:
   with os.base_music() (0x01a before the playfield is valid, then 0x01b; 0x029 while Disc Battle is lit)
   [0x0100f594 / 0x0100f5c8]. Every start of a rule's deff is traced with rule=1 (ROM caller 0x19944).
 - A few deffs hold for 1 tick only (HOLD_TICKS_BY_DEFF). A deff's exit handler stops the ramp tube show
-  it started, which re-runs the rules.
+  it started.
 """
 import csv
 import os
@@ -61,6 +61,7 @@ class Display:
                 if row["background_loop"] == "yes":
                     self.background.add(deff_id)
         self.fg = None              # running foreground deff id
+        self.show_held = False      # a show ended in this deff's hold: its rules refresh is due at its exit
         self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
         self.bg = None              # running background deff id
@@ -152,12 +153,14 @@ class Display:
                 self.start(self.bg, refresh=False)
             self.os.request_refresh()
         if self.show:
-            # the show's rules refresh request is served a tick later, unless a refresh ran meanwhile
-            # (one pending request; traces/gem_hurryup.jsonl: one tube 18 start as deff 76 ends 1 tick
-            # into its hold; clu_hurryup.jsonl: the music 0x01b just before the VUK kickout as the
-            # reel's show ends at 42.89 s, one tube 23 start as the CLU intro follows the reel at 18.0 s)
-            count = self.os.refresh_count
-            self.os.after(1, lambda: self.os.refresh_count == count and self.os.request_refresh())
+            # the show's rules refresh request is served once the deff exits (traces/gem_hurryup.jsonl:
+            # one tube 18 start as deff 76 ends; disc_multiball.jsonl 40.03 s: one tube 43 as deff 48
+            # ends), except for the Flynn's Arcade show 0x97, whose end the deferred rules wait for
+            # (FUN_0100f164; clu_hurryup.jsonl 42.89 s: the music 0x01b as the reel's hold starts)
+            if self.show.task_id == 0x97:
+                self.os.request_refresh()
+            else:
+                self.show_held = True
             show, self.show = self.show, None
             if show.on_end:
                 show.on_end()
@@ -217,13 +220,15 @@ class Display:
         for handle in self._sound_handles:
             self.os.machine.clock.unschedule(handle)
         self._sound_handles = []
+        if self.show_held:
+            self.show_held = False
+            self.os.request_refresh()
         if exit_handler and info:
-            # the deff's exit handler stops the ramp tube show it started (e.g. FUN_010022c4), and the
-            # tube release re-runs the rules (traces: deff 73 end -> deff 72 / tube 23 restart)
+            # the deff's exit handler stops the ramp tube show it started (e.g. FUN_010022c4); no rules
+            # refresh follows (traces/find_flynn_and_items.jsonl 18.15 s: tube 13 stops, no tube 14)
             for _, tube in info.tubes:
                 if self.os.tubes.is_running(tube):
                     self.os.tubes.stop(tube)
-                    self.os.request_refresh()
         self.fg = None
 
     def _ended(self, deff_id):
@@ -479,8 +484,6 @@ class Leffs:
     running lower one keeps running). When an effect ends or stops, the lamp rules start a refused rule
     leff that can run now (logged again; traces/recognizer_and_disc_battle.jsonl: leff 107 behind leff
     108; disc_multiball_restart.jsonl: leff 54 behind leff 52). Rule leffs run until the rule stops them.
-    A higher effect on a running rule leff's flashers takes them over: the rule leff waits like a refused
-    one (traces/zuse_fast_scoring.jsonl: leff 125 again as each leff 120 / 128 on f_backpanel ends).
     """
 
     def __init__(self, os_):
@@ -494,7 +497,6 @@ class Leffs:
                 self.info[int(row["leff"])] = (outputs, int(row["priority"] or 0), length)
         self.running = {}           # leff id -> end handle (or None)
         self.pending = []           # refused lamp-rule leffs, started when an effect ends
-        self.rule_leffs = set()     # running leffs started by a lamp rule (loop=True)
 
     def is_running(self, leff_id):
         return leff_id in self.running
@@ -510,14 +512,6 @@ class Leffs:
                 self.pending.append(leff_id)
             return False
         self.stop(leff_id)
-        outputs, prio, _ = self.info.get(leff_id, (frozenset(), 0, None))
-        for other in [o for o in self.rule_leffs if o in self.running]:
-            o_out, o_prio, _ = self.info.get(other, (frozenset(), 0, None))
-            if o_out & outputs and o_prio < prio:
-                self.running.pop(other)
-                self.pending.append(other)
-        if loop:
-            self.rule_leffs.add(leff_id)
         length = self.info.get(leff_id, (None, None, None))[2]
         handle = None
         if length and not loop:
