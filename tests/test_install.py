@@ -191,7 +191,9 @@ class TestEntrypoint(unittest.TestCase):
         self.assertEqual(["/opt/godot/godot", "--path", tc.GAME, "--screen", "2"], cmd)
 
     def test_mpf_command(self):
-        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], self.ep.mpf_command({})[-5:])
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], self.ep.mpf_command({})[-5:])
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], self.ep.mpf_command({"FREE_PLAY": "0"})[-5:])
+        self.assertIn("config,hw_virtual,free_play", self.ep.mpf_command({"FREE_PLAY": ""}))     # compose's unset value
         self.assertEqual(["game", ".", "-c", "config,hw_proc"], self.ep.mpf_command({"TRON_HW": "proc",
                                                                                    "MPF_TEXT_UI": "1"})[-4:])
         self.assertEqual("monitor", self.ep.monitor_command()[-1])

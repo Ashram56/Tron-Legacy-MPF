@@ -6,6 +6,7 @@
     python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD)
     python scripts/run.py --scenario NAME          # play assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
+    python scripts/run.py --no-free-play           # factory pricing: coins needed (virtual defaults to free play)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -137,8 +138,12 @@ def godot_command(godot_args, virtual_display=None):
     return cmd
 
 
-def mpf_args(hw, scenario=None, text_ui=False):
-    args = ["game", ".", "-c", "config,hw_" + hw]
+def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
+    """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine,
+    off for scenarios (the ROM traces insert a coin) and the real machine."""
+    if free_play is None:
+        free_play = hw == "virtual" and not scenario
+    args = ["game", ".", "-c", "config,hw_" + hw + (",free_play" if free_play else "")]
     if not text_ui:
         args.append("-t")
     if scenario:
@@ -146,7 +151,7 @@ def mpf_args(hw, scenario=None, text_ui=False):
     return args
 
 
-def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, godot_args=(),
+def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
@@ -172,8 +177,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
                 tc.BCP_PORT, " (Godot exited)" if godot.poll() is not None else "", godot_log,
                 log_tail(godot_log)))
         print("GMC is listening", flush=True)
-        print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui)), flush=True)
-        mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui), log=mpf_log, cwd=tc.GAME, env=env)
+        print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
+        mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
         if monitor:
             print("waiting for MPF's BCP server on port {} for MPF Monitor".format(tc.MONITOR_PORT), flush=True)
             if wait_for_port(tc.MONITOR_PORT, [mpf], 120):
@@ -213,13 +218,17 @@ def main(argv=None):
     p.add_argument("--text-ui", dest="text_ui", action="store_true", default=None,
                    help="MPF's text UI (default: on in a terminal without --seconds)")
     p.add_argument("--no-text-ui", dest="text_ui", action="store_false")
+    p.add_argument("--free-play", dest="free_play", action="store_true", default=None,
+                   help="START without a coin (default with --hw virtual and no --scenario)")
+    p.add_argument("--no-free-play", dest="free_play", action="store_false",
+                   help="the factory pricing: insert coins (key 5 in the DMD window, or s_coin in MPF Monitor)")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, monitor=args.monitor, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
-               godot_args=args.godot_args, trace=args.trace and os.path.abspath(args.trace))
+               free_play=args.free_play, godot_args=args.godot_args, trace=args.trace and os.path.abspath(args.trace))
 
 
 if __name__ == "__main__":

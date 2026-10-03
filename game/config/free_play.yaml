@@ -1,0 +1,10 @@
+#config_version=6
+
+# Desktop overlay: FREE PLAY (adj 34) on by default, so START begins a game without a coin.
+#   python scripts/run.py                 (adds it unless --scenario or --no-free-play)
+#   mpf game . -c config,hw_virtual,free_play
+# Only the default changes: a value set in the service menu (UTILITIES/ADJUSTMENTS) is persisted and wins.
+# Scenario replays leave it out, because the ROM traces start their games with a coin.
+settings:
+  free_play:
+    default: 1

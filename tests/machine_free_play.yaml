@@ -1,0 +1,7 @@
+#config_version=6
+
+# What "python scripts/run.py" loads (mpf game . -c config,hw_virtual,free_play): tests/test_hw_virtual.py.
+config:
+  - ../game/config/config.yaml
+  - ../game/config/hw_virtual.yaml
+  - ../game/config/free_play.yaml

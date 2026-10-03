@@ -86,6 +86,7 @@ Settings are environment variables. Set them per command (`DMD_SCREEN=1 docker/t
 | `DMD_DISPLAY` / `MONITOR_DISPLAY` | `$DISPLAY` | Another X screen or X server for that window, e.g. `:0.1` |
 | `GODOT_RENDERING_DRIVER` | `opengl3` | `vulkan` works too with the GPU |
 | `GODOT_ARGS` | | More Godot options, e.g. `--always-on-top` |
+| `FREE_PLAY` | on with `TRON_HW=virtual` | `0`: factory pricing, insert coins (key `5` in the DMD window). START begins a game without a coin otherwise. |
 | `MPF_TEXT_UI` | `0` | `1`: MPF's text UI. Open it with `docker attach tron-legacy-mpf-mpf-1`; leave with Ctrl+P Ctrl+Q. |
 | `TRON_GPU`, `TRON_AUDIO` | `1` | `0` keeps `docker/tron.sh` from adding the GPU or sound |
 | `TRON_FORCE_SETUP` | `0` | `1` makes the `setup` service redo the setup (after an asset update, for example) |

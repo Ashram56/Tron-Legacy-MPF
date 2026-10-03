@@ -100,14 +100,28 @@ UI). Godot's log is `game/logs/godot.log`.
 
 | Command | Hardware |
 |---|---|
-| `python scripts/run.py` | `hw_virtual`: smart_virtual, the trough starts full, ejects move balls, trough switches shift. |
+| `python scripts/run.py` | `hw_virtual`: smart_virtual, the trough starts full, ejects move balls, trough switches shift. Free play (`config/free_play.yaml`): START begins a game without a coin; `--no-free-play` keeps the factory pricing. |
 | `python scripts/run.py --monitor` | The same plus MPF Monitor (`mpf monitor`, layout in `game/monitor/`): click switches, see lamps and coils. |
 | `python scripts/run.py --scenario NAME` | Plays `assets/rules/traces/NAME.txt` in real time on smart_virtual. |
 | `python scripts/run.py --hw proc` | The real machine: Multimorphic P-ROC on the Stern SAM IO board; Godot gets `-- --proc-dmd` for the DMD. |
 
+**Playing on the desktop.** With the DMD window focused, keys close the machine's switches (`game/gmc.cfg`,
+`[keyboard]`); in MPF Monitor, click a switch instead (`s_coin`, `s_start_button` and the other cabinet
+switches are in the row of spots below the playfield).
+
+| Key | Switch |
+|---|---|
+| `5` | coin (`s_coin`, right slot: 3 coins = 1 credit at factory pricing) |
+| `1` | START (`s_start_button`) |
+| `Space` | plunge: the ball leaves the shooter lane (`s_shooter_lane` opens) |
+| `Z` / `/` | left / right flipper |
+| `T` | tilt (plumb bob) |
+| `D` | coin door open / closed |
+| `7` `8` `9` `0` | service buttons BACK, MINUS, PLUS, SELECT (service menu: FREE PLAY is adjustment 34 in STANDARD ADJUSTMENTS) |
+
 (Use the venv's Python, as in Getting started, or any Python 3: `run.py` only needs the standard library
 and finds the venv itself.) By hand, the same thing is `godot --path game`, then in `game/`:
-`mpf game . -c config,hw_virtual` (or `config,hw_proc`). [docs/hardware.md](docs/hardware.md) has the details.
+`mpf game . -c config,hw_virtual,free_play` (or `config,hw_virtual` for coins, or `config,hw_proc`). [docs/hardware.md](docs/hardware.md) has the details.
 
 **P-ROC:** MPF's wheel ships the pypinproc binary for Windows (`pinproc.cp3xx-win_amd64.pyd`), so there
 `--hw proc` works once FTDI's D2XX driver and the Visual C++ runtime are installed. On Linux and macOS (MPF's

@@ -40,7 +40,11 @@ class Adjustments:
 
     def __init__(self, machine, table):
         self.machine = machine
-        self.table = table                       # {num: (setting key, default)} (os_layer.adjustment_defaults)
+        # {num: (setting key, default)} (os_layer.adjustment_defaults); a config overlay may change a
+        # default (config/free_play.yaml: adj 34 on for desktop runs), so MPF's merged settings win
+        configured = machine.config.get("settings") or {}
+        self.table = table = {num: (key, int(configured.get(key, {}).get("default", default)))
+                              for num, (key, default) in table.items()}
         self.info = service_data()["adj_by_id"]
         self.overrides = {}
         variables = machine.variables

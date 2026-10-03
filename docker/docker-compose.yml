@@ -70,6 +70,7 @@ services:
     environment:
       <<: *tron-env
       MPF_TEXT_UI: ${MPF_TEXT_UI:-0}           # 1: MPF's text UI (docker attach tron-legacy-mpf-mpf-1)
+      FREE_PLAY: ${FREE_PLAY:-}                # 0: coins needed on the virtual machine (default: free play)
 
   monitor:
     <<: *tron

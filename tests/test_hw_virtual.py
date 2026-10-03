@@ -27,3 +27,49 @@ class TestHwVirtual(TronTestCase):
         self.assertSwitchState("s_shooter_lane", 1)
         self.assertEqual([1, 1, 1, 0], self.trough())                 # the balls rolled down
         self.assertEqual(3, self.machine.ball_devices["bd_trough"].balls)
+
+
+class TestFreePlayOverlay(TronTestCase):
+    """run.py's desktop default: free play, so START begins a game without a coin."""
+
+    FREE_PLAY = False                                 # the overlay's own default, not the test override
+
+    def get_config_file(self):
+        return "../../tests/machine_free_play.yaml"
+
+    def get_platform(self):
+        return False
+
+    def test_start_without_coin(self):
+        self.assertTrue(self.tron.credit_model.free_play())
+        self.assertEqual(0, self.tron.credit_model.credits)
+        self.advance_time_and_run(1)
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        self.assertModeRunning("game")
+
+
+class TestCoinWithoutFreePlay(TronTestCase):
+    """hw_virtual alone keeps the factory setting: START needs a credit, the coin switch gives it."""
+
+    FREE_PLAY = False
+
+    def get_config_file(self):
+        return "../../tests/machine_virtual.yaml"
+
+    def get_platform(self):
+        return False
+
+    def test_coin_then_start(self):
+        self.assertFalse(self.tron.credit_model.free_play())
+        self.advance_time_and_run(1)
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        self.assertModeNotRunning("game")
+        for _ in range(3):                            # USA 1 credit / 3 coin units on the right slot
+            self.hit_and_release_switch("s_coin")
+            self.advance_time_and_run(1)
+        self.assertGreaterEqual(self.tron.credit_model.credits, 1)
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        self.assertModeRunning("game")

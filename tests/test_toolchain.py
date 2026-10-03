@@ -186,7 +186,8 @@ class TestRun(unittest.TestCase):
             self.assertIn("GMC listening", run.log_tail(log))
 
     def test_mpf_args(self):
-        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual"))
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], run.mpf_args("virtual"))
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual", free_play=False))
         self.assertEqual(["game", ".", "-c", "config,hw_proc"], run.mpf_args("proc", text_ui=True))
         self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t", "-X"], run.mpf_args("virtual", "zuse"))
 

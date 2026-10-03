@@ -67,7 +67,8 @@ def godot_command(env, godot=None):
 def mpf_command(env):
     import run
     import toolchain as tc
-    return tc.mpf_command() + run.mpf_args(hardware(env), text_ui=truthy(env.get("MPF_TEXT_UI")))
+    return tc.mpf_command() + run.mpf_args(hardware(env), text_ui=truthy(env.get("MPF_TEXT_UI")),
+                                         free_play=truthy(env["FREE_PLAY"]) if env.get("FREE_PLAY") else None)
 
 
 def monitor_command():
