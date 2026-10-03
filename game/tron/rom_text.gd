@@ -27,11 +27,15 @@ extends MPFVariable
 ## blink_dark: the off phase of blink_ms draws the glyphs black over the picture instead of hiding them
 ## (the ROM prints with a palette mapping the font's colours to 0: deffs 116-124)
 @export var blink_dark := false
+## screens: the line shows only while the event arg `screen` (default 0) is one of these (an effect that
+## draws one of several screens on the same rows, scripts/rom_layout.py SCREENS); empty = always
+@export var screens: PackedInt32Array = PackedInt32Array()
 
 static var _metrics: Dictionary = {}
 static var _font_files: Dictionary = {}
 
 var _use_alt := false
+var _screen_on := true
 var _elapsed_ms := 0.0
 var _seeked := false
 
@@ -70,6 +74,9 @@ func _ready() -> void:
 	autowrap_mode = TextServer.AUTOWRAP_OFF
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	if screens.size():
+		_screen_on = screens.has(0)
+		visible = _screen_on
 	if _timed():
 		add_to_group("rom_timed")
 		set_process(true)
@@ -99,7 +106,7 @@ func _apply_time() -> void:
 	if not _timed():
 		return
 	var blink_on := blink_ms == 0 or int((_elapsed_ms - show_after_ms) / blink_ms) % 2 == 0
-	visible = _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
+	visible = _screen_on and _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
 		and (blink_on or blink_dark)
 	if blink_dark:
 		modulate = Color(1, 1, 1, 1) if blink_on else Color(0, 0, 0, 1)
@@ -109,6 +116,12 @@ func _apply_time() -> void:
 
 
 func update(settings: Dictionary, kwargs: Dictionary = {}) -> void:
+	if screens.size():
+		var shown = kwargs.get("screen", settings.get("screen", null))
+		if shown != null and str(shown) != "":
+			_screen_on = screens.has(int(shown))
+		if not _timed():
+			visible = _screen_on
 	if alt_when_empty:
 		var other = kwargs.get(alt_when_empty, settings.get(alt_when_empty, ""))
 		_use_alt = other == null or str(other) == ""

@@ -155,6 +155,15 @@ class Setup:
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
 
 
+def refresh_media():
+    """Generate the config and media again and import them into Godot (scripts/run.py, docker setup, when
+    tc.media_stale() says the workspace still shows the media of older code or assets)."""
+    s = Setup(argparse.Namespace(os=None, arch=None, dry_run=False, monitor=False, upgrade=False))
+    s.generate()
+    s.godot_import()
+    tc.write_media_stamp()
+
+
 def download(url):
     """The bytes at url. urllib first; curl (Windows 10+, macOS, Linux) when Python lacks CA certificates."""
     print("   downloading " + url, flush=True)
@@ -249,6 +258,8 @@ def main(argv=None):
         s.generate()
     if not args.skip_godot:
         s.godot_import()
+        if not args.skip_media and not s.dry:
+            tc.write_media_stamp()          # scripts/run.py regenerates when this no longer matches
     s.say("Done. Run `python scripts/run.py` (Godot + MPF), or `python scripts/render_check.py` without a screen.")
     return 0
 

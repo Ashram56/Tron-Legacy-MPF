@@ -173,3 +173,28 @@ class TestLiveDeffs(TronTestCase):
         self.assertEqual((9, 2, "COLLECT"), (args["lit"], args["new"], args["line0"]))
         args = bridge.deff_lines(107, {"old": 1, "new": 4})
         self.assertEqual((1, 4), (args["old"], args["new"]))
+
+    def test_letter_states_from_switch_hits(self):
+        """The letters the ZUSE / TRON deffs draw come with the deff from the target switches: the letters
+        collected before (solid) and the one just hit (blinks, then solid) [zuse_letter_hit 0x01033790,
+        deff_091 0x01033b3c, deff_107 0x0102c870]. U then E: deff 91 with lit 0 / new U, then lit U / new E."""
+        bridge = self._bridge()
+        self.release_switch_and_run("s_shooter_lane", 1)
+        self.hit_and_release_switch("s_left_bumper")           # playfield valid (no ZEN charge: it would
+        self.advance_time_and_run(4)                           # complete TRON on the next new letter)
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface:
+            for sw in ("s_zuse_u", "s_zuse_e", "s_tron_t", "s_tron_o"):
+                self.hit_and_release_switch(sw)
+                self.advance_time_and_run(0.5)                # the second hit while the first deff runs
+            plays = [(list(c.kwargs["settings"])[0], c.kwargs) for c in iface.bcp_trigger.call_args_list
+                     if c.kwargs["name"] == "slides_play"
+                     and list(c.kwargs["settings"].values())[0]["action"] == "play"]
+        zuse = [(kw["lit"], kw["new"]) for slide, kw in plays if slide == "deff_091"]
+        tron = [(kw["old"], kw["new"]) for slide, kw in plays if slide == "deff_107"]
+        self.assertEqual([(0, 2), (2, 8)], zuse)              # bit 0 = Z: U = 2, E = 8
+        self.assertEqual([(0, 1), (1, 4)], tron)              # T = 1, O = 4
+        self.assertEqual(["lit", "new"], bridge.data["deffs"][91]["args"])
+        self.assertEqual(["old", "new"], bridge.data["deffs"][107]["args"])
+        self.assertEqual("letters", bridge.data["deffs"][91]["source"])
+

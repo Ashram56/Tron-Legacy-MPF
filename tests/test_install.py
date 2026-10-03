@@ -208,6 +208,11 @@ class TestEntrypoint(unittest.TestCase):
     def test_workspace_ready(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(5, len(self.ep.workspace_ready(tmp)))
+            for mark in self.ep.workspace_ready(tmp):
+                os.makedirs(os.path.join(tmp, mark))
+            missing = self.ep.workspace_ready(tmp)           # all there, but media never stamped: setup again
+            self.assertEqual(1, len(missing))
+            self.assertIn("current media", missing[0])
 
     def test_unknown_role(self):
         with self.assertRaises(SystemExit):

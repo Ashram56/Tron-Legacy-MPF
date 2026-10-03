@@ -141,6 +141,50 @@ def godot_command(*args):
     return [godot_path(), "--path", GAME] + list(args)
 
 
+# ---------------------------------------------------------------------- generated media
+
+# What the generated config and media (game/config/rom, game/media, game/slides/deffs, game/fonts,
+# game/tron/media_data.json; all git-ignored) are made from: a change to any of these after a pull leaves
+# the workspace showing the old display effects until they are generated and imported again.
+MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py")] \
+    + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
+    + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
+MEDIA_STAMP = os.path.join(GAME, "media", ".generated")
+
+
+def media_fingerprint(root=ROOT):
+    import hashlib
+    h = hashlib.sha1()
+    for rel in MEDIA_INPUTS:
+        path = os.path.join(root, rel)
+        h.update(rel.replace(os.sep, "/").encode())
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                h.update(hashlib.sha1(f.read()).digest())
+    return h.hexdigest()
+
+
+def media_stale(root=ROOT):
+    """Why the generated media must be made again (None when current): never generated or stamped, made
+    from other generator scripts or assets than these, or generated but not imported by Godot (the
+    slides then show no picture: Godot loads a PNG only through its .import file)."""
+    stamp = os.path.join(root, "game", "media", ".generated")
+    if not os.path.exists(stamp):
+        return "no stamp of a complete media generation and Godot import ({})".format(stamp)
+    with open(stamp, encoding="utf-8") as f:
+        if f.read().strip() != media_fingerprint(root):
+            return "the generator scripts or the asset package changed since the media were generated"
+    probe = os.path.join(root, "game", "media", "dmd", "deff_091", "solid0.png")
+    if os.path.exists(probe) and not os.path.exists(probe + ".import"):
+        return "the media were generated but not imported by Godot"
+    return None
+
+
+def write_media_stamp(root=ROOT):
+    with open(os.path.join(root, "game", "media", ".generated"), "w", encoding="utf-8") as f:
+        f.write(media_fingerprint(root) + "\n")
+
+
 # ---------------------------------------------------------------------- display
 
 def needs_virtual_display(os_name=None, environ=None):

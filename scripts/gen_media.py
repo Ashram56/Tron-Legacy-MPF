@@ -60,7 +60,11 @@ LETTER_X, LETTER_DX, LETTER_Y, UNLIT_LEVEL = 42, 21, 5, 2
 # 0x040d37d8 + 0x18: "SHOOT" / item); deff 115 (0x010270a4): the skipped stage's messages 0x65d + 2k,
 # 0x65e + 2k (item / "BONUS") and the points paid; the stage deffs 116-124 (FUN_01027374 /
 # FUN_01027478): the points.
+# deffs 55, 60: every screen's lines (rom_layout.SCREENS); deff 60 prints the points on either screen's row.
 ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
+            55: "MULTIBALL + E.B. / ARE LIT / EXTRA BALL / IS LIT / %u MORE TO / LIGHT MULTIBALL / LIGHT EX. BALL"
+                " / LIGHT M.B. + E.B. / MULTIBALL / IS LIT",
+            60: "%,02lu / BALL ADDED / %,02lu / %u MORE FOR / ADD-A-BALL",
             **{d: "%,02lu" for d in range(116, 125)}}
 
 
@@ -145,6 +149,8 @@ def text_node(i, lay, name=None, var=None):
     if "alt_when_empty" in lay:
         out += ['alt_x = {}'.format(lay["alt_x"]), 'alt_y = {}'.format(lay["alt_y"]),
                 'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
+    if lay.get("screens"):
+        out.append('screens = PackedInt32Array({})'.format(", ".join(map(str, lay["screens"]))))
     for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms"):
         if lay.get(key):
             out.append('{} = {}'.format(key, lay[key]))
@@ -301,7 +307,8 @@ def build_deffs(only_data):
         layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
         panel = panels.get(deff_id) if source != "reference" else None   # captures show their panel
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
-                "panel": panel, "args": [letters[k] for k in ("lit", "new") if k in letters] if letters else [],
+                "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
+                + (["screen"] if deff_id in rom_layout.SCREENS else []),
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:

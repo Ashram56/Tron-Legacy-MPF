@@ -31,7 +31,7 @@ class TestEndOfLine(TronTestCase):
         self.assertTrue(eol.eol_letter(0))
         self.assertEqual(self.tron.pd.eol_left, 1)
         # 2 sets to light the MB, 1 to light the EB: "1 MORE TO / LIGHT EX. BALL"
-        self.assertEqual(calls[-1], (55, dict(before=(0, 0), after=(1, 0), flags=4, more=1)))
+        self.assertEqual(calls[-1], (55, dict(before=(0, 0), after=(1, 0), flags=4, more=1, screen=3)))
         for _ in range(3):
             eol.eol_letter(0)
         for _ in range(4):

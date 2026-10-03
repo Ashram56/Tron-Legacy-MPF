@@ -124,7 +124,10 @@ class Clu(Feature):
                 pd.clu_lights = min(pd.clu_lights + 1, 0xffff)
                 lit = True
             if not silent:
-                os_.deff_start(80, completions=pd.clu_lane_completions, needed=4 * lights_before + 1, lit=lit)
+                # deff 80 [0x01017230]: "%d MORE" = (needed - completions) / TO LIGHT HURRY-UP, or the
+                # HURRY-UP / IS LIT screen when this completion lit it (rom_layout.SCREENS)
+                os_.deff_start(80, more=4 * lights_before + 1 - pd.clu_lane_completions, lit=lit,
+                               screen=1 if lit else 0)
         if not silent:
             os_.leff_start(88)
             os_.sound(0x09c)

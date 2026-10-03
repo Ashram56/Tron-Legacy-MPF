@@ -170,6 +170,11 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if hw == "proc" and "--proc-dmd" not in gargs:
         gargs = (gargs + ["--proc-dmd"]) if "--" in gargs else (gargs + ["--", "--proc-dmd"])
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
+    stale = tc.media_stale()
+    if stale:                           # e.g. after a pull: the display would show the old effects
+        print("Generated media out of date ({}): generating and importing them again".format(stale), flush=True)
+        import setup
+        setup.refresh_media()
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
@@ -223,7 +228,8 @@ def main(argv=None):
     p.add_argument("--hw", choices=["virtual", "proc"], default="virtual",
                    help="hardware overlay: game/config/hw_<hw>.yaml (default virtual)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
-    p.add_argument("--scenario", help="play assets/rules/traces/NAME.txt in real time (smart_virtual)")
+    p.add_argument("--scenario", help="play assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
+                                      "(smart_virtual)")
     p.add_argument("--seconds", type=float, help="stop after this many seconds")
     p.add_argument("--trace", help="write MPF's trace (jsonl) to this file")
     p.add_argument("--text-ui", dest="text_ui", action="store_true", default=None,

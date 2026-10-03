@@ -105,7 +105,7 @@ class MediaBridge:
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)
-        values = list(args.values())
+        values = [v for k, v in args.items() if k not in info.get("args", [])]   # not lit/new/screen
         if deff_id == 19:                              # score display: ball number and score
             values = [self.machine.game.player.ball if self.os.game and self.os.game.player else 0,
                       self.os.game.player.score if self.os.game and self.os.game.player else 0]

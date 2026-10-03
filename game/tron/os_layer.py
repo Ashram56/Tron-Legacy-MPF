@@ -492,11 +492,15 @@ class TronOS(CustomCode):
                     self._sample_lengths[int(row["call_id"], 16)] = [dur.get(i, 0) for i in ids]
         return self._sample_lengths.get(call, [])
 
-    def sound2(self, call, arg):
+    def sound2(self, call, arg, index=None, in_deff=0):
         """snd_play2(call, arg) [0x0002c950]: a sound call with an argument (e.g. a spoken number). The
-        ROM traces log these from inside snd_play2 (caller 0x2c97c), which trace_check leaves out."""
-        self.trace.log("sound", call="0x{:03x}".format(call), in_deff=0, arg=arg, caller="0x2c97c")
+        ROM traces log these from inside snd_play2 (caller 0x2c97c), which trace_check leaves out.
+        index: the sample of the call's list the argument picks (the SOS skipped item, a counter), which
+        the media controller plays."""
+        self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff, arg=arg, caller="0x2c97c")
         self.machine.events.post("tron_sound_{:03x}".format(call), arg=arg)
+        if index is not None:
+            self.media.sound(call, index)
 
     def leff_start(self, leff_id, loop=False, lamp=None):
         """Logged like the ROM's call; returns False when a higher-priority leff keeps the outputs.

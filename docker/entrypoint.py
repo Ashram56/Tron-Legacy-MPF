@@ -106,7 +106,13 @@ def wait_for_port(port, timeout, label):
 def workspace_ready(root=WORKSPACE):
     marks = [os.path.join("assets", "mpf_package"), os.path.join("game", "addons", "mpf-gmc", "plugin.cfg"),
              os.path.join("game", "config", "rom"), os.path.join("game", "sounds"), os.path.join("game", ".godot")]
-    return [m for m in marks if not os.path.exists(os.path.join(root, m))]
+    missing = [m for m in marks if not os.path.exists(os.path.join(root, m))]
+    if not missing:
+        import toolchain as tc
+        stale = tc.media_stale(root)
+        if stale:                    # a pull changed the generators or the assets: setup runs again
+            missing.append("current media ({})".format(stale))
+    return missing
 
 
 def exec_(cmd, env=None, cwd=None):

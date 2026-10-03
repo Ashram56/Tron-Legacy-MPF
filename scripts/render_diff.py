@@ -53,6 +53,9 @@ EXTRA = {19: {"credits": "CREDITS 1/3", "replay": "REPLAY AT " + format_rom_text
               "award": "", "award_age": 99, "blink_age": 70}}
 # The status panel of the other effects: one player with 00 (all captures are on ball 1 with no score);
 # its blink phase comes from a counter outside the effect, so it is read off each capture (panel_phase).
+# The screen the capture shows of an effect with several (rom_layout.SCREENS): deff 55 "0 MORE TO" alone,
+# deff 60 points / BALL ADDED, deff 80 0 MORE / TO LIGHT HURRY-UP
+SCREEN = {55: 6, 60: 0, 80: 0}
 PANEL = {"p1": "00", "p2": "", "p3": "", "p4": "", "players": 1, "player": 1, "valid": False,
          "award": "", "award_age": 99}
 DYNAMIC = [19, 25, 26, 133, 38, 40]
@@ -97,6 +100,8 @@ def line_values(deff_id, lines):
         v = vals[i] if i < len(vals) else []
         out["line%d" % i] = "" if v is None else format_rom_text(line, v)
     out.update(EXTRA.get(deff_id, {}))
+    if deff_id in SCREEN:
+        out["screen"] = SCREEN[deff_id]
     return out
 
 
@@ -132,7 +137,7 @@ def text_region(deff_id, lines, values, fonts, get):
     lays = rom_layout.line_layouts(deff_id, lines, fonts)
     for i, lay in enumerate(lays):
         text = values.get("line%d" % i, "")
-        if not lay or not text:
+        if not lay or not text or values.get("screen", 0) not in lay.get("screens", [values.get("screen", 0)]):
             continue
         font_id, x, y = lay["font"], lay["x"], lay["y"]
         if "alt_when_empty" in lay and not values.get(lay["alt_when_empty"]):

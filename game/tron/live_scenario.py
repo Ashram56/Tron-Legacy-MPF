@@ -35,7 +35,8 @@ class LiveScenario:
             return
         self.started = True
         self.machine.switch_controller.add_switch_handler("s_shooter_lane", self._on_shooter, state=1)
-        path = os.path.join(self.machine.machine_path, "..", "assets", "rules", "traces", self.name + ".txt")
+        path = self.name if self.name.endswith(".txt") else os.path.join(
+            self.machine.machine_path, "..", "assets", "rules", "traces", self.name + ".txt")   # or a script file
         self.t = 2.0                                   # let the media controller settle
         with open(path, encoding="utf-8") as f:
             for line in f:

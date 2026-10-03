@@ -173,3 +173,81 @@ class TestMultiballTask(WizardTestCase):
         os_.ball_held = False
         self.advance_time_and_run(1)
         self.assertGreater(os_.task_ticks_left(0x34), 200)
+
+
+class TestSeaOfSimulationLadder(WizardTestCase):
+    """The whole SOS ladder played from the switches (not the hooks), as on the machine: skipped stages pay
+    (k+1) million with deff 115 and one sound 0x109 naming the item; every other stage waits for its own
+    shot and moves on; the last stage completes SOS and the Portal starts at the VUK
+    (assets/rules/modes/sea_of_simulation.md 5, sos_stage_setup 0x01026490, deff_115 0x010270a4)."""
+
+    def setUp(self):
+        super().setUp()
+        self.deffs, self.sounds = [], []
+        for d in (113, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 140):
+            self.machine.events.add_handler("tron_deff_%d" % d, lambda d=d, **kwargs: self.deffs.append(d))
+        for call in (0x109, 0x10a, 0x111):
+            self.machine.events.add_handler("tron_sound_%03x" % call,
+                                            lambda call=call, **kwargs: self.sounds.append((call, kwargs.get("arg"))))
+        self.played = []
+        orig = self.tron.media.sound
+        self.tron.media.sound = lambda call, index=None: (self.played.append((call, index)), orig(call, index))
+
+    def shoot(self, *switches, wait=1.0):
+        for sw in switches:
+            self.hit_and_release_switch(sw)
+            self.advance_time_and_run(0.3)
+        self.advance_time_and_run(wait)
+
+    def vuk(self, wait=12):
+        self.hit_switch_and_run("s_video_game_eject", 1)    # the ball settles, on_vuk, the kick
+        self.release_switch_and_run("s_video_game_eject", wait)
+
+    def test_ladder_from_switches_to_portal(self):
+        self.start_play()
+        sos = self.tron.features_by_name["sea_of_simulation"]
+        collected = (0, 2, 5, 7)                     # FLYNN, CLU, DISC, RECOGNIZER; the others still to play
+        self.items(lit=range(9), collected=collected)
+        self.vuk(wait=20)
+        self.assertTrue(self.tron.flag(0x34))
+        self.assertEqual(1, sos.stage)               # FLYNN collected: skipped
+        self.assertEqual({"shoot": "SHOOT", "item": "GEM"}, sos.stage_text())
+        self.assertEqual(1000000 + 0, sos.total - 1000000)
+
+        before = sos.total
+        self.vuk(wait=8)                             # the arcade: not this stage's shot
+        self.assertEqual(1, sos.stage)
+        self.assertEqual(before, sos.total)
+
+        self.shoot("s_right_inner_loop", wait=12)    # GEM (the GEM qualifying loop, sw39); CLU skipped
+        self.assertEqual(3, sos.stage)
+        self.assertEqual("ZUSE TARGETS", sos.stage_text()["item"])
+        self.shoot("s_zuse_z", "s_zuse_u", "s_zuse_s", "s_zuse_e", wait=4)
+        self.assertEqual(4, sos.stage)
+        self.assertEqual("QUORRA", sos.stage_text()["item"])
+        self.shoot("s_left_spinner", wait=14)        # left inner loop; DISC skipped
+        self.assertEqual(6, sos.stage)
+        self.assertEqual("LIGHT CYCLES", sos.stage_text()["item"])
+        self.shoot("s_right_orbit", "s_r_ramp_exit", "s_l_ramp_exit", wait=14)   # RECOGNIZER skipped
+        self.assertEqual(8, sos.stage)
+        self.assertEqual("TRON TARGETS", sos.stage_text()["item"])
+        self.shoot("s_tron_t", "s_tron_r", "s_tron_o", "s_tron_n", wait=6)
+        self.assertTrue(self.tron.flag(0x36))        # completed
+        self.assertFalse(self.tron.flag(0x34))
+        self.assertTrue(self.h("items_all_collected"))
+
+        # each skipped stage: one deff 115, one 0x109 with the stage's sample, (k+1) million once
+        self.assertEqual(4, self.deffs.count(115))
+        self.assertEqual([(0x109, k) for k in collected], [s for s in self.sounds if s[0] == 0x109])
+        self.assertEqual([(0x109, k) for k in collected], [p for p in self.played if p[0] == 0x109])
+        self.assertEqual([1] * 4, [sos.skip_paid[k] for k in collected])
+        stage_points = 200000 + 4 * 400000 + 500000 + 3 * 700000 + 4 * 900000
+        self.assertEqual(1000000 + sum((k + 1) * 1000000 for k in collected) + stage_points, sos.total)
+        # speech 0x111 (its samples in turn) as each stage completed by its shots ends its deff; the last
+        # one's deff 124 gives way to deff 125 (SEA OF SIMULATION COMPLETED) first
+        self.assertEqual([0, 1, 2, 3], [a for c, a in self.sounds if c == 0x111])
+        self.assertEqual([(0x111, k) for k in range(4)], [p for p in self.played if p[0] == 0x111])
+        self.assertIn(125, self.deffs)
+
+        self.vuk(wait=5)                             # all items collected: the Portal starts
+        self.assertTrue(self.h("portal_running"))

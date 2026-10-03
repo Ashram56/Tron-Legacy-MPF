@@ -17,6 +17,11 @@ N = r"(-?0x[0-9a-f]+|-?\d+)"
 DIRECT = re.compile(r"\b(text_draw_msg|text_printf_msg)\((0x[0-9a-f]+),[^,]+," + N + "," + N + "," + N + "," + N + ",")
 FIT = re.compile(r"\b(text_draw_msg_fit|FUN_00028eb0)\((0x[0-9a-f]+),[^,]+,\(?(?:int \*\))?&DAT_([0-9a-f]+),"
                  + N + "," + N + "," + N + ",[^,]+," + N)
+# a call whose font is a variable loaded from a per-language font table (deff 80: `uVar6 =
+# *(uint *)(&DAT_040d2ee8 + iVar4 * 4)`, iVar4 = FUN_0000a3b4(), the language): FONT_TABLES
+VAR_FONT = re.compile(r"\b(text_draw_msg|text_printf_msg)\((0x[0-9a-f]+),[^,]+,([A-Za-z_]\w*)," + N + "," + N + ","
+                      + N + ",")
+TABLE_LOAD = r"\b{} = \*\(u?int \*\)\(&DAT_([0-9a-f]+) \+"
 # a message picked from a table (deff 114: the stage's "SHOOT" / item lines): text "%s"
 TABLE = re.compile(r"\btext_draw_msg\((?!0x)[^,]+,[^,]+," + N + "," + N + "," + N + "," + N + ",")
 MSG = re.compile(r'/\* msg (0x[0-9a-f]+) "(.*?)" \*/')
@@ -59,7 +64,7 @@ def _statements(lines):
 
 
 def _calls(lines, msgs):
-    out = []
+    out, body = [], "".join(lines)
     for line in _statements(lines):
         m = DIRECT.search(line)
         if m:
@@ -67,6 +72,15 @@ def _calls(lines, msgs):
             if text is not None:
                 out.append({"text": text, "font": int(m.group(3), 0), "flags": int(m.group(4), 0),
                             "x": int(m.group(5), 0), "y": int(m.group(6), 0)})
+            continue
+        m = VAR_FONT.search(line)
+        if m:
+            text = msgs.get(int(m.group(2), 16))
+            table = re.search(TABLE_LOAD.format(re.escape(m.group(3))), body)
+            font = FONT_TABLES.get("0x" + table.group(1)) if table else None
+            if text is not None and font is not None:
+                out.append({"text": text, "font": font, "flags": int(m.group(4), 0), "x": int(m.group(5), 0),
+                            "y": int(m.group(6), 0), "font_table": "0x" + table.group(1)})
             continue
         m = FIT.search(line)
         if m:
@@ -181,6 +195,23 @@ def deff_calls():
 FONT_LISTS = {"0x040d2834": [33], "0x040d2aa4": [15], "0x040d302c": [39], "0x040d31d4": [10, 6],
               "0x040d33a8": [11], "0x040d8a80": [12], "0x040d9194": [2]}
 DEFAULT_LIST = [15, 12, 2]
+# Per-language font tables (font = table[FUN_0000a3b4()], English = entry 0): not in the package; the
+# font each reference capture shows for the call (every text dot of the capture matched, see
+# tests/test_fonts.py). Without them these lines fell back to font 12 at a guessed row: the "n MORE"
+# lines of deffs 66, 80 and 108 were drawn big over the effect.
+FONT_TABLES = {"0x040d31bc": 2,     # deff 44 LEVEL %d COMPLETED
+               "0x040d3238": 39,    # deff 63 IS LIT
+               "0x040d3290": 39,    # deff 66 %d MORE TO / ADD BALL
+               "0x040d2bec": 12,    # deff 78 %d FOLLOWING(S)
+               "0x040d2ee8": 2,     # deff 80 TO LIGHT HURRY-UP
+               "0x040d6f50": 4,     # deff 93 ZUSE / FAST SCORING
+               "0x040d6f98": 34,    # deff 94 FAST SCORING (also in OVERRIDES)
+               "0x040d6fdc": 39,    # deff 98 TIME / EXTENDED
+               "0x040d700c": 3,     # deff 99 TOTAL:
+               "0x040d39a8": 37,    # deffs 101-103 SKILL SHOT
+               "0x040d32c4": 39,    # deff 108 %u MORE / TO ACCESS
+               "0x040d2900": 39,    # deff 112 SUPER / POPS / DOUBLE / SCORING / SPINNERS
+               "0x040d2918": 10}    # deff 112 SPINNERS SCORE
 # The score display (deff 19) picks font and row from a table by score (RAM 0x370ac, not in the
 # package). Score 0 is font 26 on row 21 (reference capture); the smaller fonts for longer scores are
 # a guess: the first that fits the 87 dots right of the status panel, centred on the same middle row.
@@ -219,8 +250,24 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                            "hide_after_ms": round(24 * TICK_MS)}},
              # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
              # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
-             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)}}
+             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)},
+             # deff 55: the second rows picked into a variable (text_draw_msg(uVar8, ...) at y 0x20, font 0x21)
+             55: {t: {"font": 33, "x": 84, "y": 32, "flags": 2, "source": "rom (message from the mode spec)"}
+                  for t in ("ARE LIT", "LIGHT EX. BALL", "LIGHT M.B. + E.B.")}}
 GRAPHICS_END = {38: 64}
+# Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
+# arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
+# screen. Lines of different screens may overlap; the rules pass `screen`.
+# deff 55 (0x0100461c), by its flags argument: 0 MULTIBALL + E.B. / ARE LIT, 1 EXTRA BALL / IS LIT,
+#   2-4 %u MORE TO / LIGHT MULTIBALL, LIGHT EX. BALL or LIGHT M.B. + E.B., 5 MULTIBALL / IS LIT,
+#   6 %u MORE TO alone
+#   (messages 0x6d3, 0x6d6, 0x6d7 are picked into a variable; their text is from the mode spec)
+# deff 60 (0x01005d44): 0 points / BALL ADDED (argument 0x34 = 0), 1 points higher / %u MORE FOR /
+#   ADD-A-BALL
+# deff 80 (0x01017230): 0 %d MORE / TO LIGHT HURRY-UP, 1 HURRY-UP / IS LIT (argument 0x38 set)
+SCREENS = {55: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (2, 3, 4, 6), 5: (2,), 6: (3,), 7: (4,), 8: (5,), 9: (5,)},
+           60: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (1,)},
+           80: {0: (0,), 1: (0,), 2: (1,), 3: (1,)}}
 
 
 # deff 19 text beyond its two lines (deff_019 0x01023a98, deff_draw_status_panel 0x010230ec), all font 0:
@@ -299,6 +346,8 @@ def line_layouts(deff_id, lines, fonts, calls=None):
                 lay["hide_after_ms"] = frame_ms(deff_id, over["hide_after_frame"])
             if "step_frames" in over:
                 lay["step_ms"] = frame_ms(deff_id, over["step_frames"])
+        if i in SCREENS.get(deff_id, {}):
+            lay["screens"] = list(SCREENS[deff_id][i])
         if deff_id == 19 and "%" in line and "BALL" not in line:
             lay.update(font=SCORE_FIT["fit_fonts"][0], x=84, flags=2, y=SCORE_FIT["fit_ys"][0],
                        source="rom+table guess", **SCORE_FIT)
@@ -312,15 +361,17 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         box = (left, lay["y"] - font["cap"] + 1, left + gen_fonts.text_width(font, text) - 1, lay["y"],
                lay.get("show_after_ms", 0), lay.get("hide_after_ms") or 10 ** 9)
         call = lay.get("call")
+        screens = set(lay.get("screens", ()))
 
         def overlaps(b):
             # an outlined font's lines drawn one after the other (LIGHT CYCLE / MULTIBALL / TOTAL:) share
             # their outline row: one dot of overlap is a stack, not a later screen of the effect
-            e = 1 if font.get("outline") and call is not None and b[6] is not None and abs(call - b[6]) == 1 \
-                else 0
+            # (also the rows of one screen of a SCREENS effect)
+            e = 1 if font.get("outline") and ((call is not None and b[6] is not None and abs(call - b[6]) == 1)
+                                              or (screens and b[7])) else 0
             return (box[0] + e <= b[2] and b[0] + e <= box[2] and box[1] + e <= b[3] and b[1] + e <= box[3]
                     and box[4] < b[5] and b[4] < box[5])
-        if not any(overlaps(b) for b in boxes):
-            boxes.append(box + (call,))
+        if not any(overlaps(b) for b in boxes if not (screens and b[7] and not screens & b[7])):
+            boxes.append(box + (call, screens))
             out[i] = lay
     return out

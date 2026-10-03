@@ -79,8 +79,10 @@ class Display:
 
     # ------------------------------------------------------------------ start / stop
 
-    def start(self, deff_id, hold=False, refresh=True, run_seconds=None, **args):
-        """run_seconds: the run length when this call's variant differs from the recorded one."""
+    def start(self, deff_id, hold=False, refresh=True, run_seconds=None, sounds=None, **args):
+        """run_seconds: the run length when this call's variant differs from the recorded one.
+        sounds: [(offset s, fn)] the deff's own sound calls when the rules make them (snd_play2 with an
+        argument, a counter), played instead of the capture's sounds once the deff gets the display."""
         os_ = self.os
         os_.shaker_deff(deff_id)        # the deffs that run the shaker (shaker_run in the deff function)
         if deff_id in self.background:
@@ -113,13 +115,14 @@ class Display:
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
         info = self.media.get(deff_id)
         if info:
-            if not hold:
-                # the deff's own code starts its media once it runs: nothing if it is replaced at once
-                self._sound_handles.append(os_.machine.clock.schedule_once(lambda: self._media(deff_id), 0))
             seconds = run_seconds or info.seconds
             forced = os_.forced.get("deff_{}_seconds".format(deff_id))
             if forced:
                 seconds = forced.pop(0) or seconds   # random length (e.g. the arcade reel), from a test
+            if not hold:
+                # the deff's own code starts its media once it runs: nothing if it is replaced at once
+                self._sound_handles.append(os_.machine.clock.schedule_once(
+                    lambda: self._media(deff_id, seconds, sounds), 0))
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
                 from tron.os_layer import TICK
@@ -131,17 +134,25 @@ class Display:
             os_.after(1, self.refresh)
         return True
 
-    def _media(self, deff_id):
+    def _media(self, deff_id, seconds=None, sounds=None):
+        """The deff's lamp effects, sounds and tube shows at their offsets. A capture can hold more than
+        one run of the effect (deff 115 recorded two skipped stages back to back: 0x109 at 0 and 3.1 s);
+        only what falls inside this run's length plays."""
         if self.fg != deff_id:
             return
         os_ = self.os
         info = self.media[deff_id]
         for leff in info.leffs:
             os_.leff_start(leff)
-        events = [(t, "sound", c) for t, c in info.sounds] + [(t, "tube", n) for t, n in info.tubes]
+        if sounds is not None:
+            events = [(t, "call", fn) for t, fn in sounds]
+        else:
+            events = [(t, "sound", c) for t, c in info.sounds if not seconds or t < seconds]
+        events += [(t, "tube", n) for t, n in info.tubes if not seconds or t < seconds]
         for offset, kind, value in sorted(events, key=lambda e: e[0]):
             fire = (lambda k, v: lambda: self.fg == deff_id and (
-                self._deff_sound(v, deff_id) if k == "sound" else os_.tube_start(v)))(kind, value)
+                self._deff_sound(v, deff_id) if k == "sound" else v() if k == "call" else os_.tube_start(v)))(
+                kind, value)
             if offset <= 0:
                 fire()
             else:
