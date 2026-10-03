@@ -7,7 +7,7 @@ extends MPFVariable
 ## line ("lineN") is blank (the ROM draws a shorter layout when a value is not shown).
 ## Timed lines (deff frames in ms from the slide start): shown from show_after_ms, hidden from
 ## hide_after_ms (0 = never), and with level_steps the brightness (palette level 0-15 of the ROM's
-## colour table) steps every step_ms; with blink_ms the line shows blink_ms, hides blink_ms, ... Seekable for scripts/render_diff.py (seek_ms).
+## colour table) steps every step_ms; with blink_ms the line shows blink_ms, hides blink_ms, ... (counted from show_after_ms) Seekable for scripts/render_diff.py (seek_ms).
 
 @export var rom_font: int = 12
 @export var rom_x: int = 84
@@ -24,6 +24,9 @@ extends MPFVariable
 @export var level_steps: PackedInt32Array = PackedInt32Array()
 @export var step_ms: int = 0
 @export var blink_ms: int = 0
+## blink_dark: the off phase of blink_ms draws the glyphs black over the picture instead of hiding them
+## (the ROM prints with a palette mapping the font's colours to 0: deffs 116-124)
+@export var blink_dark := false
 
 static var _metrics: Dictionary = {}
 static var _font_files: Dictionary = {}
@@ -95,8 +98,11 @@ func _process(delta: float) -> void:
 func _apply_time() -> void:
 	if not _timed():
 		return
+	var blink_on := blink_ms == 0 or int((_elapsed_ms - show_after_ms) / blink_ms) % 2 == 0
 	visible = _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
-		and (blink_ms == 0 or int(_elapsed_ms / blink_ms) % 2 == 0)
+		and (blink_on or blink_dark)
+	if blink_dark:
+		modulate = Color(1, 1, 1, 1) if blink_on else Color(0, 0, 0, 1)
 	if level_steps.size() and step_ms > 0:
 		var level := level_steps[mini(int(_elapsed_ms / step_ms), level_steps.size() - 1)] / 15.0
 		modulate = Color(level, level, level, 1)

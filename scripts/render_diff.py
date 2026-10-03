@@ -42,6 +42,8 @@ VALUES = {19: [[1], [0]],                   # BALL 1, score 00 (score 0 printed 
           26: [[0], []],                    # PLAYER 0 (the capture had no player number)
           38: [[], [0], None],              # MATCH, match number 00
           40: [[0], []],                    # PLAYER 0 / YOU'RE UP
+          114: [[], [], ["SHOOT"], ["FLYNNS ARCADE"]],   # SOS stage 0 (deff 114's stage messages)
+          115: [["FLYNN"], ["BONUS"], [1000000]],         # stage 0 skipped: FLYNN BONUS 1,000,000
           133: [[], [], None]}              # EXTRA BALL without the score line (None: blank)
 # Other event args of the score display (tron/score_display.gd) as the deff 19 capture shows them:
 # credits 1 coin of 3, replay level 20,000,000, one player with 00, playfield not yet valid and the

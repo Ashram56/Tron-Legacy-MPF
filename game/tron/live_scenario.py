@@ -14,6 +14,7 @@ COIN_DELAY = 30 * 0.01626
 COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528 - COIN_DELAY, 0.612, 0.144 + COIN_DELAY
 SCRIPT_START_TIME = 2.745 - 1.896
 SETTLE = 0.1
+TROUGH_SWITCHES = (18, 19, 20, 21)  # tron_ref's 4-ball trough: MPF's trough device owns these switches
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -39,7 +40,9 @@ class LiveScenario:
         with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
-                if line:
+                if line.startswith("mark "):
+                    self.cmd_mark(line[5:].strip())   # free text (may hold quotes), as tests/scenario.py
+                elif line:
                     args = shlex.split(line)
                     getattr(self, "cmd_" + args[0])(*args[1:])
         self.at(0, lambda: self.os.trace.log("live_scenario_end"))
@@ -90,10 +93,15 @@ class LiveScenario:
 
     def cmd_hold(self, sw):
         from tron.switches import SW
+        if int(sw) in TROUGH_SWITCHES:              # a ball arriving in the trough is a drain (tests/scenario.py)
+            self.cmd_drain()
+            return
         self.sw(SW[int(sw)], 1)
 
     def cmd_release(self, sw):
         from tron.switches import SW
+        if int(sw) in TROUGH_SWITCHES:
+            return
         self.sw(SW[int(sw)], 0)
 
     def cmd_plunge(self):

@@ -12,7 +12,10 @@ Generated (all git-ignored, rebuilt by scripts/setup.py):
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
 graphics layer and draw each text line with tron/rom_text.gd: the ROM font, position and alignment of
-the deff's draw call in the decompiled code (scripts/rom_layout.py).
+the deff's draw call in the decompiled code (scripts/rom_layout.py). Over the bitmaps, the black boxes
+the deff clears before its text (rom_layout.effect_fills); a looping background repeats whole bitmap
+cycles (loop_period). Effects that draw target letters by state (LETTER_DEFFS) get one sprite per
+letter and state, driven by tron/letter_panel.gd from the rules' event args.
 
 Usage: .venv/bin/python scripts/gen_media.py [--only-data]
 """
@@ -31,6 +34,34 @@ GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
 TEXT_ONLY = {19, 25, 26, 33, 38, 40}
+TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
+# Effects that draw the four letters of a target bank, one bitmap per letter and state
+# (deff_091_zuse_collect 0x01033b3c, deff_092_zuse_more 0x01033fbc, deff_107_collect 0x0102c870):
+# a collected letter is the solid image (tables 0x040d704c / 0x040d3ca8), a letter still to get the
+# hollow one (0x040d7050 / 0x040d3cac) drawn with palette slot 15 at level 2, the letter just hit
+# blinks solid. Images: rom_images_all.zip, solid C E L N O R S T U Z = 2603-2612, hollow = +10.
+# Positions (tables 0x040d7044/48, 0x040d3ca0/a4, not in the package): x 42 + 21 * i, y 5, where the
+# hollow/solid images match the deffs' graphics frames dot for dot. Event args (tron/features): the
+# collected letters `lit`, the new one `new` (bit 0 = first letter). Frame = `ticks` ROM ticks; the new
+# letter shows on frames where (frame >> shift) & 1, and on every frame after `solid_after`.
+# all_new: every letter blinks solid (deff 92: a set completed).
+ZUSE = (2612, 2611, 2609, 2604)
+TRON = (2610, 2608, 2607, 2606)
+# deff 94 (deff_094_zfs_intro 0x01032510): the solid letters at y 1 (x as above: matched on the capture)
+# on frames where frame & 2, 24 frames of 4 ticks, then the ALL TARGETS / SCORE screen (rom_layout).
+LETTER_DEFFS = {94: {"images": ZUSE, "all_new": True, "ticks": 4, "shift": 1, "solid_after": 10 ** 6, "y": 1,
+                     "hide_after_frame": 24},
+                91: {"images": ZUSE, "lit": "lit", "new": "new", "ticks": 4, "shift": 0, "solid_after": 13},
+                92: {"images": ZUSE, "all_new": True, "ticks": 3, "shift": 1, "solid_after": 21},
+                107: {"images": TRON, "lit": "old", "new": "new", "ticks": 3, "shift": 1, "solid_after": 21}}
+LETTER_X, LETTER_DX, LETTER_Y, UNLIT_LEVEL = 42, 21, 5, 2
+# Text the event map's rom_text lacks: lines printed from a table or from the deff's argument.
+# deff 114 (0x01026c70): SEA OF / SIMULATION and the current stage's two messages (stage table
+# 0x040d37d8 + 0x18: "SHOOT" / item); deff 115 (0x010270a4): the skipped stage's messages 0x65d + 2k,
+# 0x65e + 2k (item / "BONUS") and the points paid; the stage deffs 116-124 (FUN_01027374 /
+# FUN_01027478): the points.
+ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
+            **{d: "%,02lu" for d in range(116, 125)}}
 
 
 def load_yaml(path):
@@ -96,8 +127,13 @@ def text_lines(rom_text):
 
 
 def text_node(i, lay, name=None, var=None):
-    """A tron/rom_text.gd label for text line i (lay from rom_layout.line_layouts)."""
-    out = ['', '[node name="{}" type="Label" parent="."]'.format(name or "Line%d" % i), 'layout_mode = 0',
+    """A tron/rom_text.gd label for text line i (lay from rom_layout.line_layouts); with a twin, a second
+    label with the same value at the twin's x and flags (the ROM draws the line twice)."""
+    out = []
+    if lay.get("twin"):
+        out += text_node(i, dict({k: v for k, v in lay.items() if k not in ("twin", "alt_when_empty")},
+                                 **lay["twin"]), (name or "Line%d" % i) + "Twin", var or "line%d" % i)
+    out += ['', '[node name="{}" type="Label" parent="."]'.format(name or "Line%d" % i), 'layout_mode = 0',
            'theme_override_colors/font_color = {}'.format(DMD_COLOR),
            'script = ExtResource("text")', 'variable_type = 1', 'variable_name = "{}"'.format(var or "line%d" % i),
            'rom_font = {}'.format(lay["font"]), 'rom_x = {}'.format(lay["x"]),
@@ -112,6 +148,8 @@ def text_node(i, lay, name=None, var=None):
     for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms"):
         if lay.get(key):
             out.append('{} = {}'.format(key, lay[key]))
+    if lay.get("blink_dark"):
+        out.append('blink_dark = true')
     if lay.get("level_steps"):
         out.append('level_steps = PackedInt32Array({})'.format(", ".join(map(str, lay["level_steps"]))))
     return out
@@ -153,7 +191,44 @@ def score_display_nodes(score_lines=True, match=False):
     return out
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False):
+def letter_nodes(deff_id, spec, folder_rel):
+    """ext_resources and nodes of a letter effect (LETTER_DEFFS): Solid0-3 and Hollow0-3 sprites and
+    tron/letter_panel.gd showing them from the event args."""
+    import io
+    import zipfile
+    from PIL import Image
+    z = zipfile.ZipFile(os.path.join(PKG, "media", "rom_images_all.zip"))
+    ext, nodes = ['[ext_resource type="Script" path="res://tron/letter_panel.gd" id="letters"]'], []
+    for i, solid in enumerate(spec["images"]):
+        for kind, image, level in (("Solid", solid, 15), ("Hollow", solid + 10, UNLIT_LEVEL)):
+            fname = "{}{}.png".format(kind.lower(), i)
+            Image.open(io.BytesIO(z.read("%04d.png" % image))).convert("RGBA").save(
+                os.path.join(GAME, folder_rel, fname))
+            rid = "{}{}".format(kind.lower(), i)
+            ext.append('[ext_resource type="Texture2D" path="res://{}/{}" id="{}"]'.format(folder_rel, fname, rid))
+            nodes += ['', '[node name="{}{}" type="Sprite2D" parent="."]'.format(kind, i),
+                      'modulate = {}'.format(level_color(level)), 'texture = ExtResource("{}")'.format(rid),
+                      'centered = false',
+                      'position = Vector2({}, {})'.format(LETTER_X + LETTER_DX * i, spec.get("y", LETTER_Y))]
+    nodes += ['', '[node name="LetterPanel" type="Node" parent="."]', 'script = ExtResource("letters")',
+              'lit_key = "{}"'.format(spec.get("lit", "")), 'new_key = "{}"'.format(spec.get("new", "")),
+              'all_new = {}'.format("true" if spec.get("all_new") else "false"),
+              'frame_ms = {}'.format(round(spec["ticks"] * TICK_MS, 2)), 'blink_shift = {}'.format(spec["shift"]),
+              'solid_after = {}'.format(spec["solid_after"]),
+              'hide_after_ms = {}'.format(round(spec.get("hide_after_frame", 0) * spec["ticks"] * TICK_MS))]
+    return ext, nodes
+
+
+def loop_period(frames):
+    """The shortest run of frames that repeats through the whole recording (the ROM's bitmap cycle), or
+    None. The recordings stop at the capture timeout, mid-cycle: looping the whole recording would jump
+    back to the first bitmap from the middle of the cycle."""
+    h = [hashlib.md5(img.tobytes()).hexdigest() for img, _ in frames]
+    n = len(h)
+    return next((p for p in range(1, n // 2 + 1) if all(h[i] == h[i + p] for i in range(n - p))), None)
+
+
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -166,13 +241,14 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False):
             ext.append('[ext_resource type="Texture2D" path="res://{}/{}" id="{}"]'.format(
                 folder_rel, fname, seen[digest]))
         entries.append('{{"duration": {:.1f}, "texture": ExtResource("{}")}}'.format(ms, seen[digest]))
-    parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + (3 if frames else 2)), '',
+    letter_ext, letter_nodes_ = letter_nodes(deff_id, letters, folder_rel) if letters else ([], [])
+    parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + len(letter_ext) + (3 if frames else 2)), '',
              '[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]']
     if any(layouts) or panel:
         parts.append('[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]')
     if panel:
         parts.append('[ext_resource type="Script" path="res://tron/score_display.gd" id="score"]')
-    parts += ext
+    parts += ext + letter_ext
     if frames:
         parts += ['', '[sub_resource type="SpriteFrames" id="frames"]',
                   'animations = [{{"frames": [{}], "loop": {}, "name": &"default", "speed": 1000.0}}]'.format(
@@ -185,6 +261,9 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False):
         parts += ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
                   'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
                   'autoplay = "default"', 'centered = false']
+    for k, (x0, y0, x1, y1) in enumerate(fills):     # black boxes the ROM clears over the bitmap
+        parts += rect_node("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0)
+    parts += letter_nodes_
     for i, lay in enumerate(layouts):
         if lay:
             parts += text_node(i, lay)
@@ -201,24 +280,28 @@ def build_deffs(only_data):
     fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json"), encoding="utf-8"))["fonts"]
     calls = rom_layout.deff_calls()
     panels = rom_layout.status_panel_deffs()
+    fills = rom_layout.effect_fills()
     out = {}
     os.makedirs(os.path.join(GAME, "slides", "deffs"), exist_ok=True)
     for folder in sorted(glob.glob(os.path.join(PKG, "media", "dmd", "deff_*"))):
         deff_id = int(os.path.basename(folder).split("_")[1])
         row = rows.get(deff_id, {})
-        rom_text = row.get("rom_text", "")
+        rom_text = ROM_TEXT.get(deff_id, row.get("rom_text", ""))
         dynamic = "%" in rom_text or deff_id in TEXT_ONLY
         loop = row.get("background_loop") == "yes"
         ref = os.path.join(folder, "reference_capture.gif")
         has_graphics = os.path.isdir(os.path.join(folder, "frames"))
-        if dynamic or not os.path.exists(ref):
+        letters = LETTER_DEFFS.get(deff_id)
+        if letters:                    # letters drawn from the rules' state, not the capture's
+            source, lines = "letters", text_lines(rom_text)
+        elif dynamic or not os.path.exists(ref):
             source, lines = ("graphics" if has_graphics else "none"), text_lines(rom_text)
         else:
             source, lines = "reference", []
         layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
         panel = panels.get(deff_id) if source != "reference" else None   # captures show their panel
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
-                "panel": panel,
+                "panel": panel, "args": [letters[k] for k in ("lit", "new") if k in letters] if letters else [],
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
@@ -233,7 +316,11 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
-        write_slide(deff_id, frames, layouts, loop, rel, panel)
+        if loop and source == "graphics":       # loop whole bitmap cycles only
+            period = loop_period(frames)
+            frames = frames[:period] if period else frames
+        write_slide(deff_id, frames, layouts, loop, rel, panel,
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters)
     return out
 
 

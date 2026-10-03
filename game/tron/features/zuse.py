@@ -37,6 +37,8 @@ class Zuse(Feature):
         os_.lamp_rule(self.clock.counting, leff=125, order=0x01031b5c)
         os_.lamp_rule(self.clock.counting, leff=124, tube=30, order=0x01031b5d)
         os_.deff_rule(self._background, 95, 0x0aa, 5)
+        # deffs 95, 96, 98 print zfs_timer ("%u", both top corners) and zfs_value ("ALL TARGETS=")
+        os_.deff_live((95, 96, 98), lambda: {"timer": self.clock.seconds, "value": self.value})
         os_.lamp_update(self.letter_lamps)
 
     def player_first_ball(self):
@@ -220,7 +222,7 @@ class Zuse(Feature):
         if os_.display.running(94) or os_.display.task_running(0x9b):
             return
         if not os_.display.running(96) and not os_.any_multiball():
-            os_.deff_start(96, value=points)
+            os_.deff_start(96, k=points // 1000)        # "%luK": FUN_01032900 prints points / 1000
         os_.sound(0x0b1)
         os_.leff_start(129)
 

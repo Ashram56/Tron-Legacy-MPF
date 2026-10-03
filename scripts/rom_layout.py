@@ -17,6 +17,8 @@ N = r"(-?0x[0-9a-f]+|-?\d+)"
 DIRECT = re.compile(r"\b(text_draw_msg|text_printf_msg)\((0x[0-9a-f]+),[^,]+," + N + "," + N + "," + N + "," + N + ",")
 FIT = re.compile(r"\b(text_draw_msg_fit|FUN_00028eb0)\((0x[0-9a-f]+),[^,]+,\(?(?:int \*\))?&DAT_([0-9a-f]+),"
                  + N + "," + N + "," + N + ",[^,]+," + N)
+# a message picked from a table (deff 114: the stage's "SHOOT" / item lines): text "%s"
+TABLE = re.compile(r"\btext_draw_msg\((?!0x)[^,]+,[^,]+," + N + "," + N + "," + N + "," + N + ",")
 MSG = re.compile(r'/\* msg (0x[0-9a-f]+) "(.*?)" \*/')
 CALLEE = re.compile(r"\b(FUN_[0-9a-f]{8}|[a-z_][a-z0-9_]*)\(")
 
@@ -44,9 +46,21 @@ def _messages(funcs):
     return out
 
 
+def _statements(lines):
+    """The lines with each call that the decompiler wrapped over several lines joined into one."""
+    out, cur = [], ""
+    for line in lines:
+        part = line.strip()
+        cur = (cur + ("" if part[:1] in ",)" or cur[-1:] in ",(" else " ") + part) if cur else line.rstrip("\n")
+        if cur.count("(") <= cur.count(")"):
+            out.append(cur)
+            cur = ""
+    return out + ([cur] if cur else [])
+
+
 def _calls(lines, msgs):
     out = []
-    for line in lines:
+    for line in _statements(lines):
         m = DIRECT.search(line)
         if m:
             text = msgs.get(int(m.group(2), 16))
@@ -61,6 +75,11 @@ def _calls(lines, msgs):
                 out.append({"text": text, "font": None, "font_list": "0x" + m.group(3),
                             "flags": int(m.group(4), 0), "x": int(m.group(5), 0), "y": int(m.group(6), 0),
                             "max_width": int(m.group(7), 0)})
+            continue
+        m = TABLE.search(line)
+        if m:
+            out.append({"text": "%s", "font": int(m.group(1), 0), "flags": int(m.group(2), 0),
+                        "x": int(m.group(3), 0), "y": int(m.group(4), 0)})
     return out
 
 
@@ -105,6 +124,44 @@ def status_panel_deffs():
     return out
 
 
+FILL = re.compile(r"\b(?:FUN_000274c0|dmd_fill_rect)\([^,]+," + N + "," + N + "," + N + "," + N + ",0\)")
+SPAWN = re.compile(r"\btask_spawn_child\((FUN_[0-9a-f]{8})\b")
+
+
+def _display_functions(fn, funcs, names):
+    """_reach of the deff function, then the display tasks it spawns (one level of their callees):
+    deff 96 draws the deff 95 screen from FUN_01032a30 and spawns its "%luK" pop-ups."""
+    addrs = _reach(fn, funcs, names)
+    for name in SPAWN.findall("".join(funcs[fn])):
+        if names.get(name) in funcs:
+            addrs += [a for a in _reach(names[name], funcs, names, 1) if a not in addrs]
+    return addrs
+
+
+def effect_fills():
+    """{deff: [(x0, y0, x1, y1), ...]} the black boxes a deff clears in the effect area (x 41-127) after
+    drawing its bitmap and before its text (FUN_000274c0 / dmd_fill_rect with colour 0, corners
+    inclusive), e.g. deff 95's band under ALL TARGETS=. Read from the deff's function, its callees and
+    the display tasks it spawns (deff 96 draws the deff 95 screen from a child task)."""
+    funcs, names = _functions()
+    out = {}
+    for deff_id, fn in _deff_functions():
+        if fn not in funcs:
+            continue
+        addrs = _display_functions(fn, funcs, names)
+        boxes = []
+        for a in addrs:
+            for line in funcs[a]:
+                m = FILL.search(line)
+                if m:
+                    box = tuple(int(v, 0) for v in m.groups())
+                    if box[0] >= 0x29 and box not in boxes:
+                        boxes.append(box)
+        if boxes:
+            out[deff_id] = boxes
+    return out
+
+
 def deff_calls():
     """{deff: [call, ...]} in code order (the deff's own function first, then its callees)."""
     funcs, names = _functions()
@@ -113,7 +170,7 @@ def deff_calls():
     for deff_id, fn in _deff_functions():
         if fn in funcs:
             calls = []
-            for addr in _reach(fn, funcs, names):
+            for addr in _display_functions(fn, funcs, names):
                 calls += _calls(funcs[addr], msgs)
             out[deff_id] = calls
     return out
@@ -134,14 +191,36 @@ FALLBACK_FONT = 12
 # x 127, y = font_height - 2 = 7, for loop frames 0-29 with the brightness of table 0x40d3cf8
 # (one step per two frames; capture levels 0..15); the match number only at loop frame 0x40, when
 # the loop has stopped drawing its 64 bitmaps (GRAPHICS_END: the screen has no animation frame).
+TICK_MS = 15.41      # ROM tick as the captures run (deff 19: 7-tick blink = 107.9 ms; deff 40: 6 ticks = 92 ms)
 OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": "rom+capture",
                             "hide_after_frame": 30, "step_frames": 2,
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
-             40: {"YOU'RE UP": {"blink_ticks": 6}}}
+             40: {"YOU'RE UP": {"blink_ticks": 6}},
+             # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
+             # on frames where frame & 2 (frames of 4 ticks) for 24 frames, then a wipe and
+             # FUN_010323d0's screen: SCORE in a fitted font (17) centred on the rows, ALL TARGETS above
+             # and the points below in a font of table 0x040d6f8c (10) at palette level 4. Fonts and the
+             # end of the wipe (1690 ms) read off the capture.
+             94: {"FAST SCORING": {"font": 34, "x": 84, "y": 30, "flags": 2, "source": "rom+capture",
+                                   "blink_ticks": 8, "show_after_ms": round(8 * TICK_MS),
+                                   "hide_after_ms": round(96 * TICK_MS)},
+                  "ALL TARGETS": {"font": 10, "x": 84, "y": 8, "flags": 2, "source": "rom+capture",
+                                  "show_after_ms": 1690, "level_steps": [4], "step_ms": 10 ** 6},
+                  "SCORE": {"font": 17, "x": 84, "y": 21, "flags": 2, "source": "rom+capture",
+                            "show_after_ms": 1690},
+                  "%,02lu POINTS": {"font": 10, "x": 84, "y": 30, "flags": 2, "source": "rom+capture",
+                                    "show_after_ms": 1690, "level_steps": [4], "step_ms": 10 ** 6}},
+             # deff 96 (0x01032bd0): each hit spawns FUN_01032900, which prints "%luK" (points / 1000) in
+             # font 0x27 near the middle of the effect (random x 0x31-0x76, y 13-20) for 24 ticks while
+             # it rises; drawn here centred at its middle row, without the random placement
+             96: {"%luK": {"font": 39, "x": 84, "y": 17, "flags": 2, "source": "rom (position approximated)",
+                           "hide_after_ms": round(24 * TICK_MS)}},
+             # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
+             # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
+             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)}}
 GRAPHICS_END = {38: 64}
-TICK_MS = 15.41      # ROM tick as the captures run (deff 19: 7-tick blink = 107.9 ms; deff 40: 6 ticks = 92 ms)
 
 
 # deff 19 text beyond its two lines (deff_019 0x01023a98, deff_draw_status_panel 0x010230ec), all font 0:
@@ -184,15 +263,21 @@ def line_layouts(deff_id, lines, fonts, calls=None):
     lays = []
     for i, line in enumerate(lines):
         mine = [k for k, c in enumerate(calls) if c["text"] == line]
+        mine = mine[min(lines[:i].count(line), len(mine) - 1):] if mine else mine   # nth line = nth call
         if mine:
             c = calls[mine[0]]
-            lay = {"x": c["x"], "y": c["y"], "flags": c["flags"], "source": "rom"}
+            lay = {"x": c["x"], "y": c["y"], "flags": c["flags"], "source": "rom", "call": mine[0]}
             if c["font"] is None:
                 lst = FONT_LISTS.get(c["font_list"], DEFAULT_LIST)
                 lay.update(font=lst[0], fit_fonts=lst, fit_ys=[c["y"]] * len(lst), fit_width=c["max_width"])
             else:
                 lay["font"] = c["font"]
             later = [k for k in mine[1:] if (calls[k]["x"], calls[k]["y"]) != (c["x"], c["y"])]
+            twin = mine[0] + 1
+            if later and later[0] == twin and calls[twin]["font"] == c["font"] and calls[twin]["y"] == c["y"]:
+                # drawn twice in a row on the same row (deff 95's timer in both top corners): both show
+                lay["twin"] = {"x": calls[twin]["x"], "flags": calls[twin]["flags"]}
+                later = later[1:]
             if later:                                    # a second layout: shown when a value line is blank
                 between = {calls[k]["text"] for k in range(mine[0] + 1, later[0])}
                 cond = [j for j, t in enumerate(lines) if j != i and "%" in t and t in between]
@@ -226,8 +311,16 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         left = gen_fonts.text_left(font, text, lay["x"], lay["flags"])
         box = (left, lay["y"] - font["cap"] + 1, left + gen_fonts.text_width(font, text) - 1, lay["y"],
                lay.get("show_after_ms", 0), lay.get("hide_after_ms") or 10 ** 9)
-        if not any(box[0] <= b[2] and b[0] <= box[2] and box[1] <= b[3] and b[1] <= box[3]
-                   and box[4] < b[5] and b[4] < box[5] for b in boxes):
-            boxes.append(box)
+        call = lay.get("call")
+
+        def overlaps(b):
+            # an outlined font's lines drawn one after the other (LIGHT CYCLE / MULTIBALL / TOTAL:) share
+            # their outline row: one dot of overlap is a stack, not a later screen of the effect
+            e = 1 if font.get("outline") and call is not None and b[6] is not None and abs(call - b[6]) == 1 \
+                else 0
+            return (box[0] + e <= b[2] and b[0] + e <= box[2] and box[1] + e <= b[3] and b[1] + e <= box[3]
+                    and box[4] < b[5] and b[4] < box[5])
+        if not any(overlaps(b) for b in boxes):
+            boxes.append(box + (call,))
             out[i] = lay
     return out
