@@ -5,7 +5,8 @@ The assets have no playfield image, so this draws a labelled grid: every switch 
 the dedicated ones) and every lamp (by SAM number, then the two ramp tubes), each at a spot with its name
 printed next to it. Click a spot in MPF Monitor to toggle the switch. Positions are fractions of the image
 (MPF Monitor's x/y). MPF Monitor rewrites monitor.yaml when spots are dragged, so re-running this script
-discards a hand-made layout: run it only to start over (or after switches or lights are added).
+discards a hand-made layout: run it only to start over. The committed layout is a VPX playfield picture with
+every device placed (docs/hardware.md); this script replaces it with the grid.
 
 Usage: .venv/bin/python scripts/gen_monitor.py   (after scripts/gen_config.py)
 """

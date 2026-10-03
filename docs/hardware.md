@@ -36,11 +36,12 @@ mpf/mpfconfig.yaml: 127.0.0.1, port 5051, which is MPF Monitor's default port), 
 setting. Do not pass `-b`, because it turns BCP off, and the monitor server with it. MPF also waits for
 GMC on port 5050 (`bcp: connections: local_display`, required), so start Godot first.
 
-`game/monitor/monitor.yaml` and `game/monitor/playfield.jpg` come from `scripts/gen_monitor.py`. The assets
-have no playfield image, so the image is a labelled grid. It shows every switch (matrix by SAM number,
-then the dedicated `D<n>` ones) and every lamp, each with its name. Click a spot to toggle a switch. Drag a
-spot to a better place and MPF Monitor saves it in monitor.yaml. Re-running the script starts the layout
-over.
+`game/monitor/playfield.jpg` is a playfield picture rendered from the VPX table, and `monitor.yaml` places
+every switch, lamp, flasher, coil, flipper, autofire and ball device of this config on it (the layout Vincent
+supplied, renamed to these device names by SAM number and function). `settings.ini` holds MPF Monitor's
+window positions. Click a spot to toggle a switch; drag a spot to move it and MPF Monitor saves it in
+monitor.yaml. `scripts/gen_monitor.py` still draws the old labelled grid instead, but it overwrites this
+layout: run it only to start over. `game/monitor/.gdignore` keeps Godot from importing the folder.
 
 This was checked by booting `mpf game . -c config,hw_virtual -t` with Godot on Xvfb, with a BCP client on
 port 5051 sending MPF Monitor's `switch?name=...&state=-1` toggles: three coins, then start. The log shows
