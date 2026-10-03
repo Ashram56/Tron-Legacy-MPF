@@ -1,0 +1,370 @@
+# MPF Monitor layout (scripts/gen_monitor.py): spots on game/monitor/playfield.jpg, x/y as fractions
+# of the image. MPF Monitor rewrites this file when spots are dragged.
+switch:
+  s_tron_t:
+    x: 0.02
+    y: 0.055
+  s_tron_r:
+    x: 0.27
+    y: 0.055
+  s_tron_o:
+    x: 0.52
+    y: 0.055
+  s_tron_n:
+    x: 0.77
+    y: 0.055
+  s_zuse_z:
+    x: 0.02
+    y: 0.085
+  s_zuse_u:
+    x: 0.27
+    y: 0.085
+  s_video_game_eject:
+    x: 0.52
+    y: 0.085
+  s_zen_rollover:
+    x: 0.77
+    y: 0.085
+  s_zuse_e:
+    x: 0.02
+    y: 0.115
+  s_clu_l:
+    x: 0.27
+    y: 0.115
+  s_tournament_start:
+    x: 0.52
+    y: 0.115
+  s_start_button:
+    x: 0.77
+    y: 0.115
+  s_trough_4_l:
+    x: 0.02
+    y: 0.145
+  s_trough_3:
+    x: 0.27
+    y: 0.145
+  s_trough_2:
+    x: 0.52
+    y: 0.145
+  s_trough_1_r:
+    x: 0.77
+    y: 0.145
+  s_trough_jam:
+    x: 0.02
+    y: 0.175
+  s_shooter_lane:
+    x: 0.27
+    y: 0.175
+  s_left_outlane:
+    x: 0.52
+    y: 0.175
+  s_clu_c:
+    x: 0.77
+    y: 0.175
+  s_left_slingshot:
+    x: 0.02
+    y: 0.205
+  s_right_slingshot:
+    x: 0.27
+    y: 0.205
+  s_clu_u:
+    x: 0.52
+    y: 0.205
+  s_right_outlane:
+    x: 0.77
+    y: 0.205
+  s_left_bumper:
+    x: 0.02
+    y: 0.235
+  s_right_bumper:
+    x: 0.27
+    y: 0.235
+  s_bottom_bumper:
+    x: 0.52
+    y: 0.235
+  s_r_ramp_exit:
+    x: 0.77
+    y: 0.235
+  s_l_ramp_entrance:
+    x: 0.02
+    y: 0.265
+  s_right_orbit_spinner:
+    x: 0.27
+    y: 0.265
+  s_l_ramp_exit:
+    x: 0.52
+    y: 0.265
+  s_r_ramp_entrance:
+    x: 0.77
+    y: 0.265
+  s_right_inner_loop:
+    x: 0.02
+    y: 0.295
+  s_disc_opto:
+    x: 0.27
+    y: 0.295
+  s_left_orbit:
+    x: 0.52
+    y: 0.295
+  s_left_spinner:
+    x: 0.77
+    y: 0.295
+  s_right_orbit:
+    x: 0.02
+    y: 0.325
+  s_zuse_s:
+    x: 0.27
+    y: 0.325
+  s_recogniz_3_bank_l:
+    x: 0.52
+    y: 0.325
+  s_recogniz_3_bank_c:
+    x: 0.77
+    y: 0.325
+  s_recogniz_3_bank_r:
+    x: 0.02
+    y: 0.355
+  s_3_bank_motor_dn:
+    x: 0.27
+    y: 0.355
+  s_3_bank_motor_up:
+    x: 0.52
+    y: 0.355
+  s_recog_motor_pos_1:
+    x: 0.77
+    y: 0.355
+  s_recog_motor_pos_2:
+    x: 0.02
+    y: 0.385
+  s_recog_motor_pos_3:
+    x: 0.27
+    y: 0.385
+  s_coin:
+    x: 0.52
+    y: 0.385
+  s_left_flipper:
+    x: 0.77
+    y: 0.385
+  s_right_flipper:
+    x: 0.02
+    y: 0.415
+  s_plumb_bob_tilt:
+    x: 0.27
+    y: 0.415
+  s_slam_tilt:
+    x: 0.52
+    y: 0.415
+  s_coin_door_open:
+    x: 0.77
+    y: 0.415
+  s_service_back:
+    x: 0.02
+    y: 0.445
+  s_service_minus:
+    x: 0.27
+    y: 0.445
+  s_service_plus:
+    x: 0.52
+    y: 0.445
+  s_service_select:
+    x: 0.77
+    y: 0.445
+light:
+  l_tron_n:
+    x: 0.02
+    y: 0.5338
+  l_tron_o:
+    x: 0.27
+    y: 0.5338
+  l_tron_r:
+    x: 0.52
+    y: 0.5338
+  l_tron_t:
+    x: 0.77
+    y: 0.5338
+  l_double_scoring:
+    x: 0.02
+    y: 0.5615
+  l_bumpers:
+    x: 0.27
+    y: 0.5615
+  l_spinners:
+    x: 0.52
+    y: 0.5615
+  l_left_outlane:
+    x: 0.77
+    y: 0.5615
+  l_clu_c:
+    x: 0.02
+    y: 0.5891
+  l_zuse_u:
+    x: 0.27
+    y: 0.5891
+  l_left_ramp_light_cycle:
+    x: 0.52
+    y: 0.5891
+  l_zuse_z:
+    x: 0.77
+    y: 0.5891
+  l_left_orbit_clu:
+    x: 0.02
+    y: 0.6168
+  l_left_orbit_light_cycle:
+    x: 0.27
+    y: 0.6168
+  l_left_orbit_disc:
+    x: 0.52
+    y: 0.6168
+  l_l_loop_arrow:
+    x: 0.77
+    y: 0.6168
+  l_center_portal:
+    x: 0.02
+    y: 0.6444
+  l_center_tron:
+    x: 0.27
+    y: 0.6444
+  l_center_recognizer:
+    x: 0.52
+    y: 0.6444
+  l_center_light_cycle:
+    x: 0.77
+    y: 0.6444
+  l_center_disc:
+    x: 0.02
+    y: 0.6721
+  l_center_quorra:
+    x: 0.27
+    y: 0.6721
+  l_center_zuse:
+    x: 0.52
+    y: 0.6721
+  l_center_clu:
+    x: 0.77
+    y: 0.6721
+  l_center_gem:
+    x: 0.02
+    y: 0.6997
+  l_shoot_again:
+    x: 0.27
+    y: 0.6997
+  l_center_flynn:
+    x: 0.52
+    y: 0.6997
+  l_eject_clu:
+    x: 0.77
+    y: 0.6997
+  l_zuse_e:
+    x: 0.02
+    y: 0.7274
+  l_clu_l:
+    x: 0.27
+    y: 0.7274
+  l_clu_u:
+    x: 0.52
+    y: 0.7274
+  l_right_outlane:
+    x: 0.77
+    y: 0.7274
+  l_r_loop_arrow:
+    x: 0.02
+    y: 0.755
+  l_right_orbit_disc:
+    x: 0.27
+    y: 0.755
+  l_right_orbit_light_cycle:
+    x: 0.52
+    y: 0.755
+  l_right_orbit_clu:
+    x: 0.77
+    y: 0.755
+  l_eject_extra_ball:
+    x: 0.02
+    y: 0.7826
+  l_eject_light_cycle:
+    x: 0.27
+    y: 0.7826
+  l_eject_quorra:
+    x: 0.52
+    y: 0.7826
+  l_eject_portal:
+    x: 0.77
+    y: 0.7826
+  l_r_ramp_light_cycle:
+    x: 0.02
+    y: 0.8103
+  l_zuse_s:
+    x: 0.27
+    y: 0.8103
+  l_flynns_arcade:
+    x: 0.52
+    y: 0.8103
+  l_left_bumper:
+    x: 0.77
+    y: 0.8103
+  l_right_bumper:
+    x: 0.02
+    y: 0.8379
+  l_bottom_bumper:
+    x: 0.27
+    y: 0.8379
+  l_left_ramp_arrow:
+    x: 0.52
+    y: 0.8379
+  l_left_ramp_disc:
+    x: 0.77
+    y: 0.8379
+  l_recognizer_pos_1:
+    x: 0.02
+    y: 0.8656
+  l_recognizer_pos_2:
+    x: 0.27
+    y: 0.8656
+  l_recognizer_pos_3:
+    x: 0.52
+    y: 0.8656
+  l_recognizer_3_bank:
+    x: 0.77
+    y: 0.8656
+  l_right_ramp_disc:
+    x: 0.02
+    y: 0.8932
+  l_r_ramp_arrow:
+    x: 0.27
+    y: 0.8932
+  l_r_inner_loop_arrow:
+    x: 0.52
+    y: 0.8932
+  l_r_inner_loop_disc:
+    x: 0.77
+    y: 0.8932
+  l_r_inner_loop_light_cycle:
+    x: 0.02
+    y: 0.9209
+  l_advance_quorra:
+    x: 0.27
+    y: 0.9209
+  l_l_inner_loop_clu:
+    x: 0.52
+    y: 0.9209
+  l_l_inner_loop_light_cycle:
+    x: 0.77
+    y: 0.9209
+  l_l_inner_loop_disc:
+    x: 0.02
+    y: 0.9485
+  l_l_inner_loop_arrow:
+    x: 0.27
+    y: 0.9485
+  l_start_button:
+    x: 0.52
+    y: 0.9485
+  l_tournament_start_button:
+    x: 0.77
+    y: 0.9485
+  l_left_ramp_tube:
+    x: 0.02
+    y: 0.9762
+  l_right_ramp_tube:
+    x: 0.27
+    y: 0.9762

@@ -1,8 +1,12 @@
 #config_version=6
 
 # Stern Tron Legacy LE v1.74, MPF machine config.
-# Switch, coil and light numbers are the original SAM numbers from the asset package; map them to
-# your controller later. The rules themselves run in Python (game/tron/), see tron/os_layer.py.
+# Switch, coil and light numbers are the original SAM numbers from the asset package. This file is
+# platform neutral: a hardware overlay is picked at launch (docs/hardware.md):
+#   mpf game . -c config,hw_virtual   smart_virtual platform (balls move, trough starts full), MPF Monitor
+#   mpf game . -c config,hw_proc      the real machine: P-ROC on the Stern SAM IO board
+# The unit tests and tests/scenario.py load this file alone and force smart_virtual themselves.
+# The rules themselves run in Python (game/tron/), see tron/os_layer.py.
 
 config:
   - rom/switches.yaml
@@ -10,9 +14,6 @@ config:
   - rom/lights.yaml
   - rom/settings.yaml   # the 88 operator adjustments as MPF settings (persisted machine vars)
   - hardware.yaml
-
-hardware:
-  platform: virtual
 
 modes:
   - attract
@@ -34,6 +35,3 @@ mpf:
 machine:
   balls_installed: 4
   min_balls: 1
-
-# Balls in the trough at power-on on the virtual platforms (live render checks with -X)
-virtual_platform_start_active_switches: s_trough_1_r, s_trough_2, s_trough_3, s_trough_4_l

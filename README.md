@@ -11,6 +11,7 @@ built from the reverse-engineered rules, media and effects in
 | `assets/` | Git submodule: [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption), the rules specs, MPF config and media read from the ROM. Never copy files out of it; reference them, so a sync never leaves stale copies. |
 | `game/` | The MPF machine folder and the Godot (GMC) project in one: `config/`, `modes/`, `slides/`, `project.godot`, `gmc.cfg`. Kept apart from `assets/` so Godot does not import the asset repo's 12,000 files. |
 | `scripts/` | Workspace setup, the headless render check and the asset sync. |
+| `docs/` | `hardware.md`: the two hardware configs (virtual + MPF Monitor, and the real machine on a Multimorphic P-ROC). |
 
 ## Toolchain (Linux x86_64)
 
@@ -30,8 +31,16 @@ On a desktop: start Godot first (it is the BCP server), then MPF.
 
 ```sh
 tools/godot/godot --path game &
-(cd game && ../.venv/bin/mpf game .)
+(cd game && ../.venv/bin/mpf game . -c config,hw_virtual)
 ```
+
+`game/config/config.yaml` is platform neutral; a hardware overlay is picked at launch
+([docs/hardware.md](docs/hardware.md)):
+
+| Command (in `game/`) | Hardware |
+|---|---|
+| `mpf game . -c config,hw_virtual` | smart_virtual: trough starts full, ejects move balls, trough switches shift. Use it with MPF Monitor (`mpf monitor`, layout in `game/monitor/`). |
+| `mpf game . -c config,hw_proc` | The real machine: Multimorphic P-ROC on the Stern SAM IO board (start Godot with `-- --proc-dmd` for the DMD). |
 
 Without a screen (CI, cloud sessions), the render check runs both on a virtual display (Xvfb),
 captures the 128x32 DMD in real time and fails if nothing was drawn:

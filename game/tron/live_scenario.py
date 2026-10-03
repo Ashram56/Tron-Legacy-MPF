@@ -1,6 +1,6 @@
 """Plays a tron_ref scenario (assets/rules/traces/<name>.txt) in real time on a running machine.
 
-Used for live render checks with the Godot media controller: `TRON_LIVE_SCENARIO=<name> mpf game . -t -X`
+Used for live render checks with the Godot media controller: `TRON_LIVE_SCENARIO=<name> mpf game . -c config,hw_virtual -t -X`
 (the smart_virtual platform moves the balls). The commands mirror tests/scenario.py, which runs the same
 scripts in virtual time for the trace comparisons.
 """

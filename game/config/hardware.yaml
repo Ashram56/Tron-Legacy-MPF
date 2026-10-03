@@ -1,36 +1,42 @@
 #config_version=6
 
 # Hardware the ROM switch table does not list (SAM dedicated switches), and the ball devices.
+# Dedicated switches use SAM's own numbering: "D<n>" is dedicated switch #n (1-24) of the SAM CPU board
+# (PinMAME src/wpc/sam.c, "Dedicated Switches"; the rules docs call the slam tilt D-18). The P-ROC config
+# overlay (hw_proc.yaml) turns D<n> into libpinproc's "SD<n>" (scripts/gen_config.py); docs/hardware.md has the list.
 
 switches:
-  s_left_flipper:
-    number: D1
-  s_right_flipper:
-    number: D2
-  s_plumb_bob_tilt:
-    number: D3
-  s_slam_tilt:
-    number: D18
-  s_coin:
-    number: D4
-  s_start_button:     # number comes from the asset package
-    tags: start
-  # Coin door (SAM dedicated switches; numbers are placeholders like the ones above). The four service
-  # buttons drive the service menu (tron/service.py); the tags are MPF's service-button tags.
-  s_service_back:
+  s_left_flipper:     # DED #9 left flipper button (EOS #10 is in hw_proc.yaml)
     number: D9
+  s_right_flipper:    # DED #11 right flipper button (EOS #12)
+    number: D11
+  s_plumb_bob_tilt:   # DED #17 tilt (plumb bob)
+    number: D17
+  s_slam_tilt:        # DED #18 slam tilt
+    number: D18
+  s_coin:             # DED #3 right coin slot (the slot tron/credits.py uses)
+    number: D3
+  s_start_button:     # number comes from the asset package (matrix switch 16)
+    tags: start
+  # Coin door buttons, DED #21-24 in the order of PinMAME's SAM input port (Back, Minus, Plus, Select).
+  # They drive the service menu (tron/service.py); the tags are MPF's service-button tags.
+  s_service_back:
+    number: D21
     tags: service_esc
   s_service_minus:
-    number: D10
+    number: D22
     tags: service_down
   s_service_plus:
-    number: D11
+    number: D23
     tags: service_up
   s_service_select:
-    number: D12
+    number: D24
     tags: service_enter
-  s_coin_door_open:   # active while the coin door is open (ROM 0x3727c bits clear): adj 41, adj 64
-    number: D13
+  # Active while the coin door is open (ROM 0x3727c bits clear): adj 41, adj 64. SAM reads the door through
+  # the IO board's interlock status bits, not a switch input; DED #20 is SAM's spare dedicated input, so
+  # a P-ROC machine needs a door switch wired there (docs/hardware.md).
+  s_coin_door_open:
+    number: D20
 
 playfields:
   playfield:

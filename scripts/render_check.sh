@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Boots MPF (virtual platform) and the Godot media controller on a virtual display
+# Boots MPF (the hw_virtual overlay: smart_virtual, trough full) and the Godot media controller on a virtual display
 # (Xvfb), captures the DMD in real time and checks that a slide was drawn.
 # Output: captures/frames/*.png, captures/dmd_latest.png (128x32) and
 # captures/dmd_latest_x8.png (1024x256 preview), plus godot.log and mpf.log.
 # Usage: scripts/render_check.sh [seconds] [scenario]   (default 15 s, attract only)
 # With a scenario (assets/rules/traces/<name>.txt) MPF plays it in real time on the smart_virtual
-# platform (balls move), so the rules drive the display and sounds as in a game.
+# platform (balls move; the overlay already uses it, -X forces it), so the rules drive the display and sounds as in a game.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,8 +14,8 @@ SECONDS_TO_RUN="${1:-15}"
 SCENARIO="${2:-}"
 OUT="$ROOT/captures"
 rm -rf "$OUT/frames" && mkdir -p "$OUT/frames"
-MPF_ARGS=(-t)
-if [ -n "$SCENARIO" ]; then MPF_ARGS=(-t -X); fi
+MPF_ARGS=(-c config,hw_virtual -t)
+if [ -n "$SCENARIO" ]; then MPF_ARGS=(-c config,hw_virtual -t -X); fi
 
 # Godot is the BCP server, so it starts first; MPF connects to it on localhost:5050.
 xvfb-run -a -s "-screen 0 1280x720x24" \
