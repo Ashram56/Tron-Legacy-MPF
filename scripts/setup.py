@@ -25,6 +25,7 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gmc_patch  # noqa: E402
+import pup_setup  # noqa: E402  (PuP Pack: docs/pup.md)
 import toolchain as tc  # noqa: E402
 
 
@@ -247,6 +248,7 @@ def main(argv=None):
         s.run([tc.venv_python(s.os), os.path.join(tc.ROOT, "scripts", "gen_config.py")], cwd=tc.ROOT)
     else:
         s.generate()
+        pup_setup.setup(tc.venv_python(s.os), s.dry)  # PuP Pack: docs/pup.md
     if not args.skip_godot:
         s.godot_import()
     s.say("Done. Run `python scripts/run.py` (Godot + MPF), or `python scripts/render_check.py` without a screen.")
