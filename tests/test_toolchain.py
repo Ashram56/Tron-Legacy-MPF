@@ -17,7 +17,7 @@ import run  # noqa: E402
 import setup  # noqa: E402
 import toolchain as tc  # noqa: E402
 
-RELEASES = "https://github.com/godotengine/godot/releases/download/4.5.2-stable/"
+RELEASES = "https://github.com/godotengine/godot/releases/download/4.6.3-stable/"
 
 
 class TestHost(unittest.TestCase):
@@ -59,12 +59,12 @@ class TestVenv(unittest.TestCase):
 
 class TestGodot(unittest.TestCase):
     CASES = [  # os, arch, zip, executable in tools/godot/
-        ("windows", "x86_64", "Godot_v4.5.2-stable_win64.exe.zip", ["Godot_v4.5.2-stable_win64.exe"]),
-        ("windows", "arm64", "Godot_v4.5.2-stable_windows_arm64.exe.zip", ["Godot_v4.5.2-stable_windows_arm64.exe"]),
-        ("macos", "x86_64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("macos", "arm64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("linux", "x86_64", "Godot_v4.5.2-stable_linux.x86_64.zip", ["Godot_v4.5.2-stable_linux.x86_64"]),
-        ("linux", "arm64", "Godot_v4.5.2-stable_linux.arm64.zip", ["Godot_v4.5.2-stable_linux.arm64"]),
+        ("windows", "x86_64", "Godot_v4.6.3-stable_win64.exe.zip", ["Godot_v4.6.3-stable_win64.exe"]),
+        ("windows", "arm64", "Godot_v4.6.3-stable_windows_arm64.exe.zip", ["Godot_v4.6.3-stable_windows_arm64.exe"]),
+        ("macos", "x86_64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("macos", "arm64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("linux", "x86_64", "Godot_v4.6.3-stable_linux.x86_64.zip", ["Godot_v4.6.3-stable_linux.x86_64"]),
+        ("linux", "arm64", "Godot_v4.6.3-stable_linux.arm64.zip", ["Godot_v4.6.3-stable_linux.arm64"]),
     ]
 
     def test_urls_and_paths(self):
@@ -139,12 +139,12 @@ class TestUnpack(unittest.TestCase):
     def test_godot_zip_keeps_exec_bit(self):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:
-            info = zipfile.ZipInfo("Godot_v4.5.2-stable_linux.x86_64")
+            info = zipfile.ZipInfo("Godot_v4.6.3-stable_linux.x86_64")
             info.external_attr = 0o755 << 16
             z.writestr(info, "ELF")
         with tempfile.TemporaryDirectory() as tmp:
             setup.unzip(buf.getvalue(), tmp, "linux")
-            exe = os.path.join(tmp, "Godot_v4.5.2-stable_linux.x86_64")
+            exe = os.path.join(tmp, "Godot_v4.6.3-stable_linux.x86_64")
             self.assertTrue(os.path.isfile(exe))
             if os.name != "nt":
                 self.assertTrue(os.access(exe, os.X_OK))

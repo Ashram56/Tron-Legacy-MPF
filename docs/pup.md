@@ -22,6 +22,13 @@ installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
+**Windows: native mp4 playback.** On Windows, `setup.py` installs the `native_video` add-on
+(`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
+they are, with hardware decoding: nothing is converted, `gen_pup.py --native` only lists the videos. This
+build carries a fix for a heap overrun in the upstream release (`pup_addons/native_video/FIX.md`), so do not
+replace it with an upstream zip. The add-on needs Godot 4.6+ and a RenderingDevice renderer (the game uses
+Mobile). Without it loaded the PuP plays the converted Theora videos, as on macOS and Linux.
+
 ## The three screens
 
 | Window | Shows | PuP screens |
@@ -94,8 +101,12 @@ python scripts/sync_upstream.py --branch main   # once upstream has merged its p
 
 The PuP touches upstream files in a few one-line places only: the `pup.yaml` include in
 `game/config/config.yaml`, the `Pup` autoload in `game/project.godot`, the `pup_pack` submodule in
-`.gitmodules`, two `.gitignore` lines, a README pointer and CI's checkout (no submodules: the PuP Pack repo is
-private, `setup.py` fetches `assets/`). Everything else is in its own files, so a merge seldom conflicts.
+`.gitmodules`, three `.gitignore` lines, a README pointer, CI's checkout (no submodules: the PuP Pack repo is
+private, `setup.py` fetches `assets/`), one `pup_setup` call each in `scripts/setup.py` and `scripts/run.py`.
+Two upstream changes are not hooks and would be best made upstream too: Godot 4.6.3 instead of 4.5.2
+(`scripts/toolchain.py`, the docs and tests that name it; the native video add-on needs 4.6) and
+`empty_dir` in `scripts/gen_media.py` (on Windows a re-run of setup stopped on DMD frame folders it could not
+delete). Everything else is in its own files, so a merge seldom conflicts.
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 

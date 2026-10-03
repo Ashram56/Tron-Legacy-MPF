@@ -6,7 +6,7 @@ config_version=5
 
 config/name="Tron Legacy MPF"
 run/main_scene="res://slides/window.tscn"
-config/features=PackedStringArray("4.5", "Mobile")
+config/features=PackedStringArray("4.6", "Mobile")
 
 [autoload]
 

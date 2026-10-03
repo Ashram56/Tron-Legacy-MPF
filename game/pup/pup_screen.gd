@@ -164,8 +164,7 @@ func _start(path: String, loop: bool, volume: float) -> void:
 			_aspect = float(_image.texture.get_width()) / maxf(1.0, _image.texture.get_height())
 		_layout()
 		return
-	var stream := VideoStreamTheora.new()
-	stream.file = path
+	var stream: VideoStream = player.video_stream(path)
 	_image.hide()
 	_video.stop()
 	_video.stream = stream

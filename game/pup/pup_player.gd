@@ -29,6 +29,8 @@ var windows := {}
 var _next := {}                     # playlist -> next index (AlphaSort playlists)
 var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
+## The native_video add-on (Windows, pup_addons/native_video): plays the pack's mp4s without conversion
+var native_video := ClassDB.class_exists("NativeVideoStream")
 
 
 func _ready() -> void:
@@ -260,7 +262,25 @@ func pick(playlist: String, file: String) -> String:
 	if key == "":
 		push_warning("PuP: no file %s in playlist %s" % [file, playlist])
 		return ""
-	return media_dir.path_join(manifest[key].get("out", key))
+	return media_path(key)
+
+
+## Where a pack file plays from: the pack's own video with the native_video add-on, else the converted copy.
+func media_path(key: String) -> String:
+	var entry: Dictionary = manifest[key]
+	if native_video and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
+		return pack_dir.path_join(key)
+	if not entry.has("out"):
+		push_warning("PuP: %s was not converted (gen_pup.py --native) and the native_video add-on is not loaded" % key)
+		return ""
+	return media_dir.path_join(entry.out)
+
+
+func video_stream(path: String) -> VideoStream:
+	var stream: VideoStream = ClassDB.instantiate("NativeVideoStream") if path.get_extension().to_lower() != "ogv" \
+		else VideoStreamTheora.new()
+	stream.file = path
+	return stream
 
 
 func _find(playlist: String, file: String) -> String:
@@ -280,7 +300,8 @@ func volume_of(cmd: Dictionary) -> float:
 func aspect_of(path: String) -> float:
 	for key in manifest:
 		var entry: Dictionary = manifest[key]
-		if media_dir.path_join(entry.get("out", key)) == path and entry.get("h", 0) > 0:
+		var here := pack_dir.path_join(key) == path or media_dir.path_join(entry.get("out", key)) == path
+		if here and entry.get("h", 0) > 0:
 			return float(entry.w) / float(entry.h)
 	return 16.0 / 9.0
 

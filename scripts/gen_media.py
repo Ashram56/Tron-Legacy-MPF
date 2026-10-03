@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -62,6 +63,26 @@ LETTER_X, LETTER_DX, LETTER_Y, UNLIT_LEVEL = 42, 21, 5, 2
 # FUN_01027478): the points.
 ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
+
+
+def empty_dir(path):
+    """path as an empty folder. On Windows a file can be read-only (OneDrive, git) or briefly held by
+    another program, so the folder may not go: then its files are removed one by one, and what is still
+    held is left to be overwritten."""
+    def writable(func, target, _exc):
+        os.chmod(target, stat.S_IWRITE)
+        func(target)
+    if not os.path.isdir(path):
+        return os.makedirs(path)
+    try:
+        shutil.rmtree(path, **({"onexc": writable} if sys.version_info >= (3, 12) else {"onerror": writable}))
+    except OSError:
+        for name in os.listdir(path):
+            try:
+                os.remove(os.path.join(path, name))
+            except OSError:
+                pass
+    os.makedirs(path, exist_ok=True)
 
 
 def load_yaml(path):
@@ -307,8 +328,7 @@ def build_deffs(only_data):
         if only_data:
             continue
         rel = "media/dmd/deff_{:03d}".format(deff_id)    # also a res:// path: "/" on every OS
-        shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
-        os.makedirs(os.path.join(GAME, rel))
+        empty_dir(os.path.join(GAME, rel))
         frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
         end = rom_layout.GRAPHICS_END.get(deff_id)
         if end and source == "graphics" and len(frames) >= end:  # the ROM stops drawing bitmaps at frame `end`

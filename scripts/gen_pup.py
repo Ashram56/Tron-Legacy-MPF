@@ -5,7 +5,8 @@
     python scripts/gen_pup.py --max-height 720 # smaller videos for a slower PC
     python scripts/gen_pup.py --only "Drain/*" # some files (testing)
 
-Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis). The OST mp3s and the pictures
+Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis); with --native (Windows,
+the native_video add-on: pup_addons/native_video) the videos are only probed and Godot plays the pack's mp4s. The OST mp3s and the pictures
 are copied as they are: Godot loads them at run time. manifest.json lists each file with its converted path,
 size and length; the Godot PuP player (game/pup/pup_player.gd) reads it, and without it the PuP stays off.
 
@@ -105,6 +106,8 @@ def convert(ffmpeg, pack, out, job, args):
         if not fresh:
             shutil.copyfile(src, dst)
         return rel, entry, "copied" if not fresh else "up to date"
+    if kind == "video" and args.native:
+        return rel, dict({k: info[k] for k in ("w", "h", "duration") if k in info}, native=True), "native"
     if kind == "video":
         w, h = info.get("w", 0), info.get("h", 0)
         if args.max_height and h > args.max_height:
@@ -140,6 +143,7 @@ def main(argv=None):
     p.add_argument("--max-height", type=int, default=0, help="scale videos down to this height (0: keep)")
     p.add_argument("--quality", type=int, default=7, choices=range(0, 11), help="Theora quality 0-10 (default 7)")
     p.add_argument("--only", action="append", help="pack paths to convert (glob, repeatable)")
+    p.add_argument("--native", action="store_true", help="keep the videos as they are (native_video add-on)")
     p.add_argument("--force", action="store_true", help="convert again even when up to date")
     args = p.parse_args(argv)
     if not os.path.exists(os.path.join(args.pack, "triggers.pup")):

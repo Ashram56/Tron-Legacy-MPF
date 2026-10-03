@@ -65,7 +65,7 @@ fi
 MACOS="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
 say "Tron Legacy MPF prerequisites on macOS $MACOS ($(uname -m))$([ "$DRY" = 1 ] && echo ', dry run')"
 case "$MACOS" in
-    10.*|11.*) note "warning: macOS 12 or newer is needed (Godot 4.5, current Python and Qt builds)" ;;
+    10.*|11.*) note "warning: macOS 12 or newer is needed (Godot 4.6, current Python and Qt builds)" ;;
 esac
 
 BREW=""

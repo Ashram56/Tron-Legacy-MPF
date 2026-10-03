@@ -22,7 +22,7 @@ GAME = os.path.join(ROOT, "game")
 
 PYTHON_MIN = (3, 10)
 MPF_VERSION = "0.80.1"
-GODOT_VERSION = "4.5.2"
+GODOT_VERSION = "4.6.3"
 GMC_VERSION = "1.0.0"
 MPF_MONITOR_VERSION = "1.0.0"
 # ruamel.yaml.clib: 0.2.15 wheels name their metadata ruamel_yaml_clib, which MPF's pkg_resources (setuptools 72)

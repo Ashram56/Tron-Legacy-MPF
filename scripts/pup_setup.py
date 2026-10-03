@@ -2,6 +2,7 @@
 """The PuP Pack part of the workspace: setup.py and run.py call it, or run it on its own.
 
     python scripts/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
+                                           # (Windows: the native_video add-on, which plays the mp4s as they are)
     python scripts/pup_setup.py --status   # one line: is the PuP on, and if not why
 
 Kept out of setup.py and run.py (upstream files, one-line hooks only) so upstream merges stay clean.
@@ -35,6 +36,25 @@ def status():
     return True, "PuP on: {} windows, {}".format(screens, music)
 
 
+NATIVE_SRC = os.path.join(tc.ROOT, "pup_addons", "native_video")
+NATIVE_DST = os.path.join(tc.GAME, "addons", "native_video")
+NATIVE_MIN_GODOT = (4, 6)           # native_video.gdextension compatibility_minimum
+
+
+def native_video(os_name=None):
+    """True where the PuP plays the pack's mp4s with the native_video add-on (Windows, Godot 4.6+): Godot's
+    own player only does Theora, so elsewhere the videos are converted."""
+    godot = tuple(int(n) for n in tc.GODOT_VERSION.split(".")[:2])
+    return tc.host_os(os_name) == "windows" and godot >= NATIVE_MIN_GODOT
+
+
+def install_native_video():
+    """Copies pup_addons/native_video (the build with the gdzig heap fix, see its FIX.md) to game/addons/."""
+    say("   native_video add-on -> game/addons/native_video (the pack's mp4s play without conversion)")
+    shutil.rmtree(NATIVE_DST, ignore_errors=True)
+    shutil.copytree(NATIVE_SRC, NATIVE_DST)
+
+
 def say(text):
     print(text, flush=True)
 
@@ -65,8 +85,13 @@ def setup(py=None, dry=False):
     if dry:
         return 0
     ensure_ffmpeg(py)
-    say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
-    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")], cwd=tc.ROOT).returncode
+    native = native_video()
+    if native:
+        install_native_video()
+    else:
+        say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
+    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
+                          cwd=tc.ROOT).returncode
     say("   " + status()[1])
     return code
 

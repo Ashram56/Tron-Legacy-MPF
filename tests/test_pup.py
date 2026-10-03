@@ -35,6 +35,18 @@ class TestPupFiles(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
+class TestSetup(unittest.TestCase):
+    def test_native_video_on_windows_only(self):
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        import pup_setup
+        self.assertTrue(pup_setup.native_video("windows"))
+        self.assertFalse(pup_setup.native_video("linux"))
+        self.assertFalse(pup_setup.native_video("macos"))
+        for name in ("native_video.gdextension", "native_video.windows.release.x86_64.dll",
+                     "native_video.windows.debug.x86_64.dll"):
+            self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
+
+
 class TestEngine(unittest.TestCase):
 
     def setUp(self):
