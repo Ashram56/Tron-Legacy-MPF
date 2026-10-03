@@ -137,6 +137,8 @@ def main(argv=None, env=None):
         return subprocess.call([tc.python(), os.path.join(WORKSPACE, "scripts", "setup.py"), "--monitor"] + rest,
                                cwd=WORKSPACE)
     if role == "godot":
+        import gmc_patch
+        gmc_patch.patch()               # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
         genv = display_env(env, "DMD_DISPLAY")
         check_display(genv)
         exec_(godot_command(genv) + rest, genv, WORKSPACE)

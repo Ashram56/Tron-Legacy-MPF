@@ -78,10 +78,19 @@ class MediaBridge:
         return bool(bcp.transport.get_named_client("local_display"))
 
     def _send(self, name, settings, priority=0, need_data=True, **kwargs):
+        """Send a slides_play / sounds_play trigger straight to GMC. MPF's bcp_trigger() only reaches clients
+        that registered a handler for the name, and GMC registers none for sounds_play (MPF's own
+        sound_player config would): sent that way, every sound was dropped."""
         if not self.connected(need_data):
             return
-        self.machine.bcp.interface.bcp_trigger(name=name, settings=settings, context=CONTEXT,
-                                               calling_context=CONTEXT, priority=priority, **kwargs)
+        bcp = self.machine.bcp
+        client = bcp.transport.get_named_client("local_display") if getattr(bcp, "transport", None) else None
+        args = dict(name=name, settings=settings, context=CONTEXT, calling_context=CONTEXT, priority=priority,
+                    **kwargs)
+        if client:
+            bcp.interface.bcp_trigger_client(client=client, **args)
+        else:                                      # unit tests: a mocked interface, no transport client
+            bcp.interface.bcp_trigger(**args)
 
     # ------------------------------------------------------------------ display effects
 

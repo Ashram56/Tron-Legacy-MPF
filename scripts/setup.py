@@ -24,6 +24,7 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gmc_patch  # noqa: E402
 import toolchain as tc  # noqa: E402
 
 
@@ -117,6 +118,7 @@ class Setup:
         self.say("   url:  " + tc.GMC_ZIP)
         if os.path.exists(os.path.join(tc.GMC_DIR, "plugin.cfg")) and not self.dry:
             self.say("   in place")
+            gmc_patch.patch()
             return
         if self.dry:
             return
@@ -133,6 +135,7 @@ class Setup:
                                 "--branch", "v" + tc.GMC_VERSION, tc.GMC_GIT, os.path.join(tmp, "gmc")], check=True)
                 shutil.rmtree(tc.GMC_DIR, ignore_errors=True)
                 shutil.copytree(os.path.join(tmp, "gmc", "addons", "mpf-gmc"), tc.GMC_DIR)
+        gmc_patch.patch()
 
     def generate(self):
         py = tc.venv_python(self.os)

@@ -390,6 +390,7 @@ class TestAuditsAndAdjustments(ServiceCase):
         with mock.patch.object(bridge, "connected", lambda need_data=True: not need_data), \
                 mock.patch.object(self.machine, "bcp", mock.Mock(), create=True):
             self.machine.bcp.interface.bcp_trigger = lambda **kw: sent.append(kw)
+            self.machine.bcp.interface.bcp_trigger_client = lambda client, **kw: sent.append(kw)
             self.enter()
             self.press("back")
         sent = [kw for kw in sent if "service" in (kw.get("settings") or {})]

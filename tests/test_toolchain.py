@@ -12,6 +12,7 @@ from unittest import mock
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import gmc_patch  # noqa: E402
 import run  # noqa: E402
 import setup  # noqa: E402
 import toolchain as tc  # noqa: E402
@@ -196,6 +197,36 @@ class TestRun(unittest.TestCase):
             self.assertEqual(sys.executable, run.godot_command([], virtual_display=False)[0])
             with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
+
+
+class TestGmcPatch(unittest.TestCase):
+
+    def test_patch_unpatched_gmc_once(self):
+        src = tc.GMC_DIR
+        if not os.path.exists(os.path.join(src, "plugin.cfg")):
+            self.skipTest("GMC not installed")
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "scripts"))
+            open(os.path.join(d, "plugin.cfg"), "w").close()
+            for rel, old, new in gmc_patch.EDITS:      # rebuild the stock files from the installed (maybe patched) ones
+                path = os.path.join(d, *rel.split("/"))
+                if not os.path.exists(path):
+                    with open(os.path.join(src, *rel.split("/")), encoding="utf-8", newline="") as f:
+                        text = f.read()
+                    with open(path, "w", encoding="utf-8", newline="") as f:
+                        f.write(text)
+            for rel, old, new in reversed(gmc_patch.EDITS):
+                path = os.path.join(d, *rel.split("/"))
+                with open(path, encoding="utf-8", newline="") as f:
+                    text = f.read()
+                if new in text:
+                    with open(path, "w", encoding="utf-8", newline="") as f:
+                        f.write(text.replace(new, old))
+            self.assertEqual("patched", gmc_patch.patch(d, quiet=True))
+            self.assertEqual("in place", gmc_patch.patch(d, quiet=True))
+            with open(os.path.join(d, "scripts", "bcp_server.gd"), encoding="utf-8") as f:
+                self.assertIn("_rx_partial = data.substr(cut + 1)", f.read())
+        self.assertEqual("missing", gmc_patch.patch(os.path.join(src, "nowhere")))
 
 
 if __name__ == "__main__":

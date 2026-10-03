@@ -52,6 +52,25 @@ class TestBridge(TronTestCase):
             self.tron.media.sound(0x001)                  # channel stop: stops the music
             self.assertEqual({"action": "stop", "key": key}, trig.call_args_list[-1].kwargs["settings"][key])
 
+    def test_sounds_go_to_the_gmc_client(self):
+        # MPF's bcp_trigger() skips clients without a registered handler, and GMC registers none for
+        # sounds_play: the bridge must address GMC (the "local_display" client) directly
+        bridge = self.tron.media
+        if not bridge.data:
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        client = mock.Mock()
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface, \
+                mock.patch.object(self.machine.bcp, "transport") as transport:
+            transport.get_named_client.return_value = client
+            bridge.sound(0x01b)
+            iface.bcp_trigger.assert_not_called()
+            kw = iface.bcp_trigger_client.call_args.kwargs
+            self.assertIs(client, kw["client"])
+            self.assertEqual("sounds_play", kw["name"])
+            transport.get_named_client.assert_called_with("local_display")
+        self.assertFalse(self.machine.bcp.transport.get_transports_for_handler("sounds_play"))   # why
+
     def test_score_display_args(self):
         bridge = self.tron.media
         if not bridge.data:

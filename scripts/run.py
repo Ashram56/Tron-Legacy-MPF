@@ -22,6 +22,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gmc_patch  # noqa: E402
 import toolchain as tc  # noqa: E402
 
 IS_WINDOWS = os.name == "nt"
@@ -160,6 +161,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     gargs = list(godot_args)
     if hw == "proc" and "--proc-dmd" not in gargs:
         gargs = (gargs + ["--proc-dmd"]) if "--" in gargs else (gargs + ["--", "--proc-dmd"])
+    gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
