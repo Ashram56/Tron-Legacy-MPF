@@ -11,6 +11,7 @@ Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it 
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
 """
 import argparse
+import errno
 import os
 import shutil
 import signal
@@ -27,24 +28,53 @@ IS_WINDOWS = os.name == "nt"
 
 def port_in_use(port):
     """True when something listens on port. Binds instead of connecting: GMC quits when its client hangs up."""
-    for host in ("", "127.0.0.1"):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    # Godot listens on "*", an IPv6 socket that also takes IPv4 on Linux but not always on Windows: probe both.
+    probes = [(socket.AF_INET, ""), (socket.AF_INET, "127.0.0.1")]
+    if socket.has_ipv6:
+        probes += [(socket.AF_INET6, "::"), (socket.AF_INET6, "::1")]
+    for family, host in probes:
+        try:
+            s = socket.socket(family, socket.SOCK_STREAM)
+        except OSError:         # no IPv6 stack
+            continue
+        with s:
             if IS_WINDOWS:      # without it a Windows bind can share a port that is taken
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             else:               # ignore TIME_WAIT leftovers of the last run; a listener still blocks the bind
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if family == socket.AF_INET6:
+                s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
             try:
                 s.bind((host, port))
-            except OSError:
+            except OSError as e:
+                if family == socket.AF_INET6 and e.errno in (errno.EADDRNOTAVAIL, errno.EAFNOSUPPORT):
+                    continue    # IPv6 present but no ::1 / disabled
                 return True
     return False
 
 
-def wait_for_port(port, procs, timeout):
-    """Wait until port is taken; fail early when one of procs exits."""
+def log_says(path, marker):
+    """True when the log file at path contains marker (GMC logs "GMC listening on port 5050")."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return marker in f.read()
+    except OSError:
+        return False
+
+
+def log_tail(path, lines=15):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return "".join(f.readlines()[-lines:])
+    except OSError:
+        return ""
+
+
+def wait_for_port(port, procs, timeout, log=None, marker=None):
+    """Wait until port is taken (or log shows marker); fail early when one of procs exits."""
     end = time.monotonic() + timeout
     while time.monotonic() < end:
-        if port_in_use(port):
+        if port_in_use(port) or (marker and log_says(log, marker)):
             return True
         for p in procs:
             if p.poll() is not None:
@@ -136,11 +166,16 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     try:
         godot = spawn(godot_command(gargs, virtual_display), log=godot_log, group=True)
         print("Godot started (log: {}), waiting for GMC on port {}".format(godot_log, tc.BCP_PORT), flush=True)
-        if not wait_for_port(tc.BCP_PORT, [godot], 120):
-            raise SystemExit("GMC did not open port {} (see {})".format(tc.BCP_PORT, godot_log))
+        if not wait_for_port(tc.BCP_PORT, [godot], 120, godot_log, "GMC listening on port"):
+            godot.log_file.flush()
+            raise SystemExit("GMC did not open port {}{}; last lines of {}:\n{}".format(
+                tc.BCP_PORT, " (Godot exited)" if godot.poll() is not None else "", godot_log,
+                log_tail(godot_log)))
+        print("GMC is listening", flush=True)
         print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui)), flush=True)
         mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui), log=mpf_log, cwd=tc.GAME, env=env)
         if monitor:
+            print("waiting for MPF's BCP server on port {} for MPF Monitor".format(tc.MONITOR_PORT), flush=True)
             if wait_for_port(tc.MONITOR_PORT, [mpf], 120):
                 mon = spawn(tc.mpf_command() + ["monitor"], cwd=tc.GAME, group=True,
                             log=os.path.join(logs, "monitor.log"))

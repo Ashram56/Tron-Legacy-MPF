@@ -176,6 +176,66 @@ try {
         Write-Note "Python: $python"
     }
 
+    # ---------------------------------------------------------------- PATH
+    # winget's per-user Python and an older install may leave python.exe off PATH: put Python and its
+    # Scripts folder first in the user PATH (ahead of the Microsoft Store "python" stub in WindowsApps)
+    Write-Step 'Python 3.11 on the user PATH'
+    $pyDir = if ($python -and (Test-Path $python)) { Split-Path -Parent $python } else { "$env:LOCALAPPDATA\Programs\Python\Python311" }
+    $want = @($pyDir, (Join-Path $pyDir 'Scripts'))
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if (-not $userPath) { $userPath = '' }
+    $parts = @($userPath -split ';' | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') })
+    $missing = @($want | Where-Object { $parts -notcontains $_.TrimEnd('\') })
+    if ($missing.Count -eq 0) {
+        Write-Note "in place: $($want -join ';')"
+    } else {
+        Write-Note "add to the user PATH: $($missing -join ';')"
+        if (-not $DryRun) {
+            [Environment]::SetEnvironmentVariable('Path', ((@($missing) + $parts) -join ';'), 'User')
+            $env:Path = ($missing -join ';') + ';' + $env:Path
+            Write-Note 'done (terminals opened from now on see it; close and reopen this one)'
+        }
+    }
+
+    # ---------------------------------------------------------------- long paths
+    # Windows limits paths to 260 characters unless LongPathsEnabled is set (machine-wide, needs administrator);
+    # pip, Godot's import cache and the asset submodule can go past it
+    Write-Step 'Windows long path support'
+    $fsKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
+    $longPaths = (Get-ItemProperty -Path $fsKey -Name LongPathsEnabled -ErrorAction SilentlyContinue).LongPathsEnabled
+    if ($longPaths -eq 1) {
+        Write-Note 'in place (LongPathsEnabled = 1)'
+    } else {
+        Confirm-Step 'Enable long paths? (machine setting: Windows asks for administrator rights)'
+        $setCmd = "Set-ItemProperty -Path '$fsKey' -Name LongPathsEnabled -Value 1 -Type DWord"
+        Write-Host "    $ $setCmd"
+        if (-not $DryRun) {
+            $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+                [Security.Principal.WindowsBuiltInRole]::Administrator)
+            try {
+                if ($admin) {
+                    Invoke-Expression $setCmd
+                } else {
+                    Start-Process -FilePath 'powershell' -Verb RunAs -Wait -WindowStyle Hidden `
+                        -ArgumentList @('-NoProfile', '-Command', $setCmd)
+                }
+            } catch {
+                Write-Note "could not change it ($($_.Exception.Message))"
+            }
+            $longPaths = (Get-ItemProperty -Path $fsKey -Name LongPathsEnabled -ErrorAction SilentlyContinue).LongPathsEnabled
+            if ($longPaths -eq 1) { Write-Note 'enabled' }
+            else { Write-Note 'warning: still off; run this script once from an administrator PowerShell, or keep the repository in a short folder such as C:\tron' }
+        }
+    }
+    $gitExe = Find-Git
+    if ($gitExe -and -not $DryRun) {
+        $gitLong = & $gitExe config --global --get core.longpaths 2>$null
+        if ($gitLong -ne 'true') { Invoke-Step $gitExe @('config', '--global', 'core.longpaths', 'true') }
+        else { Write-Note 'git core.longpaths: in place' }
+    } else {
+        Write-Note '$ git config --global core.longpaths true'
+    }
+
     # ---------------------------------------------------------------- P-ROC
     if ($Proc) {
         Write-Step 'Visual C++ 2015-2022 runtime (MPF''s pypinproc needs MSVCP140.dll)'

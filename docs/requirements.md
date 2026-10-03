@@ -55,6 +55,11 @@ The installers find or install 3.11 like this:
 | Fedora / RHEL 9 | `dnf install python3.11 python3.11-devel` |
 | Arch, Debian 13, anything else | a standalone CPython 3.11 build installed with [uv](https://docs.astral.sh/uv/). The uv binary comes from its PyPI wheel. The build goes to `~/.local/share/uv/python`: no compiler, no system changes, no pyenv. |
 
+On Windows the installer also puts Python 3.11 and its `Scripts` folder first in your user PATH (winget's
+per-user Python does not), turns on long path support (`LongPathsEnabled`, a machine setting: Windows asks
+for administrator rights once) and sets `git config --global core.longpaths true`. Open a new terminal
+afterwards so it sees the new PATH.
+
 On Linux, `--python-any` makes the installer accept any 3.10 to 3.14 already installed.
 
 ## Git and the asset submodule

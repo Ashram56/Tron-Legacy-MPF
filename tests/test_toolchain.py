@@ -159,6 +159,32 @@ class TestRun(unittest.TestCase):
             self.assertTrue(run.port_in_use(port))
         self.assertFalse(run.port_in_use(port))
 
+    @unittest.skipUnless(socket.has_ipv6, "no IPv6")
+    def test_port_in_use_ipv6_listener(self):
+        # Godot's TCPServer listens on "*": an IPv6 socket, which on Windows leaves the IPv4 port free
+        try:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            s.bind(("::1", 0))
+        except OSError:
+            self.skipTest("IPv6 loopback not available")
+        with s:
+            port = s.getsockname()[1]
+            s.listen()
+            self.assertTrue(run.port_in_use(port))
+
+    def test_wait_for_port_log_marker(self):
+        with tempfile.TemporaryDirectory() as d:
+            log = os.path.join(d, "godot.log")
+            with open(log, "w") as f:
+                f.write("INFO : GMCServer : GMC listening on port 5050\n")
+            with socket.socket() as s:      # a free port, so only the log can say ready
+                s.bind(("127.0.0.1", 0))
+                port = s.getsockname()[1]
+            self.assertTrue(run.wait_for_port(port, [], 1, log, "GMC listening on port"))
+            self.assertFalse(run.wait_for_port(port, [], 0.5, log, "not there"))
+            self.assertIn("GMC listening", run.log_tail(log))
+
     def test_mpf_args(self):
         self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual"))
         self.assertEqual(["game", ".", "-c", "config,hw_proc"], run.mpf_args("proc", text_ui=True))
