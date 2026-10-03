@@ -1,0 +1,22 @@
+# The real machine: MPF with hw_proc, Godot with --proc-dmd, the P-ROC's USB device passed through, and an
+# image with libpinproc + pypinproc (built with WITH_PROC=1). On the host, install the udev rule once so your
+# user may open the board: scripts/install/install_prereqs_linux.sh --proc --no-setup, or copy
+# scripts/install/99-pinproc.rules to /etc/udev/rules.d/. docker/tron.sh adds this file when TRON_HW=proc.
+#   TRON_HW=proc docker compose -f docker/docker-compose.yml -f docker/proc.yml up --build
+services:
+  setup:
+    build:
+      args:
+        WITH_PROC: "1"
+    environment:
+      TRON_HW: proc
+  godot:
+    environment:
+      TRON_HW: proc
+  mpf:
+    environment:
+      TRON_HW: proc
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    device_cgroup_rules:
+      - "c 189:* rmw"         # USB devices, also when the P-ROC is plugged in after the start

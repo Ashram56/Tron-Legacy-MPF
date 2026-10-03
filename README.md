@@ -10,8 +10,9 @@ built from the reverse-engineered rules, media and effects in
 |---|---|
 | `assets/` | Git submodule: [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption), the rules specs, MPF config and media read from the ROM. Never copy files out of it; reference them, so a sync never leaves stale copies. |
 | `game/` | The MPF machine folder and the Godot (GMC) project in one: `config/`, `modes/`, `slides/`, `project.godot`, `gmc.cfg`. Kept apart from `assets/` so Godot does not import the asset repo's 12,000 files. |
-| `scripts/` | Workspace setup (`setup.py`, `toolchain.py`), the launcher (`run.py`), the render check and the asset sync. |
-| `docs/` | `hardware.md`: the two hardware configs (virtual + MPF Monitor, and the real machine on a Multimorphic P-ROC). |
+| `scripts/` | Workspace setup (`setup.py`, `toolchain.py`, the prerequisite installers in `install/`), the launcher (`run.py`), the render check and the asset sync. |
+| `docs/` | `requirements.md`: what a computer needs, per OS. `hardware.md`: the two hardware configs (virtual + MPF Monitor, and the real machine on a Multimorphic P-ROC). |
+| `docker/` | The optional Docker setup for Linux hosts: one container per window (DMD, MPF, MPF Monitor). |
 
 ## What is in git, what is not
 
@@ -32,12 +33,27 @@ Godot 4.5.x you installed yourself. `python scripts/toolchain.py` prints what it
 
 ## Getting started
 
-You need Git and Python 3.10 to 3.14 (3.11 is what CI uses). Clone with the asset submodule:
+You need Git and Python 3.11 (3.10 to 3.14 also work; CI uses 3.11). [docs/requirements.md](docs/requirements.md)
+lists everything per OS: graphics, sound, disk, MPF Monitor's Qt libraries and the P-ROC drivers. Clone with
+the asset submodule:
 
 ```sh
 git clone --recurse-submodules https://github.com/Ashram56/tron-legacy-mpf.git
 cd tron-legacy-mpf
 ```
+
+The installers in `scripts/install/` then install whatever is missing (Python, Git, the Linux libraries) and
+run `setup.py`. Each one takes `--dry-run` to show its plan first:
+
+| OS | Installer |
+|---|---|
+| Windows 10/11 | `powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -Monitor` (winget, or the python.org/git-for-windows installers) |
+| macOS 12+ | `scripts/install/install_prereqs_macos.sh --monitor` (Homebrew, or the python.org installer) |
+| Linux | `scripts/install/install_prereqs_linux.sh --monitor` (apt, dnf or pacman; `--proc` also builds the P-ROC driver) |
+
+On Linux you can also run everything in Docker, with each window (DMD, MPF Monitor) on the monitor of your
+choice: [docker/README.md](docker/README.md). With Python and Git already in place, the per-OS commands below
+do the same as the installers.
 
 ### Windows
 
@@ -93,9 +109,11 @@ UI). Godot's log is `game/logs/godot.log`.
 and finds the venv itself.) By hand, the same thing is `godot --path game`, then in `game/`:
 `mpf game . -c config,hw_virtual` (or `config,hw_proc`). [docs/hardware.md](docs/hardware.md) has the details.
 
-**P-ROC:** MPF's wheel ships the pypinproc binary for Windows (`pinproc.cp3xx-win_amd64.pyd`) and macOS
-(`pinproc.so`), so on those `--hw proc` works once libusb/FTDI drivers are installed. On Linux, build and
-install libpinproc and pypinproc (github.com/preble) into `.venv` first; MPF has no Linux binary.
+**P-ROC:** MPF's wheel ships the pypinproc binary for Windows (`pinproc.cp3xx-win_amd64.pyd`), so there
+`--hw proc` works once FTDI's D2XX driver and the Visual C++ runtime are installed. On Linux and macOS (MPF's
+macOS binary is an old Intel-only build), `scripts/install/build_pinproc.sh` builds libpinproc and pypinproc
+into `.venv`; `install_prereqs_linux.sh --proc` / `install_prereqs_macos.sh --proc` run it for you
+([docs/requirements.md](docs/requirements.md#the-p-roc-optional---proc-the-real-machine)).
 
 ## Tests and checks
 

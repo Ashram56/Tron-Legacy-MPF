@@ -1,0 +1,17 @@
+# Hardware rendering: the host's GPU through /dev/dri (Intel, AMD, and NVIDIA with the open Nouveau driver;
+# the proprietary NVIDIA driver needs the NVIDIA Container Toolkit instead). docker/tron.sh adds this file when
+# /dev/dri exists and fills in the group ids that own it.
+#   docker compose -f docker/docker-compose.yml -f docker/gpu.yml up
+services:
+  godot:
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${TRON_VIDEO_GID:-44}"
+      - "${TRON_RENDER_GID:-105}"
+  monitor:
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${TRON_VIDEO_GID:-44}"
+      - "${TRON_RENDER_GID:-105}"

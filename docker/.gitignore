@@ -1,0 +1,2 @@
+# Your local settings for docker compose (DMD_SCREEN, MONITOR_DISPLAY, ...): see tron.env.example
+.env

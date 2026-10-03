@@ -39,6 +39,7 @@ class TestHost(unittest.TestCase):
 
 class TestVenv(unittest.TestCase):
 
+    @mock.patch.dict(os.environ, {"TRON_VENV": ""})
     def test_layout(self):
         venv = os.path.join(ROOT, ".venv")
         self.assertEqual(os.path.join(venv, "Scripts", "python.exe"), tc.venv_python("windows"))
@@ -46,6 +47,13 @@ class TestVenv(unittest.TestCase):
         for os_name in ("macos", "linux"):
             self.assertEqual(os.path.join(venv, "bin", "python"), tc.venv_python(os_name))
             self.assertEqual(os.path.join(venv, "bin", "mpf"), tc.venv_exe("mpf", os_name))
+
+    def test_env_override(self):
+        """The Docker image's venv lives outside the bind-mounted repository."""
+        with mock.patch.dict(os.environ, {"TRON_VENV": "/opt/venv"}):
+            self.assertEqual("/opt/venv", tc.venv_dir())
+            self.assertEqual(os.path.join("/opt/venv", "bin", "python"), tc.venv_python("linux"))
+            self.assertEqual(os.path.join("/tmp", ".venv"), tc.venv_dir("/tmp"))
 
 
 class TestGodot(unittest.TestCase):

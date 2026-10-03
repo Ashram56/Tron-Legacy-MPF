@@ -1,0 +1,102 @@
+# Tron Legacy MPF in containers, for Linux hosts: docker/README.md.
+#
+#   docker/tron.sh up                      # the usual way: sets your user id, the display, GPU and sound
+#   docker compose -f docker/docker-compose.yml up        # the same by hand (see the README for the variables)
+#   docker/tron.sh run --rm render-check   # headless: Godot + MPF under Xvfb, DMD capture in captures/
+#   docker/tron.sh run --rm test           # headless: the unit tests
+#
+# Services: setup (one-shot: generated config/media, GMC, Godot import), godot (GMC: the DMD window and the
+# BCP server on 5050), mpf (the game; it connects to GMC), monitor (MPF Monitor's windows; it connects to
+# MPF on 5051). mpf and monitor share godot's network namespace, so BCP runs over localhost exactly as on a
+# desktop. Every window opens on the host's X server (X11, or XWayland under Wayland) through /tmp/.X11-unix.
+#
+# Optional files on top of this one (docker/tron.sh adds them when they apply):
+#   gpu.yml    /dev/dri for hardware OpenGL/Vulkan (without it Mesa renders in software, fine for a DMD)
+#   audio.yml  the host's PulseAudio / PipeWire socket (without it Godot plays no sound)
+#   proc.yml   the real machine: TRON_HW=proc, USB passthrough for the P-ROC, image built WITH_PROC=1
+name: tron-legacy-mpf
+
+x-tron: &tron
+  image: tron-legacy-mpf:latest
+  pull_policy: never
+  user: "${TRON_UID:-1000}:${TRON_GID:-1000}"
+  init: true
+  volumes:
+    - ..:/workspace
+    - tron-home:/home/tron
+    - /tmp/.X11-unix:/tmp/.X11-unix
+  environment: &tron-env
+    TRON_HW: ${TRON_HW:-virtual}
+    DISPLAY: ${DISPLAY:-:0}
+
+services:
+  setup:
+    <<: *tron
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        WITH_PROC: ${TRON_WITH_PROC:-0}
+    command: ["setup"]
+    environment:
+      <<: *tron-env
+      TRON_FORCE_SETUP: ${TRON_FORCE_SETUP:-0}
+
+  godot:
+    <<: *tron
+    command: ["godot"]
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    environment:
+      <<: *tron-env
+      DMD_DISPLAY: ${DMD_DISPLAY:-}            # another X display/screen for the DMD, e.g. :0.1
+      DMD_SCREEN: ${DMD_SCREEN:-}              # monitor number (0, 1, 2...) for the DMD window
+      DMD_POSITION: ${DMD_POSITION:-}          # or an absolute position on the desktop, e.g. 1920,0
+      DMD_RESOLUTION: ${DMD_RESOLUTION:-}      # window size, e.g. 1024x256 (the default) or 1920x480
+      DMD_FULLSCREEN: ${DMD_FULLSCREEN:-0}     # 1: fill that monitor
+      GODOT_RENDERING_DRIVER: ${GODOT_RENDERING_DRIVER:-opengl3}   # or vulkan (with gpu.yml)
+      GODOT_ARGS: ${GODOT_ARGS:-}              # anything else for Godot's command line
+
+  mpf:
+    <<: *tron
+    command: ["mpf"]
+    network_mode: "service:godot"
+    depends_on:
+      - godot
+    tty: true
+    stdin_open: true
+    environment:
+      <<: *tron-env
+      MPF_TEXT_UI: ${MPF_TEXT_UI:-0}           # 1: MPF's text UI (docker attach tron-legacy-mpf-mpf-1)
+
+  monitor:
+    <<: *tron
+    command: ["monitor"]
+    network_mode: "service:godot"
+    depends_on:
+      - mpf
+    environment:
+      <<: *tron-env
+      MONITOR_DISPLAY: ${MONITOR_DISPLAY:-}    # another X display/screen for MPF Monitor, e.g. :0.2
+
+  # ---- headless profile: no screen needed (CI, a server, a quick check)
+  render-check:
+    <<: *tron
+    profiles: ["headless"]
+    command: ["render-check", "${RENDER_SECONDS:-15}"]
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+  test:
+    <<: *tron
+    profiles: ["headless"]
+    command: ["test"]
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+volumes:
+  tron-home: {}

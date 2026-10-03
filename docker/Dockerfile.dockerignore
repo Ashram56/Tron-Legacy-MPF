@@ -1,0 +1,6 @@
+# The image needs only these files; the repository itself is bind-mounted at run time.
+*
+!scripts/toolchain.py
+!scripts/setup.py
+!scripts/install/build_pinproc.sh
+!docker/entrypoint.py

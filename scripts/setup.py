@@ -77,6 +77,12 @@ class Setup:
         else:
             self.say("   in place")
         self.run([mpf, "--version"])
+        if self.args.monitor:
+            self.say("== MPF Monitor's window layouts ({} files missing from its PyPI release)".format(
+                len(tc.MPF_MONITOR_UI_FILES)))
+            self.say("   url:  " + tc.MPF_MONITOR_UI_URL)
+            if not self.dry:
+                install_monitor_ui(py)
 
     def has_module(self, py, name):
         return subprocess.run([py, "-c", "import " + name], capture_output=True).returncode == 0
@@ -163,6 +169,27 @@ def download(url):
         if r.returncode:
             raise OSError("curl could not download {} (exit code {})".format(url, r.returncode))
         return r.stdout
+
+
+def install_monitor_ui(py):
+    """Put mpf-monitor's core/ui/*.ui files into the environment of py when they are missing; returns how many."""
+    out = subprocess.run([py, "-c", "import mpfmonitor, os; print(os.path.dirname(mpfmonitor.__file__))"],
+                         capture_output=True, text=True, check=True)
+    ui_dir = os.path.join(out.stdout.strip(), "core", "ui")
+    os.makedirs(ui_dir, exist_ok=True)
+    added = 0
+    for name in tc.MPF_MONITOR_UI_FILES:
+        dst = os.path.join(ui_dir, name)
+        if os.path.exists(dst):
+            continue
+        data = download(tc.MPF_MONITOR_UI_URL + name)
+        if b"<ui" not in data[:200]:
+            raise SystemExit("{} is not a Qt Designer file".format(tc.MPF_MONITOR_UI_URL + name))
+        with open(dst, "wb") as f:
+            f.write(data)
+        added += 1
+    print("   {} added, {} in place ({})".format(added, len(tc.MPF_MONITOR_UI_FILES) - added, ui_dir), flush=True)
+    return added
 
 
 def extract_folder(data, prefix, dest):

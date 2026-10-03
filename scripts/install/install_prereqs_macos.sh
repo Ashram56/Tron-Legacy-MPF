@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# Installs what this workspace needs on macOS (12 or newer, Intel or Apple silicon) and is missing, then runs
+# scripts/setup.py. Safe to re-run.
+#
+#   scripts/install/install_prereqs_macos.sh                 # Python 3.11 + Git, then setup.py
+#   scripts/install/install_prereqs_macos.sh --monitor       # ... plus MPF Monitor
+#   scripts/install/install_prereqs_macos.sh --proc          # ... plus libpinproc/pypinproc (needs Homebrew)
+#   scripts/install/install_prereqs_macos.sh --dry-run       # print the plan, change nothing
+#   scripts/install/install_prereqs_macos.sh -- --skip-media # arguments after -- go to setup.py
+#
+# Options: --yes (no questions), --no-setup (prerequisites only), --python-org (use the python.org installer
+# even when Homebrew is there). With Homebrew: `brew install python@3.11 git`. Without it: the python.org
+# 3.11 installer (universal2 .pkg, needs an admin password) and Git from the Xcode Command Line Tools.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HERE="$ROOT/scripts/install"
+# The last Python 3.11 release with a macOS installer (later 3.11 releases are source-only security fixes)
+PYORG_VERSION="3.11.9"
+PYORG_PKG="python-${PYORG_VERSION}-macos11.pkg"
+PYORG_URL="https://www.python.org/ftp/python/${PYORG_VERSION}/${PYORG_PKG}"
+PYORG_PY="/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"
+
+DRY=0 YES=0 MONITOR=0 PROC=0 SETUP=1 PYORG=0
+SETUP_ARGS=()
+
+usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY=1 ;;
+        -y|--yes) YES=1 ;;
+        --monitor) MONITOR=1 ;;
+        --proc) PROC=1 ;;
+        --no-setup) SETUP=0 ;;
+        --python-org) PYORG=1 ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; SETUP_ARGS=("$@"); break ;;
+        *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+say() { printf '\n==> %s\n' "$*"; }
+note() { printf '    %s\n' "$*"; }
+die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
+run() {
+    printf '    $ %s\n' "$*"
+    if [ "$DRY" = 0 ]; then "$@"; fi
+}
+have_tool() { command -v "$1" >/dev/null 2>&1; }
+confirm() {
+    if [ "$DRY" = 0 ] && [ "$YES" = 0 ] && [ -t 0 ]; then
+        local answer
+        read -r -p "    $1 [Y/n] " answer
+        case "$answer" in [nN]*) die "cancelled" ;; esac
+    fi
+}
+
+if [ "$(uname -s)" != Darwin ]; then
+    [ "$DRY" = 1 ] || die "this script is for macOS (Linux: install_prereqs_linux.sh)"
+    note "not macOS: showing the plan only"
+fi
+
+MACOS="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+say "Tron Legacy MPF prerequisites on macOS $MACOS ($(uname -m))$([ "$DRY" = 1 ] && echo ', dry run')"
+case "$MACOS" in
+    10.*|11.*) note "warning: macOS 12 or newer is needed (Godot 4.5, current Python and Qt builds)" ;;
+esac
+
+BREW=""
+for b in brew /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if have_tool "$b"; then BREW="$(command -v "$b")"; break; fi
+done
+if [ -n "$BREW" ] && [ "$PYORG" = 0 ]; then note "Homebrew: $BREW"; else note "Homebrew: not used"; fi
+
+python_ok() { "$1" -c "import sys, venv, ensurepip; sys.exit(0 if sys.version_info[:2] == (3, 11) else 1)" >/dev/null 2>&1; }
+
+find_python() {
+    local c
+    for c in python3.11 /opt/homebrew/bin/python3.11 /usr/local/bin/python3.11 "$PYORG_PY"; do
+        if have_tool "$c" && python_ok "$(command -v "$c")"; then command -v "$c"; return 0; fi
+    done
+    return 1
+}
+
+brew_install() {    # brew_install FORMULA...: the ones that are not installed
+    local missing=() f
+    for f in "$@"; do
+        "$BREW" list --formula "$f" >/dev/null 2>&1 || missing+=("$f")
+    done
+    if [ ${#missing[@]} = 0 ]; then note "in place: $*"; return 0; fi
+    confirm "brew install ${missing[*]}?"
+    run "$BREW" install "${missing[@]}"
+}
+
+# ------------------------------------------------------------------ Git
+
+say "Git"
+if have_tool git && git --version >/dev/null 2>&1; then
+    note "in place: $(git --version)"
+elif [ -n "$BREW" ]; then
+    brew_install git
+else
+    # /usr/bin/git is a stub until the Command Line Tools are installed; this opens Apple's installer
+    run xcode-select --install || true
+    die "finish the Command Line Tools install that macOS just opened, then run this script again"
+fi
+
+# ------------------------------------------------------------------ Python 3.11
+
+say "Python 3.11"
+PY=""
+if PY="$(find_python)"; then
+    note "in place: $PY"
+elif [ -n "$BREW" ] && [ "$PYORG" = 0 ]; then
+    brew_install python@3.11
+    PY="$("$BREW" --prefix python@3.11 2>/dev/null || echo /opt/homebrew/opt/python@3.11)/bin/python3.11"
+else
+    note "python.org installer $PYORG_VERSION (universal2): $PYORG_URL"
+    confirm "Download and install it (asks for an admin password)?"
+    TMP="$(mktemp -d)"
+    run curl -fSL -o "$TMP/$PYORG_PKG" "$PYORG_URL"
+    run sudo installer -pkg "$TMP/$PYORG_PKG" -target /
+    # python.org builds bring no CA certificates of their own; this installs certifi's
+    run "/Applications/Python 3.11/Install Certificates.command"
+    rm -rf "$TMP"
+    PY="$PYORG_PY"
+fi
+if [ "$DRY" = 0 ]; then
+    python_ok "$PY" || die "no usable Python 3.11 at $PY (see the messages above)"
+fi
+note "Python: $PY"
+
+# ------------------------------------------------------------------ P-ROC build tools
+
+if [ "$PROC" = 1 ]; then
+    say "P-ROC build tools (Homebrew)"
+    [ -n "$BREW" ] || die "--proc needs Homebrew (https://brew.sh) for cmake, libusb, libusb-compat and libftdi"
+    brew_install cmake pkg-config libusb libusb-compat libftdi
+fi
+
+# ------------------------------------------------------------------ workspace
+
+if [ "$SETUP" = 1 ]; then
+    say "Workspace (scripts/setup.py)"
+    ARGS=()
+    [ "$MONITOR" = 1 ] && ARGS+=(--monitor)
+    [ "$DRY" = 1 ] && ARGS+=(--dry-run)
+    ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
+    if [ "$DRY" = 1 ] && ! have_tool "$PY"; then
+        note "\$ $PY $ROOT/scripts/setup.py ${ARGS[*]-}"
+    else
+        run "$PY" "$ROOT/scripts/setup.py" ${ARGS[@]+"${ARGS[@]}"}
+    fi
+fi
+
+if [ "$PROC" = 1 ]; then
+    say "P-ROC: libpinproc + pypinproc"
+    BUILD=("$HERE/build_pinproc.sh" --python "$ROOT/.venv/bin/python" --prefix "$("$BREW" --prefix 2>/dev/null || echo /usr/local)")
+    [ "$DRY" = 1 ] && BUILD+=(--dry-run)
+    if [ "$DRY" = 1 ]; then printf '    $ %s\n' "${BUILD[*]}"; else "${BUILD[@]}"; fi
+    note "If macOS claims the P-ROC as /dev/tty.usbserial*, install FTDI's D2xxHelper and reboot (docs/requirements.md)."
+fi
+
+say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
+if [ "$SETUP" = 1 ]; then
+    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
+    note "Run the tests:   .venv/bin/python -m pytest -q tests"
+fi

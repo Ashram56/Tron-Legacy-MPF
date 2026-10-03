@@ -1,0 +1,9 @@
+# Sound: the host's PulseAudio socket (PipeWire's pipewire-pulse provides the same one). The container runs as
+# your user id, which is what the sound server checks. docker/tron.sh adds this file when the socket exists.
+#   TRON_PULSE_SOCKET=$XDG_RUNTIME_DIR/pulse/native docker compose -f docker/docker-compose.yml -f docker/audio.yml up
+services:
+  godot:
+    volumes:
+      - ${TRON_PULSE_SOCKET:?set TRON_PULSE_SOCKET to the PulseAudio socket, usually $XDG_RUNTIME_DIR/pulse/native}:/run/tron/pulse.sock
+    environment:
+      PULSE_SERVER: unix:/run/tron/pulse.sock

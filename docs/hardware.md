@@ -66,8 +66,9 @@ not.
 You need libpinproc and pypinproc (github.com/preble) built for the machine's PC, and P-ROC firmware 2.14 or
 newer (MPF warns about older versions). MPF 0.80.1's wheel carries pypinproc builds for Windows
 (`mpf/platforms/pinproc/windows/pinproc.cp3xx-win_amd64.pyd`, Python 3.8-3.14) and macOS
-(`mpf/platforms/pinproc/osx/pinproc.so`); on Linux there is none, so build libpinproc and pypinproc and install
-pypinproc into `.venv` (`.venv/bin/pip install .` in its checkout). This workspace does not build them.
+(`mpf/platforms/pinproc/osx/pinproc.so`, an old Intel-only build); on Linux there is none.
+`scripts/install/build_pinproc.sh` builds libpinproc and pypinproc and installs pypinproc into `.venv`
+(`install_prereqs_linux.sh --proc` also installs the build packages and the udev rule; docs/requirements.md).
 The P-ROC's FTDI USB driver must be installed on every OS.
 
 ```sh

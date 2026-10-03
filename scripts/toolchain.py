@@ -10,7 +10,8 @@ Godot or the venv's Python takes the path from here, so Windows, macOS and Linux
                              Linux    Godot_v<ver>-stable_linux.x86_64     (linux.arm64 on ARM)
     game/addons/mpf-gmc/   the GMC add-on (Godot media controller)
 
-The environment variable GODOT overrides the Godot executable (a Godot you installed yourself).
+The environment variable GODOT overrides the Godot executable (a Godot you installed yourself), TRON_VENV the
+venv (the Docker image keeps its venv in /opt/venv, outside the bind-mounted repository: docker/README.md).
 """
 import os
 import platform
@@ -30,6 +31,11 @@ MPF_MONITOR_VERSION = "1.0.0"
 REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "pytest",
                 'ruamel.yaml.clib==0.2.14; python_version < "3.13"']
 MONITOR_REQUIREMENTS = ["mpf-monitor==" + MPF_MONITOR_VERSION]
+# mpf-monitor 1.0.0 on PyPI (wheel and sdist) lacks its Qt Designer files, so `mpf monitor` stops with
+# "searchable_tree.ui: No such file". setup.py puts them in from the release's git tag.
+MPF_MONITOR_UI_FILES = ("events_table.ui", "inspector.ui", "searchable_table.ui", "searchable_tree.ui")
+MPF_MONITOR_UI_URL = ("https://raw.githubusercontent.com/missionpinball/mpf-monitor/v{}/mpfmonitor/core/ui/"
+                      .format(MPF_MONITOR_VERSION))
 
 BCP_PORT = 5050             # GMC (Godot) is the BCP server, MPF connects to it
 MONITOR_PORT = 5051         # MPF's own BCP server, MPF Monitor connects to it
@@ -65,6 +71,9 @@ def host_arch(machine=None):
 # ---------------------------------------------------------------------- Python venv
 
 def venv_dir(root=ROOT):
+    """root/.venv, or $TRON_VENV for this workspace when it is set."""
+    if os.environ.get("TRON_VENV") and root == ROOT:
+        return os.environ["TRON_VENV"]
     return os.path.join(root, ".venv")
 
 
