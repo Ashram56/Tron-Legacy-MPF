@@ -109,12 +109,15 @@ UI). Godot's log is `game/logs/godot.log`.
 `[keyboard]`); in MPF Monitor, click a switch instead (`s_coin`, `s_start_button` and the other cabinet
 switches are in the row of spots below the playfield).
 
+Keys work by label or by position on a US keyboard, so on AZERTY the unshifted number row works (`(` is coin,
+`&` is START) and `!` is the right flipper; the arrow keys are the flippers on any layout.
+
 | Key | Switch |
 |---|---|
 | `5` | coin (`s_coin`, right slot: 3 coins = 1 credit at factory pricing) |
 | `1` | START (`s_start_button`) |
 | `Space` | plunge: the ball leaves the shooter lane (`s_shooter_lane` opens) |
-| `Z` / `/` | left / right flipper |
+| `Z` / `/` (or `←` / `→`) | left / right flipper |
 | `T` | tilt (plumb bob) |
 | `D` | coin door open / closed |
 | `7` `8` `9` `0` | service buttons BACK, MINUS, PLUS, SELECT (service menu: FREE PLAY is adjustment 34 in STANDARD ADJUSTMENTS) |

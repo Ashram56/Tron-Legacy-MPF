@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Fix GMC 1.0.0's BCP reader in game/addons/mpf-gmc (downloaded, not in git), idempotently.
+"""Two fixes to GMC 1.0.0 in game/addons/mpf-gmc (downloaded, not in git), applied idempotently.
 
-GMC's poll thread parses whatever bytes the socket holds as whole lines. MPF's "settings" message at connect
+1. GMC's poll thread parses whatever bytes the socket holds as whole lines. MPF's "settings" message at connect
 is large (every adjustment with its value labels), so a read can end inside it: GMC then parses half a
 message, `JSON.parse_string` returns null, `json.error` raises a script error and the BCP thread stops.
 Nothing MPF sends after that is handled: no sounds, no music, no callouts (slides queued before may show).
-The patch keeps the unfinished end of a read and prepends it to the next one. Upstream (mpf-gmc main, 2026-10)
-has the same code. setup.py, run.py and the Docker entrypoint call patch(); it does nothing once applied.
+The patch keeps the unfinished end of a read and prepends it to the next one.
+2. GMC looks keys up in gmc.cfg [keyboard] by their layout label only, so on AZERTY the number row (which
+needs Shift for digits) and "/" never match. A key not found by label is now also looked up by its physical
+position on a US keyboard.
+Upstream (mpf-gmc main, 2026-10) has the same code. setup.py, run.py and the Docker entrypoint call patch(); it does nothing once applied.
 
     python scripts/gmc_patch.py        # patch now; prints what it did
 """
@@ -17,6 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import toolchain as tc  # noqa: E402
 
 MARK = "# tron patch: partial BCP lines"
+# every edit carries "# tron patch" (MARK's start), so a file holds the patch when TAG is in it
+TAG = "# tron patch"
 
 EDITS = [
     ("scripts/bcp_server.gd",
@@ -35,6 +40,15 @@ EDITS = [
      "\t\tvar messages := PackedStringArray()\n"
      "\t\tif cut >= 0:\n"
      "\t\t\tmessages = data.substr(0, cut).split(\"\\n\")\n"),
+    ("mpf_gmc.gd",                         # keys by position too, so the [keyboard] map works on AZERTY & co
+     "\tif keycode in keyboard:\n",
+     "\t" + MARK.replace("partial BCP lines", "keyboard layouts") + ": a key that is not in [keyboard] by its\n"
+     "\t# label is looked up by its position on a US QWERTY keyboard (on AZERTY the '(' key is the 5 key)\n"
+     "\tif not keycode in keyboard:\n"
+     "\t\tvar physical = OS.get_keycode_string(event.get_physical_keycode_with_modifiers()).to_upper()\n"
+     "\t\tif physical in keyboard:\n"
+     "\t\t\tkeycode = physical\n"
+     "\tif keycode in keyboard:\n"),
     ("scripts/bcp_parse.gd",               # a bad message is logged instead of stopping the BCP thread
      "\t\t\tresult.error = \"Error %s parsing trigger: %s\" % [json.error, message]\n",
      "\t\t\tresult.error = \"Error parsing trigger: %s\" % message   " + MARK + "\n"),
@@ -51,11 +65,11 @@ def patch(gmc_dir=None, quiet=False):
         if rel not in texts:
             with open(os.path.join(gmc_dir, *rel.split("/")), encoding="utf-8", newline="") as f:
                 texts[rel] = f.read()
-    if all(MARK in t for t in texts.values()):
+    if all(TAG in t for t in texts.values()):
         return "in place"
     for rel, old, new in EDITS:
         text = texts[rel]
-        if MARK in text and new in text:
+        if new in text:
             continue
         crlf = "\r\n" in text
         o, n = (old.replace("\n", "\r\n"), new.replace("\n", "\r\n")) if crlf else (old, new)
