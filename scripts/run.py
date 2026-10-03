@@ -152,6 +152,14 @@ def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
     return args
 
 
+def monitor_settings():
+    """MPF Monitor keeps its window layout in game/monitor/settings.ini and rewrites it on every run, so git
+    tracks settings.ini.default and the first run copies it into place (later runs keep yours)."""
+    dst = os.path.join(tc.GAME, "monitor", "settings.ini")
+    if not os.path.exists(dst):
+        shutil.copyfile(dst + ".default", dst)
+
+
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
@@ -182,6 +190,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
         mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
         if monitor:
+            monitor_settings()
             print("waiting for MPF's BCP server on port {} for MPF Monitor".format(tc.MONITOR_PORT), flush=True)
             if wait_for_port(tc.MONITOR_PORT, [mpf], 120):
                 mon = spawn(tc.mpf_command() + ["monitor"], cwd=tc.GAME, group=True,

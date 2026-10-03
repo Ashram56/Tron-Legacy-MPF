@@ -186,6 +186,20 @@ class TestRun(unittest.TestCase):
             self.assertFalse(run.wait_for_port(port, [], 0.5, log, "not there"))
             self.assertIn("GMC listening", run.log_tail(log))
 
+    def test_monitor_settings_copied_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "monitor"))
+            with open(os.path.join(d, "monitor", "settings.ini.default"), "w") as f:
+                f.write("[settings]\n")
+            with mock.patch.object(run.tc, "GAME", d):
+                run.monitor_settings()
+                with open(os.path.join(d, "monitor", "settings.ini"), "w") as f:
+                    f.write("mine")
+                run.monitor_settings()
+            with open(os.path.join(d, "monitor", "settings.ini")) as f:
+                self.assertEqual("mine", f.read())
+        self.assertTrue(os.path.exists(os.path.join(run.tc.GAME, "monitor", "settings.ini.default")))
+
     def test_mpf_args(self):
         self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], run.mpf_args("virtual"))
         self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual", free_play=False))

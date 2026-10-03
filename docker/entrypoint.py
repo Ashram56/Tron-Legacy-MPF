@@ -146,6 +146,8 @@ def main(argv=None, env=None):
         wait_for_port(tc.BCP_PORT, timeout, "GMC (godot service)")
         exec_(mpf_command(env) + rest, env, tc.GAME)
     if role == "monitor":
+        import run
+        run.monitor_settings()
         menv = display_env(env, "MONITOR_DISPLAY")
         check_display(menv)
         wait_for_port(tc.MONITOR_PORT, timeout, "MPF (mpf service)")
