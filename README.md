@@ -4,6 +4,9 @@ A Mission Pinball Framework (MPF) recreation of **Stern Tron Legacy Limited Edit
 built from the reverse-engineered rules, media and effects in
 [Ashram56/Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption).
 
+**This fork adds the Tron Legacy "End of Line" PuP Pack** (backglass, large LCD DMD, optional topper, OST
+music): see [docs/pup.md](docs/pup.md). Upstream changes merge in with `python scripts/sync_upstream.py`.
+
 ## Layout
 
 | Path | What it is |

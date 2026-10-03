@@ -13,6 +13,7 @@ config/features=PackedStringArray("4.5", "Mobile")
 MPF="*res://addons/mpf-gmc/mpf_gmc.gd"
 DmdCapture="*res://tools/dmd_capture.gd"
 ProcDmd="*res://tools/proc_dmd.gd"
+Pup="*res://pup/pup_player.gd"
 
 [display]
 
