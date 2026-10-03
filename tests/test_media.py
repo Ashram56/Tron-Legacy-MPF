@@ -102,3 +102,74 @@ class TestBridge(TronTestCase):
             self.skipTest("media data not generated (scripts/gen_media.py)")
         lines = {k: v for k, v in bridge.deff_lines(133, {}).items() if k.startswith("line")}
         self.assertEqual({"line0": "EXTRA", "line1": "BALL", "line2": ""}, lines)
+
+
+class TestLiveDeffs(TronTestCase):
+
+    def _bridge(self):
+        bridge = self.tron.media
+        if not bridge.data:
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        self.fill_trough()
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        return bridge
+
+    @staticmethod
+    def _lines(args):
+        return {k: v for k, v in args.items() if k.startswith("line")}
+
+    def test_panel_refresh_keeps_each_effects_lines(self):
+        """Light Cycle total over the score display: the 0.25 s panel refresh sent deff 19's BALL n /
+        score lines to deff 90 too (its slide showed BALL 1 over LIGHT CYCLE)."""
+        bridge = self._bridge()
+        self.assertEqual(19, self.tron.display.bg)
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface:
+            bridge.deff_start(90, 207, total=5650000)
+            iface.bcp_trigger.reset_mock()
+            bridge.score_changed()
+            sent = {list(c.kwargs["settings"])[0]: c.kwargs for c in iface.bcp_trigger.call_args_list
+                    if c.kwargs["name"] == "slides_play"}
+        self.assertEqual("BALL 1", sent["deff_019"]["line0"])
+        self.assertNotIn("line0", sent["deff_090"])
+        self.assertEqual("00", sent["deff_090"]["p1"])
+
+    def test_zuse_values(self):
+        """deffs 95 / 96 print zfs_timer and zfs_value from RAM (they were blank)."""
+        bridge = self._bridge()
+        zuse = self.tron.features_by_name["zuse"]
+        zuse.clock.seconds, zuse.value = 23, 15000
+        self.assertEqual({"line0": "23", "line1": "ALL TARGETS=15,000"}, self._lines(bridge.deff_lines(95, {})))
+        self.assertEqual({"line0": "15K", "line1": "23", "line2": "ALL TARGETS=15,000"},
+                         self._lines(bridge.deff_lines(96, {"k": 15})))
+        zuse.clock.seconds = 22                         # a refresh sends the new value
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface:
+            bridge.deff_start(95, 1)
+            zuse.clock.seconds = 21
+            bridge.score_changed()
+            last = [c.kwargs for c in iface.bcp_trigger.call_args_list
+                    if c.kwargs["name"] == "slides_play" and "deff_095" in c.kwargs["settings"]][-1]
+        self.assertEqual("21", last["line0"])
+
+    def test_sos_stage_text(self):
+        """deff 114 shows SHOOT / the current stage's item (the capture's FLYNNS ARCADE on every stage)."""
+        bridge = self._bridge()
+        sos = self.tron.features_by_name["sea_of_simulation"]
+        for stage, item in ((0, "FLYNNS ARCADE"), (2, "CLU HELMETS"), (8, "TRON TARGETS")):
+            sos.stage = stage
+            self.assertEqual({"line0": "SEA OF", "line1": "SIMULATION", "line2": "SHOOT", "line3": item},
+                             self._lines(bridge.deff_lines(114, {})))
+        self.assertEqual("200,000", bridge.deff_lines(117, {"value": 200000, "done": 0})["line0"])
+        sos.skip_shown = (2, 3000000)                   # skipped CLU stage (it printed the stage number "02")
+        self.assertEqual({"line0": "CLU", "line1": "BONUS", "line2": "3,000,000"},
+                         self._lines(bridge.deff_lines(115, {})))
+
+    def test_letter_args(self):
+        """deffs 91 / 107 get the collected and new letters for tron/letter_panel.gd."""
+        bridge = self._bridge()
+        args = bridge.deff_lines(91, {"lit": 9, "new": 2})
+        self.assertEqual((9, 2, "COLLECT"), (args["lit"], args["new"], args["line0"]))
+        args = bridge.deff_lines(107, {"old": 1, "new": 4})
+        self.assertEqual((1, 4), (args["old"], args["new"]))

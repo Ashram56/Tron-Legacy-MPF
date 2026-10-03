@@ -40,6 +40,10 @@ STAGES = (
     (13,),
     (2, 3, 4, 5),
 )
+# The stage's messages (stage table + 0x18 and + 0x19), drawn by deff 114 under SEA OF SIMULATION
+STAGE_TEXT = ("FLYNNS ARCADE", "GEM", "CLU HELMETS", "ZUSE TARGETS", "QUORRA", "DISCS", "LIGHT CYCLES",
+              "RECOGNIZER", "TRON TARGETS")
+SKIP_ITEMS = ("FLYNN", "GEM", "CLU", "ZUSE", "QUORRA", "DISC", "LIGHT CYCLE", "RECOGNIZER", "TRON")
 RECOGNIZER_HITS = 6
 # simulation shot id -> the inserts the stage lamps draw for it. The stage lamp functions (stage table
 # +0x10, spawned by leff_136 [0x01026f74]) use lamp groups 0x4c-0x50 that are not readable here; these
@@ -76,6 +80,9 @@ class SeaOfSimulation(Feature):
         self.lc_made = 0            # 0x3b67c: Light Cycle shots made in stage 6
         self.rec_hits = 0           # 0x3b680: recognizer hits in stage 7
         self.end_wait = 0
+        os_.deff_live((114,), self.stage_text)
+        os_.deff_live((115,), self.skip_text)
+        self.skip_shown = (0, 0)    # deff 115: the skipped stage shown and the points it paid
         os_.lamp_rule(self.lit_rule, leff=134, tube=64, order=0x010267fc)
         os_.lamp_rule(self.running_rule, leff=136, tube=66, order=0x01026dbc)
         os_.lamps.leff_code(136, self._leff_stage)
@@ -124,6 +131,18 @@ class SeaOfSimulation(Feature):
     def lit_rule(self):
         """FUN_010267fc: leff 134 / tube show 64 while SOS can be started."""
         return self.can_start(self.os.hook("items_all_lit"))
+
+    def stage_text(self):
+        """deff 114's stage lines: FUN_0102635c(sos_stage) -> "SHOOT" / the stage's item (none past stage 8)."""
+        if 0 <= self.stage < len(STAGE_TEXT):
+            return {"shoot": "SHOOT", "item": STAGE_TEXT[self.stage]}
+        return {"shoot": "", "item": ""}
+
+    def skip_text(self):
+        """deff 115: messages 0x65d + 2k / 0x65e + 2k (item / BONUS; FLYNN and GEM read off the capture,
+        the other items named as in the stage table) and the points paid."""
+        k, points = self.skip_shown
+        return {"item": SKIP_ITEMS[k] if 0 <= k < len(SKIP_ITEMS) else "", "bonus": "BONUS", "value": points}
 
     def running_rule(self):
         """FUN_01026dbc: running, and the intro (task 0xa0) is not still waiting for the display."""
@@ -201,15 +220,19 @@ class SeaOfSimulation(Feature):
         k = self.skip_queue.pop(0)
         self.skip_showing = True
 
+        self.skip_shown = (k, self.skip_value[k])
+
         def pay():
             if not self.skip_paid[k]:
                 self.skip_paid[k] = 1
-                self.total += self.os.score_add(self.skip_value[k])
+                points = self.os.score_add(self.skip_value[k])
+                self.total += points
+                self.skip_shown = (k, points)          # deff 115 prints score_add's result (local_34)
 
         def ended():
             self.skip_showing = False
             self._next_skip_show()
-        self.os.show(0xa2, 115, on_start=pay, on_end=ended, stage=k)
+        self.os.show(0xa2, 115, on_start=pay, on_end=ended)
 
     # ------------------------------------------------------------------ shots [0x01026608]
 

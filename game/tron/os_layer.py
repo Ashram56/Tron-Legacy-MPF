@@ -166,6 +166,9 @@ class TronOS(CustomCode):
         self._refresh_pending = False
         self._score_pending = {}
         self.forced = {}             # name -> list of forced pick results (tests)
+        # deff id -> function returning the values the deff's code reads from RAM each frame (timers,
+        # mode values, the current stage): its display lines (tron/media_bridge.py, refreshed while shown)
+        self.deff_values = {}
         self.random = random.Random()
         self._new_game = False
         self._new_game_ball = False
@@ -333,6 +336,11 @@ class TronOS(CustomCode):
         of the rule's condition function, so rules start in the ROM's order)."""
         self.rules.append([cond, leff, tube, False, order])
         self.rules.sort(key=lambda r: r[4])
+
+    def deff_live(self, deff_ids, values):
+        """values() -> {arg: value}: what deffs `deff_ids` print from RAM (not passed at deff start)."""
+        for deff_id in deff_ids:
+            self.deff_values[deff_id] = values
 
     def deff_rule(self, cond, deff_id, music=None, priority=0, on_start=None):
         """lamp_rule_init(list 2, cond, deff, music, priority): mode background deff + music (display.py)."""

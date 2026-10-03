@@ -94,6 +94,113 @@ class TestLayout(unittest.TestCase):
         self.assertEqual("status", panels[133])
         self.assertEqual("match", panels[38])
 
+    def test_effect_fills(self):
+        """deff 95 clears a black band under ALL TARGETS= after drawing its bitmap (FUN_000274c0); deff 96
+        draws the same screen from the task it spawns (FUN_01032a30)."""
+        fills = rom_layout.effect_fills()
+        self.assertEqual([(41, 26, 127, 31)], fills[95])
+        self.assertEqual([(41, 26, 127, 31)], fills[96])
+        self.assertEqual([(41, 26, 127, 31)], fills[98])
+        self.assertNotIn(19, fills)                     # the score display's panel clears are not effect fills
+
+    def test_twin_line(self):
+        """deff 95 prints the timer twice in a row, left at x 42 and right-aligned at x 127."""
+        fonts = gen_fonts.decode_all()[2]
+        lays = rom_layout.line_layouts(95, ["%u", "ALL TARGETS=%,02lu"], fonts)
+        self.assertEqual((1, 42, 1, {"x": 127, "flags": 4}),
+                         (lays[0]["font"], lays[0]["x"], lays[0]["flags"], lays[0]["twin"]))
+
+    def test_stacked_outline_lines(self):
+        """Mode totals stack outlined lines one row into each other (deff 90 at y 6, 12, 20): every line
+        shows (MULTIBALL, SIMULATION and the SOS totals were dropped as overlapping)."""
+        fonts = gen_fonts.decode_all()[2]
+        for deff_id, lines in ((90, ["LIGHT CYCLE", "MULTIBALL", "TOTAL:", "%,02lu"]),
+                               (126, ["SEA OF", "SIMULATION", "TOTAL:", "%,02lu"]),
+                               (125, ["SEA OF", "SIMULATION", "COMPLETED", "%,02lu"]),
+                               (70, ["QUORRA", "MULTIBALL", "TOTAL:", "%,02lu"])):
+            lays = rom_layout.line_layouts(deff_id, lines, fonts)
+            self.assertTrue(all(lays), (deff_id, lays))
+        # screens of one effect drawn at the same place still exclude each other
+        lays = rom_layout.line_layouts(91, ["COLLECT", "FOR FASTSCORING", "COLLECT", "FOR SOS ITEM"], fonts)
+        self.assertEqual([True, True, False, False], [bool(x) for x in lays])
+
+    def test_zuse_intro_screens(self):
+        """deff 94 shows ZUSE / FAST SCORING blinking, then ALL TARGETS / SCORE / POINTS: never both
+        (the slide drew every line at once over the letters)."""
+        fonts = gen_fonts.decode_all()[2]
+        lays = rom_layout.line_layouts(94, ["FAST SCORING", "ALL TARGETS", "SCORE", "%,02lu POINTS"], fonts)
+        self.assertTrue(all(lays))
+        self.assertLessEqual(lays[0]["hide_after_ms"], min(x["show_after_ms"] for x in lays[1:]))
+        self.assertEqual([34, 10, 17, 10], [x["font"] for x in lays])
+        self.assertEqual([4], lays[1]["level_steps"])
+
+    def test_spawned_display_task_text(self):
+        """deff 96's timer and ALL TARGETS= come from the task it spawns (FUN_01032a30)."""
+        fonts = gen_fonts.decode_all()[2]
+        lays = rom_layout.line_layouts(96, ["%luK", "%u", "ALL TARGETS=%,02lu"], fonts)
+        self.assertEqual([39, 1, 0], [x["font"] for x in lays])
+        self.assertEqual((85, 31), (lays[2]["x"], lays[2]["y"]))
+
+    def test_table_messages(self):
+        """deff 114 draws the stage's two messages from the stage table under SEA OF SIMULATION."""
+        fonts = gen_fonts.decode_all()[2]
+        lays = rom_layout.line_layouts(114, ["SEA OF", "SIMULATION", "%s", "%s"], fonts)
+        self.assertEqual([(84, 8), (84, 14), (84, 23), (84, 29)], [(x["x"], x["y"]) for x in lays])
+
+    def test_loop_period(self):
+        import gen_media
+        from PIL import Image
+        imgs = [Image.new("RGBA", (128, 32), (k * 10, 0, 0, 255)) for k in range(3)]
+        frames = [(imgs[k % 3], 49) for k in range(8)]           # 2 2/3 cycles, cut mid-cycle
+        self.assertEqual(3, gen_media.loop_period(frames))
+        self.assertIsNone(gen_media.loop_period([(imgs[k], 49) for k in range(3)]))
+
+    def test_letter_positions_match_rom_frames(self):
+        """The letter bitmaps of deffs 91, 92 and 107 sit where the ROM draws them: every dot of the
+        hollow (91, 107) or solid (92) image equals the deff's graphics frame at x 42 + 21 i, y 5."""
+        import glob
+        import io
+        import zipfile
+        import gen_media
+        from PIL import Image
+        z = zipfile.ZipFile(os.path.join(ROOT, "assets", "mpf_package", "media", "rom_images_all.zip"))
+        for deff_id, offset in ((91, 10), (92, 0), (107, 10)):
+            spec = gen_media.LETTER_DEFFS[deff_id]
+            frame = Image.open(glob.glob(os.path.join(ROOT, "assets", "mpf_package", "media", "dmd",
+                                                      "deff_%03d_*" % deff_id, "frames", "000.png"))[0]).convert("L")
+            for i, solid in enumerate(spec["images"]):
+                img = Image.open(io.BytesIO(z.read("%04d.png" % (solid + offset)))).convert("RGBA")
+                x0, y0 = gen_media.LETTER_X + gen_media.LETTER_DX * i, gen_media.LETTER_Y
+                for y in range(img.height):
+                    for x in range(img.width):
+                        r, _, _, a = img.getpixel((x, y))
+                        if a:
+                            self.assertEqual(r > 0, frame.getpixel((x0 + x, y0 + y)) > 0, (deff_id, i, x, y))
+
+    def test_letter_slides(self):
+        path = os.path.join(ROOT, "game", "tron", "media_data.json")
+        if not os.path.exists(path):
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        deffs = json.load(open(path, encoding="utf-8"))["deffs"]
+        self.assertEqual(("letters", ["lit", "new"]), (deffs["91"]["source"], deffs["91"]["args"]))
+        self.assertEqual(["old", "new"], deffs["107"]["args"])
+        slide = os.path.join(ROOT, "game", "slides", "deffs", "deff_091.tscn")
+        if os.path.exists(slide):
+            with open(slide, encoding="utf-8") as f:
+                body = f.read()
+            for node in ("Solid0", "Hollow3", "LetterPanel"):
+                self.assertIn('[node name="%s"' % node, body)
+            self.assertIn("res://tron/letter_panel.gd", body)
+            self.assertNotIn("reference_capture", body)
+        slide = os.path.join(ROOT, "game", "slides", "deffs", "deff_095.tscn")
+        if os.path.exists(slide):
+            with open(slide, encoding="utf-8") as f:
+                body = f.read()
+            for node in ("Clear0", "Line0Twin"):
+                self.assertIn('[node name="%s"' % node, body)
+            # the ROM cycles 46 bitmaps (0x2d + 1): the loop is whole cycles, not the 246-frame recording
+            self.assertEqual(46, body.count('{"duration"'))
+
     def test_dynamic_slides_use_rom_fonts(self):
         path = os.path.join(ROOT, "game", "tron", "media_data.json")
         if not os.path.exists(path):
