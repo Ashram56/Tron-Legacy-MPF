@@ -10,14 +10,15 @@ and its OST replaces the ROM music.
 ```sh
 git clone --recurse-submodules https://github.com/Ashram56/Tron-Legacy-MPF-PuP.git
 cd Tron-Legacy-MPF-PuP
-python scripts/setup.py               # as in the README: venv, MPF, Godot, GMC, generated media
-python scripts/gen_pup.py             # the PuP media for Godot -> pup_media/ (once; re-runs redo changed files)
+python scripts/setup.py               # as in the README (venv, MPF, Godot, GMC, media) + the PuP media
 python scripts/run.py                 # the game, with the PuP windows
 ```
 
-`gen_pup.py` turns every video into Theora (`.ogv`, the only video format Godot plays) and copies the mp3s and
-pictures. It needs an ffmpeg with libtheora: ffmpeg on the PATH, `FFMPEG=<path>`, or
-`.venv/bin/pip install imageio-ffmpeg` (Windows: `.venv\Scripts\pip install imageio-ffmpeg`). The whole pack
+`run.py` prints `PuP on: ...` before it starts Godot, or what is missing. `setup.py` calls
+`scripts/pup_setup.py`, which fetches the `pup_pack` submodule and runs `scripts/gen_pup.py`: it turns
+every video into Theora (`.ogv`, the only video format Godot plays) and copies the mp3s and
+pictures. It needs an ffmpeg with libtheora (ffmpeg on the PATH, or `FFMPEG=<path>`); without one it
+installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
