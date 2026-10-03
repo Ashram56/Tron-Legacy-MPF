@@ -91,9 +91,10 @@ python scripts/sync_upstream.py                 # merges upstream/phase10-docker
 python scripts/sync_upstream.py --branch main   # once upstream has merged its phase branches into main
 ```
 
-The PuP touches upstream files in four one-line places only: the `pup.yaml` include in
+The PuP touches upstream files in a few one-line places only: the `pup.yaml` include in
 `game/config/config.yaml`, the `Pup` autoload in `game/project.godot`, the `pup_pack` submodule in
-`.gitmodules` and two `.gitignore` lines. Everything else is in its own files, so a merge seldom conflicts.
+`.gitmodules`, two `.gitignore` lines, a README pointer and CI's checkout (no submodules: the PuP Pack repo is
+private, `setup.py` fetches `assets/`). Everything else is in its own files, so a merge seldom conflicts.
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 
