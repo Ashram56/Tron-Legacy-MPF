@@ -34,7 +34,6 @@ class TestPupFiles(unittest.TestCase):
         self.assertIn("third_screen", cfg["pup"])
 
 
-@unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
 class TestSetup(unittest.TestCase):
     def test_native_video_on_windows_only(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -47,6 +46,7 @@ class TestSetup(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
 
 
+@unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
 class TestEngine(unittest.TestCase):
 
     def setUp(self):
