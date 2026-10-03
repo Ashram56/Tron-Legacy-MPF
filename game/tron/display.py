@@ -54,7 +54,7 @@ class Display:
         assets = os.path.join(os_.machine.machine_path, "..", "assets")
         self.media = media_table.load(assets)
         self.prio, self.background = {}, set()
-        with open(os.path.join(assets, "mpf_package", "event_map.csv")) as f:
+        with open(os.path.join(assets, "mpf_package", "event_map.csv"), encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 deff_id = int(row["deff"])
                 self.prio[deff_id] = int(row["priority"] or 0)
@@ -432,7 +432,7 @@ class Tubes:
         self.os = os_
         self.info = {}
         path = os.path.join(os_.machine.machine_path, "..", "assets", "io", "light_effects.csv")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 length = float(row["length_ms"] or 0) / 1000
                 # shows with no tube output in emulation still hold their tubes (traces: tube 13/14)
@@ -503,7 +503,7 @@ class Leffs:
         self.os = os_
         self.info = {}
         path = os.path.join(os_.machine.machine_path, "..", "assets", "mpf_package", "lamp_effects.csv")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 outputs = frozenset(row["flashers"].split()) if int(row["leff"]) not in UNCLAIMED else frozenset()
                 length = float(row["length_ms"]) / 1000 if row["loops"] == "0" and row["length_ms"] else None

@@ -51,9 +51,9 @@ def keep(e):
 def filtered(path, tmp):
     """Copy of the trace without non-rules events and without anything before "ready"."""
     out = os.path.join(tmp, os.path.basename(path))
-    evs = [json.loads(line) for line in open(path) if line.strip()]
+    evs = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     t0 = next((e["t"] for e in evs if e.get("ev") == "ready"), None)
-    with open(out, "w") as g:
+    with open(out, "w", encoding="utf-8") as g:
         for e in evs:
             if (t0 is None or e["t"] >= t0) and keep(e):
                 g.write(json.dumps(e) + "\n")

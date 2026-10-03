@@ -12,7 +12,7 @@ class Trace:
     def __init__(self, machine, path=None):
         self.machine = machine
         self.path = path or os.environ.get("TRON_TRACE")
-        self._file = open(self.path, "w") if self.path else None
+        self._file = open(self.path, "w", encoding="utf-8") if self.path else None
         self.events = []        # kept in memory for tests
 
     def log(self, ev, **fields):

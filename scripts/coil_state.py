@@ -33,7 +33,7 @@ TOL = 0.25                    # s: burst start tolerance (as the event compariso
 def load(path):
     """-> {coil: [(t, on)]} with times relative to "ready" (events before it are left out)."""
     t0, out = None, {}
-    for line in open(path):
+    for line in open(path, encoding="utf-8"):
         if not line.strip():
             continue
         e = json.loads(line)

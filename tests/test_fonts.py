@@ -41,7 +41,7 @@ class TestFontDecoding(unittest.TestCase):
         out = os.path.join(ROOT, "captures", "test_fonts")
         os.makedirs(out, exist_ok=True)
         name = gen_fonts.write_bmfont(self.fonts[12], self.get, out)
-        with open(os.path.join(out, name + ".fnt")) as f:
+        with open(os.path.join(out, name + ".fnt"), encoding="utf-8") as f:
             body = f.read()
         self.assertIn("common lineHeight=9 base=8", body)        # 8 rows above the baseline, comma 1 below
         self.assertIn("char id=69 ", body)
@@ -98,18 +98,18 @@ class TestLayout(unittest.TestCase):
         path = os.path.join(ROOT, "game", "tron", "media_data.json")
         if not os.path.exists(path):
             self.skipTest("media data not generated (scripts/gen_media.py)")
-        deffs = json.load(open(path))["deffs"]
+        deffs = json.load(open(path, encoding="utf-8"))["deffs"]
         dynamic = {d: i for d, i in deffs.items() if i["text"] and i["source"] != "reference"}
         self.assertGreater(len(dynamic), 70)
         for d, info in dynamic.items():
             self.assertTrue(any(f is not None for f in info["fonts"]), d)
             slide = os.path.join(ROOT, "game", "slides", "deffs", info["slide"] + ".tscn")
             if os.path.exists(slide):
-                with open(slide) as f:
+                with open(slide, encoding="utf-8") as f:
                     body = f.read()
                 self.assertIn("res://tron/rom_text.gd", body, d)
                 self.assertNotIn("font_sizes/font_size", body, d)
-        with open(os.path.join(ROOT, "game", "slides", "deffs", "deff_019.tscn")) as f:
+        with open(os.path.join(ROOT, "game", "slides", "deffs", "deff_019.tscn"), encoding="utf-8") as f:
             body = f.read()
         for node in ("Credits", "Replay", "P1", "P4", "Award", "Separator", "BarGem", "ScoreDisplay"):
             self.assertIn('[node name="%s"' % node, body)

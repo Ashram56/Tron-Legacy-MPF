@@ -22,7 +22,7 @@ def service_data():
     """service_menu.json: menus, adjustments (88), audits (150) and install presets, read once."""
     global _DATA
     if _DATA is None:
-        with open(SERVICE_JSON) as f:
+        with open(SERVICE_JSON, encoding="utf-8") as f:
             data = json.load(f)
         data["adj_by_id"] = {a["id"]: a for a in data["adjustments"]}
         data["audit_by_id"] = {a["id"]: a for a in data["audits"]}

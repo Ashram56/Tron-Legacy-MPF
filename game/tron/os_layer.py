@@ -71,7 +71,7 @@ def adjustment_defaults(settings_path):
     """Read {adj number: (key, default)} from the asset package's settings.yaml comments."""
     out = {}
     key = None
-    with open(settings_path) as f:
+    with open(settings_path, encoding="utf-8") as f:
         for line in f:
             m = re.match(r"  ([a-z0-9_]+):\s+# adj (\d+)", line)
             if m:
@@ -97,7 +97,7 @@ def shaker_table(shaker_path):
     deffs, handlers = {}, {}
     if not os.path.exists(shaker_path):
         return deffs, handlers
-    with open(shaker_path) as f:
+    with open(shaker_path, encoding="utf-8") as f:
         for line in f:
             m = re.match(r"\s+(\w+)\{settings\.shaker_motor>=(\d)\}: shaker_strength_(\d)\s*(?:# effect (\d+))?",
                          line)
@@ -474,11 +474,11 @@ class TronOS(CustomCode):
             import csv
             base = os.path.join(self.machine.machine_path, "..", "assets", "callouts")
             dur = {}
-            with open(os.path.join(base, "samples_index.csv")) as f:
+            with open(os.path.join(base, "samples_index.csv"), encoding="utf-8") as f:
                 for row in csv.DictReader(f):
                     dur[int(row["sample_id"], 16)] = float(row["duration_s"] or 0)
             self._sample_lengths = {}
-            with open(os.path.join(base, "sound_calls.csv")) as f:
+            with open(os.path.join(base, "sound_calls.csv"), encoding="utf-8") as f:
                 for row in csv.DictReader(f):
                     ids = [int(x, 16) for x in row["sample_ids (one picked per play)"].split()]
                     self._sample_lengths[int(row["call_id"], 16)] = [dur.get(i, 0) for i in ids]

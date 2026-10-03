@@ -57,7 +57,7 @@ class MediaBridge:
         path = os.path.join(os.path.dirname(__file__), "media_data.json")
         self.data = None
         if os.path.exists(path):
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             self.data = {"pools": {int(k): v for k, v in data["pools"].items()},
                          "deffs": {int(k): v for k, v in data["deffs"].items()}}

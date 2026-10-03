@@ -1,0 +1,167 @@
+"""Per-OS paths and download URLs of scripts/toolchain.py, and scripts/setup.py's plan, for Windows, macOS and
+Linux, whatever OS runs the tests."""
+import contextlib
+import io
+import os
+import socket
+import sys
+import tempfile
+import unittest
+import zipfile
+from unittest import mock
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+import run  # noqa: E402
+import setup  # noqa: E402
+import toolchain as tc  # noqa: E402
+
+RELEASES = "https://github.com/godotengine/godot/releases/download/4.5.2-stable/"
+
+
+class TestHost(unittest.TestCase):
+
+    def test_os_names(self):
+        for system, name in [("Windows", "windows"), ("Darwin", "macos"), ("Linux", "linux"), ("linux", "linux")]:
+            self.assertEqual(name, tc.host_os(system))
+        with self.assertRaises(SystemExit):
+            tc.host_os("SunOS")
+
+    def test_arch_names(self):
+        for machine, name in [("AMD64", "x86_64"), ("x86_64", "x86_64"), ("arm64", "arm64"), ("aarch64", "arm64")]:
+            self.assertEqual(name, tc.host_arch(machine))
+        with self.assertRaises(SystemExit):
+            tc.host_arch("i386")
+
+    def test_this_host_is_supported(self):
+        self.assertIn(tc.host_os(), ("windows", "macos", "linux"))
+
+
+class TestVenv(unittest.TestCase):
+
+    def test_layout(self):
+        venv = os.path.join(ROOT, ".venv")
+        self.assertEqual(os.path.join(venv, "Scripts", "python.exe"), tc.venv_python("windows"))
+        self.assertEqual(os.path.join(venv, "Scripts", "mpf.exe"), tc.venv_exe("mpf", "windows"))
+        for os_name in ("macos", "linux"):
+            self.assertEqual(os.path.join(venv, "bin", "python"), tc.venv_python(os_name))
+            self.assertEqual(os.path.join(venv, "bin", "mpf"), tc.venv_exe("mpf", os_name))
+
+
+class TestGodot(unittest.TestCase):
+    CASES = [  # os, arch, zip, executable in tools/godot/
+        ("windows", "x86_64", "Godot_v4.5.2-stable_win64.exe.zip", ["Godot_v4.5.2-stable_win64.exe"]),
+        ("windows", "arm64", "Godot_v4.5.2-stable_windows_arm64.exe.zip", ["Godot_v4.5.2-stable_windows_arm64.exe"]),
+        ("macos", "x86_64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("macos", "arm64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("linux", "x86_64", "Godot_v4.5.2-stable_linux.x86_64.zip", ["Godot_v4.5.2-stable_linux.x86_64"]),
+        ("linux", "arm64", "Godot_v4.5.2-stable_linux.arm64.zip", ["Godot_v4.5.2-stable_linux.arm64"]),
+    ]
+
+    def test_urls_and_paths(self):
+        for os_name, arch, asset, exe in self.CASES:
+            with self.subTest(os=os_name, arch=arch):
+                self.assertEqual(asset, tc.godot_asset(os_name, arch))
+                self.assertEqual(RELEASES + asset, tc.godot_url(os_name, arch))
+                self.assertEqual(os.path.join(ROOT, "tools", "godot", *exe), tc.godot_path(os_name, arch))
+
+    def test_env_override(self):
+        with mock.patch.dict(os.environ, {"GODOT": "/opt/godot/godot"}):
+            self.assertEqual("/opt/godot/godot", tc.godot_path())
+            self.assertEqual("/opt/godot/godot", tc.godot_command("--import")[0])
+
+    def test_virtual_display(self):
+        self.assertTrue(tc.needs_virtual_display("linux", {}))
+        self.assertFalse(tc.needs_virtual_display("linux", {"DISPLAY": ":0"}))
+        self.assertFalse(tc.needs_virtual_display("linux", {"WAYLAND_DISPLAY": "wayland-0"}))
+        self.assertFalse(tc.needs_virtual_display("windows", {}))
+        self.assertFalse(tc.needs_virtual_display("macos", {}))
+
+
+class TestSetupPlan(unittest.TestCase):
+    """setup.py --os/--arch prints the plan for that host and changes nothing."""
+
+    def plan(self, *args):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), mock.patch.object(setup.subprocess, "run") as sp, \
+                mock.patch.object(setup, "download") as dl:
+            self.assertEqual(0, setup.main(list(args)))
+        sp.assert_not_called()
+        dl.assert_not_called()
+        return out.getvalue()
+
+    def test_each_os(self):
+        for os_name, arch, asset, exe in TestGodot.CASES:
+            with self.subTest(os=os_name, arch=arch):
+                text = self.plan("--os", os_name, "--arch", arch)
+                self.assertIn("(dry run)", text)
+                self.assertIn(RELEASES + asset, text)
+                self.assertIn(os.path.join("tools", "godot", *exe), text)
+                self.assertIn(tc.venv_python(os_name), text)
+                self.assertIn(tc.GMC_ZIP, text)
+                self.assertIn("gen_media.py", text)
+
+    def test_monitor_and_skip(self):
+        text = self.plan("--dry-run", "--monitor", "--skip-godot")
+        self.assertIn("mpf-monitor==" + tc.MPF_MONITOR_VERSION, text)
+        self.assertNotIn("== Godot", text)
+        self.assertNotIn(tc.godot_url(), text)
+
+
+class TestUnpack(unittest.TestCase):
+
+    def zip_of(self, files):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for name, body in files.items():
+                z.writestr(name, body)
+        return buf.getvalue()
+
+    def test_gmc_folder(self):
+        """GitHub's tag zip: mpf-gmc-1.0.0/addons/mpf-gmc/... -> game/addons/mpf-gmc/..."""
+        data = self.zip_of({"mpf-gmc-1.0.0/README.md": "x", "mpf-gmc-1.0.0/addons/mpf-gmc/plugin.cfg": "[plugin]",
+                            "mpf-gmc-1.0.0/addons/mpf-gmc/scripts/bcp_server.gd": "extends Node"})
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(2, setup.extract_folder(data, "mpf-gmc-1.0.0/addons/mpf-gmc/", tmp))
+            self.assertTrue(os.path.isfile(os.path.join(tmp, "plugin.cfg")))
+            self.assertTrue(os.path.isfile(os.path.join(tmp, "scripts", "bcp_server.gd")))
+            self.assertFalse(os.path.exists(os.path.join(tmp, "README.md")))
+
+    def test_godot_zip_keeps_exec_bit(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            info = zipfile.ZipInfo("Godot_v4.5.2-stable_linux.x86_64")
+            info.external_attr = 0o755 << 16
+            z.writestr(info, "ELF")
+        with tempfile.TemporaryDirectory() as tmp:
+            setup.unzip(buf.getvalue(), tmp, "linux")
+            exe = os.path.join(tmp, "Godot_v4.5.2-stable_linux.x86_64")
+            self.assertTrue(os.path.isfile(exe))
+            if os.name != "nt":
+                self.assertTrue(os.access(exe, os.X_OK))
+
+
+class TestRun(unittest.TestCase):
+
+    def test_port_in_use(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+            s.listen()
+            self.assertTrue(run.port_in_use(port))
+        self.assertFalse(run.port_in_use(port))
+
+    def test_mpf_args(self):
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual"))
+        self.assertEqual(["game", ".", "-c", "config,hw_proc"], run.mpf_args("proc", text_ui=True))
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t", "-X"], run.mpf_args("virtual", "zuse"))
+
+    def test_xvfb_only_without_display(self):
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable}):
+            self.assertEqual(sys.executable, run.godot_command([], virtual_display=False)[0])
+            with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
+                self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

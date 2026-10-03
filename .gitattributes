@@ -1,0 +1,13 @@
+# Line endings: LF in the repo for everything text; the shell scripts must stay LF on checkout (bash),
+# the Windows scripts CRLF (cmd, PowerShell).
+* text=auto eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.wav binary
+*.ogg binary
+*.gif binary
+*.zip binary

@@ -47,7 +47,7 @@ def forced_picks(name):
     path = os.path.join(TRACES, name + ".jsonl")
     if not os.path.exists(path):
         return forced
-    evs = [json.loads(line) for line in open(path)]
+    evs = [json.loads(line) for line in open(path, encoding="utf-8")]
     for i, e in enumerate(evs):
         if e.get("ev") == "audit" and 0x53 <= e.get("id", 0) <= 0x5e:
             forced["arcade"].append(e["id"] - 0x53)
@@ -83,11 +83,11 @@ def forced_samples(evs):
     import csv
     base = os.path.join(ROOT, "assets", "callouts")
     dur = {}
-    with open(os.path.join(base, "samples_index.csv")) as f:
+    with open(os.path.join(base, "samples_index.csv"), encoding="utf-8") as f:
         for row in csv.DictReader(f):
             dur[int(row["sample_id"], 16)] = float(row["duration_s"] or 0)
     lengths = {}
-    with open(os.path.join(base, "sound_calls.csv")) as f:
+    with open(os.path.join(base, "sound_calls.csv"), encoding="utf-8") as f:
         for row in csv.DictReader(f):
             lengths[int(row["call_id"], 16)] = [dur.get(int(x, 16), 0)
                                                 for x in row["sample_ids (one picked per play)"].split()]
@@ -176,14 +176,14 @@ class ScenarioRun(TronTestCase):
         out_path = out_path or os.path.join(OUT, name + ".jsonl")
         trace = self.tron.trace
         trace.path = out_path
-        trace._file = open(out_path, "w")
+        trace._file = open(out_path, "w", encoding="utf-8")
         self.autoplunge = 1.0
         self.machine.switch_controller.add_switch_handler("s_shooter_lane", self._on_shooter, state=1)
         self.tron.forced = forced_picks(name)
         self.fill_trough()
         self.wait(6)                                  # the ROM boots 8 s before line 1
         self.log("ready")
-        with open(os.path.join(TRACES, name + ".txt")) as f:
+        with open(os.path.join(TRACES, name + ".txt"), encoding="utf-8") as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
                 if line.startswith("mark "):

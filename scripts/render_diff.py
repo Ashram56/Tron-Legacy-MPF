@@ -31,11 +31,11 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 sys.path.insert(0, os.path.join(ROOT, "game"))
 import gen_fonts  # noqa: E402
+import run  # noqa: E402
 import rom_layout  # noqa: E402
 from tron.media_bridge import format_rom_text  # noqa: E402
 
 PKG = os.path.join(ROOT, "assets", "mpf_package")
-GODOT = os.path.join(ROOT, "tools", "godot", "godot")
 # Values the reference captures show (read off the GIFs): {deff: [args per line]}
 VALUES = {19: [[1], [0]],                   # BALL 1, score 00 (score 0 printed with %,02lu)
           25: [[], [50000]],                # TOTAL BONUS 50,000
@@ -72,7 +72,7 @@ def reference(deff_id):
 
 def graphics_frames(deff_id):
     path = glob.glob(os.path.join(PKG, "media", "dmd", "deff_%03d_*" % deff_id, "timing.json"))
-    return json.load(open(path[0])).get("graphics_frames", []) if path else []
+    return json.load(open(path[0], encoding="utf-8")).get("graphics_frames", []) if path else []
 
 
 def panel_phase(ref, times):
@@ -101,8 +101,8 @@ def line_values(deff_id, lines):
 def godot_render(jobs):
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(jobs, f)
-    cmd = ["xvfb-run", "-a", "-s", "-screen 0 1280x720x24", GODOT, "--path", os.path.join(ROOT, "game"),
-           "--rendering-driver", "opengl3", "res://tools/slide_capture.tscn", "--", "--job=" + f.name]
+    cmd = run.godot_command(["--rendering-driver", "opengl3", "res://tools/slide_capture.tscn", "--",
+                             "--job=" + f.name])      # under Xvfb on Linux without a display
     subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
     os.unlink(f.name)
 
@@ -166,9 +166,9 @@ def main():
     if keep in args:
         args.remove(keep)
     deffs = [int(a) for a in args] or DEFAULT_DEFFS
-    rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv")))}
-    media = json.load(open(os.path.join(ROOT, "game", "tron", "media_data.json")))["deffs"]
-    fonts = json.load(open(os.path.join(ROOT, "game", "fonts", "fonts.json")))["fonts"]
+    rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv"), encoding="utf-8"))}
+    media = json.load(open(os.path.join(ROOT, "game", "tron", "media_data.json"), encoding="utf-8"))["deffs"]
+    fonts = json.load(open(os.path.join(ROOT, "game", "fonts", "fonts.json"), encoding="utf-8"))["fonts"]
     _, get = gen_fonts.load_images()
     work = keep or tempfile.mkdtemp(prefix="render_diff_")
     jobs, refs, info = [], {}, {}

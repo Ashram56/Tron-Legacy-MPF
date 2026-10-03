@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the Godot (GMC) media of the game from the asset package.
 
-Generated (all git-ignored, rebuilt by scripts/setup_workspace.sh):
+Generated (all git-ignored, rebuilt by scripts/setup.py):
 - game/sounds/<track>/snd_XXXX.wav    every ROM sample (GMC finds sounds by file name)
 - game/media/dmd/deff_NNN/fNNN.png    the frames of each display effect
 - game/slides/deffs/deff_NNN.tscn     one GMC slide per display effect (AnimatedSprite2D with the
@@ -35,7 +35,7 @@ TEXT_ONLY = {19, 25, 26, 33, 38, 40}
 
 def load_yaml(path):
     from ruamel.yaml import YAML
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return YAML(typ="safe").load(f)
 
 
@@ -82,7 +82,7 @@ def gif_frames(path):
 
 def png_frames(folder):
     from PIL import Image
-    timing = json.load(open(os.path.join(folder, "timing.json")))
+    timing = json.load(open(os.path.join(folder, "timing.json"), encoding="utf-8"))
     out = []
     for f in timing.get("graphics_frames", []):
         path = os.path.join(folder, f["file"])
@@ -190,15 +190,15 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False):
             parts += text_node(i, lay)
     if panel:
         parts += score_display_nodes(deff_id == 19, panel == "match")
-    with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w") as f:
+    with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(parts) + "\n")
     return name
 
 
 def build_deffs(only_data):
     import rom_layout
-    rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv")))}
-    fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json")))["fonts"]
+    rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(PKG, "event_map.csv"), encoding="utf-8"))}
+    fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json"), encoding="utf-8"))["fonts"]
     calls = rom_layout.deff_calls()
     panels = rom_layout.status_panel_deffs()
     out = {}
@@ -223,7 +223,7 @@ def build_deffs(only_data):
         out[deff_id] = info
         if only_data:
             continue
-        rel = os.path.join("media", "dmd", "deff_{:03d}".format(deff_id))
+        rel = "media/dmd/deff_{:03d}".format(deff_id)    # also a res:// path: "/" on every OS
         shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
         os.makedirs(os.path.join(GAME, rel))
         frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
@@ -243,7 +243,7 @@ def main():
     if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
         gen_fonts.build()
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
-    with open(os.path.join(GAME, "tron", "media_data.json"), "w") as f:
+    with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
     print("media: {} sound pools, {} display effects".format(len(data["pools"]), len(data["deffs"])))
 

@@ -267,7 +267,7 @@ def write_bmfont(font, get, out_dir):
             "common lineHeight=%d base=%d scaleW=%d scaleH=%d pages=1 packed=0 alphaChnl=0 redChnl=0 "
             "greenChnl=0 blueChnl=0" % (size, asc, width, height),
             'page id=0 file="%s.png"' % name, "chars count=%d" % len(glyphs)]
-    with open(os.path.join(out_dir, name + ".fnt"), "w") as f:
+    with open(os.path.join(out_dir, name + ".fnt"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(head + lines) + "\n")
     return name
 
@@ -278,7 +278,7 @@ def build(out_dir=OUT):
     os.makedirs(out_dir, exist_ok=True)
     for f in fonts:
         write_bmfont(f, get, out_dir)
-    with open(os.path.join(out_dir, "fonts.json"), "w") as fp:
+    with open(os.path.join(out_dir, "fonts.json"), "w", encoding="utf-8", newline="\n") as fp:
         json.dump({"fonts": fonts}, fp, indent=0, sort_keys=True)
     return fonts
 

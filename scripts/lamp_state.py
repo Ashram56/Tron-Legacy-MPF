@@ -40,7 +40,7 @@ BLIP = 0.03                   # s: shorter isolated pulses are ignored
 
 def load(path):
     """-> (events, t0, {lamp: ([times], [states])}) with times relative to "ready"."""
-    evs = [json.loads(line) for line in open(path) if line.strip()]
+    evs = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     t0 = next((e["t"] for e in evs if e.get("ev") == "ready"), 0.0)
     lamps = {}
     for e in evs:
@@ -103,7 +103,7 @@ def leff_table():
     names = {}
     lights = os.path.join(ROOT, "game", "config", "rom", "lights.yaml")
     cur = None
-    for line in open(lights):
+    for line in open(lights, encoding="utf-8"):
         line = line.rstrip()
         if line.startswith("  l_") and line.endswith(":"):
             cur = line.strip()[:-1]
@@ -112,7 +112,7 @@ def leff_table():
             if num.isdigit():
                 names[cur] = int(num)
     table = {}
-    with open(os.path.join(ROOT, "assets", "mpf_package", "lamp_effects.csv")) as f:
+    with open(os.path.join(ROOT, "assets", "mpf_package", "lamp_effects.csv"), encoding="utf-8") as f:
         for row in csv.DictReader(f):
             lamps = {names[n] for n in row["lamps"].split() if n in names}
             if row["tokens"]:

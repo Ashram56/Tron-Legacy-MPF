@@ -29,13 +29,13 @@ def load(assets_dir):
         folder = os.path.basename(os.path.dirname(path))
         deff_id = int(folder.split("_")[1])
         info = table.setdefault(deff_id, DeffInfo(deff_id, folder))
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         info.seconds = float(data.get("run_seconds") or 0)
         info.sounds = [(s["t_ms"] / 1000, int(s["call"], 16)) for s in data.get("sounds", [])]
         info.tubes = [(t["t_ms"] / 1000, int(t["leff"])) for t in data.get("light_effects", [])
                       if str(t.get("from_deff", deff_id)) == str(deff_id)]
-    with open(os.path.join(pkg, "lamp_effects.csv")) as f:
+    with open(os.path.join(pkg, "lamp_effects.csv"), encoding="utf-8") as f:
         for row in csv.DictReader(f):
             for m in re.finditer(r"effect (\d+) \(deff_", row["started_by"]):
                 deff_id = int(m.group(1))

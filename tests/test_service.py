@@ -259,7 +259,7 @@ class TestAuditsAndAdjustments(ServiceCase):
             self.svc.dump_path = os.path.join(tmp, "usb", "audits.txt")
             self.goto("DUMP AUDITS TO USB")
             self.press("select")
-            text = open(self.svc.dump_path).read()
+            text = open(self.svc.dump_path, encoding="utf-8").read()
         self.assertIn(" 14 TOTAL BALLS PLAYED", text)
         self.assertEqual(150, len(text.splitlines()))
         self.press("back")

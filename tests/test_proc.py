@@ -163,13 +163,13 @@ class ProcCase(TronTestCase):
 
 
 def _load(path):
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return YAML(typ="safe").load(f)
 
 
 def _coil_table():
     """assets/io/coils.csv: SAM coil number -> MPF-style name (c_/f_ dropped)."""
-    with open(os.path.join(ROOT, "assets", "io", "coils.csv")) as f:
+    with open(os.path.join(ROOT, "assets", "io", "coils.csv"), encoding="utf-8") as f:
         return {int(row["coil"]): re.sub(r"[^a-z0-9]+", "_", row["name"].lower().replace("flash:", "")).strip("_")
                 for row in csv.DictReader(f)}
 

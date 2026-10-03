@@ -158,7 +158,7 @@ class TestCoilCompare(unittest.TestCase):
 class TestLampCompare(unittest.TestCase):
 
     def write(self, path, events):
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(json.dumps({"t": 0.0, "ev": "ready"}) + "\n")
             for e in events:
                 f.write(json.dumps(e) + "\n")

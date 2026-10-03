@@ -23,7 +23,7 @@ CALLEE = re.compile(r"\b(FUN_[0-9a-f]{8}|[a-z_][a-z0-9_]*)\(")
 
 def _functions():
     funcs, names, cur = {}, {}, None
-    with open(SRC) as f:
+    with open(SRC, encoding="utf-8") as f:
         for line in f:
             m = re.match(r"// ==== ([0-9a-f]+) (\S+)", line)
             if m:
@@ -82,7 +82,7 @@ def _reach(fn, funcs, names, depth=2):
 
 
 def _deff_functions():
-    with open(EVENT_MAP) as f:
+    with open(EVENT_MAP, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             fn = int(row["rom_function"], 16) if row["rom_function"] else None
             if fn and fn != 0x1000000:                        # 0x1000000: the generic animation player
@@ -157,7 +157,7 @@ def frame_ms(deff_id, k):
     import json
     path = glob.glob(os.path.join(ROOT, "assets", "mpf_package", "media", "dmd", "deff_%03d_*" % deff_id,
                                   "timing.json"))
-    frames = json.load(open(path[0]))["graphics_frames"] if path else []
+    frames = json.load(open(path[0], encoding="utf-8"))["graphics_frames"] if path else []
     if not frames:
         return 0
     t0 = frames[0]["t_ms"]

@@ -47,7 +47,7 @@ def parse_show(path):
     -> [(seconds, {light: on(bool) or hex color}, {flasher: ms})]."""
     steps = []
     section = None
-    for line in open(path):
+    for line in open(path, encoding="utf-8"):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         m = re.match(r"- duration: (\d+)ms", line)
@@ -225,7 +225,7 @@ class Lamps:
         self.show_dir = os.path.join(root, "config", "shows")
         self._shows = {}
         self.leff_info = {}         # leff id -> (show name, loops, priority)
-        with open(os.path.join(root, "lamp_effects.csv")) as f:
+        with open(os.path.join(root, "lamp_effects.csv"), encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 self.leff_info[int(row["leff"])] = (row["show"], int(row["loops"] or 0), int(row["priority"] or 0))
         self.names = {}             # MPF light name -> lamp number (lamp matrix only)

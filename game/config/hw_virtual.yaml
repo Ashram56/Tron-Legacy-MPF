@@ -1,7 +1,7 @@
 #config_version=6
 
 # Hardware overlay for the desktop and MPF Monitor, on top of the platform-neutral config.yaml:
-#   cd game && ../.venv/bin/mpf game . -c config,hw_virtual
+#   cd game && ../.venv/bin/mpf game . -c config,hw_virtual   (or: python scripts/run.py --hw virtual)
 # smart_virtual moves balls between the ball devices when their eject coils pulse and sets the trough,
 # shooter lane and VUK switches to match (MPF's smart_virtual platform); everything else is the game as is.
 # MPF Monitor connects to MPF's own BCP server (127.0.0.1:5051, MPF 0.80's default "bcp: servers") and

@@ -20,14 +20,25 @@ CONFIG = os.path.join(ROOT, "game", "config")
 OUT = os.path.join(ROOT, "game", "monitor")
 WIDTH, HEIGHT = 1040, 1500
 SWITCH_COLUMNS, LIGHT_COLUMNS = 4, 4
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+# DejaVu Sans (Linux) draws the committed playfield.jpg; other OSes use a font of their own, then Pillow's.
+FONTS = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVuSans.ttf", "Arial.ttf", "arial.ttf",
+         "/System/Library/Fonts/Supplemental/Arial.ttf", "/Library/Fonts/Arial.ttf"]
+
+
+def load_font(size):
+    for name in FONTS:
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size)
 
 
 def devices(section, files):
     yaml = YAML(typ="safe")
     found = []
     for name in files:
-        with open(os.path.join(CONFIG, name)) as f:
+        with open(os.path.join(CONFIG, name), encoding="utf-8") as f:
             data = yaml.load(f) or {}
         for device, cfg in (data.get(section) or {}).items():
             if cfg and "number" in cfg:
@@ -62,8 +73,8 @@ def main():
 
     image = Image.new("RGB", (WIDTH, HEIGHT), (24, 24, 32))
     draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype(FONT, 15) if os.path.exists(FONT) else ImageFont.load_default()
-    head = ImageFont.truetype(FONT, 22) if os.path.exists(FONT) else font
+    font = load_font(15)
+    head = load_font(22)
     draw.text((12, 8), "SWITCHES (SAM number: name), click to toggle", font=head, fill=(230, 230, 230))
     draw.text((12, 0.49 * HEIGHT), "LIGHTS (SAM lamp number: name)", font=head, fill=(230, 230, 230))
     draw.line((0, 0.485 * HEIGHT, WIDTH, 0.485 * HEIGHT), fill=(90, 90, 110), width=2)
@@ -83,7 +94,7 @@ def main():
             lines.append("  {}:".format(name))
             lines.append("    x: {}".format(x))
             lines.append("    y: {}".format(y))
-    with open(os.path.join(OUT, "monitor.yaml"), "w") as f:
+    with open(os.path.join(OUT, "monitor.yaml"), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
     print("monitor: {} switches, {} lights".format(len(switch_spots), len(light_spots)))
     return 0

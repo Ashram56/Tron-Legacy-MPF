@@ -14,14 +14,21 @@ numbers are the ROM's SAM numbers. One of two hardware overlays is picked at lau
 
 `mpf game .` with no `-c` loads config.yaml alone, on MPF's default platform (smart_virtual), with an empty trough.
 The unit tests and `tests/scenario.py` load config.yaml alone and force smart_virtual themselves
-(`tests/tron_test.py`). `scripts/render_check.sh` uses the hw_virtual overlay.
+(`tests/tron_test.py`). `scripts/render_check.py` and `scripts/run.py` use the hw_virtual overlay by default.
 
 ## Desktop and MPF Monitor (hw_virtual)
 
 ```sh
+python scripts/setup.py --monitor          # once: installs MPF Monitor (mpf-monitor 1.0.0) into .venv too
+python scripts/run.py --monitor            # Godot, then MPF (hw_virtual), then MPF Monitor; any OS
+```
+
+By hand (Linux/macOS paths; on Windows the venv's scripts are in `.venv\Scripts\`):
+
+```sh
 tools/godot/godot --path game &                              # GMC: MPF connects to it on port 5050
 (cd game && ../.venv/bin/mpf game . -c config,hw_virtual)
-(cd game && mpf monitor)                                     # MPF Monitor (separate install, mpf-monitor)
+(cd game && ../.venv/bin/mpf monitor)                        # MPF Monitor
 ```
 
 MPF Monitor connects to MPF's own BCP server. MPF 0.80 always starts that server (`bcp: servers` in
@@ -57,10 +64,20 @@ not.
 ### Running
 
 You need libpinproc and pypinproc (github.com/preble) built for the machine's PC, and P-ROC firmware 2.14 or
-newer (MPF warns about older versions). This workspace does not install either of them.
+newer (MPF warns about older versions). MPF 0.80.1's wheel carries pypinproc builds for Windows
+(`mpf/platforms/pinproc/windows/pinproc.cp3xx-win_amd64.pyd`, Python 3.8-3.14) and macOS
+(`mpf/platforms/pinproc/osx/pinproc.so`); on Linux there is none, so build libpinproc and pypinproc and install
+pypinproc into `.venv` (`.venv/bin/pip install .` in its checkout). This workspace does not build them.
+The P-ROC's FTDI USB driver must be installed on every OS.
 
 ```sh
-scripts/gen_config.py                                   # setup_workspace.sh and the tests also run it
+python scripts/run.py --hw proc                         # any OS: Godot with --proc-dmd, then MPF with hw_proc
+```
+
+By hand:
+
+```sh
+.venv/bin/python scripts/gen_config.py                  # setup.py and the tests also run it
 tools/godot/godot --path game -- --proc-dmd &           # GMC (the BCP server); --proc-dmd feeds the P-ROC DMD
 (cd game && ../.venv/bin/mpf game . -c config,hw_proc)
 ```

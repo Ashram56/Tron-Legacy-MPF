@@ -503,7 +503,7 @@ class AuditScreen(ListScreen):
 def dump_audits(os_, path):
     """DUMP AUDITS TO USB: every audit as "number name value" lines (the USB stick is the data folder)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         for number in sorted(os_.audits.info):
             f.write("{:3d} {:34s} {}\n".format(number, os_.audits.info[number]["name"], os_.audits.text(number)))
     return path
@@ -891,7 +891,7 @@ def flasher_names():
     if _FLASHERS is None:
         from tron.settings import ROOT
         names, inside = [], False
-        with open(os.path.join(ROOT, "assets", "mpf_package", "config", "coils.yaml")) as f:
+        with open(os.path.join(ROOT, "assets", "mpf_package", "config", "coils.yaml"), encoding="utf-8") as f:
             for line in f:
                 if line.strip() and not line.startswith((" ", "#")):
                     inside = line.startswith("flashers:")

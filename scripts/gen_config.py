@@ -2,7 +2,7 @@
 """Generate game/config/rom/*.yaml from the asset package (adds MPF's config_version header).
 
 The asset package's YAML has no "#config_version=6" first line, which MPF requires. These files are
-generated, not edited: re-run after every asset sync (setup_workspace.sh and the tests do it).
+generated, not edited: re-run after every asset sync (scripts/setup.py and the tests do it).
 
 It also writes rom/proc_numbers.yaml, the P-ROC addresses of every switch, coil and light (hw_proc.yaml),
 from the SAM numbers in rom/*.yaml and hardware.yaml, in the strings libpinproc's decode() takes for
@@ -26,8 +26,8 @@ PROC_SOURCES = ["rom/switches.yaml", "rom/coils.yaml", "rom/lights.yaml", "hardw
 
 
 def _write(path, out):
-    if not os.path.exists(path) or open(path).read() != out:
-        with open(path, "w") as f:
+    if not os.path.exists(path) or open(path, encoding="utf-8").read() != out:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(out)
 
 
@@ -62,7 +62,7 @@ def gen_proc_numbers():
     for section in ("switches", "coils", "lights"):
         entries = []
         for source in PROC_SOURCES:
-            with open(os.path.join(CONFIG, source)) as f:
+            with open(os.path.join(CONFIG, source), encoding="utf-8") as f:
                 data = yaml.load(f) or {}
             for name, cfg in (data.get(section) or {}).items():
                 if cfg and "number" in cfg:
@@ -81,7 +81,7 @@ def gen_proc_numbers():
 def main():
     os.makedirs(DST, exist_ok=True)
     for name in FILES:
-        with open(os.path.join(SRC, name)) as f:
+        with open(os.path.join(SRC, name), encoding="utf-8") as f:
             body = f.read()
         # MPF 0.80 has no "flashers:" section; flashers are plain coils there.
         body = body.replace("\nflashers:\n", "\n# (flashers, as coils for MPF 0.80)\n")
