@@ -2,6 +2,7 @@ extends Node
 ## Renders GMC slides frame by frame for scripts/render_diff.py, without MPF:
 ##   godot --path game res://tools/slide_capture.tscn -- --job=/abs/job.json
 ## job.json: [{"slide": "deff_025", "kwargs": {"line1": "50,000"}, "times_ms": [0, 49, ...],
+##             optional "scene": "res://slides/service.tscn" (a slide other than slides/deffs/<slide>.tscn),
 ##             "out": "/abs/dir"}, ...]. For each time the slide's animation is put on the frame
 ## showing at that time, timed nodes (group "rom_timed": tron/rom_text.gd, tron/score_display.gd) are
 ## put at that time, and the 128x32 viewport is saved as out/frame_NNNNN.png. Quits when done.
@@ -19,7 +20,8 @@ func _ready() -> void:
 func _run(jobs: Array) -> void:
 	for job in jobs:
 		DirAccess.make_dir_recursive_absolute(job["out"])
-		var slide = load("res://slides/deffs/%s.tscn" % job["slide"]).instantiate()
+		var scene: String = job.get("scene", "res://slides/deffs/%s.tscn" % job["slide"])
+		var slide = load(scene).instantiate()
 		slide.initialize(job["slide"], {"key": job["slide"]}, "capture", 0, job.get("kwargs", {}))
 		add_child(slide)
 		var anim: AnimatedSprite2D = slide.get_node_or_null("Anim")

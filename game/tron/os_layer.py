@@ -201,6 +201,9 @@ class TronOS(CustomCode):
         ev = self.machine.events
         ev.add_handler("game_starting", self._game_starting, priority=1000)
         ev.add_handler("ball_starting", self._ball_starting, priority=1000)
+        # the ROM starts the next ball (and deff 19) as soon as the bonus ends [0x00020658]; MPF first waits
+        # for an empty playfield, so the score display comes back here (the screen was empty until then)
+        ev.add_handler("ball_will_start", lambda **kwargs: self.display.refresh())
         ev.add_handler("ball_started", self._ball_started, priority=1000)
         ev.add_handler("ball_drain", self._ball_drain, priority=1000)
         ev.add_handler("ball_ending", self._ball_ending, priority=1000)
@@ -457,17 +460,25 @@ class TronOS(CustomCode):
         self.display.music = call
         self.sound(call)
 
-    def sound(self, call, in_deff=0):
-        """snd_play(call): returns the time the picked sample ends (for sound_chain), or None."""
+    def sound(self, call, in_deff=0, index=None):
+        """snd_play(call): returns the time the picked sample ends (for sound_chain), or None.
+        index: the sample, when the caller picked it already (it needed its length)."""
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
         lengths = self.sample_lengths(call)
         if not lengths:
             self.media.sound(call)
             return None
-        i = self.pick("sample_0x{:03x}".format(call), [1] * len(lengths)) if len(lengths) > 1 else 0
+        if index is not None and index < len(lengths):
+            i = index
+        else:
+            i = self.pick("sample_0x{:03x}".format(call), [1] * len(lengths)) if len(lengths) > 1 else 0
         self.media.sound(call, i or 0)             # the media controller plays the same sample
         return self.now + lengths[i or 0]
+
+    def sound_stop(self, call):
+        """FUN_0002ceb4(call): stop the sample a sound call plays (e.g. the arcade reel's roll 0x0e1)."""
+        self.media.sound_stop(call)
 
     def sound_chain(self, call, after):
         """snd_play_chain [0x0002ca1c]: play `call` when the sample started by an earlier sound() ends."""
@@ -549,6 +560,11 @@ class TronOS(CustomCode):
         """Current player, 1-4 (0 when no game)."""
         game = self.machine.game
         return game.player.number if game and game.player else 0
+
+    def current_score(self):
+        """FUN_000233c8: the current player's score (gf_scores), as the deffs that print it read it."""
+        game = self.machine.game
+        return game.player.score if game and game.player else 0
 
     @property
     def pd(self):
@@ -1241,7 +1257,8 @@ class TronOS(CustomCode):
         self.eb_lamp_update()
 
     def collect_extra_ball(self):
-        """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points."""
+        """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points
+        (eb_paid: the points scored, which deff 133 prints)."""
         p = self.player_num - 1
         self.eb_lit[p] = max(0, self.eb_lit[p] - 1)
         self.eb_lamp_update()
@@ -1251,7 +1268,7 @@ class TronOS(CustomCode):
             self.audit(9)
             self.shoot_again_lamp_update()
             return True
-        self.score_add(3000000)
+        self.eb_paid = self.score_add(3000000)
         return False
 
     def light_special(self):

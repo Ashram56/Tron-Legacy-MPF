@@ -62,6 +62,7 @@ class Display:
                     self.background.add(deff_id)
         self.fg = None              # running foreground deff id
         self.show_held = False      # a show ended in this deff's hold: its rules refresh is due at its exit
+        self.arcade_held = False    # ... the Flynn's Arcade show 0x97: the score display comes back at its exit
         self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
         self.bg = None              # running background deff id
@@ -177,6 +178,7 @@ class Display:
             # (FUN_0100f164; clu_hurryup.jsonl 42.89 s: the music 0x01b as the reel's hold starts)
             if self.show.task_id == 0x97:
                 self.os.request_refresh()
+                self.arcade_held = True
             else:
                 self.show_held = True
             show, self.show = self.show, None
@@ -196,6 +198,8 @@ class Display:
             self._after_fg()
         elif self.bg == deff_id:
             self.bg = None
+            if self.fg is None:
+                self.refresh()                     # the rules' background deff comes back (deff 19)
 
     def set_hold_tail(self, deff_id, seconds):
         """deff_hold_frames(n, 0x20) [0x01024460] when a deff's hold is not the usual 10 ticks: for its last
@@ -250,23 +254,35 @@ class Display:
                 if self.os.tubes.is_running(tube):
                     self.os.tubes.stop(tube)
         self.fg = None
+        self.arcade_held = False
 
     def _ended(self, deff_id):
         self.fg_handle = None
         if self.fg != deff_id:
             return
+        arcade_end = self.arcade_held
         self._end_fg()
         # the deff rules restart a mode's background deff when the effect in front of it ends
         # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
         if self.mode_bg():
             self.start(self.mode_bg(), refresh=False)
             self.os.request_refresh()              # the same rules pass restarts the mode's tube show
+        elif arcade_end:
+            # the rules pass deferred during the Flynn's Arcade show 0x97 runs at its deff's exit and puts
+            # the score display back (traces/flynns_arcade.jsonl 19.36 s: deff 19 as deff 105 ends); without
+            # it the screen stayed empty until the next effect
+            self.refresh()
         self._after_fg()
 
     def _after_fg(self):
         if self.show:
             self._end_show()
         self._pump()
+        if self.fg is None and self.bg is None:
+            # nothing left on the display: the deff rules [0x000198a8] put the background deff back (the
+            # score display, or the mode's), as after every effect (traces/flynns_arcade.jsonl 19.36 s,
+            # end_of_line_multiball.jsonl 38.60 s: deff 19 as the effect in front ends)
+            self.refresh()
 
     def _end_show(self):
         show, self.show = self.show, None

@@ -20,13 +20,14 @@ rules below (bottom_offset, x_offset, SPACING, outline fonts -1, plain fonts +1)
 
 Output (git-ignored): game/fonts/rom_font_NN.fnt + rom_font_NN.png, and game/fonts/fonts.json
 (per font: image group, cap height, spacing, glyphs). For the HD display mode, game/fonts/hd/ holds the same
-44 fonts at FONT_SCALE pixels per dot (scripts/dmd_hd.py smooths each glyph; same metrics times the scale, so
-the text lands where the 128x32 layout puts it) and fonts_hd.json, the design of each font (style, weight,
-width) the HD font keeps. Usage: .venv/bin/python scripts/gen_fonts.py
+44 fonts as TrueType outlines traced from the dots (scripts/font_outline.py: rom_font_NN.ttf, the ROM's
+advances exactly, so the text lands where the 128x32 layout puts it, sharp at any resolution) with a glow
+atlas each (rom_font_NN_glow.fnt), and fonts_hd.json, the design (style, weight, width) and layers of each. Usage: .venv/bin/python scripts/gen_fonts.py
 """
 import io
 import json
 import os
+import shutil
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -303,56 +304,31 @@ def design(font, get):
             "condensed": width < 0.6, "shades": len(shades)}
 
 
-def write_bmfont_hd(font, get, out_dir, scale):
-    """The HD twin of write_bmfont: every glyph smoothed to `scale` pixels per dot (dmd_hd.upscale_glyph),
-    every metric times `scale`, glyphs packed in rows of at most 4096 pixels."""
-    from PIL import Image
-    import dmd_hd
-    name = "rom_font_%02d" % font["id"]
-    glyphs = sorted(font["glyphs"].items(), key=lambda kv: ord(kv[0]))
-    images = {c: dmd_hd.upscale_glyph(get(g["image"]), scale, font["outline"]) for c, g in glyphs}
-    gap = 2 * scale // 8 + 2                       # room for mipmaps between glyphs
-    places, x, y, row_h, width = {}, gap, gap, 0, 0
-    for c, g in glyphs:
-        w, h = images[c].size
-        if x + w + gap > 4096:
-            x, y, row_h = gap, y + row_h + gap, 0
-        places[c] = (x, y)
-        x += w + gap
-        row_h = max(row_h, h)
-        width = max(width, x)
-    height = y + row_h + gap
-    atlas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    lines = []
-    asc = font["ascent"]
-    for c, g in glyphs:
-        gx, gy = places[c]
-        atlas.paste(images[c], (gx, gy))
-        lines.append("char id=%d x=%d y=%d width=%d height=%d xoffset=%d yoffset=%d xadvance=%d page=0 chnl=15"
-                     % (ord(c), gx, gy, g["w"] * scale, g["h"] * scale, g["xoff"] * scale,
-                        (asc - g["h"] + g["below"]) * scale, (g["w"] + g["xoff"] + font["spacing"]) * scale))
-    atlas.save(os.path.join(out_dir, name + ".png"))
-    size = (asc + font["descent"]) * scale
-    head = ['info face="%s_hd" size=%d bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=1 aa=1 '
-            'padding=0,0,0,0 spacing=0,0 outline=0' % (name, size),
-            "common lineHeight=%d base=%d scaleW=%d scaleH=%d pages=1 packed=0 alphaChnl=0 redChnl=0 "
-            "greenChnl=0 blueChnl=0" % (size, asc * scale, width, height),
-            'page id=0 file="%s.png"' % name, "chars count=%d" % len(glyphs)]
-    with open(os.path.join(out_dir, name + ".fnt"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(head + lines) + "\n")
-    return name
-
-
-def build_hd(fonts, get, out_dir, scale=None):
-    """game/fonts/hd/: the HD font of every ROM font, and fonts_hd.json (scale, design per font)."""
-    import dmd_hd
-    scale = scale or dmd_hd.FONT_SCALE
-    os.makedirs(out_dir, exist_ok=True)
-    for f in fonts:
-        write_bmfont_hd(f, get, out_dir, scale)
+def build_hd(fonts, get, out_dir, processes=None):
+    """game/fonts/hd/: the vector (TrueType) font and the glow atlas of every ROM font (scripts/font_outline.py)
+    and fonts_hd.json (design and layers per font). Without fontTools the HD fonts are left out (the HD
+    mode then shows the classic DMD) and False is returned."""
+    try:
+        import fontTools  # noqa: F401
+    except ImportError:
+        print("fonts: no fontTools (pip install fonttools, or run scripts/setup.py): no HD fonts")
+        shutil.rmtree(out_dir, ignore_errors=True)
+        return False
+    import font_outline
+    shutil.rmtree(out_dir, ignore_errors=True)
+    os.makedirs(out_dir)
+    jobs = [(f, out_dir) for f in fonts]
+    if processes == 1:
+        entries = [font_outline.build_font(j) for j in jobs]
+    else:
+        import multiprocessing
+        with multiprocessing.Pool(processes or os.cpu_count() or 2) as pool:
+            entries = pool.map(font_outline.build_font, jobs, chunksize=1)
     with open(os.path.join(out_dir, "fonts_hd.json"), "w", encoding="utf-8", newline="\n") as fp:
-        json.dump({"scale": scale, "fonts": [dict(design(f, get), file="rom_font_%02d.fnt" % f["id"])
-                                             for f in fonts]}, fp, indent=0, sort_keys=True)
+        json.dump({"vector": True, "version": font_outline.VERSION,
+                   "fonts": [dict(design(f, get), **e) for f, e in zip(fonts, entries)]},
+                  fp, indent=0, sort_keys=True)
+    return True
 
 
 def build(out_dir=OUT, hd=True):

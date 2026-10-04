@@ -11,6 +11,7 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
+    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (0 = none)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -18,6 +19,7 @@ stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xv
 import argparse
 import errno
 import os
+import re
 import shutil
 import signal
 import socket
@@ -155,9 +157,10 @@ def engine_arg(gargs, *args):
     return gargs[:at] + list(args) + gargs[at:]
 
 
-def dmd_args(gargs, dmd=None, dots=None, size=None):
-    """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, and the window
-    size (Godot's --resolution WxH). None leaves the choice to TRON_DMD / the project setting (hd)."""
+def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None):
+    """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, the window
+    size (Godot's --resolution WxH), and the HD text style (--dmd-text-color=#RRGGBB, --dmd-text-glow=X).
+    None leaves the choice to TRON_DMD... / the project settings (hd, #2a6cff, 0.8)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
     if dots is not None:
@@ -167,6 +170,12 @@ def dmd_args(gargs, dmd=None, dots=None, size=None):
         if not (w.isdigit() and h.isdigit()):
             raise SystemExit("--dmd-size: expected WIDTHxHEIGHT, for example 1920x480, not " + size)
         gargs = engine_arg(gargs, "--resolution", "{}x{}".format(int(w), int(h)))
+    if text_color:
+        if not re.fullmatch(r"#?[0-9a-fA-F]{6}", text_color):
+            raise SystemExit("--dmd-text-color: expected a colour like #2a6cff, not " + text_color)
+        gargs = user_arg(gargs, "--dmd-text-color=#" + text_color.lstrip("#"))
+    if text_glow is not None:
+        gargs = user_arg(gargs, "--dmd-text-glow={:g}".format(text_glow))
     return gargs
 
 
@@ -280,13 +289,18 @@ def main(argv=None):
     p.add_argument("--dmd-dots", type=int, metavar="N",
                    help="hd only: dot-matrix look with N dots per DMD dot (1 = the 128x32 grid; 0 = off, default)")
     p.add_argument("--dmd-size", metavar="WxH", help="DMD window size, for example 1920x480 (default 1024x256)")
+    p.add_argument("--dmd-text-color", metavar="#RRGGBB",
+                   help="hd only: text colour (default #2a6cff, a Tron blue). Also TRON_DMD_TEXT_COLOR")
+    p.add_argument("--dmd-text-glow", type=float, metavar="X",
+                   help="hd only: strength of the glow around the text (default 0.8, 0 = none). Also TRON_DMD_TEXT_GLOW")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, monitor=args.monitor, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
-               free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size),
+               free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
+                                                     args.dmd_text_color, args.dmd_text_glow),
                trace=args.trace and os.path.abspath(args.trace))
 
 
