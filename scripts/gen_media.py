@@ -31,6 +31,8 @@ import re
 import shutil
 import sys
 
+import fsutil  # Windows/OneDrive-safe folder wipes
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
@@ -386,8 +388,7 @@ def build_deffs(only_data):
         if only_data:
             continue
         rel = "media/dmd/deff_{:03d}".format(deff_id)    # also a res:// path: "/" on every OS
-        shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
-        os.makedirs(os.path.join(GAME, rel))
+        fsutil.clear_dir(os.path.join(GAME, rel))
         if source == "arcade":
             arcade_slide(folder, rel, panel)
             continue

@@ -13,7 +13,17 @@
 # 3.11 installer (universal2 .pkg, needs an admin password) and Git from the Xcode Command Line Tools.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Run from a clone, it sets up that clone. Run on its own (fetched with curl, README "Install"), it first
+# clones the repository into $TRON_DIR (default ~/Tron-Legacy-MPF), branch $TRON_BRANCH (default phase11-hd
+# until the phase branches merge into main), from $TRON_REPO; an existing clone there gets a git pull.
+SRC="${BASH_SOURCE[0]:-}"
+if [ -n "$SRC" ] && [ -f "$(dirname "$SRC")/../setup.py" ]; then
+    ROOT="$(cd "$(dirname "$SRC")/../.." && pwd)" CLONE=0
+else
+    ROOT="${TRON_DIR:-$HOME/Tron-Legacy-MPF}" CLONE=1
+fi
+REPO_URL="${TRON_REPO:-https://github.com/Ashram56/Tron-Legacy-MPF.git}"
+REPO_BRANCH="${TRON_BRANCH:-phase11-hd}"
 HERE="$ROOT/scripts/install"
 # The last Python 3.11 release with a macOS installer (later 3.11 releases are source-only security fixes)
 PYORG_VERSION="3.11.9"
@@ -140,6 +150,17 @@ if [ "$PROC" = 1 ]; then
     brew_install cmake pkg-config libusb libusb-compat libftdi
 fi
 
+# ------------------------------------------------------------------ repository (run on its own: clone it)
+
+if [ "$CLONE" = 1 ]; then
+    say "Repository: $REPO_URL ($REPO_BRANCH) in $ROOT"
+    if [ -d "$ROOT/.git" ]; then
+        run git -C "$ROOT" pull --ff-only
+    else
+        run git clone --branch "$REPO_BRANCH" "$REPO_URL" "$ROOT"
+    fi
+fi
+
 # ------------------------------------------------------------------ workspace
 
 if [ "$SETUP" = 1 ]; then
@@ -165,6 +186,7 @@ fi
 
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
+    note "In $ROOT:"
     note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
     note "Run the tests:   .venv/bin/python -m pytest -q tests"
 fi
