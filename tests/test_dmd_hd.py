@@ -232,11 +232,12 @@ class TestRunSwitches(unittest.TestCase):
 
 
 # Pixel hashes (sha1 of the RGBA dots, 16 hex digits) of 128x32 frames rendered before the HD mode existed
-# (phase10-docker 662f0a8): classic mode must keep giving these. Times 0, 400 and 1600 ms.
+# (phase10-docker 662f0a8; deff 46 re-taken at 38a1bf2, whose status panel changed): classic mode must keep
+# giving these. Times 0, 400 and 1600 ms.
 CLASSIC = {
     "deff_019": ["4c202f8e88fbe459", "ceff80ed506ad992", "ceff80ed506ad992"],
     "deff_025": ["d37ed2eab53a1001", "d37ed2eab53a1001", "d37ed2eab53a1001"],
-    "deff_046": ["bf7708db11dc8854", "04cca43df9dd0e4c", "3e055f3406cf6f2d"],
+    "deff_046": ["669370d0afb62c1d", "46317d7624939fbf", "3e055f3406cf6f2d"],
     "deff_091": ["5389647d8fd053ff", "5389647d8fd053ff", "0b25fcc7236c9b02"],
     "deff_143": ["6507f3260bdb28ac", "c3c251af5390289d", "2b45f48506dd629c"],
 }
