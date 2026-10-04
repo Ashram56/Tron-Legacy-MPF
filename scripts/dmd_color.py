@@ -297,7 +297,6 @@ def serum_deff(job):
     """(folder, dst folder, scale, crom sha1, cache dir) -> palettes.json entry of the effect, its frames
     written in Serum colours; None when the colourisation knows none of its frames (writes nothing)."""
     import glob
-    import shutil
     import serum
     from PIL import Image
     folder, dst, f, crom_key, cache = job
@@ -317,7 +316,7 @@ def serum_deff(job):
         if entry is not None:
             os.makedirs(dst, exist_ok=True)
             for n in names:
-                shutil.copyfile(os.path.join(cached, n), os.path.join(dst, n))
+                fsutil.copy_file(os.path.join(cached, n), os.path.join(dst, n))
         return entry
     s = _serum
     s.reset()
@@ -364,14 +363,14 @@ def serum_deff(job):
         os.makedirs(tmp, exist_ok=True)
         if entry is not None:
             for n in names:
-                shutil.copyfile(os.path.join(dst, n), os.path.join(tmp, n))
+                fsutil.copy_file(os.path.join(dst, n), os.path.join(tmp, n))
         with open(os.path.join(tmp, "entry.json"), "w", encoding="utf-8") as fp:
             json.dump(entry, fp)
         try:
             os.replace(tmp, cached)
         except OSError:
             # another worker cached the same effect (same key, same frames) first
-            shutil.rmtree(tmp, ignore_errors=True)
+            fsutil.remove_dir(tmp)
     return entry
 
 
