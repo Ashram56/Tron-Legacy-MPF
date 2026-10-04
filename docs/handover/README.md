@@ -30,3 +30,4 @@ Not covered here: DMD colorization (its own branch and docs).
 | Asset/spec repo (ROM-derived) | `Ashram56/Tron-Legacy-LE-ROM-Decryption`, git submodule at `assets/` |
 | ROM | Tron Legacy LE v1.74, PinMAME set `trn_174h`; the ROM binary is in neither repo |
 | User docs | `README.md`, `docs/requirements.md`, `docs/hardware.md` (P-ROC), `docs/vpx.md` (Visual Pinball X) |
+| Departures from the ROM | `docs/rom_differences.md`: read before changing a rule; add every new departure there |
