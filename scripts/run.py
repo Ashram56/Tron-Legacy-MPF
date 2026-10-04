@@ -11,7 +11,7 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
-    python scripts/run.py --dmd-color off          # hd with the animations in the DMD's single colour (default: on)
+    python scripts/run.py --dmd-color on           # hd with the animations in colour (default: off, the DMD's colour)
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
     python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0 = none)
 
@@ -309,8 +309,8 @@ def main(argv=None):
     p.add_argument("--dmd-dots", type=int, metavar="N",
                    help="hd only: dot-matrix look with N dots per DMD dot (1 = the 128x32 grid; 0 = off, default)")
     p.add_argument("--dmd-color", choices=["on", "off"],
-                   help="hd only: the effects' animations in colour (on, default: each effect's palette, inspired by "
-                        "the Tron Legacy PuP-Pack videos) or in the DMD's single colour (off). Also TRON_DMD_COLOR")
+                   help="hd only: the effects' animations in colour (on: each effect's palette, inspired by the Tron "
+                        "Legacy PuP-Pack videos) or in the DMD's single colour (off, default). Also TRON_DMD_COLOR")
     p.add_argument("--dmd-size", metavar="WxH", help="DMD window size, for example 1920x480 (default 1024x256)")
     p.add_argument("--dmd-tint", choices=["blue", "orange"],
                    help="hd only: DMD colour, text and effects: blue (default, Tron blue #2a6cff) or orange (the "

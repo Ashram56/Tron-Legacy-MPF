@@ -27,7 +27,7 @@ extends Node
 ## (first match wins, left to right). The tint picks the default colours: blue #2a6cff (glow #22b8ff), or
 ## orange #ff730d (glow #ff9a3c), the classic DMD's.
 ## Animation colour (HD only): --dmd-color=on|off (scripts/run.py --dmd-color; or TRON_DMD_COLOR=on|off, or the project
-## setting tron/dmd/color, default "on"). On, the effects' animation frames show their colour twins of
+## setting tron/dmd/color, default "off"). On, the effects' animation frames show their colour twins of
 ## media/dmd_hd_color/ (scripts/dmd_color.py: each effect's 16 shades mapped to a palette inspired by the
 ## PuP-Pack video of that moment; 2x, 256x64, made with Scale2x, drawn with nearest filtering) untinted;
 ## off, the grey HD frames in the DMD colour above. Text drawn live (tron/rom_text.gd, letter_panel.gd,
@@ -83,7 +83,7 @@ static func choose_color(args: PackedStringArray, env_color: String, setting: St
 				return c == "on"
 	if env_color.to_lower() in ["on", "off"]:
 		return env_color.to_lower() == "on"
-	return setting.to_lower() != "off"
+	return setting.to_lower() == "on"
 
 
 ## The text style from the user args, the environment and the project settings (first match wins): {"tint",
@@ -156,7 +156,7 @@ func _enter_tree() -> void:
 		elif a.begins_with("--dmd-dots="):
 			dots = int(a.trim_prefix("--dmd-dots="))
 	color = choose_color(args, OS.get_environment("TRON_DMD_COLOR"),
-		str(ProjectSettings.get_setting("tron/dmd/color", "on"))) \
+		str(ProjectSettings.get_setting("tron/dmd/color", "off"))) \
 		and FileAccess.file_exists(MEDIA_COLOR + "palettes.json")
 	if color:
 		var cinfo = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_COLOR + "palettes.json"))

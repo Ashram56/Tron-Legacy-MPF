@@ -242,6 +242,10 @@ class TestGodotColor(unittest.TestCase):
         got = {s: [hashlib.sha1(f.convert("RGBA").tobytes()).hexdigest()[:16] for f in self.frames(out, s)]
                for s in HD_MONO}
         self.assertEqual(HD_MONO, got)
+        out = self.render(HD_MONO, ["--dmd=hd"], ["--resolution", "1280x320"])      # off is the default
+        got = {s: [hashlib.sha1(f.convert("RGBA").tobytes()).hexdigest()[:16] for f in self.frames(out, s)]
+               for s in HD_MONO}
+        self.assertEqual(HD_MONO, got)
 
     def test_colour_on(self):
         import colorsys
