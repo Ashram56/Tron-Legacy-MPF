@@ -299,6 +299,21 @@ class TestGodotModes(unittest.TestCase):
         score = Image.open(os.path.join(out, "deff_019", "frame_00002.png"))
         self.assertEqual((1280, 320), score.size)
 
+    def test_hd_default_is_single_colour(self):
+        """The HD animations are in the DMD's one colour (Tron blue, level for level), never multicoloured:
+        every lit pixel of the deff 46 animation is a shade of #2a6cff."""
+        from PIL import Image
+        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
+        paths = sorted(glob.glob(os.path.join(out, "deff_046", "*.png")))
+        self.assertEqual(3, len(paths))
+        for path in paths:
+            img = Image.open(path).convert("RGB")
+            px = [p for p in img.getdata() if max(p) > 40]
+            self.assertTrue(px)
+            for r, g, b in px[::50]:
+                self.assertTrue(abs(r / b - 0x2a / 0xff) < 0.08 and abs(g / b - 0x6c / 0xff) < 0.08, (r, g, b))
+        self.assertFalse(os.path.exists(os.path.join(GAME, "media", "dmd_hd_color")))
+
     def test_text_style(self):
         """HD text is in the text colour (default the Tron blue #2a6cff), without glow by default; the effect
         frames, the letters and the score panel follow; --dmd-tint=orange is the original colour;
@@ -309,7 +324,7 @@ class TestGodotModes(unittest.TestCase):
             img = Image.open(path).convert("RGB")
             px = img.load()
             return img, px
-        out = self.render(["--dmd=hd", "--dmd-color=off"], ["--resolution", "1280x320"])   # mono animations
+        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
         img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
         core = [px[x, y] for x in range(img.width) for y in range(img.height) if px[x, y][2] > 200]
         self.assertGreater(len(core), 2000)
@@ -325,7 +340,7 @@ class TestGodotModes(unittest.TestCase):
         lit = [ap[x, y] for x in range(0, art.width, 3) for y in range(0, art.height, 3) if sum(ap[x, y]) > 200]
         self.assertTrue(lit and all(b > r for r, g, b in lit))                  # the animation too
         # the original orange: text and animation
-        out = self.render(["--dmd=hd", "--dmd-tint=orange", "--dmd-color=off"], ["--resolution", "1280x320"])
+        out = self.render(["--dmd=hd", "--dmd-tint=orange"], ["--resolution", "1280x320"])
         img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
         core = [px[x, y] for x in range(img.width) for y in range(img.height) if px[x, y][0] > 200]
         self.assertGreater(len(core), 2000)

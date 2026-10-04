@@ -9,8 +9,6 @@ self-contained: read only the one your task needs.
 | [dmd_hd_upscaling.md](dmd_hd_upscaling.md) | You work on the optional HD display (128x32 DMD drawn at any window size). Separate from the rules work on purpose. | ~5 min |
 | [rom_decomp_feedback.md](rom_decomp_feedback.md) | Hand this to the agent that decompiles the ROM and produces the asset/spec repo. What the MPF build consumed, what was missing or wrong, and what to deliver for the next game. | ~8 min |
 
-Not covered here: DMD colorization (its own branch and docs).
-
 ## Token rules for the agent taking over
 
 1. Read this README, then one doc above. Do not read the whole repo: every doc names the exact file to open.

@@ -10,7 +10,7 @@
 Steps: the assets submodule; .venv/ with the pinned MPF, pillow and pytest; Godot (official build for the
 host) in tools/godot/; the GMC add-on in game/addons/mpf-gmc/; the generated MPF config and media
 (scripts/gen_config.py, scripts/gen_media.py, which also builds the HD DMD fonts and frames with
-scripts/dmd_hd.py, and the HD colour frames with scripts/dmd_color.py); the Godot import (game/.godot/).
+scripts/dmd_hd.py); the Godot import (game/.godot/).
 Versions and paths live in scripts/toolchain.py.
 """
 import argparse

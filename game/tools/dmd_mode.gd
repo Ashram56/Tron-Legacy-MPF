@@ -26,18 +26,11 @@ extends Node
 ##   glow         --dmd-text-glow=X             TRON_DMD_TEXT_GLOW        tron/dmd/text_glow        (0 = none)
 ## (first match wins, left to right). The tint picks the default colours: blue #2a6cff (glow #22b8ff), or
 ## orange #ff730d (glow #ff9a3c), the classic DMD's.
-## Animation colour (HD only): --dmd-color=on|off (scripts/run.py --dmd-color; or TRON_DMD_COLOR=on|off, or the project
-## setting tron/dmd/color, default "off"). On, the effects' animation frames show their colour twins of
-## media/dmd_hd_color/ (scripts/dmd_color.py: each effect's 16 shades mapped to a palette inspired by the
-## PuP-Pack video of that moment; 2x, 256x64, made with Scale2x, drawn with nearest filtering) untinted;
-## off, the grey HD frames in the DMD colour above. Text drawn live (tron/rom_text.gd, letter_panel.gd,
-## score_display.gd) keeps the colour above.
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
 
 const MEDIA := "res://media/dmd/"
 const MEDIA_HD := "res://media/dmd_hd/"
-const MEDIA_COLOR := "res://media/dmd_hd_color/"
 const DOTS_SHADER := "res://tools/dmd_dots.gdshader"
 const TINTS := {"blue": ["#2a6cff", "#22b8ff"], "orange": ["#ff730d", "#ff9a3c"]}
 const DEFAULT_TINT := "blue"
@@ -48,14 +41,11 @@ const DEFAULT_GLOW := 0.0
 var mode := "classic"
 var hd := false
 var dots := 0
-var color := false
 var frame_scale := 8
-var color_scale := 2
 var text_color := Color(DEFAULT_TEXT_COLOR)
 var glow_color := Color(DEFAULT_GLOW_COLOR)
 var glow := DEFAULT_GLOW
 var _frames_hd := {}
-var _colored := {}
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -72,18 +62,6 @@ static func choose(args: PackedStringArray, env_mode: String, setting: String) -
 	if env_mode.to_lower() in ["hd", "classic"]:
 		return env_mode.to_lower()
 	return "hd" if setting.to_lower() == "hd" else "classic"
-
-
-## HD colour on or off: --dmd-color=on|off, then TRON_DMD_COLOR, then the project setting.
-static func choose_color(args: PackedStringArray, env_color: String, setting: String) -> bool:
-	for a in args:
-		if a.begins_with("--dmd-color="):
-			var c := a.trim_prefix("--dmd-color=").to_lower()
-			if c in ["on", "off"]:
-				return c == "on"
-	if env_color.to_lower() in ["on", "off"]:
-		return env_color.to_lower() == "on"
-	return setting.to_lower() == "on"
 
 
 ## The text style from the user args, the environment and the project settings (first match wins): {"tint",
@@ -155,13 +133,6 @@ func _enter_tree() -> void:
 			dots = 2
 		elif a.begins_with("--dmd-dots="):
 			dots = int(a.trim_prefix("--dmd-dots="))
-	color = choose_color(args, OS.get_environment("TRON_DMD_COLOR"),
-		str(ProjectSettings.get_setting("tron/dmd/color", "off"))) \
-		and FileAccess.file_exists(MEDIA_COLOR + "palettes.json")
-	if color:
-		var cinfo = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_COLOR + "palettes.json"))
-		if cinfo is Dictionary:
-			color_scale = int(cinfo.get("scale", color_scale))
 	var env := {}
 	for k in ["TRON_DMD_TINT", "TRON_DMD_TEXT_COLOR", "TRON_DMD_TEXT_GLOW_COLOR", "TRON_DMD_TEXT_GLOW"]:
 		env[k] = OS.get_environment(k)
@@ -182,7 +153,7 @@ func _enter_tree() -> void:
 	root.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
 	root.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	get_tree().node_added.connect(_on_node_added)
-	print("DMD: hd mode, window %s%s%s, text %s glow %s x%.2f" % [root.size, ", colour" if color else "",
+	print("DMD: hd mode, window %s%s, text %s glow %s x%.2f" % [root.size,
 		(", dot-matrix look %d" % dots) if dots > 0 else "", text_color.to_html(false), glow_color.to_html(false), glow])
 
 
@@ -201,33 +172,17 @@ func _ready() -> void:
 		add_child(layer)
 
 
-## The HD twin of a classic DMD picture (its colour twin with in_color, when there is one), or null.
-func hd_texture(tex: Texture2D, in_color := false) -> Texture2D:
+## The HD twin of a classic DMD picture, or null.
+func hd_texture(tex: Texture2D) -> Texture2D:
 	if tex == null or not tex.resource_path.begins_with(MEDIA):
 		return null
-	var rel := tex.resource_path.trim_prefix(MEDIA)
-	if in_color and ResourceLoader.exists(MEDIA_COLOR + rel):
-		return load(MEDIA_COLOR + rel)
-	var path := MEDIA_HD + rel
+	var path := MEDIA_HD + tex.resource_path.trim_prefix(MEDIA)
 	return load(path) if ResourceLoader.exists(path) else null
 
 
-## The HD frames of an effect animation: all in colour (color on and every frame has its colour twin), else
-## all grey; the classic frames when an HD twin is missing.
 func _hd_frames(frames: SpriteFrames) -> SpriteFrames:
 	if _frames_hd.has(frames):
 		return _frames_hd[frames]
-	if color:
-		var colored := _twin_frames(frames, true)
-		if colored != frames:
-			_frames_hd[frames] = colored
-			_colored[colored] = true
-			return colored
-	_frames_hd[frames] = _twin_frames(frames, false)
-	return _frames_hd[frames]
-
-
-func _twin_frames(frames: SpriteFrames, in_color: bool) -> SpriteFrames:
 	var out := SpriteFrames.new()
 	var complete := true
 	for anim in frames.get_animation_names():
@@ -237,12 +192,11 @@ func _twin_frames(frames: SpriteFrames, in_color: bool) -> SpriteFrames:
 		out.set_animation_speed(anim, frames.get_animation_speed(anim))
 		for i in frames.get_frame_count(anim):
 			var tex := frames.get_frame_texture(anim, i)
-			var big := hd_texture(tex, in_color)
-			if in_color and big and not big.resource_path.begins_with(MEDIA_COLOR):
-				big = null
+			var big := hd_texture(tex)
 			complete = complete and big != null
 			out.add_frame(anim, big if big else tex, frames.get_frame_duration(anim, i))
-	return out if complete else frames
+	_frames_hd[frames] = out if complete else frames
+	return _frames_hd[frames]
 
 
 func _on_node_added(node: Node) -> void:
@@ -256,13 +210,7 @@ func _on_node_added(node: Node) -> void:
 		var sprite := node as AnimatedSprite2D
 		if sprite.sprite_frames and sprite.sprite_frames != _hd_frames(sprite.sprite_frames):
 			sprite.sprite_frames = _hd_frames(sprite.sprite_frames)
-			if _colored.has(sprite.sprite_frames):     # the colours are in the frames: no DMD tint
-				sprite.scale = sprite.scale / color_scale
-				sprite.modulate = Color(1, 1, 1, sprite.modulate.a)
-				if color_scale <= 2:                   # 2x pixel art (Scale2x): crisp dots, not blurred
-					sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			else:
-				sprite.scale = sprite.scale / frame_scale
+			sprite.scale = sprite.scale / frame_scale
 	elif node is Sprite2D:
 		var s := node as Sprite2D
 		var big := hd_texture(s.texture)

@@ -24,7 +24,6 @@ departs from the ROM, for example a new mode.
 | DMD look | 128x32 orange dots | HD by default: vector fonts and upscaled animations, drawn at any window size | `run.py --dmd classic` (exact ROM output; always used on the P-ROC and for render checks) |
 | DMD colour | orange | Tron blue, text and animations | `--dmd-tint orange` |
 | Text glow | none | none by default; optional glow | default (`--dmd-text-glow X` adds one) |
-| Animation colour | single colour | single colour by default; optional film-inspired palettes | default (`--dmd-color on` adds colour) |
 | Pricing on the desktop | coins (factory settings) | free play with virtual hardware | `run.py --no-free-play` |
 | Hardware | SAM CPU board | MPF on virtual hardware, a P-ROC, or the Visual Pinball X table | `--hw proc` drives the original driver boards |
 
