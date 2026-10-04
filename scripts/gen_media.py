@@ -418,7 +418,7 @@ def build_hd_frames(scale=None):
     scale = scale or dmd_hd.FRAME_SCALE
     src_root = os.path.join(GAME, "media", "dmd")
     dst_root = os.path.join(GAME, "media", "dmd_hd")
-    shutil.rmtree(dst_root, ignore_errors=True)
+    fsutil.remove_dir(dst_root)
     jobs = []
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
@@ -440,8 +440,8 @@ def main():
         gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
-        shutil.rmtree(os.path.join(GAME, "fonts", "hd"), ignore_errors=True)
-        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd"), ignore_errors=True)
+        fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
     if hd and not only_data:
         print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:

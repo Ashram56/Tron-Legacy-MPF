@@ -65,6 +65,19 @@ class TestFsutil(unittest.TestCase):
             fsutil.replace(tmp, self.file)
         self.assertEqual(len(calls), 3)
 
+    def test_replace_cached_keeps_an_entry_another_worker_holds(self):
+        tmp = os.path.join(self.tmp, "t")
+        open(tmp, "w").close()
+        with mock.patch.object(fsutil.os, "replace", side_effect=PermissionError("held")), \
+                mock.patch.object(fsutil, "PAUSE", 0):
+            fsutil.replace_cached(tmp, self.file)          # the entry is there: tmp is dropped
+            self.assertFalse(os.path.exists(tmp))
+            open(tmp, "w").close()
+            with self.assertRaises(PermissionError):         # no entry: the failure is real
+                fsutil.replace_cached(tmp, os.path.join(self.tmp, "missing"))
+        with open(self.file) as f:
+            self.assertEqual(f.read(), "old")
+
 
 if __name__ == "__main__":
     unittest.main()
