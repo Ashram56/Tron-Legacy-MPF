@@ -95,7 +95,7 @@ The upstream MPF game keeps changing (rules, DMD animations). Its history is thi
 upstream changes merge in:
 
 ```sh
-python scripts/sync_upstream.py                 # merges upstream/phase10-docker, then re-checks everything
+python scripts/sync_upstream.py                 # merges upstream/phase12-color (the newest phase), then re-checks everything
 python scripts/sync_upstream.py --branch main   # once upstream has merged its phase branches into main
 ```
 

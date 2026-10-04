@@ -52,9 +52,8 @@ def main(argv=None):
     subprocess.run(["git", "submodule", "update", "--init", "--depth", "1"], cwd=tc.ROOT, env=env, check=True)
     py = tc.python()
     failed = []
-    for name, cmd in (("generated config", [py, "scripts/gen_config.py"]),
-                      ("generated media", [py, "scripts/gen_media.py"]),
-                      ("PuP media", [py, "scripts/gen_pup.py"]),
+    for name, cmd in (("setup (new requirements, generated config and media, PuP media, Godot import)",
+                       [sys.executable, "scripts/setup.py"]),
                       ("PuP capture match", [py, "scripts/pup_captures.py"]),
                       ("unit tests", [py, "-m", "pytest", "-q", "tests"])):
         if step(cmd):

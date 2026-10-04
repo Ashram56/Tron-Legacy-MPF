@@ -208,11 +208,14 @@ func _make_dmd_window() -> void:
 	dmd.texture = get_tree().root.get_texture()
 	dmd.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	dmd.stretch_mode = TextureRect.STRETCH_SCALE
-	dmd.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# the game's HD DMD mode (tools/dmd_mode.gd) draws smooth text at its window's size and has its own dots
+	var dmd_mode = get_node_or_null("/root/DmdMode")
+	var hd: bool = dmd_mode != null and bool(dmd_mode.get("hd"))
+	dmd.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
 	dmd.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dmd.size = dmd_size * k
 	dmd.position = dmd_rect.position + (dmd_rect.size - dmd.size) * 0.5
-	if bool(setting("dmd", "dots", true)):
+	if bool(setting("dmd", "dots", true)) and not hd:
 		var mat := ShaderMaterial.new()
 		mat.shader = DOTS_SHADER
 		mat.set_shader_parameter("dmd_size", dmd_size)
