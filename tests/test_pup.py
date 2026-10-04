@@ -45,6 +45,20 @@ class TestSetup(unittest.TestCase):
                      "native_video.windows.debug.x86_64.dll"):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
 
+    def test_gozen_on_linux_only(self):
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        import pup_setup
+        self.assertTrue(pup_setup.gozen("linux", "arm64"))
+        self.assertTrue(pup_setup.gozen("linux", "x86_64"))
+        self.assertFalse(pup_setup.gozen("windows", "x86_64"))
+        self.assertFalse(pup_setup.gozen("macos", "arm64"))
+        with mock.patch.dict(os.environ, {"TRON_GOZEN": "0"}):
+            self.assertFalse(pup_setup.gozen("linux", "arm64"))
+        for name in ("gozen.gdextension", "video_playback.gd", "yuv_to_rgb_compatibility.gdshader",
+                     "bin/libgozen.linux.template_release.arm64.so",
+                     "bin/libgozen.linux.template_release.x86_64.so"):
+            self.assertTrue(os.path.exists(os.path.join(pup_setup.GOZEN_SRC, name)), name)
+
 
 @unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
 class TestEngine(unittest.TestCase):

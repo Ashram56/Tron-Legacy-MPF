@@ -31,6 +31,10 @@ var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
 ## The native_video add-on (Windows, pup_addons/native_video): plays the pack's mp4s without conversion
 var native_video := ClassDB.class_exists("NativeVideoStream")
+## GDE GoZen (Linux, pup_addons/gde_gozen): FFmpeg, plays the pack's mp4s without conversion, with the Jetson's
+## hardware decoder when libnvmpi is installed; the screens then use game/pup/gozen_player.gd
+var gozen := not native_video and ClassDB.class_exists("GoZenVideo") \
+	and ResourceLoader.exists("res://addons/gde_gozen/video_playback.gd")
 
 
 func _ready() -> void:
@@ -340,13 +344,13 @@ func pick(playlist: String, file: String) -> String:
 	return media_path(key)
 
 
-## Where a pack file plays from: the pack's own video with the native_video add-on, else the converted copy.
+## Where a pack file plays from: the pack's own video with the native_video add-on or GoZen, else the converted copy.
 func media_path(key: String) -> String:
 	var entry: Dictionary = manifest[key]
-	if native_video and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
+	if (native_video or gozen) and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
 		return pack_dir.path_join(key)
 	if not entry.has("out"):
-		push_warning("PuP: %s was not converted (gen_pup.py --native) and the native_video add-on is not loaded" % key)
+		push_warning("PuP: %s was not converted (gen_pup.py --native) and no video add-on is loaded" % key)
 		return ""
 	return media_dir.path_join(entry.out)
 

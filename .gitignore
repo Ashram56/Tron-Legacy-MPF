@@ -21,4 +21,5 @@ game/fonts/
 /pup_media/
 game/pup.local.cfg
 game/addons/native_video/
+game/addons/gde_gozen/
 .cache/

@@ -2,7 +2,8 @@
 """The PuP Pack part of the workspace: setup.py and run.py call it, or run it on its own.
 
     python scripts/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
-                                           # (Windows: the native_video add-on, which plays the mp4s as they are)
+                                           # (Windows: the native_video add-on, Linux: GDE GoZen, which
+                                           # play the mp4s as they are)
     python scripts/pup_setup.py --status   # one line: is the PuP on, and if not why
 
 Kept out of setup.py and run.py (upstream files, one-line hooks only) so upstream merges stay clean.
@@ -42,17 +43,36 @@ NATIVE_DST = os.path.join(tc.GAME, "addons", "native_video")
 NATIVE_MIN_GODOT = (4, 6)           # native_video.gdextension compatibility_minimum
 
 
+GOZEN_SRC = os.path.join(tc.ROOT, "pup_addons", "gde_gozen")
+GOZEN_DST = os.path.join(tc.GAME, "addons", "gde_gozen")
+
+
 def native_video(os_name=None):
     """True where the PuP plays the pack's mp4s with the native_video add-on (Windows, Godot 4.6+): Godot's
-    own player only does Theora, so elsewhere the videos are converted."""
+    own player only does Theora, so elsewhere the videos are converted (or played by GoZen, gozen())."""
     godot = tuple(int(n) for n in tc.GODOT_VERSION.split(".")[:2])
     return tc.host_os(os_name) == "windows" and godot >= NATIVE_MIN_GODOT
+
+
+def gozen(os_name=None, arch=None):
+    """True where the PuP plays the pack's mp4s with GDE GoZen (Linux x86_64 and arm64: FFmpeg, with the Jetson's
+    hardware decoder when libnvmpi is installed, see pup_addons/gde_gozen/README.md). TRON_GOZEN=0 converts
+    the videos to Theora instead."""
+    if os.environ.get("TRON_GOZEN", "").strip().lower() in ("0", "false", "no", "off"):
+        return False
+    return tc.host_os(os_name) == "linux" and tc.host_arch(arch) in ("x86_64", "arm64")
 
 
 def install_native_video():
     """Copies pup_addons/native_video (the build with the gdzig heap fix, see its FIX.md) to game/addons/."""
     say("   native_video add-on -> game/addons/native_video (the pack's mp4s play without conversion)")
     fsutil.copy_tree(NATIVE_SRC, NATIVE_DST)
+
+
+def install_gozen():
+    """Copies pup_addons/gde_gozen (GoZen built for this repo, see its README.md) to game/addons/."""
+    say("   GDE GoZen add-on -> game/addons/gde_gozen (the pack's mp4s play without conversion)")
+    fsutil.copy_tree(GOZEN_SRC, GOZEN_DST)
 
 
 def say(text):
@@ -85,10 +105,14 @@ def setup(py=None, dry=False):
     if dry:
         return 0
     ensure_ffmpeg(py)
-    native = native_video()
-    if native:
+    native = native_video() or gozen()
+    if native_video():
         install_native_video()
+    elif gozen():
+        install_gozen()
     else:
+        if os.path.isdir(GOZEN_DST):
+            fsutil.remove_dir(GOZEN_DST)    # TRON_GOZEN=0: Godot would still load it
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
