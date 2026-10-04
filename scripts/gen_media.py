@@ -34,6 +34,10 @@ GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
 TEXT_ONLY = {19, 25, 26, 33, 38, 40}
+# Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
+# columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
+CAPTURE_PANEL_KEPT = {85, 112}
+PANEL_WIDTH = 41
 TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
 # Effects that draw the four letters of a target bank, one bitmap per letter and state
 # (deff_091_zuse_collect 0x01033b3c, deff_092_zuse_more 0x01033fbc, deff_107_collect 0x0102c870):
@@ -67,6 +71,21 @@ ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             60: "%,02lu / BALL ADDED / %,02lu / %u MORE FOR / ADD-A-BALL",
             # deff 138 (0x01003c30): the named combo's message (table entry + 8) between points and jackpot
             138: "%u / WAY / COMBO / %,02lu / %s / JACKPOT=%,02lu",
+            # deff 47 (0x01007f34): each dmb_phase's lines (rom_layout.SCREENS), with the jackpot messages
+            # 0x574 / 0x577 the code picks into a variable
+            47: "DISC MULTIBALL / %d / SHOOT SPINNING DISC / JACKPOT=%,02lu / %d / SHOOT RECOGNIZER"
+                " / RECOGNIZER=%,02lu / SHOOT SPINNING DISC / SUPER=%,02lu",
+            # deff 65 (0x0101de30): the two message pairs of table 0x040d3278, SUPER=, and the double
+            # window's screen (seconds, ALL JACKPOTS / DOUBLED)
+            65: "QUORRA MULTIBALL / SHOOT LEFT INNER LOOP / FOR JACKPOT / SHOOT RIGHT INNER LOOP"
+                " / FOR SUPER JACKPOT / SUPER=%,02lu / %d / ALL JACKPOTS / DOUBLED",
+            # deffs 68 / 69 (0x0101e320 / 0x0101e654): the DOUBLE screen (argument 2, the double window) and the
+            # plain JACKPOT / SUPER JACKPOT screen, each with its own value row
+            68: "DOUBLE / JACKPOT / %,02lu / JACKPOT / %,02lu",
+            69: "DOUBLE / SUPER JACKPOT / %,02lu / SUPER / JACKPOT / %,02lu",
+            # deff 141 (0x0102ffa0): each pm_phase's lines, with SUPER= (0x6bd / 0x6c0, picked into msg_id)
+            141: "PORTAL MULTIBALL / NEXT SHOT=%,02lu / SUPER=%,02lu / SUPER JACKPOT LIT / SHOOT DISC"
+                 " / SUPER=%,02lu / ALL SHOTS=%,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
 
 
@@ -153,7 +172,8 @@ def text_node(i, lay, name=None, var=None):
                 'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
     if lay.get("screens"):
         out.append('screens = PackedInt32Array({})'.format(", ".join(map(str, lay["screens"]))))
-    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms"):
+    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms",
+                "cycle_offset_ms"):
         if lay.get(key):
             out.append('{} = {}'.format(key, lay[key]))
     if lay.get("blink_dark"):
@@ -307,7 +327,9 @@ def build_deffs(only_data):
         else:
             source, lines = "reference", []
         layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
-        panel = panels.get(deff_id) if source != "reference" else None   # captures show their panel
+        # a capture shows the status panel of the moment it was recorded (score 00): the live panel is drawn
+        # over its columns 0-40 instead, except where the effect itself covers them (deffs 85, 112)
+        panel = panels.get(deff_id) if source != "reference" or deff_id not in CAPTURE_PANEL_KEPT else None
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else []),
@@ -319,6 +341,10 @@ def build_deffs(only_data):
         shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
         os.makedirs(os.path.join(GAME, rel))
         frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
+        if source == "reference" and panel:
+            from PIL import ImageDraw
+            for img, _ in frames:
+                ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
         end = rom_layout.GRAPHICS_END.get(deff_id)
         if end and source == "graphics" and len(frames) >= end:  # the ROM stops drawing bitmaps at frame `end`
             from PIL import Image

@@ -22,6 +22,8 @@ class Gem(Feature):
         self.shots = self.total = 0
         os_.lamp_rule(self.clock.counting, leff=83, tube=18, order=0x01013b5c)
         os_.deff_rule(self.clock.counting, 77, 0x08f, 5)
+        # deff 77 [0x0101461c] prints gem_timer and the player's score on every frame
+        os_.deff_live((77,), lambda: {"timer": self.clock.seconds, "score": os_.current_score()})
 
     def player_first_ball(self):
         """gem_player_init 0x010138f8."""

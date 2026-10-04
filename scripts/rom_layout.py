@@ -258,7 +258,36 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                           "twin": {"font": 43, "show_after_ms": round(6 * TICK_MS)}}},
              # deff 55: the second rows picked into a variable (text_draw_msg(uVar8, ...) at y 0x20, font 0x21)
              55: {t: {"font": 33, "x": 84, "y": 32, "flags": 2, "source": "rom (message from the mode spec)"}
-                  for t in ("ARE LIT", "LIGHT EX. BALL", "LIGHT M.B. + E.B.")}}
+                  for t in ("ARE LIT", "LIGHT EX. BALL", "LIGHT M.B. + E.B.")},
+             # deff 47 (0x01007f34, 4-tick frames): the phase's SHOOT line is hidden on frames where frame & 4;
+             # the jackpot line's message is picked into msg_id (0x574 phase 0, 0x577 phase 1) and printed
+             # in font 1 centred at row 0x1e. 0x574 "JACKPOT=%,02lu" is read off the reference capture,
+             # 0x577 "RECOGNIZER=%,02lu" is the mode spec's (disc_multiball.md, media table).
+             47: {"SHOOT SPINNING DISC": {"blink_ticks": 16}, "SHOOT RECOGNIZER": {"blink_ticks": 16},
+                  **{t: {"font": 1, "x": 84, "y": 30, "flags": 2, "source": "rom (message picked into msg_id)"}
+                     for t in ("JACKPOT=%,02lu", "RECOGNIZER=%,02lu")}},
+             # deff 57 (0x01005524, 6-tick frames): SWITCHES= hidden on frames where frame & 2
+             57: {"SWITCHES=%,02lu": {"blink_ticks": 12}},
+             # deff 65 (0x0101de30, 6-tick frames): without the double window (task 0x5c) the two messages of
+             # table 0x040d3278 + pair (pairs 0 and 1 in turn, 40 frames = 240 ticks each) at rows 0x12 / 0x18
+             # in font 1, the first hidden on frames where frame & 4; texts read off the reference capture.
+             # With the window: the seconds in both top corners, ALL JACKPOTS, DOUBLED (hidden on frame & 4).
+             65: {"SHOOT LEFT INNER LOOP": {"font": 1, "x": 84, "y": 18, "flags": 2, "blink_ticks": 24,
+                                            "cycle_ticks": 480, "cycle_on_ticks": 240, "source": "rom table + capture"},
+                  "FOR JACKPOT": {"font": 1, "x": 84, "y": 24, "flags": 2, "cycle_ticks": 480, "cycle_on_ticks": 240,
+                                  "source": "rom table + capture"},
+                  "SHOOT RIGHT INNER LOOP": {"font": 1, "x": 84, "y": 18, "flags": 2, "blink_ticks": 24,
+                                             "cycle_ticks": 480, "cycle_on_ticks": 240, "cycle_offset_ticks": 240,
+                                             "source": "rom table + capture"},
+                  "FOR SUPER JACKPOT": {"font": 1, "x": 84, "y": 24, "flags": 2, "cycle_ticks": 480,
+                                        "cycle_on_ticks": 240, "cycle_offset_ticks": 240,
+                                        "source": "rom table + capture"},
+                  "DOUBLED": {"blink_ticks": 24, "keep": True}, "SUPER=%,02lu": {"keep": True}},
+             # deff 141 (0x0102ffa0, 4-tick frames): phase 0 NEXT SHOT= and SUPER= (message 0x6bd, picked into
+             # msg_id; text on the reference capture), phase 1 SUPER JACKPOT LIT (hidden on frame & 4), SHOOT
+             # DISC and SUPER= (0x6c0, the mode spec's text), phase 2 ALL SHOTS=1,000,000 (hidden on frame & 4)
+             141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
+                   "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
@@ -272,7 +301,18 @@ GRAPHICS_END = {38: 64}
 # deff 80 (0x01017230): 0 %d MORE / TO LIGHT HURRY-UP, 1 HURRY-UP / IS LIT (argument 0x38 set)
 SCREENS = {55: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (2, 3, 4, 6), 5: (2,), 6: (3,), 7: (4,), 8: (5,), 9: (5,)},
            60: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (1,)},
-           80: {0: (0,), 1: (0,), 2: (1,), 3: (1,)}}
+           80: {0: (0,), 1: (0,), 2: (1,), 3: (1,)},
+           # deff 47 by dmb_phase: 0 shoot the disc, 1 shoot the recognizer, 2 super at the disc
+           47: {1: (0,), 2: (0,), 3: (0,), 4: (1,), 5: (1,), 6: (1,), 7: (2,), 8: (2,)},
+           # deff 65: 0 normal, 1 the double window (task 0x5c)
+           65: {1: (0,), 2: (0,), 3: (0,), 4: (0,), 6: (1,), 7: (1,), 8: (1,)},
+           # deffs 68 / 69 by the argument at task + 0x34: 1 JACKPOT / SUPER JACKPOT, 2 DOUBLE ...
+           68: {0: (2,), 1: (2,), 2: (2,), 3: (1,), 4: (1,)},
+           69: {0: (2,), 1: (2,), 2: (2,), 3: (1,), 4: (1,), 5: (1,)},
+           # deff 140: the Sea of Simulation bonus lines only when the bonus was given (screen 1)
+           140: {0: (1,), 1: (1,), 2: (1,)},
+           # deff 141 by pm_phase
+           141: {1: (0,), 2: (0,), 3: (1,), 4: (1,), 5: (1,), 6: (2,)}}
 
 
 # deff 19 text beyond its two lines (deff_019 0x01023a98, deff_draw_status_panel 0x010230ec), all font 0:
@@ -296,6 +336,14 @@ def frame_ms(deff_id, k):
         return frames[k]["t_ms"] - t0
     step = frames[-2]["duration_ms"] if len(frames) > 1 else frames[-1]["duration_ms"]
     return frames[-1]["t_ms"] - t0 + step * (k - len(frames) + 1)
+# deff 140 (0x0102faec): the animation's 67 frames (2 ticks) with the bonus lines, then PORTAL / MULTIBALL
+# (font 0x27) for 21 frames of 3 ticks, then COMPLETE ALL SHOTS / FOR / SUPER JACKPOT to the end
+_P140 = frame_ms(140, 67)
+OVERRIDES[140] = {**{t: {"hide_after_frame": 67} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
+                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS)}
+                     for t in ("PORTAL", "MULTIBALL")},
+                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS)} for t in ("COMPLETE ALL SHOTS", "FOR",
+                                                                                 "SUPER JACKPOT")}}
 SAMPLE = {"%,02lu": "1,234,560", "%luK": "100K"}
 
 
@@ -351,6 +399,9 @@ def line_layouts(deff_id, lines, fonts, calls=None):
                 lay["hide_after_ms"] = frame_ms(deff_id, over["hide_after_frame"])
             if "step_frames" in over:
                 lay["step_ms"] = frame_ms(deff_id, over["step_frames"])
+            for key in ("cycle", "cycle_on", "cycle_offset"):
+                if key + "_ticks" in over:
+                    lay[key + "_ms"] = round(over[key + "_ticks"] * TICK_MS)
         if i in SCREENS.get(deff_id, {}):
             lay["screens"] = list(SCREENS[deff_id][i])
         if deff_id == 19 and "%" in line and "BALL" not in line:
@@ -365,6 +416,7 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         left = gen_fonts.text_left(font, text, lay["x"], lay["flags"])
         box = (left, lay["y"] - font["cap"] + 1, left + gen_fonts.text_width(font, text) - 1, lay["y"],
                lay.get("show_after_ms", 0), lay.get("hide_after_ms") or 10 ** 9)
+        cycle = (lay.get("cycle_ms"), lay.get("cycle_offset_ms", 0)) if lay.get("cycle_ms") else None
         call = lay.get("call")
         screens = set(lay.get("screens", ()))
 
@@ -374,9 +426,12 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             # (also the rows of one screen of a SCREENS effect)
             e = 1 if font.get("outline") and ((call is not None and b[6] is not None and abs(call - b[6]) == 1)
                                               or (screens and b[7])) else 0
+            if cycle and b[8] and cycle[0] == b[8][0] and cycle[1] != b[8][1]:
+                return False                     # shown in turn (cycle_ms windows)
             return (box[0] + e <= b[2] and b[0] + e <= box[2] and box[1] + e <= b[3] and b[1] + e <= box[3]
                     and box[4] < b[5] and b[4] < box[5])
-        if not any(overlaps(b) for b in boxes if not (screens and b[7] and not screens & b[7])):
-            boxes.append(box + (call, screens))
+        # "keep" (OVERRIDES): rows the code draws 6 dots apart in a font whose box is 7 high (deff 65)
+        if lay.get("keep") or not any(overlaps(b) for b in boxes if not (screens and b[7] and not screens & b[7])):
+            boxes.append(box + (call, screens, cycle))
             out[i] = lay
     return out
