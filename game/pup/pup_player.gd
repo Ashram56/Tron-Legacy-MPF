@@ -121,9 +121,13 @@ func _build() -> void:
 		defaults[int(row.get("ScreenNum", "-1"))] = row
 	var video_volume := float(setting("pup", "video_volume", 100))
 	_make_layered_window("backglass", defaults, video_volume)
+	_make_dmd_window()
 	if bool(setting("pup", "third_screen", true)):
 		_make_layered_window("topper", defaults, video_volume)
-	_make_dmd_window()
+	if str(setting("pup", "layout", "stack")) == "stack":
+		_stack_windows()
+	_layout_dmd()
+	windows["dmd"].size_changed.connect(_layout_dmd)
 	if bool(setting("pup", "ost_music", true)):
 		var music := PupScreen.new()
 		music.setup(self, MUSIC_SCREEN, {"audio_only": true, "bus": "music",
@@ -134,8 +138,20 @@ func _build() -> void:
 		screens[n].start_background()
 	if bool(setting("dmd", "hide_main_window", true)):
 		get_tree().root.mode = Window.MODE_MINIMIZED
-	print("PuP: windows %s, screens %s" % [windows.keys(), screens.keys()])
+	var placed := []
+	for section in windows:
+		placed.append("%s %s at %s" % [section, windows[section].size, windows[section].position])
+	print("PuP: windows %s, screens %s" % [", ".join(placed), screens.keys()])
 	_start_capture()
+
+
+## run.py --dmd-size WxH (Godot's --resolution, which sizes the main window): the size of the DMD window the
+## player sees, which is this one when the PuP is on. Vector2i.ZERO when not given.
+func _dmd_size_arg() -> Vector2i:
+	var root_size := get_tree().root.size
+	var default := Vector2i(int(ProjectSettings.get_setting("display/window/size/window_width_override", 0)),
+		int(ProjectSettings.get_setting("display/window/size/window_height_override", 0)))
+	return root_size if root_size != default and root_size.x > 0 and root_size.y > 0 else Vector2i.ZERO
 
 
 func _make_window(section: String) -> Window:
@@ -143,6 +159,7 @@ func _make_window(section: String) -> Window:
 	w.name = "pup_" + section
 	w.title = "Tron Legacy - " + section
 	w.transient = false
+	w.unresizable = false
 	w.borderless = bool(setting(section, "borderless", false))
 	w.close_requested.connect(func(): pass)
 	w.window_input.connect(_forward_input)
@@ -150,6 +167,8 @@ func _make_window(section: String) -> Window:
 	var size_cfg = setting(section, "size", [800, 600])
 	var pos_cfg = setting(section, "position", [0, 0])
 	w.size = Vector2i(int(size_cfg[0]), int(size_cfg[1]))
+	if section == "dmd" and _dmd_size_arg() != Vector2i.ZERO:
+		w.size = _dmd_size_arg()
 	w.position = DisplayServer.screen_get_position(screen) + Vector2i(int(pos_cfg[0]), int(pos_cfg[1]))
 	var back := ColorRect.new()
 	back.color = Color.BLACK
@@ -164,6 +183,46 @@ func _make_window(section: String) -> Window:
 	return w
 
 
+## [pup] layout="stack": backglass, DMD and topper one under the other at the left of the backglass's monitor,
+## as wide as fits its height (each keeps the aspect of its size in pup.cfg; run.py --dmd-size keeps the
+## DMD's own size). Fullscreen windows stay out of the stack.
+func _stack_windows() -> void:
+	var order: Array[Window] = []
+	for section in ["backglass", "dmd", "topper"]:
+		if windows.has(section) and windows[section].mode != Window.MODE_FULLSCREEN:
+			order.append(windows[section])
+	if order.is_empty():
+		return
+	var screen := clampi(int(setting("backglass", "screen", 0)), 0, DisplayServer.get_screen_count() - 1)
+	var area := DisplayServer.screen_get_usable_rect(screen)
+	if area.size.x <= 0 or area.size.y <= 0:
+		return
+	var fixed := _dmd_size_arg()
+	var free_h := float(area.size.y)
+	var ratio := 0.0                        # sum of height/width of the windows that take the common width
+	for w in order:
+		free_h -= _title_height(w)
+		if w == windows.get("dmd") and fixed != Vector2i.ZERO:
+			free_h -= fixed.y
+		else:
+			ratio += float(w.size.y) / maxf(1.0, float(w.size.x))
+	var width := int(minf(float(area.size.x), free_h / ratio)) if ratio > 0.0 else 0
+	var y := area.position.y
+	for w in order:
+		if not (w == windows.get("dmd") and fixed != Vector2i.ZERO):
+			w.size = Vector2i(width, int(round(width * float(w.size.y) / maxf(1.0, float(w.size.x)))))
+		y += _title_height(w)
+		w.position = Vector2i(area.position.x, y)
+		y += w.size.y
+
+
+func _title_height(w: Window) -> int:
+	if w.borderless:
+		return 0
+	var title := w.get_size_with_decorations().y - w.size.y
+	return title if title > 0 else 32
+
+
 func _make_layered_window(section: String, defaults: Dictionary, volume: float) -> void:
 	var w := _make_window(section)
 	for n in LAYERS[section]:
@@ -176,51 +235,62 @@ func _make_layered_window(section: String, defaults: Dictionary, volume: float) 
 		screens[n] = layer
 
 
+var _dmd_frame: TextureRect             # the pack's DMD panel art (null without frame_image)
+var _dmd_crop := Rect2i()
+var _dmd_view: TextureRect              # the game's DMD (the main window's picture)
+
+
 func _make_dmd_window() -> void:
 	var w := _make_window("dmd")
-	var area := Vector2(w.size)
-	var dmd_rect := Rect2(Vector2.ZERO, area)
 	var frame_path := str(setting("dmd", "frame_image", ""))
 	if frame_path != "":
 		var image := Image.load_from_file(pack_dir.path_join(frame_path))
 		if image:
 			var c = setting("dmd", "frame_crop", [0, 0, image.get_width(), image.get_height()])
-			var crop := Rect2i(int(c[0]), int(c[1]), int(c[2]), int(c[3]))
-			var frame := TextureRect.new()
-			frame.texture = ImageTexture.create_from_image(image.get_region(crop))
-			frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			var scale := minf(area.x / crop.size.x, area.y / crop.size.y)
-			var origin := (area - Vector2(crop.size) * scale) * 0.5
-			frame.position = origin
-			frame.size = Vector2(crop.size) * scale
-			w.add_child(frame)
-			var r = setting("dmd", "dmd_rect", [c[0], c[1], c[2], c[3]])
-			dmd_rect = Rect2(origin + (Vector2(float(r[0]), float(r[1])) - Vector2(crop.position)) * scale,
-				Vector2(float(r[2]), float(r[3])) * scale)
+			_dmd_crop = Rect2i(int(c[0]), int(c[1]), int(c[2]), int(c[3]))
+			_dmd_frame = TextureRect.new()
+			_dmd_frame.texture = ImageTexture.create_from_image(image.get_region(_dmd_crop))
+			_dmd_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_dmd_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			w.add_child(_dmd_frame)
 		else:
 			push_warning("PuP: cannot load the DMD frame %s" % frame_path)
-	# the game's 128x32 DMD, 4:1, centred in its rect
-	var dmd_size := Vector2(128, 32)
-	var k := minf(dmd_rect.size.x / dmd_size.x, dmd_rect.size.y / dmd_size.y)
-	var dmd := TextureRect.new()
-	dmd.name = "dmd"
-	dmd.texture = get_tree().root.get_texture()
-	dmd.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	dmd.stretch_mode = TextureRect.STRETCH_SCALE
+	_dmd_view = TextureRect.new()
+	_dmd_view.name = "dmd"
+	_dmd_view.texture = get_tree().root.get_texture()
+	_dmd_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_dmd_view.stretch_mode = TextureRect.STRETCH_SCALE
 	# the game's HD DMD mode (tools/dmd_mode.gd) draws smooth text at its window's size and has its own dots
 	var dmd_mode = get_node_or_null("/root/DmdMode")
 	var hd: bool = dmd_mode != null and bool(dmd_mode.get("hd"))
-	dmd.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
-	dmd.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dmd.size = dmd_size * k
-	dmd.position = dmd_rect.position + (dmd_rect.size - dmd.size) * 0.5
+	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
+	_dmd_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if bool(setting("dmd", "dots", true)) and not hd:
 		var mat := ShaderMaterial.new()
 		mat.shader = DOTS_SHADER
-		mat.set_shader_parameter("dmd_size", dmd_size)
-		dmd.material = mat
-	w.add_child(dmd)
+		mat.set_shader_parameter("dmd_size", Vector2(128, 32))
+		_dmd_view.material = mat
+	w.add_child(_dmd_view)
+
+
+## Frame and DMD laid out for the DMD window's current size (again on every resize).
+func _layout_dmd() -> void:
+	var area := Vector2(windows["dmd"].size)
+	var dmd_rect := Rect2(Vector2.ZERO, area)
+	if _dmd_frame:
+		var scale := minf(area.x / _dmd_crop.size.x, area.y / _dmd_crop.size.y)
+		var origin := (area - Vector2(_dmd_crop.size) * scale) * 0.5
+		_dmd_frame.position = origin
+		_dmd_frame.size = Vector2(_dmd_crop.size) * scale
+		var c := _dmd_crop
+		var r = setting("dmd", "dmd_rect", [c.position.x, c.position.y, c.size.x, c.size.y])
+		dmd_rect = Rect2(origin + (Vector2(float(r[0]), float(r[1])) - Vector2(c.position)) * scale,
+			Vector2(float(r[2]), float(r[3])) * scale)
+	# the game's 128x32 DMD, 4:1, centred in its rect
+	var dmd_size := Vector2(128, 32)
+	var k := minf(dmd_rect.size.x / dmd_size.x, dmd_rect.size.y / dmd_size.y)
+	_dmd_view.size = dmd_size * k
+	_dmd_view.position = dmd_rect.position + (dmd_rect.size - _dmd_view.size) * 0.5
 
 
 func _forward_input(event: InputEvent) -> void:

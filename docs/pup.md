@@ -7,10 +7,10 @@ and its OST replaces the ROM music.
 
 ## Setting it up
 
+The [README](../README.md#install) has the one-line install. By hand, from a clone:
+
 ```sh
-git clone --recurse-submodules https://github.com/Ashram56/Tron-Legacy-MPF-PuP.git
-cd Tron-Legacy-MPF-PuP
-python scripts/setup.py               # as in the README (venv, MPF, Godot, GMC, media) + the PuP media
+python scripts/setup.py               # venv, MPF, Godot, GMC, the game's media + the PuP media
 python scripts/run.py                 # the game, with the PuP windows
 ```
 
@@ -38,11 +38,17 @@ Mobile). Without it loaded the PuP plays the converted Theora videos, as on macO
 | `topper` (optional) | mode info, TRON / ZUSE letters, light cycles | 13 (underlay), 14 (top layer) |
 | (no window) | OST music | 15 |
 
+By default (`[pup] layout="stack"`) the windows open one under the other at the left of the main monitor,
+backglass at the top, then the DMD, then the topper, as large as the monitor's height allows. Every window
+can be resized and its content follows; `run.py --dmd-size WxH` sets the DMD window's size. For a cabinet,
+`layout="manual"` puts each window at its own `screen`/`position`/`size`, or fullscreen.
+
 Everything is set in `game/pup.cfg`. Do not edit it for your cabinet: put the keys you change in
 `game/pup.local.cfg` (git-ignored, same sections), for example:
 
 ```ini
 [pup]
+layout="manual"           ; each window where its section says
 third_screen=false        ; no topper window and no topper videos
 
 [backglass]
@@ -101,7 +107,7 @@ python scripts/sync_upstream.py --branch main   # once upstream has merged its p
 
 The PuP touches upstream files in a few one-line places only: the `pup.yaml` include in
 `game/config/config.yaml`, the `Pup` autoload in `game/project.godot`, the `pup_pack` submodule in
-`.gitmodules`, three `.gitignore` lines, a README pointer, CI's checkout (no submodules: the PuP Pack repo is
+`.gitmodules`, three `.gitignore` lines, the README (upstream's is `docs/development.md` here: on a sync, merge upstream README changes into it), CI's checkout (no submodules: the PuP Pack repo is
 private, `setup.py` fetches `assets/`), one `pup_setup` call each in `scripts/setup.py` and `scripts/run.py`.
 Two upstream changes are not hooks and would be best made upstream too: Godot 4.6.3 instead of 4.5.2
 (`scripts/toolchain.py`, the docs and tests that name it; the native video add-on needs 4.6) and

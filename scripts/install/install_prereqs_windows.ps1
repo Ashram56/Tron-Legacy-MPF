@@ -39,7 +39,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+# Run from a clone, it sets up that clone. Run on its own (irm ... | iex, README "Install"), it first clones the
+# repository into $env:TRON_DIR (default ~\Tron-Legacy-MPF-PuP, outside OneDrive; branch $env:TRON_BRANCH, main).
+$Clone = -not ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '..\setup.py')))
+$Root = if (-not $Clone) { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+        elseif ($env:TRON_DIR) { $env:TRON_DIR } else { Join-Path $HOME 'Tron-Legacy-MPF-PuP' }
+$RepoUrl = if ($env:TRON_REPO) { $env:TRON_REPO } else { 'https://github.com/Ashram56/Tron-Legacy-MPF-PuP.git' }
+$RepoBranch = if ($env:TRON_BRANCH) { $env:TRON_BRANCH } else { 'main' }
 
 # The last Python 3.11 release with Windows installers (later 3.11 releases are source-only security fixes)
 $PyOrgVersion = '3.11.9'
@@ -255,6 +261,15 @@ try {
         if ($Arm) { Write-Note 'warning: MPF has no pypinproc for Windows on ARM; the P-ROC needs an x64 PC' }
     }
 
+    # ---------------------------------------------------------------- repository (run on its own: clone it)
+    if ($Clone) {
+        Write-Step "Repository: $RepoUrl ($RepoBranch) in $Root"
+        $gitExe = Find-Git
+        if (-not $gitExe) { $gitExe = 'git' }
+        if (Test-Path (Join-Path $Root '.git')) { Invoke-Step $gitExe @('-C', $Root, 'pull', '--ff-only') }
+        else { Invoke-Step $gitExe @('clone', '--branch', $RepoBranch, $RepoUrl, $Root) }
+    }
+
     # ---------------------------------------------------------------- workspace
     if ($NoSetup) {
         Write-Note "skipping scripts\setup.py (-NoSetup): run  $python scripts\setup.py  when ready"
@@ -271,6 +286,7 @@ try {
     Write-Step "Done$suffix"
     if (-not $NoSetup) {
         $mon = if ($Monitor) { ' --monitor' } else { '' }
+        Write-Note "In ${Root}:"
         Write-Note "Start the game:  .venv\Scripts\python scripts\run.py$mon"
         Write-Note 'Run the tests:   .venv\Scripts\python -m pytest -q tests'
     }
