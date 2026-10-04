@@ -22,7 +22,7 @@ import csv
 import os
 import re
 
-from tron.hw_numbers import rom_numbers
+from tron.hw_numbers import pro_companion_flashers, rom_numbers
 from tron.os_layer import TICK
 
 LAMP_COUNT = 80
@@ -246,6 +246,7 @@ class Lamps:
         for coil in getattr(self.machine, "coils", {}).values():
             if coil.name in rom_coils:
                 self.coil_numbers[coil.name] = rom_coils[coil.name]
+        pro_companion_flashers(self.machine)
         self._start_flash()
 
     # ------------------------------------------------------------------ game image (ROM names)

@@ -466,6 +466,17 @@ class TestProcPro(ProcCase):
         driven = {c.args[0] for c in self.pinproc.driver_schedule.call_args_list + self.pinproc.driver_disable.call_args_list}
         self.assertTrue(driven & set(LAMP_DRIVERS))
 
+    def test_lower_flashers_follow_the_ramp_flashers(self):
+        """The Pro fires 22 / 23 with the ramp flashers 19 / 25 (assets/rom_data/pro/README.md)."""
+        self.machine.coils["f_left_ramp"].pulse(48)
+        self.sync()
+        self.pinproc.driver_pulse.assert_any_call(sam_decode("C19"), 48)
+        self.pinproc.driver_pulse.assert_any_call(sam_decode("C22"), 48)
+        self.tron.lamps.flasher("f_right_ramp", 50)
+        self.sync()
+        self.pinproc.driver_pulse.assert_any_call(sam_decode("C25"), 50)
+        self.pinproc.driver_pulse.assert_any_call(sam_decode("C23"), 50)
+
     def test_fiber_optics_off(self):
         """proc_ramp_tubes is 1 here, but a Pro leaves the tubes off unless fiber_optics.yaml enables them."""
         self.advance_time_and_run(.1)

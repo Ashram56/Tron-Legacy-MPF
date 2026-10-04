@@ -25,8 +25,8 @@ mode; the Pro 1.74 ROM is a separate image with different IO assignments. `asset
 | Switches 1-4 | T-R-O-N drop targets, sw 1 = T | T-R-O-N standups, reversed: sw 1 = N |
 | Switches 54-56 | Recognizer motor positions | none |
 | Coil 3 | drop target reset | disc direction relay (22 on the LE) |
-| Coils 19, 25 | left, right ramp flash | the ROM names them back center, back left; taken as the ramp flashers (unconfirmed) |
-| Coils 22, 23 | disc direction relay, Recognizer motor relay | flashers lower left, lower right |
+| Coils 19, 25 | left, right ramp flash | the ramp flashers (the Pro ROM names them back center, back left) |
+| Coils 22, 23 | disc direction relay, Recognizer motor relay | flashers lower left, lower right: fired with 19 / 25 |
 | Coils 31, 32 | red disc, blue disc flash | red disc left, right (same outputs: the rules drive them on both) |
 | Lamps 1-66 | LE matrix | renumbered; no Recognizer position lamps |
 | Ramp light tubes (fiber optics, aux bus) | fitted | not fitted; off unless enabled |
@@ -48,8 +48,9 @@ How it is built:
   docker `TRON_FIBER_OPTICS=1`). On the P-ROC they also need `proc_ramp_tubes` (below).
 - `scripts/run.py --machine pro|le` picks the overlay (docker: `TRON_MACHINE`). `--scenario` defaults to the LE,
   since the traces are the LE ROM's.
-- The Pro ROM is not decompiled: the rules are the LE's on both machines (End of Line multiball included), and
-  no rule drives the Pro's own flashers (22, 23) yet ([rom_differences.md](rom_differences.md)).
+- The rules are the LE's on both machines (End of Line multiball included; [rom_differences.md](rom_differences.md)).
+  The Pro decompile (`assets/rom_data/pro/`) shows the same coil timing; on a Pro every ramp flasher pulse
+  also pulses its lower flasher (19 with 22, 25 with 23; `tron/hw_numbers.py`), as the Pro's effects do.
 
 `mpf game .` with no `-c` loads config.yaml alone, on MPF's default platform (smart_virtual), with an empty trough.
 The unit tests and `tests/scenario.py` load config.yaml alone and force smart_virtual themselves
@@ -166,8 +167,8 @@ drivers. They stay on the virtual platform (the machine has no ticket dispenser)
 ### Coil settings (the ROM's, `rom/coil_times.yaml`)
 
 The ROM's coil table and hardware rules are decoded (`assets/rom_data/io/coils.csv`, checked in the emulator),
-so every coil uses the ROM's drive time on every platform. The Pro uses the same table for the coils both
-models share; the Pro's own flashers get 64 ms, the LE coil test's pulse (the Pro ROM is not decoded).
+so every coil uses the ROM's drive time on every platform. The Pro decompile shows the same timing
+(`assets/rom_data/pro/README.md`); its lower flashers 22 / 23 get the ramp flashers' 48 ms.
 
 - **Flippers** (coils 15, 16 and upper left 12) are single-wound: 40 ms full power, then 1 ms on / 11 ms off
   (`default_hold_power: 0.083`, a P-ROC patter). The upper flipper uses the left button. EOS switches are
@@ -261,8 +262,8 @@ PinMAME's comment says the opposite.
 - Coin door button order (DED #22 Minus / #23 Plus) and the coin slot (DED #3).
 - Every coil time, especially the orbit post (does the 1/7 hold keep it up?), the VUK's half-power kick and
   the upper flipper.
-- On a Pro: the T-R-O-N standup order (sw 1 = N), the disc direction relay on coil 3, that coils 19 / 25 are
-  the left / right ramp flashers, and the Pro's own flashers (22, 23).
+- On a Pro: the T-R-O-N standup order (sw 1 = N), the disc direction relay on coil 3, and which lower flasher
+  (22 / 23) sits on which side.
 - The P-ROC's DMD shades and timing, and the startup frame. Godot's grey clear colour shows as shade 5
   until the first slide.
 - GI comes on at power-up and stays on.
