@@ -19,7 +19,7 @@ The unit tests and `tests/scenario.py` load config.yaml alone and force smart_vi
 ## Desktop and MPF Monitor (hw_virtual)
 
 ```sh
-python scripts/setup.py --monitor          # once: installs MPF Monitor (mpf-monitor 1.0.0) into .venv too
+python scripts/setup.py                    # once: installs MPF Monitor (mpf-monitor 1.0.0) into .venv too
 python scripts/run.py --monitor            # Godot, then MPF (hw_virtual), then MPF Monitor; any OS
 ```
 

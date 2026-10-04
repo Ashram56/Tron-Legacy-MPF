@@ -9,7 +9,7 @@ git-for-windows. Python and Git are installed for the current user where possibl
 or PowerShell 7. Run it from the repository:
 
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1
-    powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -Monitor
+    powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -NoMonitor
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -DryRun
 
 Arguments that are not options of this script go to setup.py (for example --skip-media).
@@ -17,7 +17,9 @@ Arguments that are not options of this script go to setup.py (for example --skip
 .PARAMETER DryRun
 Print the plan, change nothing.
 .PARAMETER Monitor
-Also install MPF Monitor (setup.py --monitor).
+Accepted for older command lines: MPF Monitor is installed by default.
+.PARAMETER NoMonitor
+Leave MPF Monitor out (setup.py --no-monitor).
 .PARAMETER Proc
 The real machine: also the Visual C++ 2015-2022 runtime that MPF's pypinproc needs, and a check for FTDI's D2XX driver.
 .PARAMETER NoSetup
@@ -31,6 +33,7 @@ No questions.
 param(
     [switch]$DryRun,
     [switch]$Monitor,
+    [switch]$NoMonitor,
     [switch]$Proc,
     [switch]$NoSetup,
     [switch]$NoWinget,
@@ -277,7 +280,7 @@ try {
     } else {
         Write-Step 'Workspace (scripts\setup.py)'
         $cmdArgs = @("$Root\scripts\setup.py")
-        if ($Monitor) { $cmdArgs += '--monitor' }
+        if ($NoMonitor) { $cmdArgs += '--no-monitor' }
         if ($DryRun) { $cmdArgs += '--dry-run' }
         if ($SetupArgs) { $cmdArgs += $SetupArgs }
         Invoke-Step $python $cmdArgs
@@ -286,7 +289,7 @@ try {
     $suffix = if ($DryRun) { ' (dry run: nothing was changed)' } else { '' }
     Write-Step "Done$suffix"
     if (-not $NoSetup) {
-        $mon = if ($Monitor) { ' --monitor' } else { '' }
+        $mon = if ($NoMonitor) { '' } else { ' --monitor' }
         Write-Note "In ${Root}:"
         Write-Note "Start the game:  .venv\Scripts\python scripts\run.py$mon"
         Write-Note 'Run the tests:   .venv\Scripts\python -m pytest -q tests'
