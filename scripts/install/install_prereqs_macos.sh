@@ -3,7 +3,7 @@
 # scripts/setup.py. Safe to re-run.
 #
 #   scripts/install/install_prereqs_macos.sh                 # Python 3.11 + Git, then setup.py
-#   scripts/install/install_prereqs_macos.sh --monitor       # ... plus MPF Monitor
+#   scripts/install/install_prereqs_macos.sh --no-monitor    # ... without MPF Monitor (installed by default)
 #   scripts/install/install_prereqs_macos.sh --proc          # ... plus libpinproc/pypinproc (needs Homebrew)
 #   scripts/install/install_prereqs_macos.sh --dry-run       # print the plan, change nothing
 #   scripts/install/install_prereqs_macos.sh -- --skip-media # arguments after -- go to setup.py
@@ -31,7 +31,7 @@ PYORG_PKG="python-${PYORG_VERSION}-macos11.pkg"
 PYORG_URL="https://www.python.org/ftp/python/${PYORG_VERSION}/${PYORG_PKG}"
 PYORG_PY="/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"
 
-DRY=0 YES=0 MONITOR=0 PROC=0 SETUP=1 PYORG=0
+DRY=0 YES=0 MONITOR=1 PROC=0 SETUP=1 PYORG=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -41,6 +41,7 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY=1 ;;
         -y|--yes) YES=1 ;;
         --monitor) MONITOR=1 ;;
+        --no-monitor) MONITOR=0 ;;
         --proc) PROC=1 ;;
         --no-setup) SETUP=0 ;;
         --python-org) PYORG=1 ;;
@@ -166,7 +167,7 @@ fi
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    [ "$MONITOR" = 1 ] && ARGS+=(--monitor)
+    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then

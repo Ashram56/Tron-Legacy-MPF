@@ -86,10 +86,13 @@ class TestShellScripts(unittest.TestCase):
         self.assertIn("setup.py --dry-run --skip-media", r.stdout)
 
     def test_macos_plan(self):
-        r = sh([os.path.join(INSTALL, "install_prereqs_macos.sh"), "--dry-run", "--monitor"])
+        r = sh([os.path.join(INSTALL, "install_prereqs_macos.sh"), "--dry-run"])
         self.assertEqual(0, r.returncode, r.stdout + r.stderr)
         self.assertIn("Python 3.11", r.stdout)
-        self.assertIn("setup.py --monitor --dry-run", r.stdout)
+        self.assertIn("setup.py --dry-run", r.stdout)       # MPF Monitor is setup.py's default
+        self.assertIn("run.py --monitor", r.stdout)
+        r = sh([os.path.join(INSTALL, "install_prereqs_macos.sh"), "--dry-run", "--no-monitor"])
+        self.assertIn("setup.py --no-monitor --dry-run", r.stdout)
 
     def test_standalone_clones(self):
         """Run on its own (bash <(curl ...), README "Install"), an installer clones the repository first;
@@ -143,11 +146,11 @@ class TestWindowsScript(unittest.TestCase):
                  "'{}', [ref]$t, [ref]$e); exit $e.Count".format(script))
         r = subprocess.run(["pwsh", "-NoProfile", "-Command", check], capture_output=True, text=True, timeout=120)
         self.assertEqual(0, r.returncode, r.stdout + r.stderr)
-        r = subprocess.run(["pwsh", "-NoProfile", "-File", script, "-DryRun", "-Monitor", "-Proc"],
+        r = subprocess.run(["pwsh", "-NoProfile", "-File", script, "-DryRun", "-NoMonitor", "-Proc"],
                            capture_output=True, text=True, timeout=120, cwd=ROOT)
         self.assertEqual(0, r.returncode, r.stdout + r.stderr)
         self.assertIn("Python 3.11", r.stdout)
-        self.assertIn("--monitor --dry-run", r.stdout)
+        self.assertIn("--no-monitor --dry-run", r.stdout)
 
 
 class TestCompose(unittest.TestCase):
