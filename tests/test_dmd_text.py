@@ -166,3 +166,60 @@ class TestDmdFonts(unittest.TestCase):
                         text_script.group(1)) in node):
                     bad.append((os.path.basename(path), node.splitlines()[0]))
         self.assertEqual([], bad)
+
+
+class TestDmdNeverEmpty(unittest.TestCase):
+    """During a game a display effect is always on the DMD. In play the score display (deff 19) comes back
+    whenever no other deff runs (the deff rules [0x000198a8] re-assert the background deff as an effect
+    ends; traces/flynns_arcade.jsonl 19.36 s), and between effects the DMD keeps its last frame: GMC's base
+    slide (attract.tscn, below every deff) never shows. Each reference scenario is sampled every 50 ms for
+    an empty slide stack during a game, and for no running deff in play."""
+
+    SAMPLE = 0.05
+
+    def test_no_base_slide_during_a_game(self):
+        if not os.path.exists(os.path.join(ROOT, "game", "tron", "media_data.json")):
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        for name in scenario_names():
+            with self.subTest(scenario=name):
+                shown, empty, idle = set(), [], []
+
+                def send(bridge, kind, settings, priority=0, need_data=True, **kwargs):
+                    if kind == "slides_play":
+                        (slide, s), = settings.items()
+                        if s["action"] == "play":
+                            shown.add(slide)
+                        elif s["action"] == "remove":
+                            shown.discard(slide)
+                orig = MediaBridge.__init__
+
+                def init(bridge, os_):
+                    orig(bridge, os_)
+
+                    def sample(dt=None):
+                        game = bridge.machine.game
+                        if game is not None and game.player and not shown:
+                            empty.append(round(os_.now, 2))
+                        if game is not None and os_.in_play and os_.display.fg is None and os_.display.bg is None:
+                            idle.append(round(os_.now, 2))
+                    bridge.machine.clock.schedule_interval(sample, self.SAMPLE)
+                test = scenario.ScenarioRun()
+                test.scenario = name
+                test.out_path = os.path.join(ROOT, "captures", "traces", name + ".empty.jsonl")
+                with mock.patch.object(MediaBridge, "connected", lambda self, need_data=True: True), \
+                        mock.patch.object(MediaBridge, "_send", send), \
+                        mock.patch.object(MediaBridge, "__init__", init):
+                    result = unittest.TestResult()
+                    test.run(result)
+                self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+                self.assertEqual([], self.spans(empty), "seconds with no slide on the DMD (GMC's base slide)")
+                self.assertEqual([], self.spans(idle), "seconds in play with no deff running (no score display)")
+
+    def spans(self, times):
+        spans = []
+        for t in times:
+            if spans and t - spans[-1][1] <= self.SAMPLE * 1.5:
+                spans[-1][1] = t
+            else:
+                spans.append([t, t])
+        return spans
