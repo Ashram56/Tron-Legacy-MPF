@@ -14,8 +14,13 @@
 # solenoid values and lamp numbers as VPinMAME reports them, PinMAME's ramp RGB lamps 101-106, the
 # flipper "game on" output 33 the table's fast flips listen to, and tolerance for switches MPF does not know.
 
+# The VPW table is the LE (cGameName trn_174h: drop targets, Recognizer motor, ramp light tubes), so this overlay is
+# the LE; hw_vpx_pro.yaml puts the Pro's numbers on it (for a Pro table).
+config:
+  - machine_le.yaml
+
 hardware:
-  platform: virtual_pinball
+  platform: virtual_pinball, virtual    # virtual: the LE devices a Pro does not have (machine_pro.yaml)
 
 custom_code: tron.os_layer.TronOS, tron.vpx_hardware.VpxHardware
 

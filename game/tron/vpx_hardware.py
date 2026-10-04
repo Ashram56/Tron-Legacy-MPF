@@ -16,7 +16,8 @@ the answers where MPF 0.80's platform differs from VPinMAME:
 - Stop: the table closed; MPF quits too when the bridge started it.
 - Lamps are numbered as in PinMAME (1-80, 0/1), and the ramp tubes' colour bits are lamps 101-106 as PinMAME's
   SAM driver numbers them (src/wpc/sam.c, SAM_GAME_TRON: strobe 0x10 -> 101-103, strobe 0x20 -> 104-106, each
-  blue, green, red). Those six are 0-255: the table only uses them as RGB() colour values.
+  blue, green, red). Those six are 0-255: the table only uses them as RGB() colour values. They stay 0 while the
+  machine var fiber_optics is 0 (a Pro, hw_vpx_pro.yaml, unless enabled).
 
 MPF's platform classes have __slots__, so the methods are replaced on the classes; they fall back to MPF's own
 code for any platform this module did not attach to.
@@ -131,12 +132,13 @@ class VpxAdapter:
 
     def lamp_levels(self):
         levels = {}
+        fiber_optics = self.machine.variables.get_machine_var("fiber_optics") != 0    # machine_pro.yaml: off on a Pro
         for light in self.platform._lights.values():
             if light.subtype != "matrix" or not light.hw_number.isdigit():
                 continue
             number, level = int(light.hw_number), light.current_brightness
             if number in TUBE_LAMPS:
-                levels[number] = max(0, min(255, int(round(level * 255))))
+                levels[number] = max(0, min(255, int(round(level * 255)))) if fiber_optics else 0
             else:
                 levels[number] = 1 if level > 0.5 else 0
         return levels

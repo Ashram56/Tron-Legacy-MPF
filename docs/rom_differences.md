@@ -27,6 +27,8 @@ departs from the ROM, for example a new mode.
 | Animation colour | single colour | single colour by default; optional film-inspired palettes | default (`--dmd-color on` adds colour) |
 | Pricing on the desktop | coins (factory settings) | free play with virtual hardware | `run.py --no-free-play` |
 | Hardware | SAM CPU board | MPF on virtual hardware, a P-ROC, or the Visual Pinball X table | `--hw proc` drives the original driver boards |
+| Machine | LE 1.74 ROM, LE hardware only | Pro hardware by default (the Pro 1.74 IO assignments, `assets/docs/PRO_VS_LE.md`) running the LE 1.74 rules; LE selectable. The Pro ROM is not decompiled, so on a Pro: the TRON standups use the LE drop-target code with no reset coil; End of Line multiball and the LE-only adjustments stay; the Pro's light cycle ramp extra ball adjustments are missing; no rule drives the Pro's own flashers (19, 22, 23, 25); LE ramp flasher calls (19, 25) go nowhere | `--machine le` (`hw_proc_le`, `hw_virtual_le`; `hw_vpx` is the LE). docs/hardware.md, "Pro or LE" |
+| Fiber optics on a Pro | none (Pro ROM: no ramp light tube driver) | off by default; can be driven (the IO board's aux driver is there) | default (`fiber_optics` overlay turns them on) |
 
 No scoring or rules departures yet.
 
@@ -34,4 +36,5 @@ No scoring or rules departures yet.
 
 | What you see | Why it is right | Source |
 |---|---|---|
+| Shaker runs 200 / 384 / 1024 ms, longer than older notes said (75 / 265 / 1100 ms) | ROM table 0x040d3998, measured 203 / 390 / 1040 ms in the emulator | `assets/rom_data/io/README.md`, `game/tron/os_layer.py` `SHAKER_MS` |
 | Disc Multiball: Gem, the ramps, the inner loops and the orbits all show "JACKPOT" with points | Only the spinning disc collects the Jackpot. The other blue shots score their own value and add it to the Jackpot, but the ROM plays the same "DISC MULTIBALL / JACKPOT" screen (deff 48) for them | `assets/rules/modes/disc_multiball.md` (blue shot row); the disc_multiball trace: a left-ramp hit grows the Jackpot 250k to 350k, only sw41 pays it; `game/tron/features/disc_multiball.py` `disc_mb_shot` |

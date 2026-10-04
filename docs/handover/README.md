@@ -28,6 +28,7 @@ Not covered here: DMD colorization (its own branch and docs).
 |---|---|
 | Game repo (MPF + Godot) | `Ashram56/Tron-Legacy-MPF`, stacked phase branches `phase2-machine` .. `phase11-hd` (PRs #2-#9), VPX bridge PR #10 |
 | Asset/spec repo (ROM-derived) | `Ashram56/Tron-Legacy-LE-ROM-Decryption`, git submodule at `assets/` |
-| ROM | Tron Legacy LE v1.74, PinMAME set `trn_174h`; the ROM binary is in neither repo |
+| ROM | Tron Legacy LE v1.74, PinMAME set `trn_174h`; the ROM binary is in neither repo. The game runs the LE rules on Pro (default) or LE hardware: `docs/hardware.md`, "Pro or LE" |
+| Coil times | the ROM's, generated into `game/config/rom/coil_times.yaml` from `assets/rom_data/io/coils.csv` |
 | User docs | `README.md`, `docs/requirements.md`, `docs/hardware.md` (P-ROC), `docs/vpx.md` (Visual Pinball X) |
 | Departures from the ROM | `docs/rom_differences.md`: read before changing a rule; add every new departure there |
