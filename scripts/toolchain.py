@@ -146,7 +146,8 @@ def godot_command(*args):
 # What the generated config and media (game/config/rom, game/media, game/slides/deffs, game/fonts,
 # game/tron/media_data.json; all git-ignored) are made from: a change to any of these after a pull leaves
 # the workspace showing the old display effects until they are generated and imported again.
-MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py")] \
+MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py",
+                                                       "dmd_hd.py")] \
     + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
     + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
 MEDIA_STAMP = os.path.join(GAME, "media", ".generated")
@@ -174,9 +175,10 @@ def media_stale(root=ROOT):
     with open(stamp, encoding="utf-8") as f:
         if f.read().strip() != media_fingerprint(root):
             return "the generator scripts or the asset package changed since the media were generated"
-    probe = os.path.join(root, "game", "media", "dmd", "deff_091", "solid0.png")
-    if os.path.exists(probe) and not os.path.exists(probe + ".import"):
-        return "the media were generated but not imported by Godot"
+    for folder in ("dmd", "dmd_hd"):
+        probe = os.path.join(root, "game", "media", folder, "deff_091", "solid0.png")
+        if os.path.exists(probe) and not os.path.exists(probe + ".import"):
+            return "the media were generated but not imported by Godot"
     return None
 
 

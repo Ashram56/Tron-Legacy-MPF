@@ -139,12 +139,15 @@ enough when the firewall asks.
 | Repository + asset submodule | ~450 MB |
 | `.venv` (MPF, pillow, pytest) | ~110 MB (+ ~250 MB with MPF Monitor) |
 | `tools/godot/` | ~130 MB (+ a 70 MB download during setup) |
-| Generated config and media (`game/sounds`, `game/media`, ...) | ~120 MB |
-| Godot import cache (`game/.godot/`) | ~60 MB |
+| Generated config and media (`game/sounds`, `game/media`, ...) | ~200 MB (of which ~80 MB the HD DMD frames and fonts) |
+| HD upscale cache (`.cache/dmd_hd/`, makes regenerating the HD frames quick) | ~70 MB |
+| Godot import cache (`game/.godot/`) | ~140 MB |
 | Docker image (optional) | ~1.5 GB |
 
 ## Performance
 
 MPF, Godot and MPF Monitor together use a few hundred MB of RAM. The DMD is 128x32, so any GPU of the last ten
-years is plenty. Without a GPU (Mesa's software renderer, Xvfb, a container without `/dev/dri`), Godot keeps
+years is plenty; the HD DMD (the default on the desktop) draws the same layout at the window's resolution, with
+1024x256 frames for the animations, which is still light work for any GPU. Building the HD frames
+(`gen_media.py`, during setup or after a pull) takes about a minute of CPU the first time, seconds afterwards. Without a GPU (Mesa's software renderer, Xvfb, a container without `/dev/dri`), Godot keeps
 one to two CPU cores busy drawing the window. That works, but use the GPU when you have one.

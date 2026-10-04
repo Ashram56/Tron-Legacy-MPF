@@ -17,3 +17,4 @@ game/fonts/
 /game/monitor/logs/
 /game/monitor/settings.ini
 /game/monitor/settings.ini.lock
+.cache/

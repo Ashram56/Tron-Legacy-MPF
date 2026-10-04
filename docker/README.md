@@ -83,6 +83,8 @@ Settings are environment variables. Set them per command (`DMD_SCREEN=1 docker/t
 | `DMD_FULLSCREEN` | `0` | `1`: the DMD fills that monitor |
 | `DMD_POSITION` | | Window position in desktop pixels, e.g. `1920,0` |
 | `DMD_RESOLUTION` | `1024x256` (from the project) | Window size, e.g. `1920x480` |
+| `TRON_DMD` | `hd` | `classic`: the original 128x32 dots instead of the HD DMD (the main README, "The DMD: HD or classic") |
+| `TRON_DMD_DOTS` | `0` | HD with a dot-matrix look: N round dots per DMD dot |
 | `DMD_DISPLAY` / `MONITOR_DISPLAY` | `$DISPLAY` | Another X screen or X server for that window, e.g. `:0.1` |
 | `GODOT_RENDERING_DRIVER` | `opengl3` | `vulkan` works too with the GPU |
 | `GODOT_ARGS` | | More Godot options, e.g. `--always-on-top` |

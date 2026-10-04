@@ -126,6 +126,26 @@ Keys work by label or by position on a US keyboard, so on AZERTY the unshifted n
 and finds the venv itself.) By hand, the same thing is `godot --path game`, then in `game/`:
 `mpf game . -c config,hw_virtual,free_play` (or `config,hw_virtual` for coins, or `config,hw_proc`). [docs/hardware.md](docs/hardware.md) has the details.
 
+**The DMD: HD or classic.** The display effects are the ROM's 128x32 dots. The desktop window shows them in
+**HD** by default: the window can be any size (drag it, or `--dmd-size 1920x480`), the layout stays the ROM's,
+text and numbers are drawn with HD fonts made from each of the ROM's 44 fonts (same style, weight, outline
+and width, in `game/fonts/hd/`), and the animations are upscaled offline with a smoothing filter for 16-shade
+DMD art (`scripts/dmd_hd.py`). **Classic** is the original output, exactly the ROM's dots scaled up by whole
+pixels (what `scripts/render_diff.py` checks against the ROM captures). To go back to it:
+
+| Option | Effect |
+|---|---|
+| `python scripts/run.py --dmd classic` | the original 128x32 dots, this run |
+| `TRON_DMD=classic` (environment) | the same for every run, and for `godot --path game` by hand |
+| `tron/dmd/mode="classic"` in `game/project.godot` | the default when nothing else says |
+| `--dmd hd` / `TRON_DMD=hd` | HD again (the default) |
+| `--dmd-dots N` (or `TRON_DMD_DOTS=N`) | HD with a dot-matrix look: N round dots per DMD dot (1 = the 128x32 grid; 2 looks good from 1280 px up; 0 = off, the default) |
+| `--dmd-size WxH` | the window size, for example `1920x480` (default 1024x256; HD scales to any size, classic in whole steps) |
+
+`--hw proc` is always classic: the P-ROC drives the machine's own 128x32 DMD. Godot reads the same choice
+from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
+`scripts/gen_media.py --no-hd` skips building the HD media (HD then falls back to classic).
+
 **P-ROC:** MPF's wheel ships the pypinproc binary for Windows (`pinproc.cp3xx-win_amd64.pyd`), so there
 `--hw proc` works once FTDI's D2XX driver and the Visual C++ runtime are installed. On Linux and macOS (MPF's
 macOS binary is an old Intel-only build), `scripts/install/build_pinproc.sh` builds libpinproc and pypinproc

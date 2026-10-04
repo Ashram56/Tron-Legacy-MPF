@@ -8,8 +8,8 @@
 
 Steps: the assets submodule; .venv/ with the pinned MPF, pillow and pytest; Godot (official build for the
 host) in tools/godot/; the GMC add-on in game/addons/mpf-gmc/; the generated MPF config and media
-(scripts/gen_config.py, scripts/gen_media.py); the Godot import (game/.godot/). Versions and paths live in
-scripts/toolchain.py.
+(scripts/gen_config.py, scripts/gen_media.py, which also builds the HD DMD fonts and frames with
+scripts/dmd_hd.py); the Godot import (game/.godot/). Versions and paths live in scripts/toolchain.py.
 """
 import argparse
 import io
@@ -141,7 +141,7 @@ class Setup:
         py = tc.venv_python(self.os)
         self.say("== MPF config generated from the asset package")
         self.run([py, os.path.join(tc.ROOT, "scripts", "gen_config.py")], cwd=tc.ROOT)
-        self.say("== Media (sounds, DMD frames, slides and fonts from the asset package)")
+        self.say("== Media (sounds, DMD frames, slides and fonts from the asset package, and their HD versions)")
         self.run([py, os.path.join(tc.ROOT, "scripts", "gen_media.py")], cwd=tc.ROOT)
 
     def godot_import(self):

@@ -48,12 +48,26 @@ static func font_metrics(font_id: int) -> Dictionary:
 	return _metrics.get(font_id, {})
 
 
+## True when the DMD shows in HD (game/tools/dmd_mode.gd).
+static func hd() -> bool:
+	var dmd = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("DmdMode")
+	return dmd != null and dmd.hd
+
+
+## The ROM font; in HD mode its HD twin (fonts/hd/, FONT_SCALE pixels per dot with the same metrics in
+## dots, drawn scaled down to the requested size, so the text lands where the 128x32 layout puts it).
 static func font_file(font_id: int) -> FontFile:
-	if not _font_files.has(font_id):
+	var key := font_id + (1000 if hd() else 0)
+	if not _font_files.has(key):
 		var f := FontFile.new()
-		f.load_bitmap_font("res://fonts/rom_font_%02d.fnt" % font_id)
-		_font_files[font_id] = f
-	return _font_files[font_id]
+		if key >= 1000:
+			f.generate_mipmaps = true
+			f.load_bitmap_font("res://fonts/hd/rom_font_%02d.fnt" % font_id)
+			f.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_ENABLED
+		else:
+			f.load_bitmap_font("res://fonts/rom_font_%02d.fnt" % font_id)
+		_font_files[key] = f
+	return _font_files[key]
 
 
 ## Text width as the ROM measures it (glyph widths, x offsets and the spacing between glyphs).

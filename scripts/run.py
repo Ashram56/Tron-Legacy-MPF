@@ -7,6 +7,9 @@
     python scripts/run.py --scenario NAME          # play assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
     python scripts/run.py --no-free-play           # factory pricing: coins needed (virtual defaults to free play)
+    python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
+    python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
+    python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -139,6 +142,33 @@ def godot_command(godot_args, virtual_display=None):
     return cmd
 
 
+def user_arg(gargs, arg):
+    """gargs plus arg after Godot's "--" (the args game scripts read with OS.get_cmdline_user_args)."""
+    return list(gargs) + [arg] if "--" in gargs else list(gargs) + ["--", arg]
+
+
+def engine_arg(gargs, *args):
+    """gargs with Godot engine args (before "--")."""
+    gargs = list(gargs)
+    at = gargs.index("--") if "--" in gargs else len(gargs)
+    return gargs[:at] + list(args) + gargs[at:]
+
+
+def dmd_args(gargs, dmd=None, dots=None, size=None):
+    """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, and the window
+    size (Godot's --resolution WxH). None leaves the choice to TRON_DMD / the project setting (hd)."""
+    if dmd:
+        gargs = user_arg(gargs, "--dmd=" + dmd)
+    if dots is not None:
+        gargs = user_arg(gargs, "--dmd-dots={}".format(dots))
+    if size:
+        w, _, h = size.lower().partition("x")
+        if not (w.isdigit() and h.isdigit()):
+            raise SystemExit("--dmd-size: expected WIDTHxHEIGHT, for example 1920x480, not " + size)
+        gargs = engine_arg(gargs, "--resolution", "{}x{}".format(int(w), int(h)))
+    return gargs
+
+
 def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
     """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine,
     off for scenarios (the ROM traces insert a coin) and the real machine."""
@@ -167,8 +197,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     os.makedirs(logs, exist_ok=True)
     godot_log = godot_log or os.path.join(logs, "godot.log")
     gargs = list(godot_args)
-    if hw == "proc" and "--proc-dmd" not in gargs:
-        gargs = (gargs + ["--proc-dmd"]) if "--" in gargs else (gargs + ["--", "--proc-dmd"])
+    if hw == "proc" and "--proc-dmd" not in gargs:    # also keeps the DMD classic: the P-ROC takes 128x32
+        gargs = user_arg(gargs, "--proc-dmd")
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
@@ -239,13 +269,21 @@ def main(argv=None):
                    help="START without a coin (default with --hw virtual and no --scenario)")
     p.add_argument("--no-free-play", dest="free_play", action="store_false",
                    help="the factory pricing: insert coins (key 5 in the DMD window, or s_coin in MPF Monitor)")
+    p.add_argument("--dmd", choices=["hd", "classic"],
+                   help="DMD look: hd (default; text and art drawn at the window's resolution) or classic (the "
+                        "original 128x32 dots, exactly as the ROM draws them). Also TRON_DMD=classic. --hw proc "
+                        "is always classic")
+    p.add_argument("--dmd-dots", type=int, metavar="N",
+                   help="hd only: dot-matrix look with N dots per DMD dot (1 = the 128x32 grid; 0 = off, default)")
+    p.add_argument("--dmd-size", metavar="WxH", help="DMD window size, for example 1920x480 (default 1024x256)")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, monitor=args.monitor, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
-               free_play=args.free_play, godot_args=args.godot_args, trace=args.trace and os.path.abspath(args.trace))
+               free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size),
+               trace=args.trace and os.path.abspath(args.trace))
 
 
 if __name__ == "__main__":

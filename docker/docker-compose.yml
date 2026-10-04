@@ -56,6 +56,8 @@ services:
       DMD_POSITION: ${DMD_POSITION:-}          # or an absolute position on the desktop, e.g. 1920,0
       DMD_RESOLUTION: ${DMD_RESOLUTION:-}      # window size, e.g. 1024x256 (the default) or 1920x480
       DMD_FULLSCREEN: ${DMD_FULLSCREEN:-0}     # 1: fill that monitor
+      TRON_DMD: ${TRON_DMD:-}                  # hd (default) or classic (the original 128x32 dots)
+      TRON_DMD_DOTS: ${TRON_DMD_DOTS:-}        # hd: dot-matrix look, N dots per DMD dot (0 = off)
       GODOT_RENDERING_DRIVER: ${GODOT_RENDERING_DRIVER:-opengl3}   # or vulkan (with gpu.yml)
       GODOT_ARGS: ${GODOT_ARGS:-}              # anything else for Godot's command line
 

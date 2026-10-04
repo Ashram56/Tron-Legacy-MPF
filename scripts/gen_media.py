@@ -7,7 +7,10 @@ Generated (all git-ignored, rebuilt by scripts/setup.py):
 - game/slides/deffs/deff_NNN.tscn     one GMC slide per display effect (AnimatedSprite2D with the
                                       ROM frame timing, plus text labels for effects with values)
 - game/tron/media_data.json           sound pools and slide facts for tron/media_bridge.py
-- game/fonts/                         the ROM fonts (scripts/gen_fonts.py)
+- game/fonts/                         the ROM fonts (scripts/gen_fonts.py), and their HD twins in fonts/hd/
+- game/media/dmd_hd/deff_NNN/*.png    the same frames and letter sprites upscaled FRAME_SCALE times
+                                      (scripts/dmd_hd.py) for the HD display mode (game/tools/dmd_mode.gd);
+                                      cached by content in .cache/dmd_hd/, so a rebuild redoes only new art
 
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
@@ -17,7 +20,7 @@ the deff clears before its text (rom_layout.effect_fills); a looping background 
 cycles (loop_period). Effects that draw target letters by state (LETTER_DEFFS) get one sprite per
 letter and state, driven by tron/letter_panel.gd from the rules' event args.
 
-Usage: .venv/bin/python scripts/gen_media.py [--only-data]
+Usage: .venv/bin/python scripts/gen_media.py [--only-data] [--no-hd]
 """
 import csv
 import glob
@@ -331,12 +334,39 @@ def build_deffs(only_data):
     return out
 
 
+def build_hd_frames(scale=None):
+    """game/media/dmd_hd: every picture of game/media/dmd upscaled (dmd_hd.upscale_file), same names.
+    Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black."""
+    import dmd_hd
+    scale = scale or dmd_hd.FRAME_SCALE
+    src_root = os.path.join(GAME, "media", "dmd")
+    dst_root = os.path.join(GAME, "media", "dmd_hd")
+    shutil.rmtree(dst_root, ignore_errors=True)
+    jobs = []
+    for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
+        out = os.path.join(dst_root, os.path.basename(folder))
+        os.makedirs(out, exist_ok=True)
+        for src in sorted(glob.glob(os.path.join(folder, "*.png"))):
+            name = os.path.basename(src)
+            kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
+            jobs.append((src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
+    with open(os.path.join(dst_root, "scale.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"scale": scale}, f)
+    return len(dmd_hd.upscale_files(jobs))
+
+
 def main():
     import gen_fonts
     only_data = "--only-data" in sys.argv
+    hd = "--no-hd" not in sys.argv
     if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
-        gen_fonts.build()
+        gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
+    if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
+        shutil.rmtree(os.path.join(GAME, "fonts", "hd"), ignore_errors=True)
+        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd"), ignore_errors=True)
+    if hd and not only_data:
+        print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
     print("media: {} sound pools, {} display effects".format(len(data["pools"]), len(data["deffs"])))

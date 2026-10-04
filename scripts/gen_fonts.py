@@ -19,7 +19,10 @@ scripts/render_diff.py. Glyph x/y offsets and the font spacing are ROM data not 
 rules below (bottom_offset, x_offset, SPACING, outline fonts -1, plain fonts +1) reproduce the captures.
 
 Output (git-ignored): game/fonts/rom_font_NN.fnt + rom_font_NN.png, and game/fonts/fonts.json
-(per font: image group, cap height, spacing, glyphs). Usage: .venv/bin/python scripts/gen_fonts.py
+(per font: image group, cap height, spacing, glyphs). For the HD display mode, game/fonts/hd/ holds the same
+44 fonts at FONT_SCALE pixels per dot (scripts/dmd_hd.py smooths each glyph; same metrics times the scale, so
+the text lands where the 128x32 layout puts it) and fonts_hd.json, the design of each font (style, weight,
+width) the HD font keeps. Usage: .venv/bin/python scripts/gen_fonts.py
 """
 import io
 import json
@@ -272,14 +275,97 @@ def write_bmfont(font, get, out_dir):
     return name
 
 
-def build(out_dir=OUT):
-    """Writes every ROM font and fonts.json (metrics the slides and the render check use)."""
+def design(font, get):
+    """What the font looks like, for the HD font made from it: style (plain: text over its black cell;
+    outlined: a black border around the strokes; tron: the game's outlined display face; digits: score
+    digit sets; big tron digits: the shaded 20-dot digits), stroke weight in dots (lit dots per lit run
+    across a row, on the digits and capitals) and width (mean glyph width / cap height: < 0.6 condensed)."""
+    chars = [c for c in "0123456789ABCDEHMNOSTUWZ" if c in font["glyphs"]]
+    runs = lit_dots = 0
+    widths = []
+    for c in chars:
+        img = get(font["glyphs"][c]["image"])
+        for row in img:
+            on = [0 < v < TRANSPARENT and v >= 8 for v in row]
+            lit_dots += sum(on)
+            runs += sum(1 for i, v in enumerate(on) if v and (i == 0 or not on[i - 1]))
+        widths.append(sum(1 for x in range(len(img[0])) if any(0 < r[x] < TRANSPARENT for r in img)))
+    shades = sorted({v for c in font["glyphs"].values() for row in get(c["image"]) for v in row
+                     if 0 < v < TRANSPARENT})
+    n = len(font["glyphs"])
+    style = ("big tron digits" if len(shades) > 1 else "tron" if n in (37, 38, 42) else
+             "digits" if n <= 11 else "outlined" if font["outline"] else "plain")
+    if style == "digits" and font["outline"]:
+        style = "outlined digits"
+    width = sum(widths) / len(widths) / font["cap"] if widths else 0
+    return {"id": font["id"], "style": style, "cap": font["cap"], "outline": font["outline"],
+            "weight": round(lit_dots / runs, 2) if runs else 0, "width": round(width, 2),
+            "condensed": width < 0.6, "shades": len(shades)}
+
+
+def write_bmfont_hd(font, get, out_dir, scale):
+    """The HD twin of write_bmfont: every glyph smoothed to `scale` pixels per dot (dmd_hd.upscale_glyph),
+    every metric times `scale`, glyphs packed in rows of at most 4096 pixels."""
+    from PIL import Image
+    import dmd_hd
+    name = "rom_font_%02d" % font["id"]
+    glyphs = sorted(font["glyphs"].items(), key=lambda kv: ord(kv[0]))
+    images = {c: dmd_hd.upscale_glyph(get(g["image"]), scale, font["outline"]) for c, g in glyphs}
+    gap = 2 * scale // 8 + 2                       # room for mipmaps between glyphs
+    places, x, y, row_h, width = {}, gap, gap, 0, 0
+    for c, g in glyphs:
+        w, h = images[c].size
+        if x + w + gap > 4096:
+            x, y, row_h = gap, y + row_h + gap, 0
+        places[c] = (x, y)
+        x += w + gap
+        row_h = max(row_h, h)
+        width = max(width, x)
+    height = y + row_h + gap
+    atlas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    lines = []
+    asc = font["ascent"]
+    for c, g in glyphs:
+        gx, gy = places[c]
+        atlas.paste(images[c], (gx, gy))
+        lines.append("char id=%d x=%d y=%d width=%d height=%d xoffset=%d yoffset=%d xadvance=%d page=0 chnl=15"
+                     % (ord(c), gx, gy, g["w"] * scale, g["h"] * scale, g["xoff"] * scale,
+                        (asc - g["h"] + g["below"]) * scale, (g["w"] + g["xoff"] + font["spacing"]) * scale))
+    atlas.save(os.path.join(out_dir, name + ".png"))
+    size = (asc + font["descent"]) * scale
+    head = ['info face="%s_hd" size=%d bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=1 aa=1 '
+            'padding=0,0,0,0 spacing=0,0 outline=0' % (name, size),
+            "common lineHeight=%d base=%d scaleW=%d scaleH=%d pages=1 packed=0 alphaChnl=0 redChnl=0 "
+            "greenChnl=0 blueChnl=0" % (size, asc * scale, width, height),
+            'page id=0 file="%s.png"' % name, "chars count=%d" % len(glyphs)]
+    with open(os.path.join(out_dir, name + ".fnt"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(head + lines) + "\n")
+    return name
+
+
+def build_hd(fonts, get, out_dir, scale=None):
+    """game/fonts/hd/: the HD font of every ROM font, and fonts_hd.json (scale, design per font)."""
+    import dmd_hd
+    scale = scale or dmd_hd.FONT_SCALE
+    os.makedirs(out_dir, exist_ok=True)
+    for f in fonts:
+        write_bmfont_hd(f, get, out_dir, scale)
+    with open(os.path.join(out_dir, "fonts_hd.json"), "w", encoding="utf-8", newline="\n") as fp:
+        json.dump({"scale": scale, "fonts": [dict(design(f, get), file="rom_font_%02d.fnt" % f["id"])
+                                             for f in fonts]}, fp, indent=0, sort_keys=True)
+
+
+def build(out_dir=OUT, hd=True):
+    """Writes every ROM font and fonts.json (metrics the slides and the render check use), and with hd the
+    HD fonts in out_dir/hd."""
     index, get, fonts = decode_all()
     os.makedirs(out_dir, exist_ok=True)
     for f in fonts:
         write_bmfont(f, get, out_dir)
     with open(os.path.join(out_dir, "fonts.json"), "w", encoding="utf-8", newline="\n") as fp:
         json.dump({"fonts": fonts}, fp, indent=0, sort_keys=True)
+    if hd:
+        build_hd(fonts, get, os.path.join(out_dir, "hd"))
     return fonts
 
 
