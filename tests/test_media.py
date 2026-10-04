@@ -24,6 +24,12 @@ class TestRomText(unittest.TestCase):
         self.assertEqual("3 BALLS", format_rom_text("%d %P0/BALL/BALLS%", [3]))
         self.assertEqual("2ND", format_rom_text("%d%P1/ST/ND/RD/TH%", [2]))
 
+    def test_no_name_where_a_number_goes(self):
+        # a name or a tuple given for a number prints nothing (it printed "CASTOR" as combo points)
+        self.assertEqual("", format_rom_text("%,02lu", ["CASTOR"]))
+        self.assertEqual(" MORE TO", format_rom_text("%u MORE TO", [(0, 2)]))
+        self.assertEqual("", format_rom_text("%s", [None]))
+
 
 class TestBridge(TronTestCase):
 
@@ -51,6 +57,50 @@ class TestBridge(TronTestCase):
             self.assertEqual(-1, settings["loops"])
             self.tron.media.sound(0x001)                  # channel stop: stops the music
             self.assertEqual({"action": "stop", "key": key}, trig.call_args_list[-1].kwargs["settings"][key])
+
+    def _slide_plays(self, iface, slide):
+        return [c.kwargs for c in iface.bcp_trigger.call_args_list if c.kwargs["name"] == "slides_play"
+                and slide in c.kwargs["settings"] and c.kwargs["settings"][slide]["action"] == "play"]
+
+    def test_combo_text_through_the_switches(self):
+        # "WAY / COMBO / CASTOR" on the DMD: deff 138's kwargs went to the ROM's printf lines in call order,
+        # so the combo name took the points' place, the count took the jackpot's and the count was not drawn
+        bridge = self.tron.media
+        if not bridge.data:
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        self.fill_trough()
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(2)
+        self.release_switch_and_run("s_shooter_lane", 1)
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface:
+            self.hit_and_release_switch("s_l_ramp_exit")         # left ramp: opens the combo window
+            self.advance_time_and_run(0.3)
+            self.hit_and_release_switch("s_left_orbit")          # left orbit: 2-way combo CASTOR
+            self.advance_time_and_run(0.3)
+            plays = self._slide_plays(iface, "deff_138")
+        self.assertTrue(plays, "no 2-way combo display")
+        kw = plays[-1]
+        jackpot = self.tron.hook("eol_combo_jackpot_value")
+        self.assertEqual(["%u", "WAY", "COMBO", "%,02lu", "%s", "JACKPOT=%,02lu"], bridge.data["deffs"][138]["text"])
+        self.assertEqual("2", kw["line0"])                       # the count, in the ring font
+        self.assertEqual(("WAY", "COMBO"), (kw["line1"], kw["line2"]))
+        self.assertRegex(kw["line3"], r"^\d{1,3}(,\d{3})+$")    # the points
+        self.assertEqual("CASTOR", kw["line4"])                  # the named combo, on its own row
+        self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), kw["line5"])
+        with mock.patch.object(bridge, "connected", return_value=True), \
+                mock.patch.object(self.machine.bcp, "interface") as iface:
+            self.tron.deff_start(138, points=300000, named=None, count=3, total=2, jackpot=850000)
+            kw = self._slide_plays(iface, "deff_138")[-1]
+        self.assertEqual(("3", "300,000", "", "JACKPOT=850,000"), (kw["line0"], kw["line3"], kw["line4"], kw["line5"]))
+
+    def test_end_of_line_more_text(self):
+        # deff 55 prints only `more`; before / after / flags pick the screen
+        bridge = self.tron.media
+        if not bridge.data:
+            self.skipTest("media data not generated (scripts/gen_media.py)")
+        lines = bridge.deff_lines(55, dict(before=(0, 2), after=(1, 2), flags=8, more=3, screen=2))
+        self.assertEqual("3 MORE TO", lines["line4"])
 
     def test_sounds_go_to_the_gmc_client(self):
         # MPF's bcp_trigger() skips clients without a registered handler, and GMC registers none for
