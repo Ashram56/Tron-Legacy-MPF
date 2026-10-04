@@ -50,6 +50,7 @@ class EndOfLine(Feature):
         os_.lamp_rule(self.background_on, tube=88, order=0x010055d8)
         # deff + music rule [0x01005610]: deff 57, music 0x20 + (level & 3), priority 7
         os_.deff_rule(self.background_on, 57, music=lambda: 0x20 + (self.level & 3), priority=MUSIC_PRIORITY)
+        os_.deff_live((57,), lambda: {"value": self.switch_value})    # deff 57 [0x01005524]: eol_switch_value
         # End of Line combo jackpot lit (task 0xcf) [leff rule 0x01003914]
         os_.lamp_rule(lambda: os_.task_running(COMBO_JACKPOT_LIT_A), leff=161, order=0x01003914)
 

@@ -558,6 +558,11 @@ class TronOS(CustomCode):
         game = self.machine.game
         return game.player.number if game and game.player else 0
 
+    def current_score(self):
+        """FUN_000233c8: the current player's score (gf_scores), as the deffs that print it read it."""
+        game = self.machine.game
+        return game.player.score if game and game.player else 0
+
     @property
     def pd(self):
         """Rule state of the current player."""
@@ -1249,7 +1254,8 @@ class TronOS(CustomCode):
         self.eb_lamp_update()
 
     def collect_extra_ball(self):
-        """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points."""
+        """0x01012228 OS part: returns True when an extra ball was awarded, False when it paid points
+        (eb_paid: the points scored, which deff 133 prints)."""
         p = self.player_num - 1
         self.eb_lit[p] = max(0, self.eb_lit[p] - 1)
         self.eb_lamp_update()
@@ -1259,7 +1265,7 @@ class TronOS(CustomCode):
             self.audit(9)
             self.shoot_again_lamp_update()
             return True
-        self.score_add(3000000)
+        self.eb_paid = self.score_add(3000000)
         return False
 
     def light_special(self):

@@ -34,6 +34,8 @@ class Clu(Feature):
         os_.lamp_rule(self.clock.counting, leff=78, tube=23, order=0x01001d40)
         os_.lamps.leff_code(78, self._leff_shot_lamps)
         os_.deff_rule(self._background, 72, 0x086, 5)
+        # deff 72 [0x0100276c] prints clu_timer and the player's score on every frame
+        os_.deff_live((72,), lambda: {"timer": self.clock.seconds, "score": os_.current_score()})
         os_.lamp_update(self.lane_lamps)
         sc = self.machine.switch_controller
         sc.add_switch_handler("s_left_flipper", self.rotate_toward_c)
