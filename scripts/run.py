@@ -2,7 +2,7 @@
 """Start the game on Windows, macOS or Linux: Godot (GMC, the BCP server) first, then MPF, optionally MPF Monitor.
 
     python scripts/run.py                          # virtual hardware (hw_virtual: smart_virtual, trough full)
-    python scripts/run.py --monitor                # ... plus MPF Monitor (setup.py --monitor installs it)
+    python scripts/run.py --monitor                # ... plus MPF Monitor (setup.py installs it)
     python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD)
     python scripts/run.py --scenario NAME          # play assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
@@ -195,6 +195,18 @@ def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
     return args
 
 
+def ensure_monitor():
+    """MPF Monitor in the venv: a workspace set up before setup.py installed it by default (or with
+    --no-monitor) gets it now, instead of `mpf monitor` failing."""
+    py = tc.venv_python()
+    if subprocess.run([py, "-c", "import mpfmonitor"], capture_output=True).returncode == 0:
+        return
+    print("MPF Monitor is not installed: installing it (scripts/setup.py)", flush=True)
+    import argparse
+    import setup
+    setup.Setup(argparse.Namespace(os=None, arch=None, dry_run=False, monitor=True, upgrade=False)).venv()
+
+
 def monitor_settings():
     """MPF Monitor keeps its window layout in game/monitor/settings.ini and rewrites it on every run, so git
     tracks settings.ini.default and the first run copies it into place (later runs keep yours)."""
@@ -238,6 +250,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
         mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
         if monitor:
+            ensure_monitor()
             monitor_settings()
             print("waiting for MPF's BCP server on port {} for MPF Monitor".format(tc.MONITOR_PORT), flush=True)
             if wait_for_port(tc.MONITOR_PORT, [mpf], 120):

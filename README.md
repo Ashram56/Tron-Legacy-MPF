@@ -39,9 +39,9 @@ You can change where the files go, and what is installed:
   Windows, `~/Tron-Legacy-MPF` elsewhere.
 - **Branch / repository:** `TRON_BRANCH` and `TRON_REPO`, the same way. A folder that already holds a clone is
   updated with `git pull --ff-only` instead.
-- **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --monitor` for MPF
-  Monitor, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
-  `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -Monitor"`.
+- **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
+  MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
+  `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.
 
 On Windows, keep the folder out of OneDrive (the default, your home folder, is): OneDrive locks and
 read-protects files while it syncs them. Setup copes with that, but it is slower and may leave stray files.
@@ -91,7 +91,7 @@ any layout.
 
 `scripts/run.py` takes the options; `python scripts/run.py --help` lists them all:
 
-- `--monitor`: also MPF Monitor (install it with the installer's `--monitor`, or `setup.py --monitor`).
+- `--monitor`: also MPF Monitor (installed by default; `run.py --monitor` installs it if it is missing).
 - `--no-free-play`: coins as on the factory settings.
 - `--scenario NAME`: plays a rule trace from `assets/rules/traces/` in real time.
 - `--hw proc`: the real machine on a Multimorphic P-ROC ([docs/hardware.md](docs/hardware.md)).
