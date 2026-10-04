@@ -62,6 +62,7 @@ class Display:
                     self.background.add(deff_id)
         self.fg = None              # running foreground deff id
         self.show_held = False      # a show ended in this deff's hold: its rules refresh is due at its exit
+        self.arcade_held = False    # ... the Flynn's Arcade show 0x97: the score display comes back at its exit
         self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
         self.bg = None              # running background deff id
@@ -79,8 +80,10 @@ class Display:
 
     # ------------------------------------------------------------------ start / stop
 
-    def start(self, deff_id, hold=False, refresh=True, run_seconds=None, **args):
-        """run_seconds: the run length when this call's variant differs from the recorded one."""
+    def start(self, deff_id, hold=False, refresh=True, run_seconds=None, sounds=None, **args):
+        """run_seconds: the run length when this call's variant differs from the recorded one.
+        sounds: [(offset s, fn)] the deff's own sound calls when the rules make them (snd_play2 with an
+        argument, a counter), played instead of the capture's sounds once the deff gets the display."""
         os_ = self.os
         os_.shaker_deff(deff_id)        # the deffs that run the shaker (shaker_run in the deff function)
         if deff_id in self.background:
@@ -113,13 +116,14 @@ class Display:
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
         info = self.media.get(deff_id)
         if info:
-            if not hold:
-                # the deff's own code starts its media once it runs: nothing if it is replaced at once
-                self._sound_handles.append(os_.machine.clock.schedule_once(lambda: self._media(deff_id), 0))
             seconds = run_seconds or info.seconds
             forced = os_.forced.get("deff_{}_seconds".format(deff_id))
             if forced:
                 seconds = forced.pop(0) or seconds   # random length (e.g. the arcade reel), from a test
+            if not hold:
+                # the deff's own code starts its media once it runs: nothing if it is replaced at once
+                self._sound_handles.append(os_.machine.clock.schedule_once(
+                    lambda: self._media(deff_id, seconds, sounds), 0))
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
                 from tron.os_layer import TICK
@@ -131,17 +135,25 @@ class Display:
             os_.after(1, self.refresh)
         return True
 
-    def _media(self, deff_id):
+    def _media(self, deff_id, seconds=None, sounds=None):
+        """The deff's lamp effects, sounds and tube shows at their offsets. A capture can hold more than
+        one run of the effect (deff 115 recorded two skipped stages back to back: 0x109 at 0 and 3.1 s);
+        only what falls inside this run's length plays."""
         if self.fg != deff_id:
             return
         os_ = self.os
         info = self.media[deff_id]
         for leff in info.leffs:
             os_.leff_start(leff)
-        events = [(t, "sound", c) for t, c in info.sounds] + [(t, "tube", n) for t, n in info.tubes]
+        if sounds is not None:
+            events = [(t, "call", fn) for t, fn in sounds]
+        else:
+            events = [(t, "sound", c) for t, c in info.sounds if not seconds or t < seconds]
+        events += [(t, "tube", n) for t, n in info.tubes if not seconds or t < seconds]
         for offset, kind, value in sorted(events, key=lambda e: e[0]):
             fire = (lambda k, v: lambda: self.fg == deff_id and (
-                self._deff_sound(v, deff_id) if k == "sound" else os_.tube_start(v)))(kind, value)
+                self._deff_sound(v, deff_id) if k == "sound" else v() if k == "call" else os_.tube_start(v)))(
+                kind, value)
             if offset <= 0:
                 fire()
             else:
@@ -166,6 +178,7 @@ class Display:
             # (FUN_0100f164; clu_hurryup.jsonl 42.89 s: the music 0x01b as the reel's hold starts)
             if self.show.task_id == 0x97:
                 self.os.request_refresh()
+                self.arcade_held = True
             else:
                 self.show_held = True
             show, self.show = self.show, None
@@ -185,6 +198,8 @@ class Display:
             self._after_fg()
         elif self.bg == deff_id:
             self.bg = None
+            if self.fg is None:
+                self.refresh()                     # the rules' background deff comes back (deff 19)
 
     def set_hold_tail(self, deff_id, seconds):
         """deff_hold_frames(n, 0x20) [0x01024460] when a deff's hold is not the usual 10 ticks: for its last
@@ -239,23 +254,35 @@ class Display:
                 if self.os.tubes.is_running(tube):
                     self.os.tubes.stop(tube)
         self.fg = None
+        self.arcade_held = False
 
     def _ended(self, deff_id):
         self.fg_handle = None
         if self.fg != deff_id:
             return
+        arcade_end = self.arcade_held
         self._end_fg()
         # the deff rules restart a mode's background deff when the effect in front of it ends
         # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
         if self.mode_bg():
             self.start(self.mode_bg(), refresh=False)
             self.os.request_refresh()              # the same rules pass restarts the mode's tube show
+        elif arcade_end:
+            # the rules pass deferred during the Flynn's Arcade show 0x97 runs at its deff's exit and puts
+            # the score display back (traces/flynns_arcade.jsonl 19.36 s: deff 19 as deff 105 ends); without
+            # it the screen stayed empty until the next effect
+            self.refresh()
         self._after_fg()
 
     def _after_fg(self):
         if self.show:
             self._end_show()
         self._pump()
+        if self.fg is None and self.bg is None:
+            # nothing left on the display: the deff rules [0x000198a8] put the background deff back (the
+            # score display, or the mode's), as after every effect (traces/flynns_arcade.jsonl 19.36 s,
+            # end_of_line_multiball.jsonl 38.60 s: deff 19 as the effect in front ends)
+            self.refresh()
 
     def _end_show(self):
         show, self.show = self.show, None

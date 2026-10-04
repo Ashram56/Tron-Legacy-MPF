@@ -16,8 +16,8 @@ class GameOver(Feature):
             os_.hook("attract_start")
             done()
             return
-        os_.deff_start(38)
         number = random.randrange(0, 100, 10)
+        os_.deff_start(38, number=number, number_again=number)   # deff 38 prints the number (task + 0x34)
         forced = os_.forced.get("match")
         matched = 0
         # match [0x0001b660]: adj 30 MATCH PERCENTAGE (11 = OFF). The number can match only while the

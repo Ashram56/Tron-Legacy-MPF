@@ -72,7 +72,8 @@ class Entry:
                                  seconds=self.seconds if self.counting else None)
         self.os.media.text_show("text_page", ["PLAYER {} - ENTER INITIALS".format(self.player),
                                               self.name + ("_" if self.cursor >= len(LETTERS) else self.letter()),
-                                              str(self.seconds) if self.counting else ""], 244)
+                                              str(self.seconds) if self.counting else ""], 244,
+                                 screen=4)   # text_page.tscn: deff 32's rows (0x010346e8), ROM fonts 2 / 14 / 2
 
     def _start(self):
         self.select = True

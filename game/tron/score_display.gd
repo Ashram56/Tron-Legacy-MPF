@@ -28,7 +28,19 @@ var _received_ms := 0.0          # slide time of the last update (ages count fro
 func _ready() -> void:
 	add_to_group("rom_timed")
 	MPF.util.find_parent_slide_or_widget(self).register_updater(self)
+	_tint_panel()
 	_apply()
+
+
+## HD mode (tools/dmd_mode.gd): the panel's separator, dashes and timer bars in the DMD text colour, as its
+## text (tron/rom_text.gd), at the same levels.
+func _tint_panel() -> void:
+	var dmd = get_tree().root.get_node_or_null("DmdMode")
+	if not (dmd and dmd.hd):
+		return
+	for node in get_parent().get_children():
+		if node is ColorRect and node.name != "Background":
+			(node as ColorRect).color = dmd.text_tint((node as ColorRect).color)
 
 
 func _exit_tree() -> void:

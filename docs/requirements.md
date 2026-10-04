@@ -9,9 +9,9 @@ The quickest route is the installer for your OS. It installs only what is missin
 
 | OS | Command (in the repository) |
 |---|---|
-| Windows 10/11 | `powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -Monitor` |
-| macOS 12+ | `scripts/install/install_prereqs_macos.sh --monitor` |
-| Linux | `scripts/install/install_prereqs_linux.sh --monitor` |
+| Windows 10/11 | `powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1` |
+| macOS 12+ | `scripts/install/install_prereqs_macos.sh` |
+| Linux | `scripts/install/install_prereqs_linux.sh` |
 
 Each installer takes `--dry-run` (`-DryRun` on Windows), which prints the plan and changes nothing. With
 `--proc` (`-Proc`) it also prepares the P-ROC. Arguments after `--` go to `setup.py`, for example
@@ -68,9 +68,9 @@ On Linux, `--python-any` makes the installer accept any 3.10 to 3.14 already ins
 `git clone --recurse-submodules ...`. Otherwise `setup.py` runs `git submodule update --init --depth 1 assets`
 itself. Git LFS is not needed: setup sets `GIT_LFS_SKIP_SMUDGE=1`.
 
-## Godot 4.5.2 (GMC 1.0.0)
+## Godot 4.6.3 (GMC 1.0.0)
 
-`setup.py` downloads the official Godot 4.5.2 build for the OS and CPU into `tools/godot/` (about 130 MB
+`setup.py` downloads the official Godot 4.6.3 build for the OS and CPU into `tools/godot/` (about 130 MB
 unpacked). GMC 1.0.0 goes into `game/addons/mpf-gmc/`. The project uses Godot's Mobile renderer, which draws
 with Vulkan and falls back to OpenGL 3.3. The render check forces OpenGL with `--rendering-driver opengl3`.
 
@@ -94,18 +94,18 @@ audio output is enough: WASAPI on Windows, CoreAudio on macOS, PulseAudio or Pip
 `pipewire-pulse`, which current desktops ship). Godot falls back to ALSA, then to silence. On the real machine
 the SAM sound board is gone (docs/hardware.md), so the PC feeds an amplifier.
 
-## MPF Monitor (optional: `--monitor`)
+## MPF Monitor (installed by default; `--no-monitor` leaves it out)
 
 `mpf-monitor` 1.0.0 is a PyQt6 application. pip installs `PyQt6` and `PyQt6-Qt6` (about 250 MB) from wheels.
 Qt brings its own libraries on Windows and macOS. On Linux it needs the X11/xcb libraries, which the
-installer adds with `--monitor`: `libglib2.0-0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4
+installer adds unless given `--no-monitor`: `libglib2.0-0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4
 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1`
 (Fedora: `glib2 libxkbcommon-x11 xcb-util-cursor xcb-util-image xcb-util-keysyms xcb-util-renderutil
 xcb-util-wm`).
 
 mpf-monitor 1.0.0 on PyPI (wheel and sdist, both published 2026-10-03) is missing its four Qt Designer
 files (`mpfmonitor/core/ui/*.ui`). Without them, `mpf monitor` stops with
-`searchable_tree.ui: No such file or directory`. `setup.py --monitor` copies them from the release's git tag
+`searchable_tree.ui: No such file or directory`. `setup.py` copies them from the release's git tag
 (`toolchain.MPF_MONITOR_UI_URL`) into the venv. It does nothing once a fixed release ships them.
 
 ## The P-ROC (optional: `--proc`, the real machine)
@@ -139,12 +139,15 @@ enough when the firewall asks.
 | Repository + asset submodule | ~450 MB |
 | `.venv` (MPF, pillow, pytest) | ~110 MB (+ ~250 MB with MPF Monitor) |
 | `tools/godot/` | ~130 MB (+ a 70 MB download during setup) |
-| Generated config and media (`game/sounds`, `game/media`, ...) | ~120 MB |
-| Godot import cache (`game/.godot/`) | ~60 MB |
+| Generated config and media (`game/sounds`, `game/media`, ...) | ~220 MB (of which ~100 MB the HD DMD frames, grey and colour, and fonts) |
+| HD upscale cache (`.cache/dmd_hd/`, makes regenerating the HD frames quick; with the colour frames) | ~100 MB |
+| Godot import cache (`game/.godot/`) | ~160 MB |
 | Docker image (optional) | ~1.5 GB |
 
 ## Performance
 
 MPF, Godot and MPF Monitor together use a few hundred MB of RAM. The DMD is 128x32, so any GPU of the last ten
-years is plenty. Without a GPU (Mesa's software renderer, Xvfb, a container without `/dev/dri`), Godot keeps
+years is plenty; the HD DMD (the default on the desktop) draws the same layout at the window's resolution, with
+1024x256 frames for the animations, which is still light work for any GPU. Building the HD frames
+(`gen_media.py`, during setup or after a pull) takes about a minute of CPU the first time, seconds afterwards. Without a GPU (Mesa's software renderer, Xvfb, a container without `/dev/dri`), Godot keeps
 one to two CPU cores busy drawing the window. That works, but use the GPU when you have one.

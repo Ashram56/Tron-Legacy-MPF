@@ -17,6 +17,13 @@ N = r"(-?0x[0-9a-f]+|-?\d+)"
 DIRECT = re.compile(r"\b(text_draw_msg|text_printf_msg)\((0x[0-9a-f]+),[^,]+," + N + "," + N + "," + N + "," + N + ",")
 FIT = re.compile(r"\b(text_draw_msg_fit|FUN_00028eb0)\((0x[0-9a-f]+),[^,]+,\(?(?:int \*\))?&DAT_([0-9a-f]+),"
                  + N + "," + N + "," + N + ",[^,]+," + N)
+# a call whose font is a variable loaded from a per-language font table (deff 80: `uVar6 =
+# *(uint *)(&DAT_040d2ee8 + iVar4 * 4)`, iVar4 = FUN_0000a3b4(), the language): FONT_TABLES
+VAR_FONT = re.compile(r"\b(text_draw_msg|text_printf_msg)\((0x[0-9a-f]+),[^,]+,([A-Za-z_]\w*)," + N + "," + N + ","
+                      + N + ",")
+TABLE_LOAD = r"\b{} = \*\(u?int \*\)\(&DAT_([0-9a-f]+) \+"
+# a message picked from a table (deff 114: the stage's "SHOOT" / item lines): text "%s"
+TABLE = re.compile(r"\btext_draw_msg\((?!0x)[^,]+,[^,]+," + N + "," + N + "," + N + "," + N + ",")
 MSG = re.compile(r'/\* msg (0x[0-9a-f]+) "(.*?)" \*/')
 CALLEE = re.compile(r"\b(FUN_[0-9a-f]{8}|[a-z_][a-z0-9_]*)\(")
 
@@ -44,15 +51,36 @@ def _messages(funcs):
     return out
 
 
-def _calls(lines, msgs):
-    out = []
+def _statements(lines):
+    """The lines with each call that the decompiler wrapped over several lines joined into one."""
+    out, cur = [], ""
     for line in lines:
+        part = line.strip()
+        cur = (cur + ("" if part[:1] in ",)" or cur[-1:] in ",(" else " ") + part) if cur else line.rstrip("\n")
+        if cur.count("(") <= cur.count(")"):
+            out.append(cur)
+            cur = ""
+    return out + ([cur] if cur else [])
+
+
+def _calls(lines, msgs):
+    out, body = [], "".join(lines)
+    for line in _statements(lines):
         m = DIRECT.search(line)
         if m:
             text = msgs.get(int(m.group(2), 16))
             if text is not None:
                 out.append({"text": text, "font": int(m.group(3), 0), "flags": int(m.group(4), 0),
                             "x": int(m.group(5), 0), "y": int(m.group(6), 0)})
+            continue
+        m = VAR_FONT.search(line)
+        if m:
+            text = msgs.get(int(m.group(2), 16))
+            table = re.search(TABLE_LOAD.format(re.escape(m.group(3))), body)
+            font = FONT_TABLES.get("0x" + table.group(1)) if table else None
+            if text is not None and font is not None:
+                out.append({"text": text, "font": font, "flags": int(m.group(4), 0), "x": int(m.group(5), 0),
+                            "y": int(m.group(6), 0), "font_table": "0x" + table.group(1)})
             continue
         m = FIT.search(line)
         if m:
@@ -61,6 +89,11 @@ def _calls(lines, msgs):
                 out.append({"text": text, "font": None, "font_list": "0x" + m.group(3),
                             "flags": int(m.group(4), 0), "x": int(m.group(5), 0), "y": int(m.group(6), 0),
                             "max_width": int(m.group(7), 0)})
+            continue
+        m = TABLE.search(line)
+        if m:
+            out.append({"text": "%s", "font": int(m.group(1), 0), "flags": int(m.group(2), 0),
+                        "x": int(m.group(3), 0), "y": int(m.group(4), 0)})
     return out
 
 
@@ -105,15 +138,53 @@ def status_panel_deffs():
     return out
 
 
+FILL = re.compile(r"\b(?:FUN_000274c0|dmd_fill_rect)\([^,]+," + N + "," + N + "," + N + "," + N + ",0\)")
+SPAWN = re.compile(r"\btask_spawn_child\((FUN_[0-9a-f]{8})\b")
+
+
+def _display_functions(fn, funcs, names):
+    """_reach of the deff function, then the display tasks it spawns (one level of their callees):
+    deff 96 draws the deff 95 screen from FUN_01032a30 and spawns its "%luK" pop-ups."""
+    addrs = _reach(fn, funcs, names)
+    for name in SPAWN.findall("".join(funcs[fn])):
+        if names.get(name) in funcs:
+            addrs += [a for a in _reach(names[name], funcs, names, 1) if a not in addrs]
+    return addrs
+
+
+def effect_fills():
+    """{deff: [(x0, y0, x1, y1), ...]} the black boxes a deff clears in the effect area (x 41-127) after
+    drawing its bitmap and before its text (FUN_000274c0 / dmd_fill_rect with colour 0, corners
+    inclusive), e.g. deff 95's band under ALL TARGETS=. Read from the deff's function, its callees and
+    the display tasks it spawns (deff 96 draws the deff 95 screen from a child task)."""
+    funcs, names = _functions()
+    out = {}
+    for deff_id, fn in _deff_functions():
+        if fn not in funcs:
+            continue
+        addrs = _display_functions(fn, funcs, names)
+        boxes = []
+        for a in addrs:
+            for line in funcs[a]:
+                m = FILL.search(line)
+                if m:
+                    box = tuple(int(v, 0) for v in m.groups())
+                    if box[0] >= 0x29 and box not in boxes:
+                        boxes.append(box)
+        if boxes:
+            out[deff_id] = boxes
+    return out
+
+
 def deff_calls():
     """{deff: [call, ...]} in code order (the deff's own function first, then its callees)."""
     funcs, names = _functions()
-    msgs = _messages(funcs)
+    msgs = {**EXTRA_MESSAGES, **_messages(funcs)}
     out = {}
     for deff_id, fn in _deff_functions():
         if fn in funcs:
             calls = []
-            for addr in _reach(fn, funcs, names):
+            for addr in _display_functions(fn, funcs, names):
                 calls += _calls(funcs[addr], msgs)
             out[deff_id] = calls
     return out
@@ -122,8 +193,33 @@ def deff_calls():
 # Font lists of text_draw_msg_fit: the ROM data is not in the package; the fonts are the ones the
 # reference captures show for these calls (by scripts/render_diff.py style matching).
 FONT_LISTS = {"0x040d2834": [33], "0x040d2aa4": [15], "0x040d302c": [39], "0x040d31d4": [10, 6],
-              "0x040d33a8": [11], "0x040d8a80": [12], "0x040d9194": [2]}
+              "0x040d33a8": [11], "0x040d8a80": [12], "0x040d9194": [2],
+              # deff 32 PLAYER %d - ENTER INITIALS (rows 0-4 of its capture: font 2)
+              "0x040d89f8": [2],
+              # deff 99's total (FUN_00028eb0, max width 0x39): font 15 on its capture (710,000); the fonts
+              # for totals too wide for it are not known, the default list's are used
+              "0x040d6ff4": [15, 12, 2]}
+# Messages whose text the decompile does not comment (the call is wrapped over two lines): the event map's
+# rom_text for the deff that prints them
+EXTRA_MESSAGES = {0x348: "PLAYER %d - ENTER INITIALS"}
 DEFAULT_LIST = [15, 12, 2]
+# Per-language font tables (font = table[FUN_0000a3b4()], English = entry 0): not in the package; the
+# font each reference capture shows for the call (every text dot of the capture matched, see
+# tests/test_fonts.py). Without them these lines fell back to font 12 at a guessed row: the "n MORE"
+# lines of deffs 66, 80 and 108 were drawn big over the effect.
+FONT_TABLES = {"0x040d31bc": 2,     # deff 44 LEVEL %d COMPLETED
+               "0x040d3238": 39,    # deff 63 IS LIT
+               "0x040d3290": 39,    # deff 66 %d MORE TO / ADD BALL
+               "0x040d2bec": 12,    # deff 78 %d FOLLOWING(S)
+               "0x040d2ee8": 2,     # deff 80 TO LIGHT HURRY-UP
+               "0x040d6f50": 4,     # deff 93 ZUSE / FAST SCORING
+               "0x040d6f98": 34,    # deff 94 FAST SCORING (also in OVERRIDES)
+               "0x040d6fdc": 39,    # deff 98 TIME / EXTENDED
+               "0x040d700c": 3,     # deff 99 TOTAL:
+               "0x040d39a8": 37,    # deffs 101-103 SKILL SHOT
+               "0x040d32c4": 39,    # deff 108 %u MORE / TO ACCESS
+               "0x040d2900": 39,    # deff 112 SUPER / POPS / DOUBLE / SCORING / SPINNERS
+               "0x040d2918": 10}    # deff 112 SPINNERS SCORE
 # The score display (deff 19) picks font and row from a table by score (RAM 0x370ac, not in the
 # package). Score 0 is font 26 on row 21 (reference capture); the smaller fonts for longer scores are
 # a guess: the first that fits the 87 dots right of the status panel, centred on the same middle row.
@@ -134,14 +230,100 @@ FALLBACK_FONT = 12
 # x 127, y = font_height - 2 = 7, for loop frames 0-29 with the brightness of table 0x40d3cf8
 # (one step per two frames; capture levels 0..15); the match number only at loop frame 0x40, when
 # the loop has stopped drawing its 64 bitmaps (GRAPHICS_END: the screen has no animation frame).
+TICK_MS = 15.41      # ROM tick as the captures run (deff 19: 7-tick blink = 107.9 ms; deff 40: 6 ticks = 92 ms)
 OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": "rom+capture",
                             "hide_after_frame": 30, "step_frames": 2,
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
-             40: {"YOU'RE UP": {"blink_ticks": 6}}}
+             40: {"YOU'RE UP": {"blink_ticks": 6}},
+             # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
+             # on frames where frame & 2 (frames of 4 ticks) for 24 frames, then a wipe and
+             # FUN_010323d0's screen: SCORE in a fitted font (17) centred on the rows, ALL TARGETS above
+             # and the points below in a font of table 0x040d6f8c (10) at palette level 4. Fonts and the
+             # end of the wipe (1690 ms) read off the capture.
+             94: {"FAST SCORING": {"font": 34, "x": 84, "y": 30, "flags": 2, "source": "rom+capture",
+                                   "blink_ticks": 8, "show_after_ms": round(8 * TICK_MS),
+                                   "hide_after_ms": round(96 * TICK_MS)},
+                  "ALL TARGETS": {"font": 10, "x": 84, "y": 8, "flags": 2, "source": "rom+capture",
+                                  "show_after_ms": 1690, "level_steps": [4], "step_ms": 10 ** 6},
+                  "SCORE": {"font": 17, "x": 84, "y": 21, "flags": 2, "source": "rom+capture",
+                            "show_after_ms": 1690},
+                  "%,02lu POINTS": {"font": 10, "x": 84, "y": 30, "flags": 2, "source": "rom+capture",
+                                    "show_after_ms": 1690, "level_steps": [4], "step_ms": 10 ** 6}},
+             # deff 96 (0x01032bd0): each hit spawns FUN_01032900, which prints "%luK" (points / 1000) in
+             # font 0x27 near the middle of the effect (random x 0x31-0x76, y 13-20) for 24 ticks while
+             # it rises; drawn here centred at its middle row, without the random placement
+             96: {"%luK": {"font": 39, "x": 84, "y": 17, "flags": 2, "source": "rom (position approximated)",
+                           "hide_after_ms": round(24 * TICK_MS)}},
+             # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
+             # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
+             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)},
+             # deff 138 (0x01003c30): the combo count "%u" right-aligned at x 0x53, row 0x13, in font 0x2a on
+             # frames where !(frame & 2), else in the outlined font 0x2b (frames of 3 ticks): two labels that
+             # blink in turn
+             138: {"%u": {"font": 42, "x": 83, "y": 19, "flags": 4, "source": "rom", "blink_ticks": 6,
+                          "twin": {"font": 43, "show_after_ms": round(6 * TICK_MS)}}},
+             # deff 55: the second rows picked into a variable (text_draw_msg(uVar8, ...) at y 0x20, font 0x21)
+             55: {t: {"font": 33, "x": 84, "y": 32, "flags": 2, "source": "rom (message from the mode spec)"}
+                  for t in ("ARE LIT", "LIGHT EX. BALL", "LIGHT M.B. + E.B.")},
+             # deff 47 (0x01007f34, 4-tick frames): the phase's SHOOT line is hidden on frames where frame & 4;
+             # the jackpot line's message is picked into msg_id (0x574 phase 0, 0x577 phase 1) and printed
+             # in font 1 centred at row 0x1e. 0x574 "JACKPOT=%,02lu" is read off the reference capture,
+             # 0x577 "RECOGNIZER=%,02lu" is the mode spec's (disc_multiball.md, media table).
+             47: {"SHOOT SPINNING DISC": {"blink_ticks": 16}, "SHOOT RECOGNIZER": {"blink_ticks": 16},
+                  **{t: {"font": 1, "x": 84, "y": 30, "flags": 2, "source": "rom (message picked into msg_id)"}
+                     for t in ("JACKPOT=%,02lu", "RECOGNIZER=%,02lu")}},
+             # deff 99 (0x010331ac, 3-tick frames): the total on even frames only; its row on the capture is 28
+             # (the call says 0x1d: FUN_00028eb0 places the fitted font one row up)
+             99: {"%,02lu": {"blink_ticks": 3, "y": 28, "fit_ys": [28, 28, 28], "source": "rom+capture"}},
+             # deff 57 (0x01005524, 6-tick frames): SWITCHES= hidden on frames where frame & 2
+             57: {"SWITCHES=%,02lu": {"blink_ticks": 12}},
+             # deff 65 (0x0101de30, 6-tick frames): without the double window (task 0x5c) the two messages of
+             # table 0x040d3278 + pair (pairs 0 and 1 in turn, 40 frames = 240 ticks each) at rows 0x12 / 0x18
+             # in font 1, the first hidden on frames where frame & 4; texts read off the reference capture.
+             # With the window: the seconds in both top corners, ALL JACKPOTS, DOUBLED (hidden on frame & 4).
+             65: {"SHOOT LEFT INNER LOOP": {"font": 1, "x": 84, "y": 18, "flags": 2, "blink_ticks": 24,
+                                            "cycle_ticks": 480, "cycle_on_ticks": 240, "source": "rom table + capture"},
+                  "FOR JACKPOT": {"font": 1, "x": 84, "y": 24, "flags": 2, "cycle_ticks": 480, "cycle_on_ticks": 240,
+                                  "source": "rom table + capture"},
+                  "SHOOT RIGHT INNER LOOP": {"font": 1, "x": 84, "y": 18, "flags": 2, "blink_ticks": 24,
+                                             "cycle_ticks": 480, "cycle_on_ticks": 240, "cycle_offset_ticks": 240,
+                                             "source": "rom table + capture"},
+                  "FOR SUPER JACKPOT": {"font": 1, "x": 84, "y": 24, "flags": 2, "cycle_ticks": 480,
+                                        "cycle_on_ticks": 240, "cycle_offset_ticks": 240,
+                                        "source": "rom table + capture"},
+                  "DOUBLED": {"blink_ticks": 24, "keep": True}, "SUPER=%,02lu": {"keep": True}},
+             # deff 141 (0x0102ffa0, 4-tick frames): phase 0 NEXT SHOT= and SUPER= (message 0x6bd, picked into
+             # msg_id; text on the reference capture), phase 1 SUPER JACKPOT LIT (hidden on frame & 4), SHOOT
+             # DISC and SUPER= (0x6c0, the mode spec's text), phase 2 ALL SHOTS=1,000,000 (hidden on frame & 4)
+             141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
+                   "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
-TICK_MS = 15.41      # ROM tick as the captures run (deff 19: 7-tick blink = 107.9 ms; deff 40: 6 ticks = 92 ms)
+# Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
+# arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
+# screen. Lines of different screens may overlap; the rules pass `screen`.
+# deff 55 (0x0100461c), by its flags argument: 0 MULTIBALL + E.B. / ARE LIT, 1 EXTRA BALL / IS LIT,
+#   2-4 %u MORE TO / LIGHT MULTIBALL, LIGHT EX. BALL or LIGHT M.B. + E.B., 5 MULTIBALL / IS LIT,
+#   6 %u MORE TO alone
+#   (messages 0x6d3, 0x6d6, 0x6d7 are picked into a variable; their text is from the mode spec)
+# deff 60 (0x01005d44): 0 points / BALL ADDED (argument 0x34 = 0), 1 points higher / %u MORE FOR /
+#   ADD-A-BALL
+# deff 80 (0x01017230): 0 %d MORE / TO LIGHT HURRY-UP, 1 HURRY-UP / IS LIT (argument 0x38 set)
+SCREENS = {55: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (2, 3, 4, 6), 5: (2,), 6: (3,), 7: (4,), 8: (5,), 9: (5,)},
+           60: {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (1,)},
+           80: {0: (0,), 1: (0,), 2: (1,), 3: (1,)},
+           # deff 47 by dmb_phase: 0 shoot the disc, 1 shoot the recognizer, 2 super at the disc
+           47: {1: (0,), 2: (0,), 3: (0,), 4: (1,), 5: (1,), 6: (1,), 7: (2,), 8: (2,)},
+           # deff 65: 0 normal, 1 the double window (task 0x5c)
+           65: {1: (0,), 2: (0,), 3: (0,), 4: (0,), 6: (1,), 7: (1,), 8: (1,)},
+           # deffs 68 / 69 by the argument at task + 0x34: 1 JACKPOT / SUPER JACKPOT, 2 DOUBLE ...
+           68: {0: (2,), 1: (2,), 2: (2,), 3: (1,), 4: (1,)},
+           69: {0: (2,), 1: (2,), 2: (2,), 3: (1,), 4: (1,), 5: (1,)},
+           # deff 140: the Sea of Simulation bonus lines only when the bonus was given (screen 1)
+           140: {0: (1,), 1: (1,), 2: (1,)},
+           # deff 141 by pm_phase
+           141: {1: (0,), 2: (0,), 3: (1,), 4: (1,), 5: (1,), 6: (2,)}}
 
 
 # deff 19 text beyond its two lines (deff_019 0x01023a98, deff_draw_status_panel 0x010230ec), all font 0:
@@ -165,6 +347,14 @@ def frame_ms(deff_id, k):
         return frames[k]["t_ms"] - t0
     step = frames[-2]["duration_ms"] if len(frames) > 1 else frames[-1]["duration_ms"]
     return frames[-1]["t_ms"] - t0 + step * (k - len(frames) + 1)
+# deff 140 (0x0102faec): the animation's 67 frames (2 ticks) with the bonus lines, then PORTAL / MULTIBALL
+# (font 0x27) for 21 frames of 3 ticks, then COMPLETE ALL SHOTS / FOR / SUPER JACKPOT to the end
+_P140 = frame_ms(140, 67)
+OVERRIDES[140] = {**{t: {"hide_after_frame": 67} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
+                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS)}
+                     for t in ("PORTAL", "MULTIBALL")},
+                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS)} for t in ("COMPLETE ALL SHOTS", "FOR",
+                                                                                 "SUPER JACKPOT")}}
 SAMPLE = {"%,02lu": "1,234,560", "%luK": "100K"}
 
 
@@ -184,15 +374,21 @@ def line_layouts(deff_id, lines, fonts, calls=None):
     lays = []
     for i, line in enumerate(lines):
         mine = [k for k, c in enumerate(calls) if c["text"] == line]
+        mine = mine[min(lines[:i].count(line), len(mine) - 1):] if mine else mine   # nth line = nth call
         if mine:
             c = calls[mine[0]]
-            lay = {"x": c["x"], "y": c["y"], "flags": c["flags"], "source": "rom"}
+            lay = {"x": c["x"], "y": c["y"], "flags": c["flags"], "source": "rom", "call": mine[0]}
             if c["font"] is None:
                 lst = FONT_LISTS.get(c["font_list"], DEFAULT_LIST)
                 lay.update(font=lst[0], fit_fonts=lst, fit_ys=[c["y"]] * len(lst), fit_width=c["max_width"])
             else:
                 lay["font"] = c["font"]
             later = [k for k in mine[1:] if (calls[k]["x"], calls[k]["y"]) != (c["x"], c["y"])]
+            twin = mine[0] + 1
+            if later and later[0] == twin and calls[twin]["font"] == c["font"] and calls[twin]["y"] == c["y"]:
+                # drawn twice in a row on the same row (deff 95's timer in both top corners): both show
+                lay["twin"] = {"x": calls[twin]["x"], "flags": calls[twin]["flags"]}
+                later = later[1:]
             if later:                                    # a second layout: shown when a value line is blank
                 between = {calls[k]["text"] for k in range(mine[0] + 1, later[0])}
                 cond = [j for j, t in enumerate(lines) if j != i and "%" in t and t in between]
@@ -214,6 +410,11 @@ def line_layouts(deff_id, lines, fonts, calls=None):
                 lay["hide_after_ms"] = frame_ms(deff_id, over["hide_after_frame"])
             if "step_frames" in over:
                 lay["step_ms"] = frame_ms(deff_id, over["step_frames"])
+            for key in ("cycle", "cycle_on", "cycle_offset"):
+                if key + "_ticks" in over:
+                    lay[key + "_ms"] = round(over[key + "_ticks"] * TICK_MS)
+        if i in SCREENS.get(deff_id, {}):
+            lay["screens"] = list(SCREENS[deff_id][i])
         if deff_id == 19 and "%" in line and "BALL" not in line:
             lay.update(font=SCORE_FIT["fit_fonts"][0], x=84, flags=2, y=SCORE_FIT["fit_ys"][0],
                        source="rom+table guess", **SCORE_FIT)
@@ -226,8 +427,22 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         left = gen_fonts.text_left(font, text, lay["x"], lay["flags"])
         box = (left, lay["y"] - font["cap"] + 1, left + gen_fonts.text_width(font, text) - 1, lay["y"],
                lay.get("show_after_ms", 0), lay.get("hide_after_ms") or 10 ** 9)
-        if not any(box[0] <= b[2] and b[0] <= box[2] and box[1] <= b[3] and b[1] <= box[3]
-                   and box[4] < b[5] and b[4] < box[5] for b in boxes):
-            boxes.append(box)
+        cycle = (lay.get("cycle_ms"), lay.get("cycle_offset_ms", 0)) if lay.get("cycle_ms") else None
+        call = lay.get("call")
+        screens = set(lay.get("screens", ()))
+
+        def overlaps(b):
+            # an outlined font's lines drawn one after the other (LIGHT CYCLE / MULTIBALL / TOTAL:) share
+            # their outline row: one dot of overlap is a stack, not a later screen of the effect
+            # (also the rows of one screen of a SCREENS effect)
+            e = 1 if font.get("outline") and ((call is not None and b[6] is not None and abs(call - b[6]) == 1)
+                                              or (screens and b[7])) else 0
+            if cycle and b[8] and cycle[0] == b[8][0] and cycle[1] != b[8][1]:
+                return False                     # shown in turn (cycle_ms windows)
+            return (box[0] + e <= b[2] and b[0] + e <= box[2] and box[1] + e <= b[3] and b[1] + e <= box[3]
+                    and box[4] < b[5] and b[4] < box[5])
+        # "keep" (OVERRIDES): rows the code draws 6 dots apart in a font whose box is 7 high (deff 65)
+        if lay.get("keep") or not any(overlaps(b) for b in boxes if not (screens and b[7] and not screens & b[7])):
+            boxes.append(box + (call, screens, cycle))
             out[i] = lay
     return out

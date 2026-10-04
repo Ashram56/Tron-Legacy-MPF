@@ -108,8 +108,9 @@ class Scoop(Feature):
         """eb_collect_game 0x01012228: the scoop collects one lit extra ball; deff 133 (show task 0x83)."""
         os_ = self.os
         self.vuk_lit_take(1)
-        os_.collect_extra_ball()
-        os_.show(0x83, 133)
+        # deff 133 [0x0101237c]: EXTRA / BALL, or EXTRA / BALL / the points paid instead (award type 2)
+        awarded = os_.collect_extra_ball()
+        os_.show(0x83, 133, value=None if awarded else os_.eb_paid)
         return True
 
 

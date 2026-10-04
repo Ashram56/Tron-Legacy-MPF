@@ -2,7 +2,7 @@
 
 This is an optional alternative to the native install (`scripts/setup.py`, or the installers in
 `scripts/install/`). One image holds the whole toolchain: Python 3.11 with MPF 0.80.1 and MPF Monitor 1.0.0,
-Godot 4.5.2, and the libraries for X11, OpenGL/Vulkan, sound and the P-ROC's USB chip. Nothing is installed
+Godot 4.6.3, and the libraries for X11, OpenGL/Vulkan, sound and the P-ROC's USB chip. Nothing is installed
 on your computer except Docker.
 
 The game runs as three containers. Each one opens its own window on your desktop, so you can put each window
@@ -83,6 +83,8 @@ Settings are environment variables. Set them per command (`DMD_SCREEN=1 docker/t
 | `DMD_FULLSCREEN` | `0` | `1`: the DMD fills that monitor |
 | `DMD_POSITION` | | Window position in desktop pixels, e.g. `1920,0` |
 | `DMD_RESOLUTION` | `1024x256` (from the project) | Window size, e.g. `1920x480` |
+| `TRON_DMD` | `hd` | `classic`: the original 128x32 dots instead of the HD DMD (the main README, "The DMD: HD or classic") |
+| `TRON_DMD_DOTS` | `0` | HD with a dot-matrix look: N round dots per DMD dot |
 | `DMD_DISPLAY` / `MONITOR_DISPLAY` | `$DISPLAY` | Another X screen or X server for that window, e.g. `:0.1` |
 | `GODOT_RENDERING_DRIVER` | `opengl3` | `vulkan` works too with the GPU |
 | `GODOT_ARGS` | | More Godot options, e.g. `--always-on-top` |

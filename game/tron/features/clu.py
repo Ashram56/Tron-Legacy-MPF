@@ -34,6 +34,8 @@ class Clu(Feature):
         os_.lamp_rule(self.clock.counting, leff=78, tube=23, order=0x01001d40)
         os_.lamps.leff_code(78, self._leff_shot_lamps)
         os_.deff_rule(self._background, 72, 0x086, 5)
+        # deff 72 [0x0100276c] prints clu_timer and the player's score on every frame
+        os_.deff_live((72,), lambda: {"timer": self.clock.seconds, "score": os_.current_score()})
         os_.lamp_update(self.lane_lamps)
         sc = self.machine.switch_controller
         sc.add_switch_handler("s_left_flipper", self.rotate_toward_c)
@@ -124,7 +126,10 @@ class Clu(Feature):
                 pd.clu_lights = min(pd.clu_lights + 1, 0xffff)
                 lit = True
             if not silent:
-                os_.deff_start(80, completions=pd.clu_lane_completions, needed=4 * lights_before + 1, lit=lit)
+                # deff 80 [0x01017230]: "%d MORE" = (needed - completions) / TO LIGHT HURRY-UP, or the
+                # HURRY-UP / IS LIT screen when this completion lit it (rom_layout.SCREENS)
+                os_.deff_start(80, more=4 * lights_before + 1 - pd.clu_lane_completions, lit=lit,
+                               screen=1 if lit else 0)
         if not silent:
             os_.leff_start(88)
             os_.sound(0x09c)

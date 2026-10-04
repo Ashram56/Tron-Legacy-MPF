@@ -3,7 +3,7 @@
 # scripts/setup.py. Safe to re-run.
 #
 #   scripts/install/install_prereqs_macos.sh                 # Python 3.11 + Git, then setup.py
-#   scripts/install/install_prereqs_macos.sh --monitor       # ... plus MPF Monitor
+#   scripts/install/install_prereqs_macos.sh --no-monitor    # ... without MPF Monitor (installed by default)
 #   scripts/install/install_prereqs_macos.sh --proc          # ... plus libpinproc/pypinproc (needs Homebrew)
 #   scripts/install/install_prereqs_macos.sh --dry-run       # print the plan, change nothing
 #   scripts/install/install_prereqs_macos.sh -- --skip-media # arguments after -- go to setup.py
@@ -13,7 +13,17 @@
 # 3.11 installer (universal2 .pkg, needs an admin password) and Git from the Xcode Command Line Tools.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Run from a clone, it sets up that clone. Run on its own (fetched with curl, README "Install"), it first
+# clones the repository into $TRON_DIR (default ~/Tron-Legacy-MPF-PuP), branch $TRON_BRANCH (default main),
+# from $TRON_REPO; an existing clone there gets a git pull.
+SRC="${BASH_SOURCE[0]:-}"
+if [ -n "$SRC" ] && [ -f "$(dirname "$SRC")/../setup.py" ]; then
+    ROOT="$(cd "$(dirname "$SRC")/../.." && pwd)" CLONE=0
+else
+    ROOT="${TRON_DIR:-$HOME/Tron-Legacy-MPF-PuP}" CLONE=1
+fi
+REPO_URL="${TRON_REPO:-https://github.com/Ashram56/Tron-Legacy-MPF-PuP.git}"
+REPO_BRANCH="${TRON_BRANCH:-main}"
 HERE="$ROOT/scripts/install"
 # The last Python 3.11 release with a macOS installer (later 3.11 releases are source-only security fixes)
 PYORG_VERSION="3.11.9"
@@ -21,7 +31,7 @@ PYORG_PKG="python-${PYORG_VERSION}-macos11.pkg"
 PYORG_URL="https://www.python.org/ftp/python/${PYORG_VERSION}/${PYORG_PKG}"
 PYORG_PY="/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"
 
-DRY=0 YES=0 MONITOR=0 PROC=0 SETUP=1 PYORG=0
+DRY=0 YES=0 MONITOR=1 PROC=0 SETUP=1 PYORG=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -31,6 +41,7 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY=1 ;;
         -y|--yes) YES=1 ;;
         --monitor) MONITOR=1 ;;
+        --no-monitor) MONITOR=0 ;;
         --proc) PROC=1 ;;
         --no-setup) SETUP=0 ;;
         --python-org) PYORG=1 ;;
@@ -140,12 +151,32 @@ if [ "$PROC" = 1 ]; then
     brew_install cmake pkg-config libusb libusb-compat libftdi
 fi
 
+# ------------------------------------------------------------------ repository (run on its own: clone it)
+
+if [ "$CLONE" = 1 ]; then
+    say "Repository: $REPO_URL ($REPO_BRANCH) in $ROOT"
+    if [ -d "$ROOT/.git" ]; then
+        # an existing clone: update its branch, or move to $REPO_BRANCH when that branch is gone from GitHub
+        # (a deleted pull-request branch) or none is checked out
+        CUR="$(git -C "$ROOT" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+        if [ -n "$CUR" ] && git -C "$ROOT" ls-remote --exit-code --heads origin "$CUR" >/dev/null 2>&1; then
+            run git -C "$ROOT" pull --ff-only
+        else
+            note "branch '${CUR:-none}' is no longer on GitHub: switching to $REPO_BRANCH"
+            run git -C "$ROOT" fetch --prune origin
+            run git -C "$ROOT" checkout -B "$REPO_BRANCH" --track "origin/$REPO_BRANCH"
+        fi
+    else
+        run git clone --branch "$REPO_BRANCH" "$REPO_URL" "$ROOT"
+    fi
+fi
+
 # ------------------------------------------------------------------ workspace
 
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    [ "$MONITOR" = 1 ] && ARGS+=(--monitor)
+    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then
@@ -165,6 +196,7 @@ fi
 
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
+    note "In $ROOT:"
     note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
     note "Run the tests:   .venv/bin/python -m pytest -q tests"
 fi

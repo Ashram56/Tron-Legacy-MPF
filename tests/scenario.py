@@ -60,6 +60,14 @@ def forced_picks(name):
             # That is the start of its 10-tick hold (deff_hold_frames(10, 0x20)), where the next deff may
             # start, so the run length is 10 ticks longer.
             hold = 10 * 0.01626
+            # the slot the award stopped in: the reel scrolls 5, 18 or 30 frames of 3 ticks before its
+            # stop sound 0x0e3 (deff_105_arcade_award 0x0100e8bc)
+            stop = next((n["t"] - e["t"] for n in evs[i + 1:] if n.get("ev") == "sound"
+                         and n.get("call") == "0x0e3" and n.get("in_deff") == 105), None)
+            if stop is not None:
+                from tron.features.arcade import scroll_frames
+                forced.setdefault("arcade_slot", []).append(
+                    min(range(3), key=lambda k: abs(scroll_frames(k) * 3 * 0.01626 - stop)))
             for n in evs[i + 1:]:
                 if n.get("ev") == "deff_start" and n.get("id") not in (19, 105):
                     forced.setdefault("deff_105_seconds", []).append(n["t"] - e["t"] + hold)

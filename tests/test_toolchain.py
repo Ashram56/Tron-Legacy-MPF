@@ -17,7 +17,7 @@ import run  # noqa: E402
 import setup  # noqa: E402
 import toolchain as tc  # noqa: E402
 
-RELEASES = "https://github.com/godotengine/godot/releases/download/4.5.2-stable/"
+RELEASES = "https://github.com/godotengine/godot/releases/download/4.6.3-stable/"
 
 
 class TestHost(unittest.TestCase):
@@ -59,12 +59,12 @@ class TestVenv(unittest.TestCase):
 
 class TestGodot(unittest.TestCase):
     CASES = [  # os, arch, zip, executable in tools/godot/
-        ("windows", "x86_64", "Godot_v4.5.2-stable_win64.exe.zip", ["Godot_v4.5.2-stable_win64.exe"]),
-        ("windows", "arm64", "Godot_v4.5.2-stable_windows_arm64.exe.zip", ["Godot_v4.5.2-stable_windows_arm64.exe"]),
-        ("macos", "x86_64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("macos", "arm64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("linux", "x86_64", "Godot_v4.5.2-stable_linux.x86_64.zip", ["Godot_v4.5.2-stable_linux.x86_64"]),
-        ("linux", "arm64", "Godot_v4.5.2-stable_linux.arm64.zip", ["Godot_v4.5.2-stable_linux.arm64"]),
+        ("windows", "x86_64", "Godot_v4.6.3-stable_win64.exe.zip", ["Godot_v4.6.3-stable_win64.exe"]),
+        ("windows", "arm64", "Godot_v4.6.3-stable_windows_arm64.exe.zip", ["Godot_v4.6.3-stable_windows_arm64.exe"]),
+        ("macos", "x86_64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("macos", "arm64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("linux", "x86_64", "Godot_v4.6.3-stable_linux.x86_64.zip", ["Godot_v4.6.3-stable_linux.x86_64"]),
+        ("linux", "arm64", "Godot_v4.6.3-stable_linux.arm64.zip", ["Godot_v4.6.3-stable_linux.arm64"]),
     ]
 
     def test_urls_and_paths(self):
@@ -111,8 +111,10 @@ class TestSetupPlan(unittest.TestCase):
                 self.assertIn("gen_media.py", text)
 
     def test_monitor_and_skip(self):
-        text = self.plan("--dry-run", "--monitor", "--skip-godot")
+        text = self.plan("--dry-run", "--skip-godot")             # MPF Monitor is in by default
         self.assertIn("mpf-monitor==" + tc.MPF_MONITOR_VERSION, text)
+        self.assertIn("mpf-monitor==", self.plan("--dry-run", "--monitor", "--skip-godot"))
+        self.assertNotIn("mpf-monitor==", self.plan("--dry-run", "--no-monitor", "--skip-godot"))
         self.assertNotIn("== Godot", text)
         self.assertNotIn(tc.godot_url(), text)
 
@@ -139,12 +141,12 @@ class TestUnpack(unittest.TestCase):
     def test_godot_zip_keeps_exec_bit(self):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:
-            info = zipfile.ZipInfo("Godot_v4.5.2-stable_linux.x86_64")
+            info = zipfile.ZipInfo("Godot_v4.6.3-stable_linux.x86_64")
             info.external_attr = 0o755 << 16
             z.writestr(info, "ELF")
         with tempfile.TemporaryDirectory() as tmp:
             setup.unzip(buf.getvalue(), tmp, "linux")
-            exe = os.path.join(tmp, "Godot_v4.5.2-stable_linux.x86_64")
+            exe = os.path.join(tmp, "Godot_v4.6.3-stable_linux.x86_64")
             self.assertTrue(os.path.isfile(exe))
             if os.name != "nt":
                 self.assertTrue(os.access(exe, os.X_OK))
@@ -200,6 +202,18 @@ class TestRun(unittest.TestCase):
                 self.assertEqual("mine", f.read())
         self.assertTrue(os.path.exists(os.path.join(run.tc.GAME, "monitor", "settings.ini.default")))
 
+    def test_ensure_monitor(self):
+        """run.py --monitor in a workspace without MPF Monitor installs it rather than failing."""
+        ok, missing = mock.Mock(returncode=0), mock.Mock(returncode=1)
+        with mock.patch.object(run.subprocess, "run", return_value=ok), \
+                mock.patch.object(setup.Setup, "venv") as venv:
+            run.ensure_monitor()
+        venv.assert_not_called()
+        with mock.patch.object(run.subprocess, "run", return_value=missing), \
+                mock.patch.object(setup.Setup, "venv") as venv, contextlib.redirect_stdout(io.StringIO()):
+            run.ensure_monitor()
+        venv.assert_called_once_with()
+
     def test_mpf_args(self):
         self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], run.mpf_args("virtual"))
         self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual", free_play=False))
@@ -211,6 +225,41 @@ class TestRun(unittest.TestCase):
             self.assertEqual(sys.executable, run.godot_command([], virtual_display=False)[0])
             with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
+
+
+class TestMediaStale(unittest.TestCase):
+    """The generated media (git-ignored) follow the generators and the assets: after a pull that changes
+    them, run.py and the docker setup make and import them again. Play test 2: the ZUSE / TRON letters,
+    the SOS stage text and the fixed layouts were in the code, but a workspace kept the slides generated
+    before (the capture's letters, all hollow; SHOOT FLYNNS ARCADE on every stage)."""
+
+    def test_stamp_follows_inputs_and_import(self):
+        with tempfile.TemporaryDirectory() as root:
+            for rel in tc.MEDIA_INPUTS:
+                os.makedirs(os.path.join(root, os.path.dirname(rel)), exist_ok=True)
+                with open(os.path.join(root, rel), "w") as f:
+                    f.write("v1")
+            letters = os.path.join(root, "game", "media", "dmd", "deff_091")
+            os.makedirs(letters)
+            png = os.path.join(letters, "solid0.png")
+            open(png, "w").close()
+            self.assertIn("no stamp", tc.media_stale(root))             # never generated with a stamp
+            tc.write_media_stamp(root)
+            self.assertIn("not imported", tc.media_stale(root))         # gen_media without the Godot import
+            open(png + ".import", "w").close()
+            self.assertIsNone(tc.media_stale(root))
+            with open(os.path.join(root, "scripts", "rom_layout.py"), "w") as f:
+                f.write("v2")                                           # a pull changed a generator
+            self.assertIn("changed", tc.media_stale(root))
+
+    def test_run_refreshes_stale_media(self):
+        with mock.patch.object(tc, "media_stale", return_value="changed"), \
+                mock.patch.object(setup, "refresh_media") as refresh, \
+                mock.patch.object(run, "port_in_use", return_value=True), \
+                mock.patch.object(run.gmc_patch, "patch"), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit):                         # stops at the busy port, after the refresh
+                run.run("virtual")
+        refresh.assert_called_once_with()
 
 
 class TestGmcPatch(unittest.TestCase):

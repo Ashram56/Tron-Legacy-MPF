@@ -19,12 +19,17 @@ scripts/render_diff.py. Glyph x/y offsets and the font spacing are ROM data not 
 rules below (bottom_offset, x_offset, SPACING, outline fonts -1, plain fonts +1) reproduce the captures.
 
 Output (git-ignored): game/fonts/rom_font_NN.fnt + rom_font_NN.png, and game/fonts/fonts.json
-(per font: image group, cap height, spacing, glyphs). Usage: .venv/bin/python scripts/gen_fonts.py
+(per font: image group, cap height, spacing, glyphs). For the HD display mode, game/fonts/hd/ holds the same
+44 fonts as TrueType outlines traced from the dots (scripts/font_outline.py: rom_font_NN.ttf, the ROM's
+advances exactly, so the text lands where the 128x32 layout puts it, sharp at any resolution) with a glow
+atlas each (rom_font_NN_glow.fnt), and fonts_hd.json, the design (style, weight, width) and layers of each. Usage: .venv/bin/python scripts/gen_fonts.py
 """
 import io
 import json
 import os
 import zipfile
+
+import fsutil  # Windows/OneDrive-safe folder wipes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ZIP = os.path.join(ROOT, "assets", "mpf_package", "media", "rom_images_all.zip")
@@ -272,14 +277,71 @@ def write_bmfont(font, get, out_dir):
     return name
 
 
-def build(out_dir=OUT):
-    """Writes every ROM font and fonts.json (metrics the slides and the render check use)."""
+def design(font, get):
+    """What the font looks like, for the HD font made from it: style (plain: text over its black cell;
+    outlined: a black border around the strokes; tron: the game's outlined display face; digits: score
+    digit sets; big tron digits: the shaded 20-dot digits), stroke weight in dots (lit dots per lit run
+    across a row, on the digits and capitals) and width (mean glyph width / cap height: < 0.6 condensed)."""
+    chars = [c for c in "0123456789ABCDEHMNOSTUWZ" if c in font["glyphs"]]
+    runs = lit_dots = 0
+    widths = []
+    for c in chars:
+        img = get(font["glyphs"][c]["image"])
+        for row in img:
+            on = [0 < v < TRANSPARENT and v >= 8 for v in row]
+            lit_dots += sum(on)
+            runs += sum(1 for i, v in enumerate(on) if v and (i == 0 or not on[i - 1]))
+        widths.append(sum(1 for x in range(len(img[0])) if any(0 < r[x] < TRANSPARENT for r in img)))
+    shades = sorted({v for c in font["glyphs"].values() for row in get(c["image"]) for v in row
+                     if 0 < v < TRANSPARENT})
+    n = len(font["glyphs"])
+    style = ("big tron digits" if len(shades) > 1 else "tron" if n in (37, 38, 42) else
+             "digits" if n <= 11 else "outlined" if font["outline"] else "plain")
+    if style == "digits" and font["outline"]:
+        style = "outlined digits"
+    width = sum(widths) / len(widths) / font["cap"] if widths else 0
+    return {"id": font["id"], "style": style, "cap": font["cap"], "outline": font["outline"],
+            "weight": round(lit_dots / runs, 2) if runs else 0, "width": round(width, 2),
+            "condensed": width < 0.6, "shades": len(shades)}
+
+
+def build_hd(fonts, get, out_dir, processes=None):
+    """game/fonts/hd/: the vector (TrueType) font and the glow atlas of every ROM font (scripts/font_outline.py)
+    and fonts_hd.json (design and layers per font). Without fontTools the HD fonts are left out (the HD
+    mode then shows the classic DMD) and False is returned."""
+    try:
+        import fontTools  # noqa: F401
+    except ImportError:
+        print("fonts: no fontTools (pip install fonttools, or run scripts/setup.py): no HD fonts")
+        fsutil.remove_dir(out_dir)
+        return False
+    import font_outline
+    fsutil.clear_dir(out_dir)
+    jobs = [(f, out_dir) for f in fonts]
+    if processes == 1:
+        entries = [font_outline.build_font(j) for j in jobs]
+    else:
+        import multiprocessing
+        with multiprocessing.Pool(processes or os.cpu_count() or 2) as pool:
+            entries = pool.map(font_outline.build_font, jobs, chunksize=1)
+    with open(os.path.join(out_dir, "fonts_hd.json"), "w", encoding="utf-8", newline="\n") as fp:
+        json.dump({"vector": True, "version": font_outline.VERSION,
+                   "fonts": [dict(design(f, get), **e) for f, e in zip(fonts, entries)]},
+                  fp, indent=0, sort_keys=True)
+    return True
+
+
+def build(out_dir=OUT, hd=True):
+    """Writes every ROM font and fonts.json (metrics the slides and the render check use), and with hd the
+    HD fonts in out_dir/hd."""
     index, get, fonts = decode_all()
     os.makedirs(out_dir, exist_ok=True)
     for f in fonts:
         write_bmfont(f, get, out_dir)
     with open(os.path.join(out_dir, "fonts.json"), "w", encoding="utf-8", newline="\n") as fp:
         json.dump({"fonts": fonts}, fp, indent=0, sort_keys=True)
+    if hd:
+        build_hd(fonts, get, os.path.join(out_dir, "hd"))
     return fonts
 
 

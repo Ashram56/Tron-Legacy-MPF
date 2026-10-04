@@ -22,15 +22,19 @@ GAME = os.path.join(ROOT, "game")
 
 PYTHON_MIN = (3, 10)
 MPF_VERSION = "0.80.1"
-GODOT_VERSION = "4.5.2"
+GODOT_VERSION = "4.6.3"
 GMC_VERSION = "1.0.0"
 MPF_MONITOR_VERSION = "1.0.0"
 # ruamel.yaml.clib: 0.2.15 wheels name their metadata ruamel_yaml_clib, which MPF's pkg_resources (setuptools 72)
 # cannot match to ruamel.yaml's requirement; with MPF Monitor installed `mpf` then fails to start. 0.2.14 is the
 # last with the dotted name. Python 3.13+ does not use the C library.
-REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "pytest",
+# fonttools: the HD mode's vector fonts (scripts/font_outline.py)
+REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "fonttools>=4.40", "pytest",
                 'ruamel.yaml.clib==0.2.14; python_version < "3.13"']
 MONITOR_REQUIREMENTS = ["mpf-monitor==" + MPF_MONITOR_VERSION]
+# Visual Pinball X (setup.py --vpx): olefile reads the table's script out of the .vpx (scripts/vpx_table.py),
+# pywin32 runs the TronMPF.Controller COM server VPX talks to (scripts/vpx_bridge.py, Windows only).
+VPX_REQUIREMENTS = ["olefile>=0.46", 'pywin32>=306; sys_platform == "win32"']
 # mpf-monitor 1.0.0 on PyPI (wheel and sdist) lacks its Qt Designer files, so `mpf monitor` stops with
 # "searchable_tree.ui: No such file". setup.py puts them in from the release's git tag.
 MPF_MONITOR_UI_FILES = ("events_table.ui", "inspector.ui", "searchable_table.ui", "searchable_tree.ui")
@@ -139,6 +143,54 @@ def godot_path(os_name=None, arch=None, root=ROOT):
 
 def godot_command(*args):
     return [godot_path(), "--path", GAME] + list(args)
+
+
+# ---------------------------------------------------------------------- generated media
+
+# What the generated config and media (game/config/rom, game/media, game/slides/deffs, game/fonts,
+# game/tron/media_data.json; all git-ignored) are made from: a change to any of these after a pull leaves
+# the workspace showing the old display effects until they are generated and imported again.
+MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py",
+                                                       "dmd_hd.py", "font_outline.py", "dmd_color.py")] \
+    + [os.path.join("game", "tools", "dmd_colormap.json")] \
+    + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
+    + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
+MEDIA_STAMP = os.path.join(GAME, "media", ".generated")
+
+
+def media_fingerprint(root=ROOT):
+    import hashlib
+    h = hashlib.sha1()
+    for rel in MEDIA_INPUTS:
+        path = os.path.join(root, rel)
+        h.update(rel.replace(os.sep, "/").encode())
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                h.update(hashlib.sha1(f.read()).digest())
+    return h.hexdigest()
+
+
+def media_stale(root=ROOT):
+    """Why the generated media must be made again (None when current): never generated or stamped, made
+    from other generator scripts or assets than these, or generated but not imported by Godot (the
+    slides then show no picture: Godot loads a PNG only through its .import file)."""
+    stamp = os.path.join(root, "game", "media", ".generated")
+    if not os.path.exists(stamp):
+        return "no stamp of a complete media generation and Godot import ({})".format(stamp)
+    with open(stamp, encoding="utf-8") as f:
+        if f.read().strip() != media_fingerprint(root):
+            return "the generator scripts or the asset package changed since the media were generated"
+    for folder, pic in (("dmd", "deff_091/solid0.png"), ("dmd_hd", "deff_091/solid0.png"),
+                        ("dmd_hd_color", "deff_001/f000.png")):
+        probe = os.path.join(root, "game", "media", folder, *pic.split("/"))
+        if os.path.exists(probe) and not os.path.exists(probe + ".import"):
+            return "the media were generated but not imported by Godot"
+    return None
+
+
+def write_media_stamp(root=ROOT):
+    with open(os.path.join(root, "game", "media", ".generated"), "w", encoding="utf-8") as f:
+        f.write(media_fingerprint(root) + "\n")
 
 
 # ---------------------------------------------------------------------- display
