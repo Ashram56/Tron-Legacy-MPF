@@ -42,6 +42,8 @@ import json
 import os
 import sys
 
+import fsutil  # Windows/OneDrive-safe renames and folder wipes
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
 VERSION = "5"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
@@ -413,13 +415,7 @@ def color_file(job):
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
         shutil.copyfile(dst, tmp)
-        try:
-            os.replace(tmp, cached)
-        except PermissionError:
-            # Windows: another worker cached the same picture (same key, same bytes) and has it open
-            if not os.path.exists(cached):
-                raise
-            os.remove(tmp)
+        fsutil.replace_cached(tmp, cached)    # another worker may hold the same entry (Windows)
     return dst
 
 
@@ -428,12 +424,11 @@ def build(src_root, dst_root, scale, cache=None, processes=None, crom=None):
     names); the letter sprites stay out (tron/letter_panel.gd draws them: text). crom: the Serum
     colourisation (serum_build) for the effects it knows. Returns the frame count."""
     import glob
-    import shutil
     from PIL import Image
     import dmd_hd
     cmap = load_colormap()
     tpal = text_palette(cmap)
-    shutil.rmtree(dst_root, ignore_errors=True)
+    fsutil.remove_dir(dst_root)
     folders = sorted(glob.glob(os.path.join(src_root, "deff_*")))
     masks = text_masks()
     jobs, palettes = [], {}
