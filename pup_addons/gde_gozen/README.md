@@ -25,14 +25,16 @@ starts) to them as well.
 
 ## Hardware decoding on the Jetson (JetPack 5 or 6)
 
-Build and install libnvmpi once, on the Jetson (it needs the Jetson Multimedia API:
-`sudo apt install nvidia-l4t-jetson-multimedia-api` if `/usr/src/jetson_multimedia_api` is missing):
+`scripts/install/install_prereqs_linux.sh` (the README's Linux line) installs libnvmpi by itself on a Jetson.
+On its own, one line on the Jetson:
 
 ```bash
-sudo apt install cmake build-essential git
-git clone https://github.com/gjrtimmer/jetson-ffmpeg && cd jetson-ffmpeg
-./scripts/build.sh --install          # libnvmpi.so in /usr/local/lib, ldconfig
+bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF-PuP/main/scripts/install/install_jetson_hwdec.sh)
 ```
+
+It installs the build packages and the Jetson Multimedia API (apt), then builds jetson-ffmpeg's libnvmpi (at
+the revision this GoZen was built with) into `/usr/local/lib`. `--test` also builds a small ffmpeg (not installed
+system-wide) and decodes a pack video with `h264_nvmpi` to prove the hardware path.
 
 When the game starts, Godot's log (`game/logs/` or the terminal) says for each video either
 `GoZen: hardware decoder h264_nvmpi` or `GoZen: hardware decoder h264_nvmpi unavailable, using software`.

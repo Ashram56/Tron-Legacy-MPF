@@ -355,6 +355,7 @@ if [ "$PROC" = 1 ]; then
     fi
 fi
 
+[ ! -f /etc/nv_tegra_release ] || "$HERE/install_jetson_hwdec.sh" $([ "$DRY" = 1 ] && echo --dry-run) || true  # PuP: Jetson decoder
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
     note "In $ROOT:"

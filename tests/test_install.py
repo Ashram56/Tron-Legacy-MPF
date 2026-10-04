@@ -34,13 +34,20 @@ def sh(args, env=None):
 
 @unittest.skipUnless(BASH and POSIX, "needs bash on Linux or macOS")
 class TestShellScripts(unittest.TestCase):
-    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh"]
+    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh"]
 
     def test_syntax(self):
         for name in self.SCRIPTS + [os.path.join("..", "..", "docker", "tron.sh")]:
             with self.subTest(script=name):
                 r = sh(["-n", os.path.join(INSTALL, name)])
                 self.assertEqual(0, r.returncode, r.stderr)
+
+    def test_jetson_hwdec_skips_other_machines(self):
+        if os.path.exists("/etc/nv_tegra_release"):
+            self.skipTest("on a Jetson")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"])
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn("not an NVIDIA Jetson", r.stdout)
 
     def os_release(self, text):
         f = tempfile.NamedTemporaryFile("w", suffix=".os-release", delete=False)
