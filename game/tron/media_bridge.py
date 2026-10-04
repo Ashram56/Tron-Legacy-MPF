@@ -17,6 +17,13 @@ CONTEXT = "tron_media"
 SERVICE_PRIORITY = 1000         # the service slide covers every deff (ROM priorities are 0-255)
 TICK = 0.01626                                     # seconds per ROM tick (os_layer.TICK)
 SPEC = re.compile(r"%(P\d/[^%]*%|[-+ #0,]*\d*l?[dus])")
+# The values of a deff's printf lines, in the ROM's argument order, for effects whose callers also pass
+# arguments the text does not print (the others: every argument not in the deff's "args", in call order).
+# deff 55 (0x0100461c): before / after / flags pick the screen, only `more` is printed ("%u MORE TO").
+# deff 138 (0x01003c30): "%u" combo count (ring font), "%,02lu" points, the named combo ("%s", blank when
+# the shots match no named combo) and "JACKPOT=%,02lu"; the combo total is not shown. Without this the
+# kwargs order printed the combo name where the points go: "WAY / COMBO / CASTOR".
+TEXT_ARGS = {55: ("more",), 138: ("count", "points", "named", "jackpot")}
 
 
 def format_rom_text(line, args):
@@ -34,12 +41,14 @@ def format_rom_text(line, args):
                 return choices[n - 1] if 0 < n <= len(choices) else ""
             return choices[0] if n == 1 else (choices[2] if len(choices) > 2 else choices[-1])
         value = args.pop(0) if args else 0
+        if value is None:
+            return ""
         if spec.endswith("s"):
             return str(value)
         try:
             value = int(value)
-        except (TypeError, ValueError):
-            return str(value)
+        except (TypeError, ValueError):            # never print a name or a tuple where the ROM prints a number
+            return ""
         last[0] = value
         text = "{:,}".format(value) if "," in spec else str(value)
         flags, width = re.match(r"([-+ #0,]*)(\d*)", spec).groups()
@@ -62,6 +71,7 @@ class MediaBridge:
             self.data = {"pools": {int(k): v for k, v in data["pools"].items()},
                          "deffs": {int(k): v for k, v in data["deffs"].items()}}
         self.music_key = None
+        self.service_shown = False
         self.counters = {}
         self.last_scores = {}
         self.award = (0, None, None)               # last points, shown since, blink counter since
@@ -105,7 +115,10 @@ class MediaBridge:
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)
-        values = [v for k, v in args.items() if k not in info.get("args", [])]   # not lit/new/screen
+        if deff_id in TEXT_ARGS:
+            values = [args.get(k) for k in TEXT_ARGS[deff_id]]
+        else:
+            values = [v for k, v in args.items() if k not in info.get("args", [])]   # not lit/new/screen
         if deff_id == 19:                              # score display: ball number and score
             values = [self.machine.game.player.ball if self.os.game and self.os.game.player else 0,
                       self.os.game.player.score if self.os.game and self.os.game.player else 0]
@@ -234,22 +247,30 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ service menu
 
-    def text_show(self, slide, lines, priority):
+    def text_show(self, slide, lines, priority, **extra):
         """Rules text on a generic slide (game/slides/<slide>.tscn, labels line0-line2); needs no generated
         media: the service menu, the attract pages and the initials entry."""
         lines = {"line{}".format(i): text for i, text in enumerate(lines)}
         self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
         self._send("slides_play", {slide: {"action": "play", "key": slide, "expire": None, "priority": priority}},
-                   priority=priority, need_data=False, **lines)
+                   priority=priority, need_data=False, **lines, **extra)
 
     def text_hide(self, slide):
         self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
 
-    def service_show(self, lines):
-        """Service menu text (tron/service.py), above every deff."""
-        self.text_show("service", lines, SERVICE_PRIORITY)
+    def service_show(self, lines, draw=None):
+        """Service menu screen (tron/service.py), above every deff: the ROM draw list `draw` (tron/rom_draw.py,
+        drawn by tron/service_screen.gd) and its text lines."""
+        if self.service_shown:          # redrawn in place: a remove and play would show the slides below
+            lines = {"line{}".format(i): text for i, text in enumerate(lines)}
+            self._send("slides_play", {"service": {"action": "update", "key": "service", "expire": None}},
+                       priority=SERVICE_PRIORITY, need_data=False, draw=draw or [], **lines)
+            return
+        self.text_show("service", lines, SERVICE_PRIORITY, draw=draw or [])
+        self.service_shown = self.connected(need_data=False)
 
     def service_hide(self):
+        self.service_shown = False
         self.text_hide("service")
 
     # ------------------------------------------------------------------ sounds

@@ -251,6 +251,11 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
              # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
              **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)},
+             # deff 138 (0x01003c30): the combo count "%u" right-aligned at x 0x53, row 0x13, in font 0x2a on
+             # frames where !(frame & 2), else in the outlined font 0x2b (frames of 3 ticks): two labels that
+             # blink in turn
+             138: {"%u": {"font": 42, "x": 83, "y": 19, "flags": 4, "source": "rom", "blink_ticks": 6,
+                          "twin": {"font": 43, "show_after_ms": round(6 * TICK_MS)}}},
              # deff 55: the second rows picked into a variable (text_draw_msg(uVar8, ...) at y 0x20, font 0x21)
              55: {t: {"font": 33, "x": 84, "y": 32, "flags": 2, "source": "rom (message from the mode spec)"}
                   for t in ("ARE LIT", "LIGHT EX. BALL", "LIGHT M.B. + E.B.")}}

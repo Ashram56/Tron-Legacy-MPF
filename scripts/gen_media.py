@@ -65,6 +65,8 @@ ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             55: "MULTIBALL + E.B. / ARE LIT / EXTRA BALL / IS LIT / %u MORE TO / LIGHT MULTIBALL / LIGHT EX. BALL"
                 " / LIGHT M.B. + E.B. / MULTIBALL / IS LIT",
             60: "%,02lu / BALL ADDED / %,02lu / %u MORE FOR / ADD-A-BALL",
+            # deff 138 (0x01003c30): the named combo's message (table entry + 8) between points and jackpot
+            138: "%u / WAY / COMBO / %,02lu / %s / JACKPOT=%,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
 
 
