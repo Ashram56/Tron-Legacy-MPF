@@ -103,3 +103,66 @@ class TestDmdText(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Deffs whose text the rules never draw: their fonts come from per-language tables or lists the package
+# lacks (deff 3 technician alert, 12 message, 16 tournament game, 45 the Light Cycle maze video mode).
+NEVER_STARTED = {3, 12, 16, 45}
+
+
+class TestDmdFonts(unittest.TestCase):
+    """Every text line a display effect can draw is placed in a ROM font, at the ROM's position, as the
+    deff's draw code (or its reference capture) gives it: no guessed fallback font (the oversized "n MORE"
+    lines of deffs 66, 80 and 108 were font 12 at a guessed row), and no Godot default font on any slide."""
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        if not os.path.exists(os.path.join(ROOT, "game", "fonts", "fonts.json")):
+            self.skipTest("fonts not generated (scripts/gen_media.py)")
+
+    def test_no_fallback_font(self):
+        import json
+        import rom_layout
+        with open(os.path.join(ROOT, "game", "tron", "media_data.json"), encoding="utf-8") as f:
+            deffs = json.load(f)["deffs"]
+        with open(os.path.join(ROOT, "game", "fonts", "fonts.json"), encoding="utf-8") as f:
+            fonts = {font["id"]: font for font in json.load(f)["fonts"]}
+        calls = rom_layout.deff_calls()
+        bad = []
+        for deff_id, info in sorted(deffs.items(), key=lambda kv: int(kv[0])):
+            deff_id = int(deff_id)
+            if deff_id in NEVER_STARTED or not info["text"]:
+                continue
+            for line, lay in zip(info["text"], rom_layout.line_layouts(deff_id, info["text"], fonts,
+                                                                       calls.get(deff_id, []))):
+                if lay and lay["source"] == "fallback":
+                    bad.append((deff_id, line, "fallback font"))
+            for call in calls.get(deff_id, []):
+                if call["font"] is None and call["font_list"] not in rom_layout.FONT_LISTS \
+                        and call["text"] in info["text"]:
+                    bad.append((deff_id, call["text"], "unknown font list " + call["font_list"]))
+        self.assertEqual([], bad)
+
+    def test_never_started_deffs(self):
+        source = ""
+        for path in glob.glob(os.path.join(ROOT, "game", "tron", "**", "*.py"), recursive=True):
+            with open(path, encoding="utf-8") as f:
+                source += f.read()
+        for deff_id in NEVER_STARTED:
+            self.assertNotRegex(source, r"deff_start\({}\b".format(deff_id))
+
+    def test_slides_draw_rom_fonts(self):
+        # every text label of every slide is a tron/rom_text.gd label (a ROM font); the boot slide said
+        # "TRON LEGACY / MPF + GMC BOOT OK" and the attract pages and initials used Godot's default font
+        paths = glob.glob(os.path.join(ROOT, "game", "slides", "*.tscn")) + \
+            glob.glob(os.path.join(ROOT, "game", "slides", "deffs", "*.tscn"))
+        bad = []
+        for path in paths:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            text_script = re.search(r'path="res://tron/rom_text.gd" id="([^"]+)"', text)
+            for node in re.split(r"\n(?=\[node )", text):
+                if 'type="Label"' in node and not (text_script and 'script = ExtResource("{}")'.format(
+                        text_script.group(1)) in node):
+                    bad.append((os.path.basename(path), node.splitlines()[0]))
+        self.assertEqual([], bad)

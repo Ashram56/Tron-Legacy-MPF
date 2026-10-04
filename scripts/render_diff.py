@@ -50,6 +50,7 @@ VALUES = {19: [[1], [0]],                   # BALL 1, score 00 (score 0 printed 
           47: [[], [6], [], [0]],                       # phase 0: 6 discs to go, JACKPOT=00
           65: [[], [], [], [], [], [0], None],          # SHOOT ... / FOR ... (in turn), SUPER=00
           141: [[], [500000], [0]],
+          99: [[], [], [710000]],                       # FAST SCORING / TOTAL: / 710,000
           68: [[], [], [0], [], [0]], 69: [[], [], [0], [], [], [0]]}   # plain JACKPOT / SUPER JACKPOT 00                     # phase 0: NEXT SHOT=500,000, SUPER=00
 # Other event args of the score display (tron/score_display.gd) as the deff 19 capture shows them:
 # credits 1 coin of 3, replay level 20,000,000, one player with 00, playfield not yet valid and the

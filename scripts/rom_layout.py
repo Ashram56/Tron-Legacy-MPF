@@ -179,7 +179,7 @@ def effect_fills():
 def deff_calls():
     """{deff: [call, ...]} in code order (the deff's own function first, then its callees)."""
     funcs, names = _functions()
-    msgs = _messages(funcs)
+    msgs = {**EXTRA_MESSAGES, **_messages(funcs)}
     out = {}
     for deff_id, fn in _deff_functions():
         if fn in funcs:
@@ -193,7 +193,15 @@ def deff_calls():
 # Font lists of text_draw_msg_fit: the ROM data is not in the package; the fonts are the ones the
 # reference captures show for these calls (by scripts/render_diff.py style matching).
 FONT_LISTS = {"0x040d2834": [33], "0x040d2aa4": [15], "0x040d302c": [39], "0x040d31d4": [10, 6],
-              "0x040d33a8": [11], "0x040d8a80": [12], "0x040d9194": [2]}
+              "0x040d33a8": [11], "0x040d8a80": [12], "0x040d9194": [2],
+              # deff 32 PLAYER %d - ENTER INITIALS (rows 0-4 of its capture: font 2)
+              "0x040d89f8": [2],
+              # deff 99's total (FUN_00028eb0, max width 0x39): font 15 on its capture (710,000); the fonts
+              # for totals too wide for it are not known, the default list's are used
+              "0x040d6ff4": [15, 12, 2]}
+# Messages whose text the decompile does not comment (the call is wrapped over two lines): the event map's
+# rom_text for the deff that prints them
+EXTRA_MESSAGES = {0x348: "PLAYER %d - ENTER INITIALS"}
 DEFAULT_LIST = [15, 12, 2]
 # Per-language font tables (font = table[FUN_0000a3b4()], English = entry 0): not in the package; the
 # font each reference capture shows for the call (every text dot of the capture matched, see
@@ -266,6 +274,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              47: {"SHOOT SPINNING DISC": {"blink_ticks": 16}, "SHOOT RECOGNIZER": {"blink_ticks": 16},
                   **{t: {"font": 1, "x": 84, "y": 30, "flags": 2, "source": "rom (message picked into msg_id)"}
                      for t in ("JACKPOT=%,02lu", "RECOGNIZER=%,02lu")}},
+             # deff 99 (0x010331ac, 3-tick frames): the total on even frames only; its row on the capture is 28
+             # (the call says 0x1d: FUN_00028eb0 places the fitted font one row up)
+             99: {"%,02lu": {"blink_ticks": 3, "y": 28, "fit_ys": [28, 28, 28], "source": "rom+capture"}},
              # deff 57 (0x01005524, 6-tick frames): SWITCHES= hidden on frames where frame & 2
              57: {"SWITCHES=%,02lu": {"blink_ticks": 12}},
              # deff 65 (0x0101de30, 6-tick frames): without the double window (task 0x5c) the two messages of

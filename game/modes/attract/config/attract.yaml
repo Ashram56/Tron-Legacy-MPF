@@ -1,6 +1,6 @@
 #config_version=6
 
-# Boot slide, below every ROM display effect (deff slides play at their ROM priority, 0-255)
+# Boot slide: a blank (black) DMD below every ROM display effect (deff slides play at their ROM priority, 0-255)
 slide_player:
   mode_attract_started:
     attract:
