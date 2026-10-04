@@ -32,10 +32,12 @@ PROC_SOURCES = ["rom/switches.yaml", "rom/coils.yaml", "rom/lights.yaml", "hardw
 PRO_MAP = os.path.join(ROOT, "assets", "io", "pro_vs_le_io_map.csv")
 COIL_TIMES = os.path.join(ROOT, "assets", "rom_data", "io", "coils.csv")
 SECTION = {"switch": "switches", "coil": "coils", "lamp": "lights"}
-# The disc's two flashers: LE 31 RED DISC / 32 BLUE DISC, Pro 31 RED DISC (LEFT) / 32 RED DISC (RIGHT). The names
-# differ, so the map calls them absent on the other model, but they are the same two outputs: the rules keep
-# driving them on the Pro.
-SAME_OUTPUT = {("coil", 31), ("coil", 32)}
+# Outputs the Pro renames but uses for the same flasher, so the rules keep driving them on the Pro (the map calls
+# them absent on the other model because the names differ):
+# - the disc: LE 31 RED DISC / 32 BLUE DISC, Pro 31 RED DISC (LEFT) / 32 RED DISC (RIGHT);
+# - the ramps: LE 19 LEFT RAMP / 25 RIGHT RAMP, Pro 19 BACK CENTER / 25 BACK LEFT. The Pro has ramp flashers too
+#   (Vincent, 2026-10-04) and its coil table names none, so they are taken to be the same outputs (unconfirmed).
+SAME_OUTPUT = {("coil", 31), ("coil", 32), ("coil", 19), ("coil", 25)}
 PRO_FLASHER_PULSE_MS = 64     # the Pro's own flashers: the LE coil test's pulse (the Pro ROM is not decoded)
 
 

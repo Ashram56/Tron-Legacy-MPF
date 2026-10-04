@@ -407,8 +407,8 @@ class TestProcPro(ProcCase):
         on = self.machine.default_platform
         for name, number in (("s_tron_t", "S04"), ("s_tron_r", "S03"), ("s_tron_o", "S02"), ("s_tron_n", "S01")):
             self.assertEqual(sam_decode(number), self.proc(self.machine.switches[name]), name)
-        for name, number in (("c_disc_direction_relay", "C03"), ("f_back_center", "C19"), ("f_lower_left", "C22"),
-                             ("f_lower_right", "C23"), ("f_back_left", "C25"), ("f_red_disc", "C31"),
+        for name, number in (("c_disc_direction_relay", "C03"), ("f_left_ramp", "C19"), ("f_lower_left", "C22"),
+                             ("f_lower_right", "C23"), ("f_right_ramp", "C25"), ("f_red_disc", "C31"),
                              ("f_blue_disc", "C32"), ("c_shaker_motor_optional", "C08")):
             self.assertIs(on, self.machine.coils[name].platform, name)
             self.assertEqual(sam_decode(number), self.proc(self.machine.coils[name]), name)
@@ -418,7 +418,7 @@ class TestProcPro(ProcCase):
 
     def test_le_only_devices_are_virtual(self):
         on = self.machine.default_platform
-        for name in ("c_drop_target_bank", "c_recognizer_motor_relay", "f_left_ramp", "f_right_ramp"):
+        for name in ("c_drop_target_bank", "c_recognizer_motor_relay"):
             self.assertIsNot(on, self.machine.coils[name].platform, name)
         for name in ("s_recog_motor_pos_1", "s_recog_motor_pos_2", "s_recog_motor_pos_3"):
             self.assertIsNot(on, self.machine.switches[name].platform, name)
@@ -432,7 +432,7 @@ class TestProcPro(ProcCase):
         pro = _pro_map()
         le = {kind: _load(os.path.join(PACKAGE, f))[section] for kind, f, section in (
             ("switch", "switches.yaml", "switches"), ("coil", "coils.yaml", "coils"), ("lamp", "lights.yaml", "lights"))}
-        same = {("coil", 31), ("coil", 32)}       # the disc flashers: renamed on the Pro, same outputs
+        same = {("coil", 19), ("coil", 25), ("coil", 31), ("coil", 32)}   # ramp and disc flashers: renamed on the Pro
         for kind, devices in (("switch", self.machine.switches), ("coil", self.machine.coils),
                               ("lamp", self.machine.lights)):
             seen = {}
