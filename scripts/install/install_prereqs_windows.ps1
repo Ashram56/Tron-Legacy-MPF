@@ -133,6 +133,8 @@ function Find-Git {
 # for this run only (git's url.insteadOf in the environment, inherited by setup.py), and handed to git's
 # credential helper (Git Credential Manager), so later `git pull`s work too.
 $AssetsUrl = if ($env:TRON_ASSETS_REPO) { $env:TRON_ASSETS_REPO } else { 'https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption.git' }
+# the pup_pack submodule (PuP fork)
+$PupUrl = if ($env:TRON_PUP_REPO) { $env:TRON_PUP_REPO } else { 'https://github.com/Ashram56/Tron-LE-PuP-Pack.git' }
 
 function Test-RepoAccess([string]$GitExe, [string]$Url, [switch]$Anonymous) {
     # no prompt of any kind: GIT_TERMINAL_PROMPT for git's own, GCM_INTERACTIVE for Git Credential Manager's
@@ -154,17 +156,17 @@ function Invoke-GitHubAuth([string]$GitExe) {
         return
     }
     if (-not $token) {
-        if ((Test-RepoAccess $GitExe $RepoUrl -Anonymous) -and (Test-RepoAccess $GitExe $AssetsUrl -Anonymous)) {
+        if ((Test-RepoAccess $GitExe $RepoUrl -Anonymous) -and (Test-RepoAccess $GitExe $AssetsUrl -Anonymous) -and (Test-RepoAccess $GitExe $PupUrl -Anonymous)) {
             Write-Note 'the repositories are public: no token needed'
             return
         }
-        if ((Test-RepoAccess $GitExe $RepoUrl) -and (Test-RepoAccess $GitExe $AssetsUrl)) {
+        if ((Test-RepoAccess $GitExe $RepoUrl) -and (Test-RepoAccess $GitExe $AssetsUrl) -and (Test-RepoAccess $GitExe $PupUrl)) {
             Write-Note 'a private repository, readable with the GitHub credentials git already has'
             return
         }
         if ($Yes) { throw 'a repository is private: set $env:TRON_GITHUB_TOKEN to a GitHub token that can read it' }
         Write-Note 'A repository is private. Paste a GitHub token that can read it (github.com > Settings > Developer'
-        Write-Note 'settings > Personal access tokens; a fine-grained token with Contents: read-only on both repositories).'
+        Write-Note 'settings > Personal access tokens; a fine-grained token with Contents: read-only on these repositories).'
         $secure = Read-Host '    token (not shown)' -AsSecureString
         $token = [System.Net.NetworkCredential]::new('', $secure).Password
         if (-not $token) { throw 'no token given' }
@@ -174,6 +176,9 @@ function Invoke-GitHubAuth([string]$GitExe) {
     $env:GIT_CONFIG_VALUE_0 = 'https://github.com/'
     if (-not (Test-RepoAccess $GitExe $AssetsUrl)) {
         throw "the GitHub token cannot read $AssetsUrl (check its repository access and expiry)"
+    }
+    if (-not (Test-RepoAccess $GitExe $PupUrl)) {
+        throw "the GitHub token cannot read $PupUrl (check its repository access and expiry)"
     }
     "protocol=https`nhost=github.com`nusername=x-access-token`npassword=$token`n" | & $GitExe credential approve 2>$null
     Write-Note 'token accepted'
