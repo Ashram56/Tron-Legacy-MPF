@@ -28,7 +28,8 @@ MPF_MONITOR_VERSION = "1.0.0"
 # ruamel.yaml.clib: 0.2.15 wheels name their metadata ruamel_yaml_clib, which MPF's pkg_resources (setuptools 72)
 # cannot match to ruamel.yaml's requirement; with MPF Monitor installed `mpf` then fails to start. 0.2.14 is the
 # last with the dotted name. Python 3.13+ does not use the C library.
-REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "pytest",
+# fonttools: the HD mode's vector fonts (scripts/font_outline.py)
+REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "fonttools>=4.40", "pytest",
                 'ruamel.yaml.clib==0.2.14; python_version < "3.13"']
 MONITOR_REQUIREMENTS = ["mpf-monitor==" + MPF_MONITOR_VERSION]
 # mpf-monitor 1.0.0 on PyPI (wheel and sdist) lacks its Qt Designer files, so `mpf monitor` stops with
@@ -147,7 +148,7 @@ def godot_command(*args):
 # game/tron/media_data.json; all git-ignored) are made from: a change to any of these after a pull leaves
 # the workspace showing the old display effects until they are generated and imported again.
 MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py",
-                                                       "dmd_hd.py")] \
+                                                       "dmd_hd.py", "font_outline.py")] \
     + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
     + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
 MEDIA_STAMP = os.path.join(GAME, "media", ".generated")
