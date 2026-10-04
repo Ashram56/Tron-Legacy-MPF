@@ -50,6 +50,7 @@ class EndOfLine(Feature):
         os_.lamp_rule(self.background_on, tube=88, order=0x010055d8)
         # deff + music rule [0x01005610]: deff 57, music 0x20 + (level & 3), priority 7
         os_.deff_rule(self.background_on, 57, music=lambda: 0x20 + (self.level & 3), priority=MUSIC_PRIORITY)
+        os_.deff_live((57,), lambda: {"value": self.switch_value})    # deff 57 [0x01005524]: eol_switch_value
         # End of Line combo jackpot lit (task 0xcf) [leff rule 0x01003914]
         os_.lamp_rule(lambda: os_.task_running(COMBO_JACKPOT_LIT_A), leff=161, order=0x01003914)
 
@@ -128,8 +129,24 @@ class EndOfLine(Feature):
                 more, what = eb_left, 4                               # "LIGHT EX. BALL"
             elif eb_left == mb_left:
                 what = 0xc                                            # "LIGHT M.B. + E.B."
-        os_.deff_start(55, before=before, after=after, flags=flags | what, more=more)
+        os_.deff_start(55, before=before, after=after, flags=flags | what, more=more,
+                       screen=self.letters_screen(flags | what))
         return True
+
+    @staticmethod
+    def letters_screen(flags):
+        """deff 55's text by its flags [0x0100461c] (rom_layout.SCREENS): 0 MULTIBALL + E.B. / ARE LIT,
+        1 EXTRA BALL / IS LIT, 5 MULTIBALL / IS LIT, else %u MORE TO and 2 LIGHT MULTIBALL, 3 LIGHT EX.
+        BALL, 4 LIGHT M.B. + E.B. or 6 nothing below."""
+        if flags & 3 == 3:
+            return 0
+        if flags & 1:
+            return 1
+        if flags & 2:
+            return 5
+        if flags & 0xc == 0xc:
+            return 4
+        return 3 if flags & 4 else 2 if flags & 8 else 6
 
     def extra_ball_check(self, sets_total):
         """eol_extra_ball_check 0x01004238: the extra ball is lit once per game at set number adj 85."""
@@ -222,7 +239,10 @@ class EndOfLine(Feature):
             self.mask = 7
             points = os_.score_add(200000)
             self.total += points
-            os_.deff_start(60, value=points, more=0 if added else self.aab_left)
+            more = 0 if added else self.aab_left
+            # deff 60: points / BALL ADDED when argument 0x34 is 0, else points / %u MORE FOR / ADD-A-BALL
+            # (the points on either screen's row: rom_layout.SCREENS)
+            os_.deff_start(60, value=points, value_row2=points, more=more, screen=0 if more == 0 else 1)
             self.switch_value = min(self.switch_value + 1000, 50000)
         os_.request_refresh()
         return True

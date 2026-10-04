@@ -15,6 +15,7 @@ COIN_FIRST, COIN_GAP, START_AFTER_COIN = 0.528 - COIN_DELAY, 0.612, 0.144 + COIN
 SCRIPT_START_TIME = 2.745 - 1.896
 SETTLE = 0.1
 TROUGH_SWITCHES = (18, 19, 20, 21)  # tron_ref's 4-ball trough: MPF's trough device owns these switches
+RANDOM_SEED = 1974                  # tests/tron_test.py; live play stays unseeded
 BUTTONS = {"left": "s_left_flipper", "right": "s_right_flipper", "tilt": "s_plumb_bob_tilt",
            "start": "s_start_button", "tournament": "s_tournament_start"}
 
@@ -34,8 +35,10 @@ class LiveScenario:
         if self.started:
             return
         self.started = True
+        self.os.random.seed(RANDOM_SEED)                # a scenario replays the same random choices
         self.machine.switch_controller.add_switch_handler("s_shooter_lane", self._on_shooter, state=1)
-        path = os.path.join(self.machine.machine_path, "..", "assets", "rules", "traces", self.name + ".txt")
+        path = self.name if self.name.endswith(".txt") else os.path.join(
+            self.machine.machine_path, "..", "assets", "rules", "traces", self.name + ".txt")   # or a script file
         self.t = 2.0                                   # let the media controller settle
         with open(path, encoding="utf-8") as f:
             for line in f:

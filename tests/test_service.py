@@ -11,7 +11,8 @@ import sys
 if GAME not in sys.path:
     sys.path.insert(0, GAME)
 from tron.settings import service_data          # noqa: E402
-from tron.service import MenuScreen, flasher_names  # noqa: E402
+from tron import rom_draw  # noqa: E402
+from tron.service import EntryScreen, MenuScreen, flasher_names, menu_draw  # noqa: E402
 
 
 class ServiceCase(TronTestCase):
@@ -31,9 +32,12 @@ class ServiceCase(TronTestCase):
         self.advance_time_and_run(wait)
 
     def enter(self):
+        """SELECT shows the service entry screen (deff 3), SELECT again the main menu."""
         self.advance_time_and_run(1)
         self.press("select")
         self.assertTrue(self.svc.active)
+        self.assertIsInstance(self.top, EntryScreen)
+        self.press("select")
 
     @property
     def top(self):
@@ -55,6 +59,8 @@ class TestMenuTree(ServiceCase):
 
     def test_enter_from_attract_only_and_exit(self):
         self.enter()
+        self.assertEqual(("SERVICE MENU", "PRESS 'SELECT' TO CONTINUE", "TRON L.E. V1.74 SYS. 1.63 HDW. 1"),
+                         self.shown[-2])
         self.assertEqual(("MAIN MENU", "GO TO DIAGNOSTICS MENU", "1 OF 5"), self.shown[-1])
         self.assertFalse(self.machine.modes["attract"].active)     # no game start from the menu
         self.press("minus")                                       # wraps to the last item
@@ -63,7 +69,10 @@ class TestMenuTree(ServiceCase):
         self.assertFalse(self.svc.active)
         self.assertTrue(self.machine.modes["attract"].active)
         self.assertIn(1, [e["id"] for e in self.tron.trace.of("deff_start")])
-        # BACK out of the main menu leaves too
+        # BACK out of the main menu leaves too, as BACK on the entry screen does
+        self.enter()
+        self.press("back")
+        self.assertFalse(self.svc.active)
         self.press("select")
         self.assertTrue(self.svc.active)
         self.press("back")
@@ -123,17 +132,69 @@ class TestMenuTree(ServiceCase):
         self.assertEqual("NOT AVAILABLE", self.shown[-1][1])
 
 
+class TestRomDraw(ServiceCase):
+    """The screens as the ROM draws them (tron/rom_draw.py lists, drawn by tron/service_screen.gd)."""
+
+    def test_menu_icon_row(self):
+        """FUN_01037588: up to 7 icons centred, the selected one in its own image, the others dimmed (n + 1);
+        more scroll 5 at a time between the MORE arrows (images 12, 13)."""
+        draw = menu_draw([0, 2, 4, 6, 16], 1, "GO TO AUDITS MENU")
+        self.assertEqual([{"i": 1, "x": 19, "y": 1}, {"i": 2, "x": 37, "y": 1}, {"i": 5, "x": 55, "y": 1},
+                          {"i": 7, "x": 73, "y": 1}, {"i": 17, "x": 91, "y": 1}], draw[:5])
+        self.assertEqual({"t": "GO TO AUDITS MENU", "f": 2, "x": 64, "y": 30, "a": 2}, draw[5])
+        icons = list(range(20, 42, 2))                            # 11 items
+        first = [d for d in menu_draw(icons, 0, "") if "i" in d]
+        self.assertEqual([20, 23, 25, 27, 29, 13], [d["i"] for d in first])       # no left arrow yet
+        self.assertEqual(19 + 5 * 18, first[-1]["x"])
+        middle = [d["i"] for d in menu_draw(icons, 5, "") if "i" in d]
+        self.assertEqual([12, 27, 29, 30, 33, 35, 13], middle)                    # selected item in the middle
+        last = [d["i"] for d in menu_draw(icons, 10, "") if "i" in d]
+        self.assertEqual([12, 33, 35, 37, 39, 40], last)                          # no right arrow at the end
+
+    def test_entry_screen_and_main_menu_draw(self):
+        self.advance_time_and_run(1)
+        self.press("select")
+        draw = self.svc.draw_items
+        self.assertIn({"t": "V1.74", "f": 2, "x": 0, "y": 11, "a": 1}, draw)
+        self.assertIn({"t": "HDW. 1", "f": 2, "x": 127, "y": 11, "a": 4}, draw)
+        self.assertEqual("SERVICE MENU", next(d for d in draw if d.get("y") == 23)["t"])
+        self.press("select")
+        images = [d["i"] for d in self.svc.draw_items if "i" in d]
+        self.assertEqual([0, 3, 5, 7, 17], images)                # DIAG selected, AUD ADJ UTIL QUIT dimmed
+        self.press("plus")
+        self.assertEqual([1, 2, 5, 7, 17], [d["i"] for d in self.svc.draw_items if "i" in d])
+
+    def test_adjustment_value_blinks_while_edited(self):
+        self.enter()
+        self.goto("GO TO ADJUSTMENTS MENU", "STANDARD ADJUSTMENTS")
+        texts = rom_draw.lines_of(self.svc.draw_items)
+        self.assertIn("(INSTALLED, FACTORY DEFAULT)", texts)
+        value = texts[2]
+        self.press("select")
+        seen = set()
+        for _ in range(6):
+            self.advance_time_and_run(0.13)
+            seen.add(value in rom_draw.lines_of(self.svc.draw_items))
+        self.assertEqual({True, False}, seen)
+        self.press("back")
+
+
 class TestDiagnostics(ServiceCase):
 
     def test_switch_tests_and_alerts(self):
         self.enter()
         self.goto("GO TO DIAGNOSTICS MENU", "GO TO SWITCH MENU", "SWITCH TEST")
-        self.assertEqual("ACTIVATE A SWITCH", self.shown[-1][1])
+        self.assertEqual("NONE", self.shown[-1][1])
         self.hit_switch_and_run("s_left_slingshot", 0.1)
-        self.assertEqual(("SWITCH TEST", "{} LEFT_SLINGSHOT".format(
-            self.machine.switches["s_left_slingshot"].config["number"]), "CLOSED"), self.shown[-1])
+        number = self.machine.switches["s_left_slingshot"].config["number"]
+        self.assertEqual(("SWITCH TEST", "LEFT SLINGSHOT", "SWITCH #{}".format(number)), self.shown[-1])
+        # the switch grid: a dot in the switch's cell while it is closed
+        row, col = divmod(int(number) - 1, 16)
+        cell = {"i": 0xa5, "x": 2 + 3 * col, "y": 6 + 3 * row}
+        self.assertIn(cell, self.svc.draw_items)
         self.release_switch_and_run("s_left_slingshot", 0.1)
-        self.assertEqual("OPEN", self.shown[-1][2])
+        self.assertEqual("LEFT SLINGSHOT", self.shown[-1][1])       # the last switch stays shown
+        self.assertNotIn(cell, self.svc.draw_items)
         self.press("back")
         for name in ("s_trough_1_r", "s_trough_2", "s_trough_3", "s_trough_4_l"):
             self.machine.switch_controller.process_switch(name, 0, True)       # an empty machine
@@ -142,11 +203,12 @@ class TestDiagnostics(ServiceCase):
         self.press("back")
         self.hit_switch_and_run("s_shooter_lane", 0.1)
         self.goto("ACTIVE SWITCH TEST")
-        self.assertIn("SHOOTER_LANE", self.shown[-1][1])
+        self.assertIn("SHOOTER", self.shown[-1][1])
         self.press("back")
         self.goto("SWITCH ALERTS")
-        self.assertIn("NOT ACTIVE", self.shown[-1][1])
+        self.assertEqual("NOT ACTIVE", self.shown[-1][2])
         self.assertNotIn("LEFT_SLINGSHOT", " ".join(e.name.upper() for e in self.top.entries()))
+        self.assertRegex(rom_draw.lines_of(self.svc.draw_items)[0], r"^TECHNICIAN ALERT - \(1/\d+\)$")
         # every switch seen: no alerts
         for switch in self.machine.switches.values():
             switch.last_change = 1
@@ -176,8 +238,10 @@ class TestDiagnostics(ServiceCase):
         self.assertTrue(all(name in flasher_names() for name in self.top.fired))
         self.press("back")
         self.goto("RETURN TO DIAGNOSTICS MENU", "KNOCKER TEST")
+        self.assertEqual(("KNOCKER TEST", "PRESS 'SELECT' TO ACTIVATE", "KNOCKER"), self.shown[-1])
         self.press("select")
         self.assertEqual("0x019", self.tron.trace.of("sound")[-1]["call"])
+        self.assertIn("ACTIVATING KNOCKER", rom_draw.lines_of(self.svc.draw_items))
 
     def test_lamp_tests_blink_at_service_priority(self):
         self.enter()
@@ -192,12 +256,13 @@ class TestDiagnostics(ServiceCase):
         self.assertFalse(any(e.key == "service" for e in light.stack))
         self.goto("LAMP COLUMN TEST")
         self.assertEqual(("LAMP COLUMN TEST", "COLUMN 1", "1 OF 9"), self.shown[-1])
+        self.assertIn("COLUMN LAMPS TEST", rom_draw.lines_of(self.svc.draw_items))
         self.press("back")
         self.goto("LAMP ROW TEST")
         self.assertEqual("ROW 1", self.shown[-1][1])
         self.press("back")
         self.goto("SINGLE LAMP TEST")
-        self.assertEqual("1 TRON_N", self.shown[-1][1])
+        self.assertEqual(("SINGLE LAMP TEST", "TRO(N)", "LAMP #1"), self.shown[-1])
 
     def test_trough_sound_burn_in_motors_and_tubes(self):
         self.fill_trough()
@@ -213,7 +278,10 @@ class TestDiagnostics(ServiceCase):
         self.assertEqual(self.top.current(), int(self.tron.trace.of("sound")[-1]["call"], 16))
         self.press("back")
         self.goto("BEGIN BURN-IN")
+        self.assertIn("PRESS 'SELECT' TO START", rom_draw.lines_of(self.svc.draw_items))
+        self.press("select")
         self.advance_time_and_run(2.5)
+        self.assertEqual(("BURN-IN", "TOTAL BURN-IN TIME:", "0:03"), self.shown[-1])
         self.assertGreaterEqual(self.top.cycles, 3)
         self.assertIn(8, [e["id"] for e in self.tron.trace.of("leff_start")])
         self.press("back")
@@ -264,8 +332,10 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.assertEqual(150, len(text.splitlines()))
         self.press("back")
         self.goto("RETURN TO MAIN MENU", "GO TO UTILITIES MENU", "GO TO RESETS MENU", "RESET COIN AUDITS")
+        self.assertEqual(("RESET COIN AUDITS", "PRESS 'SELECT' TO RESET", "PRESS 'BACK' TO CANCEL"),
+                         self.shown[-1])
         self.press("select")
-        self.assertEqual("DONE", self.shown[-1][1])
+        self.assertEqual(("RESET COIN AUDITS", "COMPLETE", "PRESS 'SELECT' TO CONTINUE"), self.shown[-1])
         self.assertEqual(0, os_.audits.value(10))                 # TOTAL COINS
         self.assertEqual(4, os_.audits.value(14))                 # game audits kept
         self.press("back")
@@ -315,7 +385,10 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.enter()
         self.goto("GO TO UTILITIES MENU", "GO TO INSTALLS MENU", "INSTALL 5-BALL")
         self.press("select")
-        self.assertEqual(("INSTALL 5-BALL", "INSTALLED", ""), self.shown[-1])
+        self.assertEqual(("5-BALL", "INSTALLED", "PRESS 'SELECT' TO CONTINUE"), self.shown[-1])
+        self.press("select")                                      # CONTINUE: back to the menu
+        self.goto("INSTALL 5-BALL")
+        self.assertEqual("(INSTALLED)", self.shown[-1][1])
         self.assertEqual(5, os_.adj[31])
         self.press("back")
         self.goto("INSTALL ADD-A-BALL")
@@ -382,7 +455,7 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.press("back")                                        # dropped
         self.assertEqual(1, self.machine.variables.get_machine_var("custom_coin_units"))
         self.goto("GO TO USB MENU", "UPDATE GAME CODE")
-        self.assertEqual("NO UPDATE FOUND", self.shown[-1][1])
+        self.assertEqual(("GAME CODE UPDATE", "NO UPDATE FOUND"), self.shown[-1][:2])
 
     def test_slide_sent_over_bcp(self):
         sent = []
@@ -394,8 +467,13 @@ class TestAuditsAndAdjustments(ServiceCase):
             self.enter()
             self.press("back")
         sent = [kw for kw in sent if "service" in (kw.get("settings") or {})]
-        plays = [kw for kw in sent if kw["settings"]["service"]["action"] == "play"]
-        self.assertEqual("MAIN MENU", plays[0]["line0"])
+        plays = [kw for kw in sent if kw["settings"]["service"]["action"] in ("play", "update")]
+        self.assertEqual("play", plays[0]["settings"]["service"]["action"])
+        self.assertEqual("SERVICE MENU", plays[0]["line0"])
+        # later screens update the slide in place (a remove and play would flash the slides below)
+        self.assertEqual("update", plays[1]["settings"]["service"]["action"])
+        self.assertEqual("MAIN MENU", plays[1]["line0"])
+        self.assertIn({"t": "GO TO DIAGNOSTICS MENU", "f": 2, "x": 64, "y": 30, "a": 2}, plays[1]["draw"])
         self.assertEqual("remove", sent[-1]["settings"]["service"]["action"])
 
 

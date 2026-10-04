@@ -17,6 +17,17 @@ LOGO_SECONDS, ANIMATION_SECONDS = 3.76, 3.98
 PRIORITY = 2                     # just above deff 1 (priority 1)
 
 
+def page_layout(name, lines):
+    """The layout of game/slides/text_page.tscn (its `screen`) for a page, in the ROM fonts the attract capture
+    (media/dmd/deff_001_*) shows, all centred right of the status panel (x 84): 0 one line in font 15 (GAME OVER),
+    1 the credit text in font 12, 2 two lines in font 15 (REPLAY AT / level), 3 three lines in font 12, a title
+    too wide in font 6 (GRAND CHAMPION / initials / score). The last-game scores, the clock, the custom message
+    and the web address use the layout of their line count (not in the capture)."""
+    if name == "CREDITS":
+        return 1
+    return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)
+
+
 class AttractPages(Feature):
     name = "attract_pages"
     HOOKS = ("attract_start",)
@@ -86,7 +97,7 @@ class AttractPages(Feature):
         name, lines, seconds = self.pages[self.index]
         lines = lines() if callable(lines) else lines
         self.machine.events.post("tron_attract_page", page=name, lines=lines)
-        self.os.media.text_show("text_page", lines, PRIORITY)
+        self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines))
         if self.handle:
             self.machine.clock.unschedule(self.handle)
         self.handle = self.machine.clock.schedule_once(lambda dt=None: self.step(1), seconds)

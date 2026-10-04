@@ -213,6 +213,41 @@ class TestRun(unittest.TestCase):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
 
 
+class TestMediaStale(unittest.TestCase):
+    """The generated media (git-ignored) follow the generators and the assets: after a pull that changes
+    them, run.py and the docker setup make and import them again. Play test 2: the ZUSE / TRON letters,
+    the SOS stage text and the fixed layouts were in the code, but a workspace kept the slides generated
+    before (the capture's letters, all hollow; SHOOT FLYNNS ARCADE on every stage)."""
+
+    def test_stamp_follows_inputs_and_import(self):
+        with tempfile.TemporaryDirectory() as root:
+            for rel in tc.MEDIA_INPUTS:
+                os.makedirs(os.path.join(root, os.path.dirname(rel)), exist_ok=True)
+                with open(os.path.join(root, rel), "w") as f:
+                    f.write("v1")
+            letters = os.path.join(root, "game", "media", "dmd", "deff_091")
+            os.makedirs(letters)
+            png = os.path.join(letters, "solid0.png")
+            open(png, "w").close()
+            self.assertIn("no stamp", tc.media_stale(root))             # never generated with a stamp
+            tc.write_media_stamp(root)
+            self.assertIn("not imported", tc.media_stale(root))         # gen_media without the Godot import
+            open(png + ".import", "w").close()
+            self.assertIsNone(tc.media_stale(root))
+            with open(os.path.join(root, "scripts", "rom_layout.py"), "w") as f:
+                f.write("v2")                                           # a pull changed a generator
+            self.assertIn("changed", tc.media_stale(root))
+
+    def test_run_refreshes_stale_media(self):
+        with mock.patch.object(tc, "media_stale", return_value="changed"), \
+                mock.patch.object(setup, "refresh_media") as refresh, \
+                mock.patch.object(run, "port_in_use", return_value=True), \
+                mock.patch.object(run.gmc_patch, "patch"), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit):                         # stops at the busy port, after the refresh
+                run.run("virtual")
+        refresh.assert_called_once_with()
+
+
 class TestGmcPatch(unittest.TestCase):
 
     def test_patch_unpatched_gmc_once(self):

@@ -7,6 +7,7 @@ from mpf.tests.MpfTestCase import MpfTestCase
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 GAME = os.path.join(ROOT, "game")
+RANDOM_SEED = 1974
 subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "gen_config.py")], check=True)
 
 
@@ -32,6 +33,7 @@ class TronTestCase(MpfTestCase):
         if GAME not in sys.path:
             sys.path.insert(0, GAME)
         super().setUp()
+        self.machine.tron.random.seed(RANDOM_SEED)     # live play draws from an unseeded generator
         if self.FREE_PLAY:
             self.machine.tron.adj.override(34, 1)
 

@@ -27,13 +27,25 @@ extends MPFVariable
 ## blink_dark: the off phase of blink_ms draws the glyphs black over the picture instead of hiding them
 ## (the ROM prints with a palette mapping the font's colours to 0: deffs 116-124)
 @export var blink_dark := false
+## cycle_ms: the line shows only for cycle_on_ms of every cycle_ms, counted from cycle_offset_ms (two message
+## pairs drawn in turn, deff 65); combined with blink_ms (both must be on)
+@export var cycle_ms: int = 0
+@export var cycle_on_ms: int = 0
+@export var cycle_offset_ms: int = 0
+## screens: the line shows only while the event arg `screen` (default 0) is one of these (an effect that
+## draws one of several screens on the same rows, scripts/rom_layout.py SCREENS); empty = always
+@export var screens: PackedInt32Array = PackedInt32Array()
+
+const RomTextHd = preload("res://tron/rom_text_hd.gd")
 
 static var _metrics: Dictionary = {}
 static var _font_files: Dictionary = {}
 
 var _use_alt := false
+var _screen_on := true
 var _elapsed_ms := 0.0
 var _seeked := false
+var _hd_text: Node2D = null
 
 
 static func font_metrics(font_id: int) -> Dictionary:
@@ -44,7 +56,17 @@ static func font_metrics(font_id: int) -> Dictionary:
 	return _metrics.get(font_id, {})
 
 
+## True when the DMD shows in HD (game/tools/dmd_mode.gd).
+static func hd() -> bool:
+	var dmd = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("DmdMode")
+	return dmd != null and dmd.hd
+
+
+## The ROM font; in HD mode its vector version (fonts/hd/, tron/rom_text_hd.gd: TrueType outlines with the
+## same metrics in dots, so the text lands where the 128x32 layout puts it).
 static func font_file(font_id: int) -> FontFile:
+	if hd():
+		return RomTextHd.vector_font(font_id)
 	if not _font_files.has(font_id):
 		var f := FontFile.new()
 		f.load_bitmap_font("res://fonts/rom_font_%02d.fnt" % font_id)
@@ -70,6 +92,9 @@ func _ready() -> void:
 	autowrap_mode = TextServer.AUTOWRAP_OFF
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	if screens.size():
+		_screen_on = screens.has(0)
+		visible = _screen_on
 	if _timed():
 		add_to_group("rom_timed")
 		set_process(true)
@@ -80,7 +105,7 @@ func _ready() -> void:
 
 
 func _timed() -> bool:
-	return show_after_ms or hide_after_ms or blink_ms or level_steps.size()
+	return show_after_ms or hide_after_ms or blink_ms or cycle_ms or level_steps.size()
 
 
 func seek_ms(t: float) -> void:
@@ -99,7 +124,8 @@ func _apply_time() -> void:
 	if not _timed():
 		return
 	var blink_on := blink_ms == 0 or int((_elapsed_ms - show_after_ms) / blink_ms) % 2 == 0
-	visible = _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
+	var cycle_on := cycle_ms == 0 or fposmod(_elapsed_ms - cycle_offset_ms, cycle_ms) < cycle_on_ms
+	visible = _screen_on and cycle_on and _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
 		and (blink_on or blink_dark)
 	if blink_dark:
 		modulate = Color(1, 1, 1, 1) if blink_on else Color(0, 0, 0, 1)
@@ -109,6 +135,12 @@ func _apply_time() -> void:
 
 
 func update(settings: Dictionary, kwargs: Dictionary = {}) -> void:
+	if screens.size():
+		var shown = kwargs.get("screen", settings.get("screen", null))
+		if shown != null and str(shown) != "":
+			_screen_on = screens.has(int(shown))
+		if not _timed():
+			visible = _screen_on
 	if alt_when_empty:
 		var other = kwargs.get(alt_when_empty, settings.get(alt_when_empty, ""))
 		_use_alt = other == null or str(other) == ""
@@ -160,3 +192,15 @@ func _layout() -> void:
 	add_theme_constant_override("line_spacing", 0)
 	position = Vector2(left, y - int(m["ascent"]) + 1)
 	size = Vector2(maxi(w, 1) + 2, line_h)
+	if hd():
+		_layout_hd(shown, font_id, int(m["ascent"]), line_h)
+
+
+## HD mode: the line is drawn by a tron/rom_text_hd.gd child (vector outlines, text colour and glow); the
+## label itself only places it (its own glyphs are hidden).
+func _layout_hd(shown: String, font_id: int, ascent: int, line_h: int) -> void:
+	if _hd_text == null:
+		_hd_text = RomTextHd.new()
+		add_child(_hd_text, false, INTERNAL_MODE_FRONT)
+		self_modulate = Color(1, 1, 1, 0)
+	_hd_text.set_line(shown, font_id, ascent, line_h)

@@ -10,6 +10,7 @@ config/features=PackedStringArray("4.6", "Mobile")
 
 [autoload]
 
+DmdMode="*res://tools/dmd_mode.gd"
 MPF="*res://addons/mpf-gmc/mpf_gmc.gd"
 DmdCapture="*res://tools/dmd_capture.gd"
 ProcDmd="*res://tools/proc_dmd.gd"
@@ -23,6 +24,14 @@ window/size/window_width_override=1024
 window/size/window_height_override=256
 window/stretch/mode="viewport"
 window/stretch/scale_mode="integer"
+
+[tron]
+
+dmd/mode="hd"
+dmd/dots=0
+dmd/text_color="#2a6cff"
+dmd/text_glow_color="#22b8ff"
+dmd/text_glow=0.8
 
 [editor_plugins]
 

@@ -59,7 +59,13 @@ HELMET_BITS = 0x1c0
 # the deff drops to priority 0x20 for a 10-frame hold (traces/sea_of_simulation: 22.208 -> 24.318,
 # 28.632 -> 30.736 when the queued deff 115 takes the display).
 STAGE_DONE_SECONDS = 2.105
+STAGE_SPEECH_SECONDS = 2.1      # snd_play2(0x111) as the variant's animation ends (36.637 -> 38.741 s)
 MAIN_TASK_TICKS = 90            # deff 114: 15 loops of 6 frames before the final-stage speech
+# deff 115 [0x010270a4]: bitmaps 0x1931-0x196f (63) of 3 ticks, then deff_hold_frames(10, 0x20). Its capture
+# holds two skipped stages back to back (0x109 at 0 and 3.102 s, the second run's first frame at 3.109 s):
+# one run is 3.102 s to the hold, where the next queued show takes the display.
+SKIP_SECONDS = 3.102
+SHOT_SAMPLES, DONE_SAMPLES = 6, 8   # FUN_0002d024(0x10a) / (0x111): the counters wrap at the call's sample count
 
 
 class SeaOfSimulation(Feature):
@@ -80,6 +86,8 @@ class SeaOfSimulation(Feature):
         self.lc_made = 0            # 0x3b67c: Light Cycle shots made in stage 6
         self.rec_hits = 0           # 0x3b680: recognizer hits in stage 7
         self.end_wait = 0
+        self.shot_sound = 0         # 0x3b61c: sample of 0x10a for the stage's next shot (0 at each stage set-up)
+        self.done_sound = 0         # 0x3b620: sample of speech 0x111 for the next stage completed (0 at start)
         os_.deff_live((114,), self.stage_text)
         os_.deff_live((115,), self.skip_text)
         self.skip_shown = (0, 0)    # deff 115: the skipped stage shown and the points it paid
@@ -172,6 +180,7 @@ class SeaOfSimulation(Feature):
         self.total = os_.score_add(1000000)
         self.stage = 0
         self.setup()
+        self.done_sound = 0
         os_.flag_set(0x34)
         os_.flag_clear(0x35)
         os_.flag_clear(0x36)
@@ -194,6 +203,7 @@ class SeaOfSimulation(Feature):
                 self.stage += 1
                 continue
             self.needed = bits(STAGES[k])
+            self.shot_sound = 0
             self.helmets = self.lc_made = self.rec_hits = 0
             if sum(1 for i in range(k, 9) if not self.collected(i)) == 1:
                 self.os.flag_set(0x35)
@@ -232,7 +242,9 @@ class SeaOfSimulation(Feature):
         def ended():
             self.skip_showing = False
             self._next_skip_show()
-        self.os.show(0xa2, 115, on_start=pay, on_end=ended)
+        # one run of deff 115, its sound snd_play2(0x109, k): sample k names the skipped item, once
+        self.os.show(0xa2, 115, on_start=pay, on_end=ended, run_seconds=SKIP_SECONDS + 10 * TICK,
+                     sounds=[(0, lambda: self.os.sound2(0x109, k, index=k, in_deff=115))])
 
     # ------------------------------------------------------------------ shots [0x01026608]
 
@@ -299,11 +311,22 @@ class SeaOfSimulation(Feature):
         points = os_.score_add((k + 1) * (10000 if quiet else 100000))
         self.total += points
         done = not self.needed
-        length = STAGE_DONE_SECONDS if done else None
+        length = STAGE_DONE_SECONDS + 10 * TICK if done else None     # the hold follows the speech
+        # the stage deff's own sounds (FUN_01027374 / FUN_01027478): snd_play2(0x10a, counter) as it starts
+        # and, for the stage-completing shot, speech snd_play2(0x111, counter) as its animation ends
+        sounds = [(0, lambda: self._counted_sound(0x10a, "shot_sound", SHOT_SAMPLES, 116 + k))]
+        if done:
+            sounds.append((STAGE_SPEECH_SECONDS,
+                           lambda: self._counted_sound(0x111, "done_sound", DONE_SAMPLES, 116 + k)))
         if quiet:
-            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length)
+            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
         else:
-            os_.deff_start(116 + k, value=points, done=done, run_seconds=length)
+            os_.deff_start(116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
+
+    def _counted_sound(self, call, counter, samples, deff_id):
+        n = getattr(self, counter)
+        self.os.sound2(call, n, index=n, in_deff=deff_id)
+        setattr(self, counter, 0 if n + 1 >= samples else n + 1)
 
     def complete(self):
         """sos_complete [0x01026430]: flag 0x36, SOS ends, deff 125."""

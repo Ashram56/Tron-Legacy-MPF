@@ -44,7 +44,14 @@ VALUES = {19: [[1], [0]],                   # BALL 1, score 00 (score 0 printed 
           40: [[0], []],                    # PLAYER 0 / YOU'RE UP
           114: [[], [], ["SHOOT"], ["FLYNNS ARCADE"]],   # SOS stage 0 (deff 114's stage messages)
           115: [["FLYNN"], ["BONUS"], [1000000]],         # stage 0 skipped: FLYNN BONUS 1,000,000
-          133: [[], [], None]}              # EXTRA BALL without the score line (None: blank)
+          133: [[], [], None],              # EXTRA BALL without the score line (None: blank)
+          138: [[0], [], [], [0], None, [500000]],   # 0 WAY COMBO 00, no named combo, JACKPOT=500,000
+          41: [[], [0], [0]], 42: [[], [0], [0]],       # LEFT / RIGHT SPINNER = 00 / 00
+          47: [[], [6], [], [0]],                       # phase 0: 6 discs to go, JACKPOT=00
+          65: [[], [], [], [], [], [0], None],          # SHOOT ... / FOR ... (in turn), SUPER=00
+          141: [[], [500000], [0]],
+          99: [[], [], [710000]],                       # FAST SCORING / TOTAL: / 710,000
+          68: [[], [], [0], [], [0]], 69: [[], [], [0], [], [], [0]]}   # plain JACKPOT / SUPER JACKPOT 00                     # phase 0: NEXT SHOT=500,000, SUPER=00
 # Other event args of the score display (tron/score_display.gd) as the deff 19 capture shows them:
 # credits 1 coin of 3, replay level 20,000,000, one player with 00, playfield not yet valid and the
 # blink counter where the capture's blink phase is (score shown at 0 ms, blanked 110 ms later).
@@ -53,6 +60,9 @@ EXTRA = {19: {"credits": "CREDITS 1/3", "replay": "REPLAY AT " + format_rom_text
               "award": "", "award_age": 99, "blink_age": 70}}
 # The status panel of the other effects: one player with 00 (all captures are on ball 1 with no score);
 # its blink phase comes from a counter outside the effect, so it is read off each capture (panel_phase).
+# The screen the capture shows of an effect with several (rom_layout.SCREENS): deff 55 "0 MORE TO" alone,
+# deff 60 points / BALL ADDED, deff 80 0 MORE / TO LIGHT HURRY-UP
+SCREEN = {55: 6, 60: 0, 80: 0, 47: 0, 65: 0, 141: 0, 68: 1, 69: 1}
 PANEL = {"p1": "00", "p2": "", "p3": "", "p4": "", "players": 1, "player": 1, "valid": False,
          "award": "", "award_age": 99}
 DYNAMIC = [19, 25, 26, 133, 38, 40]
@@ -97,6 +107,8 @@ def line_values(deff_id, lines):
         v = vals[i] if i < len(vals) else []
         out["line%d" % i] = "" if v is None else format_rom_text(line, v)
     out.update(EXTRA.get(deff_id, {}))
+    if deff_id in SCREEN:
+        out["screen"] = SCREEN[deff_id]
     return out
 
 
@@ -132,7 +144,7 @@ def text_region(deff_id, lines, values, fonts, get):
     lays = rom_layout.line_layouts(deff_id, lines, fonts)
     for i, lay in enumerate(lays):
         text = values.get("line%d" % i, "")
-        if not lay or not text:
+        if not lay or not text or values.get("screen", 0) not in lay.get("screens", [values.get("screen", 0)]):
             continue
         font_id, x, y = lay["font"], lay["x"], lay["y"]
         if "alt_when_empty" in lay and not values.get(lay["alt_when_empty"]):

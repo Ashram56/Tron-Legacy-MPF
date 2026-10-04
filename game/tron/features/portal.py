@@ -36,6 +36,10 @@ class Portal(Feature):
         os_.lamp_rule(self.background_rule, leff=166, tube=81, order=0x01030150)
         os_.lamp_rule(self.all_shots_done, leff=167, order=0x0102f37c)
         os_.deff_rule(self.background_rule, 141, music=0x076, priority=7)
+        # deff 141 [0x0102ffa0] reads pm_phase, the next award and pm_super_value on every frame
+        os_.deff_live((141,), lambda: {"screen": self.phase, "next": self.award_value(),
+                                       "super": self.super_value, "super_lit": self.super_value,
+                                       "all_shots": 1000000})
 
     def player_first_ball(self):
         """Event 0x26 [0x0102f2e8]: Portals started this game (read by the bonus)."""
@@ -100,7 +104,7 @@ class Portal(Feature):
         os_.audit(0x89)
         self.total = os_.score_add(1000000)
         sos_bonus = 0 if sos_played else os_.score_add(50000000)
-        os_.show(0xa5, 140, total=self.total, sos_bonus=sos_bonus)
+        os_.show(0xa5, 140, total=self.total, sos_bonus=sos_bonus, screen=1 if sos_bonus else 0)
         os_.hook("dmb_cancel_restart_window")
         os_.request_refresh()
         return True
