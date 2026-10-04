@@ -48,6 +48,10 @@ class DiscMultiball(Feature):
         self.total_wait = 0
         os_.deff_rule(self.status_display_cond, 47, music=0x02a, priority=7)
         os_.deff_rule(self.restart_display_cond, 53, music=0x02b, priority=7)
+        # deff 47 [0x01007f34]: by dmb_phase the disc / recognizer shots still needed (not drawn once the count
+        # passed the adjustment), the jackpot and the super; deff 53 [0x010096d0]: dmb_restart_secs
+        os_.deff_live((47,), self._status_values)
+        os_.deff_live((53,), lambda: {"secs": self.restart_secs})
         os_.lamp_rule(self.status_display_cond, leff=45, tube=43, order=0x010081c0)
         os_.lamps.leff_code(45, self._leff_status)
         os_.lamps.leff_code(47, self._leff_phase1_chase)
@@ -56,6 +60,15 @@ class DiscMultiball(Feature):
         # same condition: the ROM starts leff 54 before leff 53 (traces/disc_multiball_restart.jsonl)
         os_.lamp_rule(self.restart_display_cond, leff=54, tube=49, order=0x010097ec)
         os_.lamp_rule(self.restart_display_cond, leff=53, order=0x010097ec)
+
+    def _status_values(self):
+        os_ = self.os
+        discs, recogs = os_.adj_value(68), os_.adj_value(69)
+        return {"screen": self.phase,
+                "disc_left": discs - self.disc_count if self.disc_count <= discs else None,
+                "jackpot": self.jackpot,
+                "recog_left": recogs - self.recog_count if self.recog_count <= recogs else None,
+                "recog_jackpot": self.jackpot, "super": self.super}
 
     def _leff_phase1_chase(self, task):
         """leff_047 [0x010082e4]: over lamp group 0x34 (the recognizer target inserts), every 8 ticks one

@@ -44,6 +44,9 @@ class Quorra(Feature):
         # rules [0x0101fb1c]: background deff 65 + music 0x066 (priority 7), leff 68 + tube show 35,
         # leff 69 while a ball can be added
         os_.deff_rule(self.rule_active, 65, 0x066, 7)
+        # deff 65 [0x0101de30]: quorra_super on every frame; its double-window screen (1: the seconds, ALL
+        # JACKPOTS / DOUBLED) needs task 0x5c, which this ROM never arms (see above): always screen 0
+        os_.deff_live((65,), lambda: {"screen": 0, "super": self.super, "secs": None})
         os_.lamp_rule(self.rule_active, leff=68, tube=35, order=0x0101f0ac)
         os_.lamp_rule(self.add_ball_available, leff=69, order=0x0101ce90)
         os_.lamp_update(self.advance_lamp)
@@ -173,14 +176,14 @@ class Quorra(Feature):
         if mask & 4:
             scored = os_.score_add(self.jackpot)
             self.total += scored
-            os_.deff_start(68, points=scored, double=1)
+            os_.deff_start(68, points=scored, double=1, screen=1)   # 1: no double window
             os_.audit(0x48)
             self.super += scored
             self.jackpot = min(self.jackpot + 25000, JACKPOT_MAX)
         elif mask & 8:
             scored = os_.score_add(self.super)
             self.total += scored
-            os_.deff_start(69, points=scored, double=1)
+            os_.deff_start(69, points=scored, double=1, screen=1)
             self.pd.quorra_supers = min(self.pd.quorra_supers + 1, 0xff)
             self.mb_supers = (self.mb_supers + 1) & 0xff
             os_.hook("item_collect", ITEM)

@@ -5,6 +5,7 @@ The award functions of the other features are reached through hooks named arcade
 given). A feature that is not built leaves its entry at weight 0.
 """
 from tron.features import Feature
+from tron.os_layer import TICK
 
 ORDER = 20
 # (name, default weight, audit) in bag order [entries table 0x040f08dc]
@@ -22,6 +23,35 @@ AWARDS = (
     ("extra_ball", 1, 0x5d),
     ("special", 1, 0x5e),
 )
+# What each award is called: the ROM's audit names "FLYNN'S ARCADE: <name>" (audits 91-102, counters
+# 0x53-0x5e), in bag order = award id 1-12. Deff 105 prints no text: it shows the award's icon (table
+# 0x040d29a0 {id, icon_a, icon_b}, assets deff_105 parts/index.json); the name goes with the deff's event.
+AWARD_NAMES = ("500K", "ADV. GEM", "ADV. CLU", "ADV. ZUSE", "ADV. QUORRA", "ADV. DISC", "ADV. LIGHT CYCLE",
+               "ADV. RECOGNIZER", "ADV. SEA OF SIMUL.", "MORE TIME", "LIGHT EXTRA BALL", "LIGHT SPECIAL")
+
+# deff_105_arcade_award [0x0100e8bc]: 3 cabinets 45 dots wide, 5 apart, enter from x 0x7f - 45 and move
+# 4 dots left every frame of 3 ticks until the slot holding the award is centred on x 84 (0x54).
+CABINET_W, CABINET_GAP, REEL_X, REEL_STEP, FRAME_TICKS = 45, 5, 0x7f - 45, 4, 3
+BLINK_MIN, BLINK_MAX = 21, 61       # blink steps: at least 21 (ends on an even step), at most 61
+SOUND_INTRO, SOUND_ROLL, SOUND_STOP = 0x0e4, 0x0e1, 0x0e3
+
+
+def scroll_frames(slot):
+    """Frames the reel scrolls before the award's slot stops (5, 18 or 30 for slot 0, 1, 2)."""
+    stop = 0x54 - CABINET_GAP * slot - CABINET_W * slot - CABINET_W // 2
+    n, x = 0, REEL_X
+    while stop < x:
+        n, x = n + 1, x - REEL_STEP
+    return n
+
+
+def blink_frames(sound_seconds):
+    """Frames of the blink loop: step l blinks the award (icon_a on even steps); the loop goes on while
+    l < 21, l is odd or sound 0x0e3 still plays, up to 61 steps (the ROM's do/while)."""
+    l = 0
+    while l + 1 < BLINK_MAX and (l < BLINK_MIN or l % 2 or (l + 1) * FRAME_TICKS * TICK < sound_seconds):
+        l += 1
+    return l + 1
 
 
 def award_percentage_ok(rate, adj, margin):
@@ -98,7 +128,7 @@ class Arcade(Feature):
             return False
         name, _, audit = AWARDS[i]
         self.last_award = name
-        os_.show(0x97, 105, award=name)
+        os_.show(0x97, 105, **self.reel(i + 1))
         if self.award(name):
             os_.audit(audit)
             self.pd.arcade_lit = 0
@@ -106,6 +136,51 @@ class Arcade(Feature):
             return True
         os_.display.cancel(0x97)
         return False
+
+    def reel(self, award_id):
+        """deff_105_arcade_award [0x0100e8bc] for award id 1-12 (the bag pick, task arg +0x30): its random
+        choices, run length and sounds, as the deff's args. Per slot: a cabinet from table 0x040d2990
+        (FUN_0000c6b4(4)) and an award id FUN_0000c6b4(13) + 1, 13 -> 1, moved on past ids already shown.
+        The award goes where it already shows, else in a random slot (FUN_0000c6b4(3)). A test or
+        scenario can force the slot (os.forced["arcade_slot"])."""
+        os_ = self.os
+        rnd = os_.random
+        cabinets, icons = [], []
+        for _ in range(3):
+            cabinets.append(rnd.randrange(4))
+            first = rnd.randrange(13)
+            v = first
+            while True:
+                v = v + 1 if v + 1 < 13 else 1
+                if v not in icons or v == first:
+                    break
+            icons.append(v)
+        forced = os_.forced.get("arcade_slot")
+        slot = forced.pop(0) if forced else None
+        if slot is None:
+            slot = icons.index(award_id) if award_id in icons else rnd.randrange(3)
+        elif award_id in icons and icons.index(award_id) != slot:
+            icons[icons.index(award_id)] = icons[slot]
+        icons[slot] = award_id
+        scroll = scroll_frames(slot)
+        lengths = os_.sample_lengths(SOUND_STOP)
+        sample = os_.pick("sample_0x{:03x}".format(SOUND_STOP), [1] * len(lengths)) if len(lengths) > 1 else 0
+        sample = sample or 0
+        blink = blink_frames(lengths[sample] if lengths else 0)
+        stop_at = scroll * FRAME_TICKS * TICK
+
+        def stop():
+            os_.sound_stop(SOUND_ROLL)                     # FUN_0002ceb4(0xe1)
+            os_.sound(SOUND_STOP, in_deff=105, index=sample)
+
+        from tron.display import HOLD_TICKS
+        return dict(award=award_id, award_name=AWARD_NAMES[award_id - 1],
+                    cab0=cabinets[0], cab1=cabinets[1], cab2=cabinets[2],
+                    icon0=icons[0], icon1=icons[1], icon2=icons[2], slot=slot, scroll=scroll, blink=blink,
+                    run_seconds=((scroll + blink) * FRAME_TICKS + HOLD_TICKS) * TICK,
+                    sounds=[(0, lambda: os_.sound(SOUND_INTRO, in_deff=105)),
+                            (0, lambda: os_.sound(SOUND_ROLL, in_deff=105)),
+                            (stop_at, stop)])
 
     def award(self, name):
         os_ = self.os
