@@ -63,9 +63,21 @@ class TestColormap(unittest.TestCase):
             if "via" in e:
                 self.assertIn(str(e["via"]), deffs)
         for d in (71, 85, 87):
-            self.assertIn(deffs[str(d)]["hues"][0], ("orange", "amber", "red"), d)
+            self.assertIn(deffs[str(d)]["hues"][0], ("orange", "red"), d)
         self.assertIn(deffs["140"]["hues"][0], ("cyan", "blue"))
         self.assertIn(deffs["108"]["hues"][0], ("red", "orange"))     # the Recognizer
+
+    def test_only_film_colours(self):
+        """Blue, cyan, red / red-orange, white and black only: no green, violet or yellow anywhere (Vincent)."""
+        import colorsys
+        for d, e in self.cmap["deffs"].items():
+            self.assertTrue(set(e["hues"]) <= set(dmd_color.HUES), (d, e["hues"]))
+        for d in self.cmap["deffs"]:
+            for rgb in dmd_color.palette(int(d), self.cmap):
+                h, s, v = colorsys.rgb_to_hsv(*[c / 255 for c in rgb[:3]])
+                if s > 0.25 and v > 0.15:
+                    deg = h * 360
+                    self.assertTrue(deg < 30 or deg > 340 or 180 <= deg <= 240, (d, rgb, deg))
 
     def test_colormap_is_small(self):
         self.assertLess(os.path.getsize(dmd_color.COLORMAP), 64 * 1024)

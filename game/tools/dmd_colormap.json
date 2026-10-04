@@ -106,8 +106,8 @@
   "104": {
    "captures": [],
    "hues": [
-    "amber",
-    "violet"
+    "orange",
+    "deep blue"
    ],
    "measured": [
     305,
@@ -121,8 +121,8 @@
   },
   "105": {
    "hues": [
-    "amber",
-    "violet"
+    "orange",
+    "deep blue"
    ],
    "measured": [
     305,
@@ -564,7 +564,7 @@
     8
    ],
    "hues": [
-    "amber"
+    "orange"
    ],
    "measured": [
     45
@@ -580,7 +580,7 @@
     9
    ],
    "hues": [
-    "amber"
+    "orange"
    ],
    "measured": [
     55
@@ -826,7 +826,7 @@
     10
    ],
    "hues": [
-    "amber",
+    "orange",
     "cyan"
    ],
    "measured": [
@@ -1213,7 +1213,7 @@
     45
    ],
    "hues": [
-    "green",
+    "blue",
     "cyan"
    ],
    "measured": [
@@ -1234,7 +1234,7 @@
     60
    ],
    "hues": [
-    "green",
+    "blue",
     "cyan"
    ],
    "measured": [
@@ -1304,7 +1304,7 @@
     52
    ],
    "hues": [
-    "amber",
+    "orange",
     "red"
    ],
    "measured": [
@@ -1425,7 +1425,7 @@
     32
    ],
    "hues": [
-    "amber",
+    "orange",
     "cyan"
    ],
    "measured": [
@@ -1498,7 +1498,7 @@
     31
    ],
    "hues": [
-    "amber",
+    "orange",
     "cyan"
    ],
    "measured": [
@@ -1520,7 +1520,7 @@
     31
    ],
    "hues": [
-    "amber",
+    "orange",
     "cyan"
    ],
    "measured": [
@@ -1539,7 +1539,7 @@
   },
   "89": {
    "hues": [
-    "amber",
+    "orange",
     "cyan"
    ],
    "measured": [
