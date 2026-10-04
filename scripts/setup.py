@@ -72,7 +72,8 @@ class Setup:
         if not os.path.exists(py) or self.dry:
             self.run([sys.executable, "-m", "venv", tc.venv_dir()])
         missing = self.dry or (not os.path.exists(mpf) or self.args.upgrade
-                               or (self.args.monitor and not self.has_module(py, "mpfmonitor")))
+                               or (self.args.monitor and not self.has_module(py, "mpfmonitor"))
+                               or not self.has_module(py, "fontTools"))
         if missing:
             self.run([py, "-m", "pip", "install", "--quiet", "--upgrade", "pip"])
             self.run([py, "-m", "pip", "install", "--quiet"] + reqs)

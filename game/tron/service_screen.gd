@@ -5,9 +5,11 @@ extends Control
 ##   x, 2 centred on x, 4 right edge at x), measured as the ROM measures it (RomText.rom_width);
 ## - {"i", "x", "y"}: ROM image i (assets/mpf_package/media/rom_images_all.zip, "%04d.png"), top left at x, y;
 ## - {"r": [x, y, w, h], "l"}: a filled rectangle at palette level l (0-15).
-## Everything is tinted with the DMD colour.
+## Everything is tinted with the DMD colour; in the HD mode (tools/dmd_mode.gd) with the DMD text colour, the
+## text drawn from the ROM fonts' vector outlines with its glow (tron/rom_text_hd.gd).
 
 const RomText = preload("res://tron/rom_text.gd")
+const RomTextHd = preload("res://tron/rom_text_hd.gd")
 const DMD_COLOR := Color(1, 0.45, 0.05, 1)
 const IMAGES_ZIP := "../assets/mpf_package/media/rom_images_all.zip"
 
@@ -69,12 +71,12 @@ func _draw_items(items: Array) -> void:
 				r.position = Vector2(int(d["x"]), int(d["y"]))
 				r.size = tex.get_size()
 				r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-				r.modulate = DMD_COLOR
+				r.modulate = _tint(DMD_COLOR)
 				add_child(r)
 		elif d.has("r"):
 			var rect := ColorRect.new()
 			var level := int(d.get("l", 15)) / 15.0
-			rect.color = Color(DMD_COLOR.r * level, DMD_COLOR.g * level, DMD_COLOR.b * level, 1)
+			rect.color = _tint(Color(DMD_COLOR.r * level, DMD_COLOR.g * level, DMD_COLOR.b * level, 1))
 			rect.position = Vector2(int(d["r"][0]), int(d["r"][1]))
 			rect.size = Vector2(int(d["r"][2]), int(d["r"][3]))
 			add_child(rect)
@@ -107,4 +109,16 @@ func _add_text(s: String, font_id: int, x: int, y: int, flags: int) -> void:
 	label.add_theme_color_override("font_color", DMD_COLOR)
 	label.position = Vector2(left, y - int(m["ascent"]) + 1)
 	label.size = Vector2(maxi(w, 1) + 2, line_h)
+	if RomText.hd():
+		label.self_modulate = Color(1, 1, 1, 0)
+		label.set_meta("dmd_text_hd", true)            # drawn by the child: not a plain label (dmd_mode.gd)
+		var line := RomTextHd.new()
+		line.set_line(shown, font_id, int(m["ascent"]), line_h)
+		label.add_child(line)
 	add_child(label)
+
+
+## A DMD colour (orange times a level) in the HD text colour, or as it is in the classic mode.
+static func _tint(c: Color) -> Color:
+	var dmd = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("DmdMode")
+	return dmd.text_tint(c) if dmd and dmd.hd else c

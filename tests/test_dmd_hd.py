@@ -69,46 +69,105 @@ class TestUpscaler(unittest.TestCase):
 
 
 class TestHdFonts(unittest.TestCase):
-    """Every one of the 44 ROM fonts has an HD twin with the same metrics times the scale."""
+    """Every one of the 44 ROM fonts has a vector (TrueType) twin whose every advance is the ROM's times the
+    font units per dot, and a glow atlas with the same advances (scripts/font_outline.py)."""
 
     @classmethod
     def setUpClass(cls):
         cls.out = tempfile.mkdtemp()
         _, get, cls.fonts = gen_fonts.decode_all()
         cls.get = staticmethod(get)
-        gen_fonts.build_hd(cls.fonts, get, cls.out, 4)            # a small scale keeps the test quick
+        cls.built = gen_fonts.build_hd(cls.fonts, get, cls.out)
 
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.out, ignore_errors=True)
 
+    def ttf(self, n):
+        from fontTools.ttLib import TTFont
+        return TTFont(os.path.join(self.out, "rom_font_%02d.ttf" % n))
+
     def test_every_font_has_an_hd_font(self):
+        self.assertTrue(self.built, "fontTools missing")
         self.assertEqual(44, len(self.fonts))
         info = json.load(open(os.path.join(self.out, "fonts_hd.json"), encoding="utf-8"))
-        self.assertEqual(4, info["scale"])
+        self.assertTrue(info["vector"])
         self.assertEqual(list(range(44)), [f["id"] for f in info["fonts"]])
         styles = {f["style"] for f in info["fonts"]}
         self.assertTrue({"plain", "outlined", "tron", "digits", "big tron digits"} <= styles, styles)
         self.assertTrue(info["fonts"][1]["outline"] and not info["fonts"][0]["outline"])
-        for f in self.fonts:
-            self.assertTrue(os.path.exists(os.path.join(self.out, "rom_font_%02d.png" % f["id"])))
+        for f in info["fonts"]:
+            self.assertEqual("rom_font_%02d.ttf" % f["id"], f["file"])
+            for name in (f["file"], f["glow"], f["glow"].replace(".fnt", ".png")):
+                self.assertTrue(os.path.exists(os.path.join(self.out, name)), name)
+        self.assertEqual([15], info["fonts"][13]["levels"])
+        self.assertGreater(len(info["fonts"][42]["levels"]), 2)          # shaded big digits: a layer per level
 
-    def test_metrics_scaled(self):
+    def test_advances_are_the_roms(self):
+        """Every glyph of every plane (cell, lit dots, levels) of all 44 fonts: advance = ROM advance x units per
+        dot, so every string's width and position is the ROM layout scaled up."""
+        import font_outline as fo
         for f in self.fonts:
-            text = open(os.path.join(self.out, "rom_font_%02d.fnt" % f["id"]), encoding="utf-8").read()
-            chars = {}
-            for line in text.splitlines():
-                if line.startswith("char "):
-                    kv = dict(p.split("=") for p in line.split()[1:])
-                    chars[chr(int(kv["id"]))] = kv
-            self.assertEqual(set(f["glyphs"]), set(chars))
+            font = self.ttf(f["id"])
+            line = f["ascent"] + f["descent"]
+            self.assertEqual(line * fo.UNITS, font["head"].unitsPerEm)
+            self.assertEqual(f["ascent"] * fo.UNITS, font["hhea"].ascent)
+            self.assertEqual(-f["descent"] * fo.UNITS, font["hhea"].descent)
+            cmap = font.getBestCmap()
+            levels = fo.font_levels(f, self.get) or [15]
             for c, g in f["glyphs"].items():
-                kv = chars[c]
-                self.assertEqual(g["w"] * 4, int(kv["width"]))
-                self.assertEqual(g["h"] * 4, int(kv["height"]))
-                self.assertEqual((g["w"] + g["xoff"] + f["spacing"]) * 4, int(kv["xadvance"]))
-                self.assertEqual((f["ascent"] - g["h"] + g["below"]) * 4, int(kv["yoffset"]))
-            self.assertIn("size=%d" % ((f["ascent"] + f["descent"]) * 4), text)
+                rom = g["w"] + g["xoff"] + f["spacing"]
+                codes = [ord(c), fo.CELL_PLANE + ord(c)] + [fo.LEVEL_PLANE + 0x100 * k + ord(c)
+                                                             for k in range(1, len(levels))]
+                for code in codes:
+                    self.assertIn(code, cmap, (f["id"], c, hex(code)))
+                    self.assertEqual(rom * fo.UNITS, font["hmtx"][cmap[code]][0], (f["id"], c, hex(code)))
+            text = "".join(sorted(f["glyphs"]))
+            self.assertEqual(sum(f["glyphs"][c]["w"] + f["glyphs"][c]["xoff"] + f["spacing"] for c in text)
+                             - f["spacing"], gen_fonts.text_width(f, text))
+            glow = {}
+            for row in open(os.path.join(self.out, "rom_font_%02d_glow.fnt" % f["id"]), encoding="utf-8"):
+                if row.startswith("char "):
+                    kv = dict(p.split("=") for p in row.split()[1:])
+                    glow[chr(int(kv["id"]))] = int(kv["xadvance"])
+            self.assertEqual({c: (g["w"] + g["xoff"] + f["spacing"]) * fo.GLOW_SCALE for c, g in f["glyphs"].items()},
+                             glow)
+
+    def test_outlines(self):
+        """Traced outlines: an O is an outer contour and a hole, wound as TrueType wants (outer clockwise), within
+        its dots' box; a plain font's cell is its exact rectangle; outlined fonts' cells hold their lit dots."""
+        import font_outline as fo
+        from fontTools.pens.areaPen import AreaPen
+        font = self.ttf(13)
+        cmap = font.getBestCmap()
+        glyf = font["glyf"]
+        o = glyf[cmap[ord("O")]]
+        self.assertEqual(2, o.numberOfContours)
+        pen = AreaPen(font.getGlyphSet())
+        font.getGlyphSet()[cmap[ord("O")]].draw(pen)
+        self.assertLess(pen.value, 0)                                # clockwise outer contour (negative area)
+        g = self.fonts[13]["glyphs"]["O"]
+        o.recalcBounds(glyf)
+        top = (g["h"] - g["below"]) * fo.UNITS
+        self.assertTrue(-fo.UNITS // 2 <= o.xMin and o.xMax <= (g["w"] + 1) * fo.UNITS, (o.xMin, o.xMax))
+        self.assertTrue(o.yMax <= top + fo.UNITS // 2, (o.yMax, top))
+        cell = glyf[cmap[fo.CELL_PLANE + ord("O")]]
+        cell.recalcBounds(glyf)
+        self.assertTrue(cell.xMin <= o.xMin and cell.xMax >= o.xMax and cell.yMin <= o.yMin and cell.yMax >= o.yMax)
+        plain = self.ttf(12)
+        pc = plain.getBestCmap()
+        box = plain["glyf"][pc[fo.CELL_PLANE + ord("A")]]
+        box.recalcBounds(plain["glyf"])
+        ga = self.fonts[12]["glyphs"]["A"]
+        self.assertEqual((0, -ga["below"] * fo.UNITS, ga["w"] * fo.UNITS, (ga["h"] - ga["below"]) * fo.UNITS),
+                         (box.xMin, box.yMin, box.xMax, box.yMax))
+        self.assertEqual(1, box.numberOfContours)
+
+    def test_deterministic(self):
+        import font_outline as fo
+        a = fo.glyph_contours(self.fonts[38], "S", self.get, [15])
+        self.assertEqual(a, fo.glyph_contours(self.fonts[38], "S", self.get, [15]))
+        self.assertTrue(all(len(c) >= 8 for c in a[ord("S")]))       # smooth: more than the dots' corners
 
     def test_glyph_cells(self):
         """Plain fonts keep their black cell (opaque rectangle); outline fonts are transparent around."""
@@ -143,7 +202,8 @@ class TestHdMedia(unittest.TestCase):
         for deff in data["deffs"]:
             self.assertTrue(os.path.isdir(os.path.join(GAME, "media", "dmd_hd", "deff_%03d" % int(deff))), deff)
         for n in range(44):
-            self.assertTrue(os.path.exists(os.path.join(GAME, "fonts", "hd", "rom_font_%02d.fnt" % n)))
+            self.assertTrue(os.path.exists(os.path.join(GAME, "fonts", "hd", "rom_font_%02d.ttf" % n)))
+            self.assertTrue(os.path.exists(os.path.join(GAME, "fonts", "hd", "rom_font_%02d_glow.fnt" % n)))
 
 
 class TestRunSwitches(unittest.TestCase):
@@ -155,6 +215,10 @@ class TestRunSwitches(unittest.TestCase):
         self.assertEqual([], run.dmd_args([]))                     # TRON_DMD / the project setting decide
         with self.assertRaises(SystemExit):
             run.dmd_args([], size="big")
+        self.assertEqual(["--", "--dmd-text-color=#ff0000", "--dmd-text-glow=0"],
+                         run.dmd_args([], text_color="ff0000", text_glow=0.0))
+        with self.assertRaises(SystemExit):
+            run.dmd_args([], text_color="blue")
 
     def test_cli(self):
         seen = {}
@@ -163,6 +227,8 @@ class TestRunSwitches(unittest.TestCase):
             self.assertIn("--dmd=classic", seen["godot_args"])
             run.main(["--seconds", "1"])
             self.assertEqual([], seen["godot_args"])
+            run.main(["--seconds", "1", "--dmd-text-color", "#2a6cff", "--dmd-text-glow", "1.5"])
+            self.assertEqual(["--", "--dmd-text-color=#2a6cff", "--dmd-text-glow=1.5"], seen["godot_args"])
 
 
 # Pixel hashes (sha1 of the RGBA dots, 16 hex digits) of 128x32 frames rendered before the HD mode existed
@@ -218,7 +284,7 @@ class TestGodotModes(unittest.TestCase):
 
     def test_hd_draws_text_at_window_resolution(self):
         from PIL import Image
-        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
+        out = self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"])
         frame = Image.open(os.path.join(out, "deff_025", "frame_00000.png")).convert("L")
         self.assertEqual((1280, 320), frame.size)
         box = frame.point(lambda p: 255 if p > 40 else 0).getbbox()
@@ -229,6 +295,61 @@ class TestGodotModes(unittest.TestCase):
         score = Image.open(os.path.join(out, "deff_019", "frame_00002.png"))
         self.assertEqual((1280, 320), score.size)
 
+    def test_text_style(self):
+        """HD text is in the text colour (default the Tron blue #2a6cff) with a glow of the glow colour around it;
+        --dmd-text-color / TRON_DMD_TEXT_GLOW change them; the letters and the score panel follow."""
+        from PIL import Image
+
+        def strokes(path):
+            img = Image.open(path).convert("RGB")
+            px = img.load()
+            return img, px
+        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
+        img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
+        core = [px[x, y] for x in range(img.width) for y in range(img.height) if px[x, y][2] > 200]
+        self.assertGreater(len(core), 2000)
+        common = max(set(core), key=core.count)
+        self.assertTrue(all(abs(a - b) <= 3 for a, b in zip(common, (0x2a, 0x6c, 0xff))), common)
+        # the glow: blue-cyan light around the strokes, in the dots between the digits' black cells and beyond
+        box = Image.open(os.path.join(out, "deff_025", "frame_00000.png")).convert("L").point(
+            lambda p: 255 if p > 90 else 0).getbbox()
+        halo = [px[x, box[1] - 8] for x in range(box[0], box[2])]
+        self.assertTrue(any(b > 30 and b > r for r, g, b in halo), halo[::40])
+        letters, lp = strokes(os.path.join(out, "deff_091", "frame_00002.png"))
+        lit = [lp[x, y] for x in range(0, letters.width, 3) for y in range(0, letters.height, 3) if sum(lp[x, y]) > 200]
+        self.assertTrue(lit and all(b >= r for r, g, b in lit))                 # blue letters, no orange
+        # other colour, no glow
+        out = self.render(["--dmd=hd", "--dmd-text-color=#ff0000"], ["--resolution", "1280x320"],
+                          env={"TRON_DMD_TEXT_GLOW": "0"})
+        img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
+        colours = {px[x, y] for x in range(img.width) for y in range(img.height)}
+        self.assertIn((255, 0, 0), colours)
+        self.assertTrue(all(g == 0 and b == 0 for r, g, b in colours if r > 0), sorted(colours)[-5:])
+
+
+GODOT_FONTS = (os.path.exists(tc.godot_path()) and os.path.exists(os.path.join(GAME, "fonts", "hd", "fonts_hd.json"))
+               and os.path.exists(os.path.join(GAME, "fonts", "fonts.json")))
+
+
+@unittest.skipUnless(GODOT_FONTS, "needs Godot and the generated HD fonts (scripts/gen_media.py)")
+class TestGodotFonts(unittest.TestCase):
+    def test_godot_advances_are_the_roms(self):
+        """As Godot lays them out (game/tools/font_check.gd), at the size the DMD draws them: every character of
+        all 44 vector fonts and of their glow fonts advances by the ROM's dots, and a string by their sum."""
+        out = subprocess.run([tc.godot_path(), "--headless", "--path", GAME, "--script", "res://tools/font_check.gd"],
+                             capture_output=True, text=True, timeout=300).stdout
+        line = [r for r in out.splitlines() if r.startswith("FONT_CHECK ")]
+        self.assertTrue(line, out[-2000:])
+        got = json.loads(line[0][len("FONT_CHECK "):])
+        fonts = json.load(open(os.path.join(GAME, "fonts", "fonts.json"), encoding="utf-8"))["fonts"]
+        self.assertEqual(44, len(got))
+        for f in fonts:
+            g = got[str(f["id"])]
+            rom = {c: g_["w"] + g_["xoff"] + f["spacing"] for c, g_ in f["glyphs"].items()}
+            self.assertEqual({c: [float(a)] * 3 for c, a in rom.items()}, g["advances"], f["id"])
+            self.assertEqual(sum(rom.values()), g["all"], f["id"])
+            self.assertEqual(f["ascent"], g["ascent"], f["id"])
+            self.assertEqual(f["descent"], g["descent"], f["id"])
 
 if __name__ == "__main__":
     unittest.main()

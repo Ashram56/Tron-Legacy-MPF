@@ -13,14 +13,21 @@ extends Node
 ## In classic mode this node does nothing at all: the output is the 128x32 picture as before.
 ##
 ## HD mode: the window's content scale mode becomes canvas_items (2D drawn at the window's resolution,
-## kept at the 4:1 aspect), textures are filtered, tron/rom_text.gd loads the HD fonts (fonts/hd/), and
-## every sprite showing a picture of media/dmd/ shows its twin of media/dmd_hd/ (same name), scaled down
-## to the same 128x32 footprint.
+## kept at the 4:1 aspect), textures are filtered, tron/rom_text.gd draws the text from the ROM fonts'
+## vector outlines (fonts/hd/, tron/rom_text_hd.gd), and every sprite showing a picture of media/dmd/ shows
+## its twin of media/dmd_hd/ (same name), scaled down to the same 128x32 footprint.
+## Text style (HD only): every DMD text (ROM text lines, the score display, the service menu, the ZUSE/TRON
+## letters, the attract and initials pages) is drawn in the text colour with a soft glow around it:
+##   colour       --dmd-text-color=#RRGGBB      TRON_DMD_TEXT_COLOR       tron/dmd/text_color       (#2a6cff)
+##   glow colour  --dmd-text-glow-color=#RRGGBB TRON_DMD_TEXT_GLOW_COLOR  tron/dmd/text_glow_color  (#22b8ff)
+##   glow         --dmd-text-glow=X             TRON_DMD_TEXT_GLOW        tron/dmd/text_glow        (0.8; 0 = none)
+## (first match wins, left to right).
 ## Colour (HD only): --dmd-color=on|off (scripts/run.py --dmd-color; or TRON_DMD_COLOR=on|off, or the project
 ## setting tron/dmd/color, default "on"). On, the effects' animation frames show their colour twins of
 ## media/dmd_hd_color/ (scripts/dmd_color.py: each effect's 16 shades mapped to a palette inspired by the
-## PuP-Pack video of that moment; 2x, 256x64, made with Scale2x, drawn with nearest filtering) untinted; off, the grey HD frames tinted as in classic mode. Text
-## drawn live (tron/rom_text.gd, letter_panel.gd, score_display.gd) is not touched.
+## PuP-Pack video of that moment; 2x, 256x64, made with Scale2x, drawn with nearest filtering) untinted;
+## off, the grey HD frames tinted as in classic mode. Text drawn live (tron/rom_text.gd, letter_panel.gd,
+## score_display.gd) keeps the text style above.
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
 
@@ -28,6 +35,9 @@ const MEDIA := "res://media/dmd/"
 const MEDIA_HD := "res://media/dmd_hd/"
 const MEDIA_COLOR := "res://media/dmd_hd_color/"
 const DOTS_SHADER := "res://tools/dmd_dots.gdshader"
+const DEFAULT_TEXT_COLOR := "#2a6cff"
+const DEFAULT_GLOW_COLOR := "#22b8ff"
+const DEFAULT_GLOW := 0.8
 
 var mode := "classic"
 var hd := false
@@ -35,6 +45,9 @@ var dots := 0
 var color := false
 var frame_scale := 8
 var color_scale := 2
+var text_color := Color(DEFAULT_TEXT_COLOR)
+var glow_color := Color(DEFAULT_GLOW_COLOR)
+var glow := DEFAULT_GLOW
 var _frames_hd := {}
 var _colored := {}
 
@@ -67,6 +80,42 @@ static func choose_color(args: PackedStringArray, env_color: String, setting: St
 	return setting.to_lower() != "off"
 
 
+## The text style from the user args, the environment and the project settings (first match wins): {"color",
+## "glow_color", "glow"}. Invalid values are skipped.
+static func choose_text_style(args: PackedStringArray, env: Dictionary, settings: Dictionary) -> Dictionary:
+	var out := {}
+	for spec in [["color", "--dmd-text-color=", "TRON_DMD_TEXT_COLOR", "tron/dmd/text_color", DEFAULT_TEXT_COLOR],
+			["glow_color", "--dmd-text-glow-color=", "TRON_DMD_TEXT_GLOW_COLOR", "tron/dmd/text_glow_color",
+				DEFAULT_GLOW_COLOR],
+			["glow", "--dmd-text-glow=", "TRON_DMD_TEXT_GLOW", "tron/dmd/text_glow", DEFAULT_GLOW]]:
+		var values: Array = []
+		for a in args:
+			if a.begins_with(spec[1]):
+				values.append(a.trim_prefix(spec[1]))
+		values += [env.get(spec[2], ""), settings.get(spec[3], ""), spec[4]]
+		for v in values:
+			var text := str(v).strip_edges()
+			if spec[0] == "glow":
+				if text.is_valid_float():
+					out["glow"] = clampf(text.to_float(), 0.0, 4.0)
+					break
+			elif Color.html_is_valid(text):
+				out[spec[0]] = Color.html(text)
+				break
+	return out
+
+
+## The DMD text style (tron/rom_text_hd.gd and the text drawers): {"color", "glow_color", "glow"}.
+func text_style() -> Dictionary:
+	return {"color": text_color, "glow_color": glow_color, "glow": glow}
+
+
+## A DMD colour of the classic look (orange times a palette level) in the HD text colour, same level.
+func text_tint(classic: Color) -> Color:
+	var level := classic.r
+	return Color(text_color.r * level, text_color.g * level, text_color.b * level, classic.a)
+
+
 func _enter_tree() -> void:
 	var args := OS.get_cmdline_user_args()
 	mode = choose(args, OS.get_environment("TRON_DMD"),
@@ -92,6 +141,16 @@ func _enter_tree() -> void:
 		var cinfo = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_COLOR + "palettes.json"))
 		if cinfo is Dictionary:
 			color_scale = int(cinfo.get("scale", color_scale))
+	var env := {}
+	for k in ["TRON_DMD_TEXT_COLOR", "TRON_DMD_TEXT_GLOW_COLOR", "TRON_DMD_TEXT_GLOW"]:
+		env[k] = OS.get_environment(k)
+	var settings := {}
+	for k in ["tron/dmd/text_color", "tron/dmd/text_glow_color", "tron/dmd/text_glow"]:
+		settings[k] = ProjectSettings.get_setting(k, "")
+	var st := choose_text_style(args, env, settings)
+	text_color = st["color"]
+	glow_color = st["glow_color"]
+	glow = st["glow"]
 	if FileAccess.file_exists(MEDIA_HD + "scale.json"):
 		var info = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "scale.json"))
 		if info is Dictionary:
@@ -102,8 +161,8 @@ func _enter_tree() -> void:
 	root.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
 	root.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	get_tree().node_added.connect(_on_node_added)
-	print("DMD: hd mode, window %s%s%s" % [root.size, ", colour" if color else "",
-		(", dot-matrix look %d" % dots) if dots > 0 else ""])
+	print("DMD: hd mode, window %s%s%s, text %s glow %s x%.2f" % [root.size, ", colour" if color else "",
+		(", dot-matrix look %d" % dots) if dots > 0 else "", text_color.to_html(false), glow_color.to_html(false), glow])
 
 
 func _ready() -> void:
@@ -166,7 +225,9 @@ func _twin_frames(frames: SpriteFrames, in_color: bool) -> SpriteFrames:
 
 
 func _on_node_added(node: Node) -> void:
-	if node is AnimatedSprite2D:
+	if node is Label and not ("rom_font" in node):
+		_style_label(node as Label)
+	elif node is AnimatedSprite2D:
 		var sprite := node as AnimatedSprite2D
 		if sprite.sprite_frames and sprite.sprite_frames != _hd_frames(sprite.sprite_frames):
 			sprite.sprite_frames = _hd_frames(sprite.sprite_frames)
@@ -183,3 +244,66 @@ func _on_node_added(node: Node) -> void:
 		if big:
 			s.texture = big
 			s.scale = s.scale / frame_scale
+
+
+## A plain label on the DMD (game/slides/text_page.tscn: attract pages, initials entry): the text colour, and
+## the glow drawn behind it (LabelGlow).
+func _style_label(label: Label) -> void:
+	if label.has_meta("dmd_glow_copy") or label.has_meta("dmd_text_hd"):
+		return
+	label.add_theme_color_override("font_color", text_color)
+	if glow > 0.0:
+		label.add_child(LabelGlow.new(label, glow_color, glow), false, INTERNAL_MODE_FRONT)
+
+
+## The glow of a plain label: its text drawn white into a small picture (a SubViewport, PX pixels per dot,
+## redrawn when the text changes), blurred by tools/dmd_glow.gdshader and added behind the label.
+class LabelGlow extends Node2D:
+	const PX := 4
+	const MARGIN := 4                  # dots of glow around the label's box
+	const SHADER := "res://tools/dmd_glow.gdshader"
+	var label: Label
+	var _vp: SubViewport
+	var _copy: Label
+
+	func _init(of: Label, glow_color: Color, glow_strength: float) -> void:
+		label = of
+		name = "Glow"
+		show_behind_parent = true
+		var mat := ShaderMaterial.new()
+		mat.shader = load(SHADER)
+		mat.set_shader_parameter("glow_color", glow_color)
+		mat.set_shader_parameter("strength", glow_strength)
+		mat.set_shader_parameter("sigma", 0.9 * PX)
+		material = mat
+		_vp = SubViewport.new()
+		_vp.transparent_bg = true
+		_vp.disable_3d = true
+		_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+		_vp.canvas_transform = Transform2D.IDENTITY.scaled(Vector2(PX, PX))
+		_copy = Label.new()
+		_copy.set_meta("dmd_glow_copy", true)
+		_vp.add_child(_copy)
+		add_child(_vp)
+
+	func _ready() -> void:
+		label.draw.connect(_sync)
+		_sync()
+
+	func _sync() -> void:
+		var box := label.size
+		_vp.size = Vector2i(((box + Vector2.ONE * 2 * MARGIN) * PX).ceil())
+		_copy.position = Vector2.ONE * MARGIN
+		_copy.size = box
+		_copy.text = label.text
+		_copy.horizontal_alignment = label.horizontal_alignment
+		_copy.vertical_alignment = label.vertical_alignment
+		_copy.add_theme_font_override("font", label.get_theme_font("font"))
+		_copy.add_theme_font_size_override("font_size", label.get_theme_font_size("font_size"))
+		_copy.add_theme_color_override("font_color", Color.WHITE)
+		_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+		queue_redraw()
+
+	func _draw() -> void:
+		if label.text != "":
+			draw_texture_rect(_vp.get_texture(), Rect2(-Vector2.ONE * MARGIN, label.size + Vector2.ONE * 2 * MARGIN), false)
