@@ -66,6 +66,7 @@ run() {
 # this run only (git's url.insteadOf in the environment, inherited by setup.py), and handed to git's
 # credential helper, if one is set up (the macOS keychain, for example), so later `git pull`s work too.
 ASSETS_URL="${TRON_ASSETS_REPO:-https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption.git}"
+PUP_URL="${TRON_PUP_REPO:-https://github.com/Ashram56/Tron-LE-PuP-Pack.git}"   # the pup_pack submodule (PuP fork)
 TOKEN="${TRON_GITHUB_TOKEN:-${GITHUB_TOKEN:-${GH_TOKEN:-}}}"
 
 public_repo() { GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git -c credential.helper= ls-remote "$1" HEAD >/dev/null 2>&1; }
@@ -78,18 +79,19 @@ github_auth() {
         return
     fi
     if [ -z "$TOKEN" ]; then
-        if public_repo "$REPO_URL" && public_repo "$ASSETS_URL"; then
+        if public_repo "$REPO_URL" && public_repo "$ASSETS_URL" && public_repo "$PUP_URL"; then
             note "the repositories are public: no token needed"
             return
         fi
         if GIT_TERMINAL_PROMPT=0 git ls-remote "$ASSETS_URL" HEAD >/dev/null 2>&1 \
-                && GIT_TERMINAL_PROMPT=0 git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1; then
+                && GIT_TERMINAL_PROMPT=0 git ls-remote "$REPO_URL" HEAD >/dev/null 2>&1 \
+                && GIT_TERMINAL_PROMPT=0 git ls-remote "$PUP_URL" HEAD >/dev/null 2>&1; then
             note "a private repository, readable with the GitHub credentials git already has"
             return
         fi
         [ "$YES" = 0 ] && [ -r /dev/tty ] || die "a repository is private: set TRON_GITHUB_TOKEN to a GitHub token that can read it"
         note "A repository is private. Paste a GitHub token that can read it (github.com > Settings > Developer"
-        note "settings > Personal access tokens; a fine-grained token with Contents: read-only on both repositories)."
+        note "settings > Personal access tokens; a fine-grained token with Contents: read-only on these repositories)."
         printf '    token (not shown): ' >/dev/tty
         IFS= read -rs TOKEN </dev/tty
         printf '\n' >/dev/tty
@@ -99,6 +101,8 @@ github_auth() {
         GIT_CONFIG_VALUE_0="https://github.com/"
     GIT_TERMINAL_PROMPT=0 git ls-remote "$ASSETS_URL" HEAD >/dev/null 2>&1 \
         || die "the GitHub token cannot read $ASSETS_URL (check its repository access and expiry)"
+    GIT_TERMINAL_PROMPT=0 git ls-remote "$PUP_URL" HEAD >/dev/null 2>&1 \
+        || die "the GitHub token cannot read $PUP_URL (check its repository access and expiry)"
     printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n\n' "$TOKEN" \
         | git credential approve 2>/dev/null || true
     note "token accepted"
