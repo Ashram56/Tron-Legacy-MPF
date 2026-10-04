@@ -31,8 +31,9 @@ import json
 import os
 import re
 import shutil
-import stat
 import sys
+
+import fsutil  # Windows/OneDrive-safe folder wipes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PKG = os.path.join(ROOT, "assets", "mpf_package")
@@ -100,26 +101,6 @@ ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             141: "PORTAL MULTIBALL / NEXT SHOT=%,02lu / SUPER=%,02lu / SUPER JACKPOT LIT / SHOOT DISC"
                  " / SUPER=%,02lu / ALL SHOTS=%,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
-
-
-def empty_dir(path):
-    """path as an empty folder. On Windows a file can be read-only (OneDrive, git) or briefly held by
-    another program, so the folder may not go: then its files are removed one by one, and what is still
-    held is left to be overwritten."""
-    def writable(func, target, _exc):
-        os.chmod(target, stat.S_IWRITE)
-        func(target)
-    if not os.path.isdir(path):
-        return os.makedirs(path)
-    try:
-        shutil.rmtree(path, **({"onexc": writable} if sys.version_info >= (3, 12) else {"onerror": writable}))
-    except OSError:
-        for name in os.listdir(path):
-            try:
-                os.remove(os.path.join(path, name))
-            except OSError:
-                pass
-    os.makedirs(path, exist_ok=True)
 
 
 def load_yaml(path):
@@ -409,7 +390,7 @@ def build_deffs(only_data):
         if only_data:
             continue
         rel = "media/dmd/deff_{:03d}".format(deff_id)    # also a res:// path: "/" on every OS
-        empty_dir(os.path.join(GAME, rel))
+        fsutil.clear_dir(os.path.join(GAME, rel))
         if source == "arcade":
             arcade_slide(folder, rel, panel)
             continue
@@ -439,7 +420,7 @@ def build_hd_frames(scale=None):
     scale = scale or dmd_hd.FRAME_SCALE
     src_root = os.path.join(GAME, "media", "dmd")
     dst_root = os.path.join(GAME, "media", "dmd_hd")
-    shutil.rmtree(dst_root, ignore_errors=True)
+    fsutil.remove_dir(dst_root)
     jobs = []
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
@@ -469,9 +450,9 @@ def main():
         gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
-        shutil.rmtree(os.path.join(GAME, "fonts", "hd"), ignore_errors=True)
-        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd"), ignore_errors=True)
-        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd_color"), ignore_errors=True)
+        fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))
     if hd and not only_data:
         print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
         print("media: {} HD colour frames in game/media/dmd_hd_color".format(build_color_frames()), flush=True)

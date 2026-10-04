@@ -25,6 +25,7 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fsutil  # noqa: E402
 import gmc_patch  # noqa: E402
 import pup_setup  # noqa: E402  (PuP Pack: docs/pup.md)
 import toolchain as tc  # noqa: E402
@@ -136,8 +137,7 @@ class Setup:
             with tempfile.TemporaryDirectory() as tmp:
                 subprocess.run(["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
                                 "--branch", "v" + tc.GMC_VERSION, tc.GMC_GIT, os.path.join(tmp, "gmc")], check=True)
-                shutil.rmtree(tc.GMC_DIR, ignore_errors=True)
-                shutil.copytree(os.path.join(tmp, "gmc", "addons", "mpf-gmc"), tc.GMC_DIR)
+                fsutil.copy_tree(os.path.join(tmp, "gmc", "addons", "mpf-gmc"), tc.GMC_DIR)
         gmc_patch.patch()
 
     def generate(self):

@@ -24,6 +24,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fsutil  # noqa: E402
 import toolchain as tc  # noqa: E402
 
 sys.path.insert(0, tc.GAME)
@@ -130,7 +131,7 @@ def convert(ffmpeg, pack, out, job, args):
         if os.path.exists(tmp):
             os.remove(tmp)
         raise RuntimeError("{}: {}".format(rel, result.stderr.strip()[-500:]))
-    os.replace(tmp, dst)
+    fsutil.replace(tmp, dst)
     return rel, entry, "converted"
 
 

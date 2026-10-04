@@ -30,6 +30,8 @@ import json
 import os
 import sys
 
+import fsutil  # Windows/OneDrive-safe folder wipes
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
 VERSION = "2"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
@@ -259,7 +261,7 @@ def color_file(job):
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
         shutil.copyfile(dst, tmp)
-        os.replace(tmp, cached)
+        fsutil.replace(tmp, cached)
     return dst
 
 
@@ -272,7 +274,7 @@ def build(src_root, dst_root, scale, cache=None, processes=None):
     import dmd_hd
     cmap = load_colormap()
     tpal = text_palette(cmap)
-    shutil.rmtree(dst_root, ignore_errors=True)
+    fsutil.remove_dir(dst_root)
     folders = sorted(glob.glob(os.path.join(src_root, "deff_*")))
     masks = text_masks()
     jobs, palettes = [], {}
