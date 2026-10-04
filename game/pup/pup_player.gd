@@ -250,7 +250,9 @@ func pick(playlist: String, file: String) -> String:
 			return ""
 		var info: Dictionary = playlists.get(playlist.to_lower(), {})
 		if info.get("alpha_sort", false):
-			var i: int = _next.get(playlist, 0) % files.size()
+			# in order from a random first file: the pack's AlphaSort playlists are numbered variants
+			# (StartGame 1-3, Drain1-5), and starting at 1 every boot showed the same one first
+			var i: int = _next.get(playlist, randi()) % files.size()
 			_next[playlist] = i + 1
 			key = files[i]
 		else:
