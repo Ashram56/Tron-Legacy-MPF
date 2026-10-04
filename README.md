@@ -141,10 +141,26 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 | `--dmd hd` / `TRON_DMD=hd` | HD again (the default) |
 | `--dmd-dots N` (or `TRON_DMD_DOTS=N`) | HD with a dot-matrix look: N round dots per DMD dot (1 = the 128x32 grid; 2 looks good from 1280 px up; 0 = off, the default) |
 | `--dmd-size WxH` | the window size, for example `1920x480` (default 1024x256; HD scales to any size, classic in whole steps) |
+| `--dmd-color off` (or `TRON_DMD_COLOR=off`) | HD with the animations in the DMD's single colour (default: on, see HD colour below) |
 
 `--hw proc` is always classic: the P-ROC drives the machine's own 128x32 DMD. Godot reads the same choice
 from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
 `scripts/gen_media.py --no-hd` skips building the HD media (HD then falls back to classic).
+
+**HD colour.** In HD the effects' animations are in colour by default, as a colour DMD (Serum-style)
+colourisation would show them: each effect maps its 16 shades to a palette, the dim shades (film clips,
+faces, vehicles) in one hue and the bright ones (light lines) in another, up to a white highlight. The hues
+come from the video that Terry Red's "End of Line" PuP-Pack for Tron Legacy
+([Ashram56/Tron-LE-PuP-Pack](https://github.com/Ashram56/Tron-LE-PuP-Pack)) plays at that moment: 63 effects
+match one of the pack's DMD captures, 33 more share the video of their feature, and the rest use the
+default Tron palette (cyan to white). Orange marks CLU, Rinzler and the light cycles, red the Recognizer,
+cyan and blue the Grid. Only the measured hues are kept, in `game/tools/dmd_colormap.json`
+(`scripts/pup_colormap.py` measures them from a local copy of the pack, which is not needed to build); the
+frames are coloured at build time by `scripts/dmd_color.py` into `game/media/dmd_hd_color/`. Text drawn
+live (scores, values, letters) is not coloured by this; text baked into the captured pictures (BALL SAVED,
+GAME OVER, the lines of an intro, the status panel) is found by drawing the ROM's lines with their fonts
+and takes a dark blue palette. `--dmd-color off` (or `TRON_DMD_COLOR=off`, or `tron/dmd/color="off"` in
+`game/project.godot`) shows the grey HD frames in the DMD's single colour; classic is never coloured.
 
 **P-ROC:** MPF's wheel ships the pypinproc binary for Windows (`pinproc.cp3xx-win_amd64.pyd`), so there
 `--hw proc` works once FTDI's D2XX driver and the Visual C++ runtime are installed. On Linux and macOS (MPF's

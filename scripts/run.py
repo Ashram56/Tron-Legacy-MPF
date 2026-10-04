@@ -10,6 +10,7 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
+    python scripts/run.py --dmd-color off          # hd with the animations in the DMD's single colour (default: on)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -154,11 +155,14 @@ def engine_arg(gargs, *args):
     return gargs[:at] + list(args) + gargs[at:]
 
 
-def dmd_args(gargs, dmd=None, dots=None, size=None):
-    """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, and the window
-    size (Godot's --resolution WxH). None leaves the choice to TRON_DMD / the project setting (hd)."""
+def dmd_args(gargs, dmd=None, dots=None, size=None, color=None):
+    """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, --dmd-color=on|off
+    and the window size (Godot's --resolution WxH). None leaves the choice to TRON_DMD / TRON_DMD_COLOR / the
+    project settings (hd, colour on)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
+    if color:
+        gargs = user_arg(gargs, "--dmd-color=" + color)
     if dots is not None:
         gargs = user_arg(gargs, "--dmd-dots={}".format(dots))
     if size:
@@ -275,6 +279,9 @@ def main(argv=None):
                         "is always classic")
     p.add_argument("--dmd-dots", type=int, metavar="N",
                    help="hd only: dot-matrix look with N dots per DMD dot (1 = the 128x32 grid; 0 = off, default)")
+    p.add_argument("--dmd-color", choices=["on", "off"],
+                   help="hd only: the effects' animations in colour (on, default: each effect's palette, inspired by "
+                        "the Tron Legacy PuP-Pack videos) or in the DMD's single colour (off). Also TRON_DMD_COLOR")
     p.add_argument("--dmd-size", metavar="WxH", help="DMD window size, for example 1920x480 (default 1024x256)")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
@@ -282,7 +289,8 @@ def main(argv=None):
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, monitor=args.monitor, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
-               free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size),
+               free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
+                                                             args.dmd_color),
                trace=args.trace and os.path.abspath(args.trace))
 
 

@@ -139,9 +139,9 @@ enough when the firewall asks.
 | Repository + asset submodule | ~450 MB |
 | `.venv` (MPF, pillow, pytest) | ~110 MB (+ ~250 MB with MPF Monitor) |
 | `tools/godot/` | ~130 MB (+ a 70 MB download during setup) |
-| Generated config and media (`game/sounds`, `game/media`, ...) | ~200 MB (of which ~80 MB the HD DMD frames and fonts) |
-| HD upscale cache (`.cache/dmd_hd/`, makes regenerating the HD frames quick) | ~70 MB |
-| Godot import cache (`game/.godot/`) | ~140 MB |
+| Generated config and media (`game/sounds`, `game/media`, ...) | ~360 MB (of which ~240 MB the HD DMD frames, grey and colour, and fonts) |
+| HD upscale cache (`.cache/dmd_hd/`, makes regenerating the HD frames quick; with the colour frames) | ~220 MB |
+| Godot import cache (`game/.godot/`) | ~270 MB |
 | Docker image (optional) | ~1.5 GB |
 
 ## Performance

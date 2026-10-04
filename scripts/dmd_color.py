@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""Colour for the HD DMD: the 16 shades of each display effect's animation mapped to colours, as a colour
+DMD (Serum-style colourisation) does, at build time (scripts/gen_media.py build_color_frames).
+
+The colour map, game/tools/dmd_colormap.json (small, tracked):
+- "default": the Tron palette of effects without their own (cyan light lines to a white highlight);
+- "text": the palette of text baked into an effect's pictures (dark blue, as the HD text drawn live);
+- "deffs": {deff: {"hues": [main, accent], ...}} measured on the PuP-Pack video each effect plays with
+  (scripts/pup_colormap.py, which also records the capture, the videos and the measured hues).
+A palette is 16 colours (ramp): shade 0 black; the dim shades 1-7 (the ROM's film clips and backgrounds)
+in the main hue, getting brighter; the bright shades 12-15 (the foreground: lines, objects, logos) in the
+accent hue, getting lighter, 15 almost white (the highlight). The art never uses shades 8-11; they blend.
+
+The frames are upscaled as the HD grey frames are (scripts/dmd_hd.py: one smoothed mask per shade), each
+shade's mask laid over the lower ones in the shade's colour, so the edge between two shades blends their
+two colours (and a palette of greys gives back the grey HD frame).
+Text: an effect played from the emulator's capture shows its ROM text lines inside the picture (and the
+status panel left of x 41 when the deff draws it). Each line is drawn with the ROM font at its layout
+(scripts/rom_layout.py); in each frame that shows it (TEXT_MATCH of its dots lit, TEXT_BG of the black
+cells or outlines around them dark), its lit dots take the text palette, as do the panel's lit dots. A
+captured frame drawn in a single shade is a text screen (GAME OVER, BALL SAVED, TILT): all text. Other
+frames in a single shade (logos, line art: DAFT PUNK) keep their top shades coloured (flat_palette).
+
+    .venv/bin/python scripts/dmd_color.py DEFF IN.png OUT.png [scale]   # one classic frame in DEFF's colours
+"""
+import colorsys
+import hashlib
+import json
+import os
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
+VERSION = "1"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
+TEXT_MATCH = 0.9
+
+HUES = {"cyan": 188, "blue": 212, "deep blue": 232, "violet": 275, "red": 4, "orange": 28, "amber": 48, "green": 125}
+# (shade, saturation, value) of the main hue (dim shades) and of the accent hue (bright shades)
+DIM = ((1, 1.0, 0.22), (4, 1.0, 0.55), (7, 0.92, 0.85))
+BRIGHT = ((12, 0.95, 0.92), (13, 0.75, 1.0), (14, 0.45, 1.0), (15, 0.1, 1.0))
+
+
+def load_colormap(path=COLORMAP):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_colormap(data, path=COLORMAP):
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=1, sort_keys=True)
+        f.write("\n")
+
+
+def hue_of(name):
+    return HUES[name] if isinstance(name, str) else float(name)
+
+
+def ramp(main, accent=None, dim=DIM, bright=BRIGHT):
+    """16 (r, g, b) bytes: shade 0 black, the dim stops in the main hue, the bright ones in the accent hue
+    (main if none), the shades between stops mixed in RGB (no rainbow between two hues)."""
+    hm, ha = hue_of(main) / 360, hue_of(accent if accent is not None else main) / 360
+    stops = [(0, (0.0, 0.0, 0.0))] + [(k, colorsys.hsv_to_rgb(hm, s, v)) for k, s, v in dim] \
+        + [(k, colorsys.hsv_to_rgb(ha, s, v)) for k, s, v in bright]
+    out = []
+    for shade in range(16):
+        a = max((st for st in stops if st[0] <= shade), key=lambda st: st[0])
+        b = min((st for st in stops if st[0] >= shade), key=lambda st: st[0], default=a)
+        t = 0 if b[0] == a[0] else (shade - a[0]) / (b[0] - a[0])
+        out.append(tuple(round((x + (y - x) * t) * 255) for x, y in zip(a[1], b[1])))
+    return out
+
+
+def palette(deff, cmap=None):
+    """The 16 colours of a display effect: its own (PuP hues) or the default."""
+    cmap = cmap or load_colormap()
+    entry = cmap["deffs"].get(str(deff)) or cmap["default"]
+    return ramp(*entry["hues"][:2])
+
+
+def text_palette(cmap=None):
+    cmap = cmap or load_colormap()
+    t = cmap["text"]
+    return ramp(*t["hues"][:2], dim=[tuple(x) for x in t.get("dim", DIM)], bright=[tuple(x) for x in t.get("bright", BRIGHT)])
+
+
+def palette_hex(pal):
+    return ["#%02x%02x%02x" % c for c in pal]
+
+
+def upscale_color(img, pal, f, text_pal=None, text_dots=None):
+    """A classic effect frame -> 'RGB' frame f times larger, coloured shade by shade: the same level sets
+    as dmd_hd.upscale_levels (each "dot >= shade" mask smoothed), each one laid over the lower ones in its
+    shade's colour, so an edge blends the two colours it separates. text_dots ('L' 128x32 mask): the dots
+    drawn in the text palette."""
+    from PIL import Image
+    import dmd_hd
+    grey = dmd_hd.grey(img)
+    size = (grey.width * f, grey.height * f)
+    out = Image.new("RGB", size, (0, 0, 0))
+    weight = None
+    if text_pal is not None and text_dots is not None and text_dots.getbbox():
+        weight = dmd_hd.upscale_levels(text_dots, f)
+    for v in sorted(c for _, c in (grey.getcolors(256) or []) if c):
+        shade = min(15, round(v / 17))
+        fill = Image.new("RGB", size, tuple(pal[shade]))
+        if weight is not None:
+            fill = Image.composite(Image.new("RGB", size, tuple(text_pal[shade])), fill, weight)
+        out = Image.composite(fill, out, dmd_hd.smooth_mask(grey.point(lambda p, v=v: 255 if p >= v else 0), f))
+    return out
+
+
+# ---------------------------------------------------------------------- text inside the pictures
+
+PANEL_X = 41            # the status panel (scores, separator) left of this column, in captures that show it
+FLAT = 0.95
+TEXT_BG = 0.8           # share of a line's glyph cells (outline, plain cell) that must be dark
+
+
+def text_masks(deff_ids=None):
+    """{deff: {"lines": [(text dots, cell dots), ...], "panel": bool}} for every effect that plays the
+    emulator's capture: each ROM text line drawn with its font at its layout (lists of 4096 booleans, 128 x
+    32: the glyph dots, and the dark dots of the glyph cells or outlines around them), and whether the
+    capture shows the status panel (rom_layout.status_panel_deffs)."""
+    import csv
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import gen_fonts
+    import gen_media
+    import rom_layout
+    data = json.load(open(os.path.join(ROOT, "game", "tron", "media_data.json"), encoding="utf-8"))["deffs"]
+    rows = {int(r["deff"]): r for r in csv.DictReader(open(os.path.join(gen_media.PKG, "event_map.csv"),
+                                                           encoding="utf-8"))}
+    _, get, _ = gen_fonts.decode_all()
+    fonts = json.load(open(os.path.join(ROOT, "game", "fonts", "fonts.json"), encoding="utf-8"))["fonts"]
+    calls = rom_layout.deff_calls()
+    panels = rom_layout.status_panel_deffs()
+    out = {}
+    for key, info in data.items():
+        deff = int(key)
+        if info["source"] != "reference" or (deff_ids is not None and deff not in deff_ids):
+            continue
+        lines = gen_media.text_lines(gen_media.ROM_TEXT.get(deff, rows.get(deff, {}).get("rom_text", "")))
+        lines = [ln for ln in lines if "%" not in ln]
+        masks = []
+        for line, lay in zip(lines, rom_layout.line_layouts(deff, lines, fonts, calls.get(deff, [])) if lines else []):
+            if not lay:
+                continue
+            canvas = gen_fonts.render(get, fonts[lay["font"]], line, lay["x"], lay["y"], lay["flags"],
+                                      [[-1] * 128 for _ in range(32)])
+            fg = [v > 0 for row in canvas for v in row]
+            bg = [v == 0 for row in canvas for v in row]
+            if any(fg):
+                masks.append((fg, bg))
+        out[deff] = {"lines": masks, "panel": deff in panels}
+    return out
+
+
+def is_flat(grey):
+    """A frame drawn in one shade (FLAT of its lit dots right of the panel): a text screen or line art."""
+    counts = {}
+    for i, v in enumerate(grey.tobytes()):
+        if v and i % 128 >= PANEL_X:
+            counts[v] = counts.get(v, 0) + 1
+    return not counts or max(counts.values()) >= FLAT * sum(counts.values())
+
+
+def frame_text_dots(spec, grey):
+    """The text dots of one classic frame of a captured effect ('L' greys) as 128x32 'L' bytes, or None:
+    every lit dot of a frame in one shade (a text screen: BALL SAVED, GAME OVER, TILT, ...); else the lit
+    dots of each text line the frame shows (TEXT_MATCH of its glyph dots lit, TEXT_BG of its cell dark),
+    and the lit dots of the status panel."""
+    lit = [p > 0 for p in grey.tobytes()]
+    if is_flat(grey):
+        return bytes(255 if t else 0 for t in lit) if any(lit) else None
+    text = [False] * len(lit)
+    for fg, bg in spec["lines"]:
+        n_fg, n_bg = sum(fg), sum(bg)
+        on = sum(1 for a, b in zip(fg, lit) if a and b)
+        dark = sum(1 for a, b in zip(bg, lit) if a and not b)
+        if on >= TEXT_MATCH * n_fg and (not n_bg or dark >= TEXT_BG * n_bg):
+            text = [t or (a and b) for t, a, b in zip(text, fg, lit)]
+    if spec["panel"]:
+        text = [t or (b and i % 128 < PANEL_X) for i, (t, b) in enumerate(zip(text, lit))]
+    return bytes(255 if t else 0 for t in text) if any(text) else None
+
+
+def flat_palette(pal):
+    """The palette of line art drawn in one shade (a logo): the top shades kept coloured, not white."""
+    return list(pal[:13]) + [pal[13]] * 3
+
+
+# ---------------------------------------------------------------------- build
+
+def color_file(job):
+    """(src classic png, dst, palette, text palette, text dots (frame_text_dots) or None, scale, cache dir):
+    writes the colour HD frame dst, through the cache (keyed on the picture, the palettes and the dots)."""
+    import shutil
+    from PIL import Image
+    import dmd_hd
+    src, dst, pal, text_pal, mask, f, cache = job
+    with open(src, "rb") as fp:
+        data = fp.read()
+    key = hashlib.sha1(b"|".join([b"color", VERSION.encode(), dmd_hd.VERSION.encode(), str(dmd_hd.SIGMA).encode(),
+                                  str(dmd_hd.CUT).encode(), str(f).encode(), json.dumps([pal, text_pal]).encode(),
+                                  mask or b"-", data])).hexdigest()
+    cached = os.path.join(cache, key + ".png") if cache else None
+    if cached and os.path.exists(cached):
+        shutil.copyfile(cached, dst)
+        return dst
+    img = Image.open(src)
+    dots = Image.frombytes("L", img.size, mask) if mask else None
+    upscale_color(img, pal, f, text_pal, dots).save(dst, compress_level=6)
+    if cached:
+        os.makedirs(cache, exist_ok=True)
+        tmp = cached + ".%d.tmp" % os.getpid()
+        shutil.copyfile(dst, tmp)
+        os.replace(tmp, cached)
+    return dst
+
+
+def build(src_root, dst_root, scale, cache=None, processes=None):
+    """Every effect frame (f*.png) of src_root (game/media/dmd) upscaled in colour into dst_root (same
+    names); the letter sprites stay out (tron/letter_panel.gd draws them: text). Returns the frame count."""
+    import glob
+    import shutil
+    from PIL import Image
+    import dmd_hd
+    cmap = load_colormap()
+    tpal = text_palette(cmap)
+    shutil.rmtree(dst_root, ignore_errors=True)
+    folders = sorted(glob.glob(os.path.join(src_root, "deff_*")))
+    masks = text_masks()
+    jobs, palettes = [], {}
+    for folder in folders:
+        name = os.path.basename(folder)
+        deff = int(name.split("_")[1])
+        frames = sorted(glob.glob(os.path.join(folder, "f*.png")))
+        pal = palette(deff, cmap)
+        palettes[name] = {"palette": palette_hex(pal), "source": "pup" if str(deff) in cmap["deffs"] else "default"}
+        if not frames:
+            continue
+        os.makedirs(os.path.join(dst_root, name), exist_ok=True)
+        text_frames = 0
+        for p in frames:
+            fname = os.path.basename(p)
+            grey = dmd_hd.grey(Image.open(p))
+            mask = frame_text_dots(masks[deff], grey) if deff in masks else None
+            text_frames += mask is not None
+            fpal = flat_palette(pal) if deff not in masks and is_flat(grey) else pal
+            jobs.append((p, os.path.join(dst_root, name, fname), fpal, tpal, mask, scale, cache))
+        if text_frames:
+            palettes[name]["text_frames"] = text_frames
+    os.makedirs(dst_root, exist_ok=True)
+    with open(os.path.join(dst_root, "palettes.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"scale": scale, "text": palette_hex(tpal), "deffs": palettes}, f, indent=0, sort_keys=True)
+    if len(jobs) < 8:
+        return len([color_file(j) for j in jobs])
+    import multiprocessing
+    with multiprocessing.Pool(processes or os.cpu_count() or 2) as pool:
+        return len(pool.map(color_file, jobs, chunksize=4))
+
+
+def main(argv):
+    if len(argv) < 3:
+        print(__doc__)
+        return 2
+    from PIL import Image
+    import dmd_hd
+    upscale_color(Image.open(argv[1]), palette(int(argv[0])), int(argv[3]) if len(argv) > 3 else dmd_hd.FRAME_SCALE
+                  ).save(argv[2])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
