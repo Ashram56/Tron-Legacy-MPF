@@ -91,6 +91,31 @@ class TestShellScripts(unittest.TestCase):
         self.assertIn("Python 3.11", r.stdout)
         self.assertIn("setup.py --monitor --dry-run", r.stdout)
 
+    def test_standalone_clones(self):
+        """Run on its own (bash <(curl ...), README "Install"), an installer clones the repository first;
+        run from a clone, it never does."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        target = os.path.join(tmp, "tron")
+        env = {"TRON_OS_RELEASE": self.os_release("ID=debian\n"), "DISPLAY": ":0", "TRON_DIR": target,
+               "TRON_BRANCH": "some-branch", "TRON_REPO": "https://example.invalid/tron.git"}
+        for name in ("install_prereqs_linux.sh", "install_prereqs_macos.sh"):
+            with self.subTest(script=name):
+                alone = os.path.join(tmp, name)
+                shutil.copy(os.path.join(INSTALL, name), alone)
+                r = sh([alone, "--dry-run"], env=env)
+                self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+                self.assertIn("git clone --branch some-branch https://example.invalid/tron.git " + target, r.stdout)
+                self.assertIn(os.path.join(target, "scripts", "setup.py"), r.stdout)
+                os.makedirs(os.path.join(target, ".git"), exist_ok=True)      # already cloned: pull
+                r = sh([alone, "--dry-run"], env=env)
+                self.assertIn("git -C {} pull --ff-only".format(target), r.stdout)
+                shutil.rmtree(os.path.join(target, ".git"))
+                r = sh([os.path.join(INSTALL, name), "--dry-run"], env=env)
+                self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+                self.assertNotIn("git clone", r.stdout)
+                self.assertIn(os.path.join(ROOT, "scripts", "setup.py"), r.stdout)
+
     def test_build_pinproc_plan(self):
         r = sh([os.path.join(INSTALL, "build_pinproc.sh"), "--dry-run", "--python", sys.executable,
                 "--src", tempfile.gettempdir() + "/tron-pinproc-plan"])

@@ -33,6 +33,8 @@ import re
 import shutil
 import sys
 
+import fsutil  # Windows/OneDrive-safe folder wipes
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
@@ -388,8 +390,7 @@ def build_deffs(only_data):
         if only_data:
             continue
         rel = "media/dmd/deff_{:03d}".format(deff_id)    # also a res:// path: "/" on every OS
-        shutil.rmtree(os.path.join(GAME, rel), ignore_errors=True)
-        os.makedirs(os.path.join(GAME, rel))
+        fsutil.clear_dir(os.path.join(GAME, rel))
         if source == "arcade":
             arcade_slide(folder, rel, panel)
             continue
@@ -419,7 +420,7 @@ def build_hd_frames(scale=None):
     scale = scale or dmd_hd.FRAME_SCALE
     src_root = os.path.join(GAME, "media", "dmd")
     dst_root = os.path.join(GAME, "media", "dmd_hd")
-    shutil.rmtree(dst_root, ignore_errors=True)
+    fsutil.remove_dir(dst_root)
     jobs = []
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
@@ -452,9 +453,9 @@ def main():
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
-        shutil.rmtree(os.path.join(GAME, "fonts", "hd"), ignore_errors=True)
-        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd"), ignore_errors=True)
-        shutil.rmtree(os.path.join(GAME, "media", "dmd_hd_color"), ignore_errors=True)
+        fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))
     if hd and not only_data:
         print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
         print("media: {} HD colour frames in game/media/dmd_hd_color".format(build_color_frames()), flush=True)

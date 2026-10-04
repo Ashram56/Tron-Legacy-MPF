@@ -27,8 +27,9 @@ atlas each (rom_font_NN_glow.fnt), and fonts_hd.json, the design (style, weight,
 import io
 import json
 import os
-import shutil
 import zipfile
+
+import fsutil  # Windows/OneDrive-safe folder wipes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ZIP = os.path.join(ROOT, "assets", "mpf_package", "media", "rom_images_all.zip")
@@ -312,11 +313,10 @@ def build_hd(fonts, get, out_dir, processes=None):
         import fontTools  # noqa: F401
     except ImportError:
         print("fonts: no fontTools (pip install fonttools, or run scripts/setup.py): no HD fonts")
-        shutil.rmtree(out_dir, ignore_errors=True)
+        fsutil.remove_dir(out_dir)
         return False
     import font_outline
-    shutil.rmtree(out_dir, ignore_errors=True)
-    os.makedirs(out_dir)
+    fsutil.clear_dir(out_dir)
     jobs = [(f, out_dir) for f in fonts]
     if processes == 1:
         entries = [font_outline.build_font(j) for j in jobs]
