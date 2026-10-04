@@ -63,9 +63,21 @@ class TestColormap(unittest.TestCase):
             if "via" in e:
                 self.assertIn(str(e["via"]), deffs)
         for d in (71, 85, 87):
-            self.assertIn(deffs[str(d)]["hues"][0], ("orange", "amber", "red"), d)
+            self.assertIn(deffs[str(d)]["hues"][0], ("orange", "red"), d)
         self.assertIn(deffs["140"]["hues"][0], ("cyan", "blue"))
         self.assertIn(deffs["108"]["hues"][0], ("red", "orange"))     # the Recognizer
+
+    def test_only_film_colours(self):
+        """Blue, cyan, red / red-orange, white and black only: no green, violet or yellow anywhere (Vincent)."""
+        import colorsys
+        for d, e in self.cmap["deffs"].items():
+            self.assertTrue(set(e["hues"]) <= set(dmd_color.HUES), (d, e["hues"]))
+        for d in self.cmap["deffs"]:
+            for rgb in dmd_color.palette(int(d), self.cmap):
+                h, s, v = colorsys.rgb_to_hsv(*[c / 255 for c in rgb[:3]])
+                if s > 0.25 and v > 0.15:
+                    deg = h * 360
+                    self.assertTrue(deg < 30 or deg > 340 or 180 <= deg <= 240, (d, rgb, deg))
 
     def test_colormap_is_small(self):
         self.assertLess(os.path.getsize(dmd_color.COLORMAP), 64 * 1024)
@@ -190,12 +202,11 @@ class TestRunSwitch(unittest.TestCase):
 
 
 # Pixel hashes (sha1 of the RGBA pixels, 16 hex digits) of HD frames at 1280x320 rendered by phase11-hd
-# (00d67c0; deff 46 re-taken after phase10-docker changed its status panel), before colour existed:
-# --dmd-color=off must keep giving these. Effects without text nodes (their
-# pictures only), times 0, 400 and 1600 ms.
+# (29b1b85: the Tron blue tint, no glow), before colour existed: --dmd-color=off must keep giving these.
+# Effects without text nodes (their pictures only), times 0, 400 and 1600 ms.
 HD_MONO = {
-    "deff_046": ["e214b6ee01710805", "8beb5ede5c32156c", "764dc5efb5f145f6"],
-    "deff_085": ["43166058c3d61514", "287d47affb38753d", "63b08551779a5221"],
+    "deff_046": ["67c19910553a69d7", "6ba267046ecc4cc3", "4bec6155c25801e6"],
+    "deff_085": ["4c87418160015986", "488eea378d4a632c", "d68d9fb12d85cd64"],
 }
 
 

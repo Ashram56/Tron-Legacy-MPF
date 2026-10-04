@@ -9,9 +9,9 @@ The quickest route is the installer for your OS. It installs only what is missin
 
 | OS | Command (in the repository) |
 |---|---|
-| Windows 10/11 | `powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -Monitor` |
-| macOS 12+ | `scripts/install/install_prereqs_macos.sh --monitor` |
-| Linux | `scripts/install/install_prereqs_linux.sh --monitor` |
+| Windows 10/11 | `powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1` |
+| macOS 12+ | `scripts/install/install_prereqs_macos.sh` |
+| Linux | `scripts/install/install_prereqs_linux.sh` |
 
 Each installer takes `--dry-run` (`-DryRun` on Windows), which prints the plan and changes nothing. With
 `--proc` (`-Proc`) it also prepares the P-ROC. Arguments after `--` go to `setup.py`, for example
@@ -94,18 +94,18 @@ audio output is enough: WASAPI on Windows, CoreAudio on macOS, PulseAudio or Pip
 `pipewire-pulse`, which current desktops ship). Godot falls back to ALSA, then to silence. On the real machine
 the SAM sound board is gone (docs/hardware.md), so the PC feeds an amplifier.
 
-## MPF Monitor (optional: `--monitor`)
+## MPF Monitor (installed by default; `--no-monitor` leaves it out)
 
 `mpf-monitor` 1.0.0 is a PyQt6 application. pip installs `PyQt6` and `PyQt6-Qt6` (about 250 MB) from wheels.
 Qt brings its own libraries on Windows and macOS. On Linux it needs the X11/xcb libraries, which the
-installer adds with `--monitor`: `libglib2.0-0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4
+installer adds unless given `--no-monitor`: `libglib2.0-0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4
 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1`
 (Fedora: `glib2 libxkbcommon-x11 xcb-util-cursor xcb-util-image xcb-util-keysyms xcb-util-renderutil
 xcb-util-wm`).
 
 mpf-monitor 1.0.0 on PyPI (wheel and sdist, both published 2026-10-03) is missing its four Qt Designer
 files (`mpfmonitor/core/ui/*.ui`). Without them, `mpf monitor` stops with
-`searchable_tree.ui: No such file or directory`. `setup.py --monitor` copies them from the release's git tag
+`searchable_tree.ui: No such file or directory`. `setup.py` copies them from the release's git tag
 (`toolchain.MPF_MONITOR_UI_URL`) into the venv. It does nothing once a fixed release ships them.
 
 ## The P-ROC (optional: `--proc`, the real machine)

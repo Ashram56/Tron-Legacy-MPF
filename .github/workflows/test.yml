@@ -1,8 +1,10 @@
 name: test
 
+# Only pushes to main (and a manual run from the Actions tab): other branches and pull requests are
+# tested locally.
 on:
   push:
-  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

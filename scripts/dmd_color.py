@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Colour for the HD DMD: the 16 shades of each display effect's animation mapped to colours, as a colour
-DMD (Serum-style colourisation) does, at build time (scripts/gen_media.py build_color_frames).
+DMD colourisation does, at build time (scripts/gen_media.py build_color_frames).
 
 The colour map, game/tools/dmd_colormap.json (small, tracked):
 - "default": the Tron palette of effects without their own (cyan light lines to a white highlight);
@@ -30,15 +30,19 @@ import json
 import os
 import sys
 
-import fsutil  # Windows/OneDrive-safe folder wipes
+import fsutil  # Windows/OneDrive-safe renames and folder wipes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
-VERSION = "2"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
+VERSION = "3"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
 TEXT_MATCH = 0.9
 COLOR_SCALE = 2          # colour frames: 2x (Scale2x, crisp, 256x64), the default; 8 = the smooth per-shade filter
 
-HUES = {"cyan": 188, "blue": 212, "deep blue": 232, "violet": 275, "red": 4, "orange": 28, "amber": 48, "green": 125}
+# The film's palette only: blue and cyan light lines, red / red-orange for CLU, Rinzler and the Recognizer, white
+# highlights (the top shade) and black. No green, violet or yellow: the PuP videos have big green or amber text
+# and graphics that are not the film's colours, so measured hues of those kinds are folded into these (ALIASES).
+HUES = {"cyan": 188, "blue": 212, "deep blue": 232, "red": 2, "orange": 14}
+ALIASES = {"green": "blue", "violet": "deep blue", "amber": "orange", "yellow": "orange"}
 # (shade, saturation, value) of the main hue (dim shades) and of the accent hue (bright shades)
 DIM = ((1, 1.0, 0.22), (4, 1.0, 0.55), (7, 0.92, 0.85))
 BRIGHT = ((12, 0.95, 0.92), (13, 0.75, 1.0), (14, 0.45, 1.0), (15, 0.1, 1.0))
@@ -56,7 +60,7 @@ def save_colormap(data, path=COLORMAP):
 
 
 def hue_of(name):
-    return HUES[name] if isinstance(name, str) else float(name)
+    return HUES[ALIASES.get(name, name)] if isinstance(name, str) else float(name)
 
 
 def ramp(main, accent=None, dim=DIM, bright=BRIGHT):
@@ -65,6 +69,11 @@ def ramp(main, accent=None, dim=DIM, bright=BRIGHT):
     hm, ha = hue_of(main) / 360, hue_of(accent if accent is not None else main) / 360
     stops = [(0, (0.0, 0.0, 0.0))] + [(k, colorsys.hsv_to_rgb(hm, s, v)) for k, s, v in dim] \
         + [(k, colorsys.hsv_to_rgb(ha, s, v)) for k, s, v in bright]
+    gap = abs(hm - ha) * 360
+    if min(gap, 360 - gap) > 60:
+        # a warm body and cool light lines: mixing them in RGB gives purple/magenta mid shades, which the
+        # film never shows, so the shades after the last dim stop start again in the accent hue
+        stops.append((dim[-1][0] + 1, colorsys.hsv_to_rgb(ha, 0.95, 0.5)))
     out = []
     for shade in range(16):
         a = max((st for st in stops if st[0] <= shade), key=lambda st: st[0])
@@ -261,7 +270,7 @@ def color_file(job):
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
         shutil.copyfile(dst, tmp)
-        fsutil.replace(tmp, cached)
+        fsutil.replace_cached(tmp, cached)    # another worker may hold the same entry (Windows)
     return dst
 
 
@@ -269,7 +278,6 @@ def build(src_root, dst_root, scale, cache=None, processes=None):
     """Every effect frame (f*.png) of src_root (game/media/dmd) upscaled in colour into dst_root (same
     names); the letter sprites stay out (tron/letter_panel.gd draws them: text). Returns the frame count."""
     import glob
-    import shutil
     from PIL import Image
     import dmd_hd
     cmap = load_colormap()

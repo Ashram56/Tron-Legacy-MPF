@@ -111,8 +111,10 @@ class TestSetupPlan(unittest.TestCase):
                 self.assertIn("gen_media.py", text)
 
     def test_monitor_and_skip(self):
-        text = self.plan("--dry-run", "--monitor", "--skip-godot")
+        text = self.plan("--dry-run", "--skip-godot")             # MPF Monitor is in by default
         self.assertIn("mpf-monitor==" + tc.MPF_MONITOR_VERSION, text)
+        self.assertIn("mpf-monitor==", self.plan("--dry-run", "--monitor", "--skip-godot"))
+        self.assertNotIn("mpf-monitor==", self.plan("--dry-run", "--no-monitor", "--skip-godot"))
         self.assertNotIn("== Godot", text)
         self.assertNotIn(tc.godot_url(), text)
 
@@ -199,6 +201,18 @@ class TestRun(unittest.TestCase):
             with open(os.path.join(d, "monitor", "settings.ini")) as f:
                 self.assertEqual("mine", f.read())
         self.assertTrue(os.path.exists(os.path.join(run.tc.GAME, "monitor", "settings.ini.default")))
+
+    def test_ensure_monitor(self):
+        """run.py --monitor in a workspace without MPF Monitor installs it rather than failing."""
+        ok, missing = mock.Mock(returncode=0), mock.Mock(returncode=1)
+        with mock.patch.object(run.subprocess, "run", return_value=ok), \
+                mock.patch.object(setup.Setup, "venv") as venv:
+            run.ensure_monitor()
+        venv.assert_not_called()
+        with mock.patch.object(run.subprocess, "run", return_value=missing), \
+                mock.patch.object(setup.Setup, "venv") as venv, contextlib.redirect_stdout(io.StringIO()):
+            run.ensure_monitor()
+        venv.assert_called_once_with()
 
     def test_mpf_args(self):
         self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], run.mpf_args("virtual"))

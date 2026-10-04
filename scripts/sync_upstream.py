@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Merge the latest upstream MPF game (Ashram56/Tron-Legacy-MPF) into this repository and re-check the PuP.
 
-    python scripts/sync_upstream.py                      # fetch + merge upstream/phase12-color, then checks
-    python scripts/sync_upstream.py --branch main        # once upstream has merged its phase branches
+    python scripts/sync_upstream.py                      # fetch + merge upstream/main, then checks
+    python scripts/sync_upstream.py --branch NAME        # another upstream branch
     python scripts/sync_upstream.py --no-merge           # only the checks (after a manual merge)
 
 The PuP lives in its own files (game/pup/, game/tron_pup/, game/pup.cfg, game/config/pup.yaml,
@@ -35,7 +35,7 @@ def step(cmd):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--branch", default="phase12-color", help="upstream branch to merge (default phase12-color, the newest phase)")
+    p.add_argument("--branch", default="main", help="upstream branch to merge (default main)")
     p.add_argument("--no-merge", action="store_true", help="skip fetch and merge, run the checks")
     args = p.parse_args(argv)
     if not args.no_merge:

@@ -449,7 +449,7 @@ def main():
     if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
         gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
-    # written before the HD colour frames: dmd_color.text_masks() reads it (a fresh checkout has none yet)
+    # written before the HD and colour frames: dmd_color.text_masks reads the deffs' text from it
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD

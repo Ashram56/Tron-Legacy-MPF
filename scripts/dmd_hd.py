@@ -18,7 +18,7 @@ import hashlib
 import os
 import sys
 
-import fsutil  # Windows/OneDrive-safe folder wipes
+import fsutil  # Windows/OneDrive-safe renames and folder wipes
 
 FONT_SCALE = 16       # HD font atlases: 16 px per dot (crisp up to a 2048 px wide DMD, mipmapped below)
 FRAME_SCALE = 8       # HD frames of the display effects: 1024x256 (linear filtering above that)
@@ -125,7 +125,7 @@ def upscale_file(job):
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
         shutil.copyfile(dst, tmp)
-        fsutil.replace(tmp, cached)
+        fsutil.replace_cached(tmp, cached)    # another worker may hold the same entry (Windows)
     return dst
 
 

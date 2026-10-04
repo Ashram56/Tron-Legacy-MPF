@@ -9,7 +9,7 @@ git-for-windows. Python and Git are installed for the current user where possibl
 or PowerShell 7. Run it from the repository:
 
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1
-    powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -Monitor
+    powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -NoMonitor
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -DryRun
 
 Arguments that are not options of this script go to setup.py (for example --skip-media).
@@ -17,7 +17,9 @@ Arguments that are not options of this script go to setup.py (for example --skip
 .PARAMETER DryRun
 Print the plan, change nothing.
 .PARAMETER Monitor
-MPF Monitor is now installed by default (setup.py); the switch is kept for old commands.
+Accepted for older command lines: MPF Monitor is installed by default.
+.PARAMETER NoMonitor
+Leave MPF Monitor out (setup.py --no-monitor).
 .PARAMETER Proc
 The real machine: also the Visual C++ 2015-2022 runtime that MPF's pypinproc needs, and a check for FTDI's D2XX driver.
 .PARAMETER NoSetup
@@ -31,6 +33,7 @@ No questions.
 param(
     [switch]$DryRun,
     [switch]$Monitor,
+    [switch]$NoMonitor,
     [switch]$Proc,
     [switch]$NoSetup,
     [switch]$NoWinget,
@@ -40,7 +43,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 # Run from a clone, it sets up that clone. Run on its own (irm ... | iex, README "Install"), it first clones the
-# repository into $env:TRON_DIR (default ~\Tron-Legacy-MPF-PuP, outside OneDrive; branch $env:TRON_BRANCH, main).
+# repository into $env:TRON_DIR (default ~\Tron-Legacy-MPF-PuP, outside OneDrive), branch $env:TRON_BRANCH (default
+# main), from $env:TRON_REPO; an existing clone gets a git pull.
 $Clone = -not ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '..\setup.py')))
 $Root = if (-not $Clone) { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
         elseif ($env:TRON_DIR) { $env:TRON_DIR } else { Join-Path $HOME 'Tron-Legacy-MPF-PuP' }
@@ -266,7 +270,22 @@ try {
         Write-Step "Repository: $RepoUrl ($RepoBranch) in $Root"
         $gitExe = Find-Git
         if (-not $gitExe) { $gitExe = 'git' }
-        if (Test-Path (Join-Path $Root '.git')) { Invoke-Step $gitExe @('-C', $Root, 'pull', '--ff-only') }
+        if (Test-Path (Join-Path $Root '.git')) {
+            # an existing clone: update its branch, or move to $RepoBranch when that branch is gone from GitHub
+            # (a deleted pull-request branch) or none is checked out
+            $cur = (& $gitExe -C $Root symbolic-ref --short -q HEAD 2>$null)
+            $onRemote = $false
+            if ($cur) {
+                & $gitExe -C $Root ls-remote --exit-code --heads origin $cur *> $null
+                $onRemote = ($LASTEXITCODE -eq 0)
+            }
+            if ($onRemote) { Invoke-Step $gitExe @('-C', $Root, 'pull', '--ff-only') }
+            else {
+                Write-Note "branch '$(if ($cur) { $cur } else { 'none' })' is no longer on GitHub: switching to $RepoBranch"
+                Invoke-Step $gitExe @('-C', $Root, 'fetch', '--prune', 'origin')
+                Invoke-Step $gitExe @('-C', $Root, 'checkout', '-B', $RepoBranch, '--track', "origin/$RepoBranch")
+            }
+        }
         else { Invoke-Step $gitExe @('clone', '--branch', $RepoBranch, $RepoUrl, $Root) }
     }
 
@@ -276,7 +295,7 @@ try {
     } else {
         Write-Step 'Workspace (scripts\setup.py)'
         $cmdArgs = @("$Root\scripts\setup.py")
-        if ($Monitor) { $cmdArgs += '--monitor' }
+        if ($NoMonitor) { $cmdArgs += '--no-monitor' }
         if ($DryRun) { $cmdArgs += '--dry-run' }
         if ($SetupArgs) { $cmdArgs += $SetupArgs }
         Invoke-Step $python $cmdArgs
@@ -285,7 +304,7 @@ try {
     $suffix = if ($DryRun) { ' (dry run: nothing was changed)' } else { '' }
     Write-Step "Done$suffix"
     if (-not $NoSetup) {
-        $mon = if ($Monitor) { ' --monitor' } else { '' }
+        $mon = if ($NoMonitor) { '' } else { ' --monitor' }
         Write-Note "In ${Root}:"
         Write-Note "Start the game:  .venv\Scripts\python scripts\run.py$mon"
         Write-Note 'Run the tests:   .venv\Scripts\python -m pytest -q tests'

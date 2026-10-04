@@ -74,6 +74,21 @@ def replace(src, dst):
     _retry(os.replace, src, dst)
 
 
+def replace_cached(tmp, cached):
+    """tmp moved into place as cached, an entry of a cache keyed on the content. On Windows another worker can
+    hold the same entry open (same key, same bytes): replacing it is "Access denied", so that copy stays and
+    tmp goes. Any other failure is retried as replace() does."""
+    try:
+        os.replace(tmp, cached)
+    except PermissionError:
+        if not os.path.exists(cached):
+            return replace(tmp, cached)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def copy_file(src, dst):
     if os.path.exists(dst):
         _writable(dst)

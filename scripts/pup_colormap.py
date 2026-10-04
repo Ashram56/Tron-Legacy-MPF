@@ -13,9 +13,10 @@ capture for take the videos of their feature (FAMILY: the running screen of a mo
 For each effect, the videos are sampled (ffmpeg, 2 frames a second, inside the film window: CROP) and the
 hues of the coloured pixels are counted (weight saturation^2 x value, 10 degree bins). The two strongest
 hues at least 45 degrees apart are snapped to the Tron hues (dmd_color.HUES: cyan and blue light lines,
-orange CLU / Rinzler, amber, red, violet, green) and make the effect's 16-shade palette (dmd_color.ramp):
+red-orange CLU / Rinzler, red; green, violet and amber in the pack's
+videos are its own graphics, not the film's, and fold into blue or red-orange: dmd_color.ALIASES) and make the effect's 16-shade palette (dmd_color.ramp):
 dim shades in the main hue, bright shades in the second hue, the top shade a white highlight. A warm hue
-(red, orange, amber) marks the subject of the pack's videos against the cyan world (CLU, Rinzler, the
+(red, orange) marks the subject of the pack's videos against the cyan world (CLU, Rinzler, the
 light cycles, the Recognizer), so it takes the body shades and the cool hue the light lines.
 
     .venv/bin/python scripts/pup_colormap.py PATH/TO/Tron-LE-PuP-Pack    # rewrites game/tools/dmd_colormap.json
@@ -33,7 +34,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import dmd_color  # noqa: E402
 
 TRON_HUES = dmd_color.HUES                # the hues (degrees) the measured ones snap to: the film's palette
-WARM = {"red", "orange", "amber"}
+WARM = {"red", "orange"}
 GENERIC = {"TronLegacyBG.mp4"}            # the pack's backglass loop: plays under everything
 CROP = "crop=iw*0.72:ih*0.64:iw*0.14:ih*0.11"   # the film window inside the pack's frame
 SCREENS = (12, 2, 14, 13)                 # event layer first, then underlay, topper

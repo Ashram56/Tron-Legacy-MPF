@@ -101,20 +101,17 @@ The upstream MPF game keeps changing (rules, DMD animations). Its history is thi
 upstream changes merge in:
 
 ```sh
-python scripts/sync_upstream.py                 # merges upstream/phase12-color (the newest phase), then re-checks everything
-python scripts/sync_upstream.py --branch main   # once upstream has merged its phase branches into main
+python scripts/sync_upstream.py                 # merges upstream/main, then re-checks everything
+python scripts/sync_upstream.py --branch NAME   # another upstream branch
 ```
 
 The PuP touches upstream files in a few one-line places only: the `pup.yaml` include in
 `game/config/config.yaml`, the `Pup` autoload in `game/project.godot`, the `pup_pack` submodule in
-`.gitmodules`, three `.gitignore` lines, the README (upstream's is `docs/development.md` here: on a sync, merge upstream README changes into it), CI's checkout (no submodules: the PuP Pack repo is
+`.gitmodules`, three `.gitignore` lines, the README (the PuP paragraphs, the fork's install URLs and the screens section), the installers' default
+repository and folder (`Tron-Legacy-MPF-PuP`), CI's checkout (no submodules: the PuP Pack repo is
 private, `setup.py` fetches `assets/`), one `pup_setup` call each in `scripts/setup.py` and `scripts/run.py`.
-Two upstream changes are not hooks and would be best made upstream too: Godot 4.6.3 instead of 4.5.2
-(`scripts/toolchain.py`, the docs and tests that name it; the native video add-on needs 4.6) and
-`scripts/fsutil.py` calls in place of `shutil.rmtree`/`copytree`/`os.replace` in `setup.py`, `gen_media.py`,
-`gen_fonts.py`, `dmd_hd.py`, `dmd_color.py` (in a OneDrive folder on Windows, setup stopped on folders and
-files OneDrive held or left read-only), MPF Monitor installed by default (`setup.py --no-monitor` and the installers' `--no-monitor` skip it)
-and `run.py --monitor` stopping with a message when it is missing. Everything else is in its own files, so a merge seldom conflicts.
+One upstream change is not a hook and would be best made upstream too: Godot 4.6.3 instead of 4.5.2
+(`scripts/toolchain.py`, the docs and tests that name it; the native video add-on needs 4.6). Everything else is in its own files, so a merge seldom conflicts.
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 

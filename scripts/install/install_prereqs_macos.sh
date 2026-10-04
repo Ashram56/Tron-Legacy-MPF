@@ -14,7 +14,8 @@
 set -euo pipefail
 
 # Run from a clone, it sets up that clone. Run on its own (fetched with curl, README "Install"), it first
-# clones the repository into $TRON_DIR (default ~/Tron-Legacy-MPF-PuP; branch $TRON_BRANCH, default main).
+# clones the repository into $TRON_DIR (default ~/Tron-Legacy-MPF-PuP), branch $TRON_BRANCH (default main),
+# from $TRON_REPO; an existing clone there gets a git pull.
 SRC="${BASH_SOURCE[0]:-}"
 if [ -n "$SRC" ] && [ -f "$(dirname "$SRC")/../setup.py" ]; then
     ROOT="$(cd "$(dirname "$SRC")/../.." && pwd)" CLONE=0
@@ -30,7 +31,7 @@ PYORG_PKG="python-${PYORG_VERSION}-macos11.pkg"
 PYORG_URL="https://www.python.org/ftp/python/${PYORG_VERSION}/${PYORG_PKG}"
 PYORG_PY="/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"
 
-DRY=0 YES=0 MONITOR= PROC=0 SETUP=1 PYORG=0
+DRY=0 YES=0 MONITOR=1 PROC=0 SETUP=1 PYORG=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -75,7 +76,7 @@ fi
 MACOS="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
 say "Tron Legacy MPF prerequisites on macOS $MACOS ($(uname -m))$([ "$DRY" = 1 ] && echo ', dry run')"
 case "$MACOS" in
-    10.*|11.*) note "warning: macOS 12 or newer is needed (Godot 4.6, current Python and Qt builds)" ;;
+    10.*|11.*) note "warning: macOS 12 or newer is needed (Godot 4.5, current Python and Qt builds)" ;;
 esac
 
 BREW=""
@@ -155,7 +156,16 @@ fi
 if [ "$CLONE" = 1 ]; then
     say "Repository: $REPO_URL ($REPO_BRANCH) in $ROOT"
     if [ -d "$ROOT/.git" ]; then
-        run git -C "$ROOT" pull --ff-only
+        # an existing clone: update its branch, or move to $REPO_BRANCH when that branch is gone from GitHub
+        # (a deleted pull-request branch) or none is checked out
+        CUR="$(git -C "$ROOT" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+        if [ -n "$CUR" ] && git -C "$ROOT" ls-remote --exit-code --heads origin "$CUR" >/dev/null 2>&1; then
+            run git -C "$ROOT" pull --ff-only
+        else
+            note "branch '${CUR:-none}' is no longer on GitHub: switching to $REPO_BRANCH"
+            run git -C "$ROOT" fetch --prune origin
+            run git -C "$ROOT" checkout -B "$REPO_BRANCH" --track "origin/$REPO_BRANCH"
+        fi
     else
         run git clone --branch "$REPO_BRANCH" "$REPO_URL" "$ROOT"
     fi
@@ -166,7 +176,7 @@ fi
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    case "$MONITOR" in 1) ARGS+=(--monitor) ;; 0) ARGS+=(--no-monitor) ;; esac  # empty: setup.py default (with)
+    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then
@@ -187,6 +197,6 @@ fi
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
     note "In $ROOT:"
-    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" != 0 ] && echo ' --monitor')"
+    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
     note "Run the tests:   .venv/bin/python -m pytest -q tests"
 fi
