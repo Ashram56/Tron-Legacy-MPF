@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Colour for the HD DMD: the 16 shades of each display effect's animation mapped to colours, as a colour
-DMD (Serum-style colourisation) does, at build time (scripts/gen_media.py build_color_frames).
+DMD colourisation does, at build time (scripts/gen_media.py build_color_frames).
 
 The colour map, game/tools/dmd_colormap.json (small, tracked):
 - "default": the Tron palette of effects without their own (cyan light lines to a white highlight);

@@ -155,7 +155,7 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
 `scripts/gen_media.py --no-hd` skips building the HD media (HD then falls back to classic).
 
-**HD colour.** In HD the effects' animations are in colour by default, as a colour DMD (Serum-style)
+**HD colour.** In HD the effects' animations are in colour by default, as a colour DMD
 colourisation would show them: each effect maps its 16 shades to a palette, the dim shades (film clips,
 faces, vehicles) in one hue and the bright ones (light lines) in another, up to a white highlight. The hues
 come from the video that Terry Red's "End of Line" PuP-Pack for Tron Legacy
