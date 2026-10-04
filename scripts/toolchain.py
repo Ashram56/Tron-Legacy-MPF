@@ -31,6 +31,9 @@ MPF_MONITOR_VERSION = "1.0.0"
 REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "pytest",
                 'ruamel.yaml.clib==0.2.14; python_version < "3.13"']
 MONITOR_REQUIREMENTS = ["mpf-monitor==" + MPF_MONITOR_VERSION]
+# Visual Pinball X (setup.py --vpx): olefile reads the table's script out of the .vpx (scripts/vpx_table.py),
+# pywin32 runs the TronMPF.Controller COM server VPX talks to (scripts/vpx_bridge.py, Windows only).
+VPX_REQUIREMENTS = ["olefile>=0.46", 'pywin32>=306; sys_platform == "win32"']
 # mpf-monitor 1.0.0 on PyPI (wheel and sdist) lacks its Qt Designer files, so `mpf monitor` stops with
 # "searchable_tree.ui: No such file". setup.py puts them in from the release's git tag.
 MPF_MONITOR_UI_FILES = ("events_table.ui", "inspector.ui", "searchable_table.ui", "searchable_tree.ui")

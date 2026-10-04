@@ -4,6 +4,7 @@
     python scripts/run.py                          # virtual hardware (hw_virtual: smart_virtual, trough full)
     python scripts/run.py --monitor                # ... plus MPF Monitor (setup.py --monitor installs it)
     python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD)
+    python scripts/run.py --hw vpx                 # Visual Pinball X plays the table (docs/vpx.md); MPF waits for it
     python scripts/run.py --scenario NAME          # play assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
     python scripts/run.py --no-free-play           # factory pricing: coins needed (virtual defaults to free play)
@@ -170,10 +171,10 @@ def dmd_args(gargs, dmd=None, dots=None, size=None):
 
 
 def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
-    """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine,
+    """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine and VPX,
     off for scenarios (the ROM traces insert a coin) and the real machine."""
     if free_play is None:
-        free_play = hw == "virtual" and not scenario
+        free_play = hw in ("virtual", "vpx") and not scenario
     args = ["game", ".", "-c", "config,hw_" + hw + (",free_play" if free_play else "")]
     if not text_ui:
         args.append("-t")
@@ -224,6 +225,9 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("GMC is listening", flush=True)
         print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
         mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
+        if hw == "vpx":
+            print("MPF waits for the Visual Pinball X table (TronMPF.Controller) on port {}: start the table "
+                  "now (docs/vpx.md)".format(tc.MONITOR_PORT), flush=True)
         if monitor:
             monitor_settings()
             print("waiting for MPF's BCP server on port {} for MPF Monitor".format(tc.MONITOR_PORT), flush=True)
@@ -255,7 +259,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--hw", choices=["virtual", "proc"], default="virtual",
+    p.add_argument("--hw", choices=["virtual", "proc", "vpx"], default="virtual",
                    help="hardware overlay: game/config/hw_<hw>.yaml (default virtual)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
     p.add_argument("--scenario", help="play assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
@@ -266,7 +270,7 @@ def main(argv=None):
                    help="MPF's text UI (default: on in a terminal without --seconds)")
     p.add_argument("--no-text-ui", dest="text_ui", action="store_false")
     p.add_argument("--free-play", dest="free_play", action="store_true", default=None,
-                   help="START without a coin (default with --hw virtual and no --scenario)")
+                   help="START without a coin (default with --hw virtual or vpx and no --scenario)")
     p.add_argument("--no-free-play", dest="free_play", action="store_false",
                    help="the factory pricing: insert coins (key 5 in the DMD window, or s_coin in MPF Monitor)")
     p.add_argument("--dmd", choices=["hd", "classic"],
