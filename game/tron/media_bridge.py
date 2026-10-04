@@ -275,6 +275,12 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ sounds
 
+    def sound_stop(self, call):
+        """Stop every sample of sound call `call` (FUN_0002ceb4)."""
+        pool = self.data["pools"].get(call) if self.data else None
+        for sample in (pool or {}).get("samples", []):
+            self._send("sounds_play", {sample: {"action": "stop", "key": sample}})
+
     def sound(self, call, index=None):
         if not self.data:
             return

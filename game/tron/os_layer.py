@@ -457,17 +457,25 @@ class TronOS(CustomCode):
         self.display.music = call
         self.sound(call)
 
-    def sound(self, call, in_deff=0):
-        """snd_play(call): returns the time the picked sample ends (for sound_chain), or None."""
+    def sound(self, call, in_deff=0, index=None):
+        """snd_play(call): returns the time the picked sample ends (for sound_chain), or None.
+        index: the sample, when the caller picked it already (it needed its length)."""
         self.trace.log("sound", call="0x{:03x}".format(call), in_deff=in_deff)
         self.machine.events.post("tron_sound_{:03x}".format(call))
         lengths = self.sample_lengths(call)
         if not lengths:
             self.media.sound(call)
             return None
-        i = self.pick("sample_0x{:03x}".format(call), [1] * len(lengths)) if len(lengths) > 1 else 0
+        if index is not None and index < len(lengths):
+            i = index
+        else:
+            i = self.pick("sample_0x{:03x}".format(call), [1] * len(lengths)) if len(lengths) > 1 else 0
         self.media.sound(call, i or 0)             # the media controller plays the same sample
         return self.now + lengths[i or 0]
+
+    def sound_stop(self, call):
+        """FUN_0002ceb4(call): stop the sample a sound call plays (e.g. the arcade reel's roll 0x0e1)."""
+        self.media.sound_stop(call)
 
     def sound_chain(self, call, after):
         """snd_play_chain [0x0002ca1c]: play `call` when the sample started by an earlier sound() ends."""
