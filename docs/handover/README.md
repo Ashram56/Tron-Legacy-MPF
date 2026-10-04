@@ -9,8 +9,6 @@ self-contained: read only the one your task needs.
 | [dmd_hd_upscaling.md](dmd_hd_upscaling.md) | You work on the optional HD display (128x32 DMD drawn at any window size). Separate from the rules work on purpose. | ~5 min |
 | [rom_decomp_feedback.md](rom_decomp_feedback.md) | Hand this to the agent that decompiles the ROM and produces the asset/spec repo. What the MPF build consumed, what was missing or wrong, and what to deliver for the next game. | ~8 min |
 
-Not covered here: DMD colorization (its own branch and docs).
-
 ## Token rules for the agent taking over
 
 1. Read this README, then one doc above. Do not read the whole repo: every doc names the exact file to open.
@@ -30,3 +28,4 @@ Not covered here: DMD colorization (its own branch and docs).
 | Asset/spec repo (ROM-derived) | `Ashram56/Tron-Legacy-LE-ROM-Decryption`, git submodule at `assets/` |
 | ROM | Tron Legacy LE v1.74, PinMAME set `trn_174h`; the ROM binary is in neither repo |
 | User docs | `README.md`, `docs/requirements.md`, `docs/hardware.md` (P-ROC), `docs/vpx.md` (Visual Pinball X) |
+| Departures from the ROM | `docs/rom_differences.md`: read before changing a rule; add every new departure there |
