@@ -9,6 +9,7 @@ Kept out of setup.py and run.py (upstream files, one-line hooks only) so upstrea
 """
 import os
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -51,8 +52,15 @@ def native_video(os_name=None):
 def install_native_video():
     """Copies pup_addons/native_video (the build with the gdzig heap fix, see its FIX.md) to game/addons/."""
     say("   native_video add-on -> game/addons/native_video (the pack's mp4s play without conversion)")
-    shutil.rmtree(NATIVE_DST, ignore_errors=True)
-    shutil.copytree(NATIVE_SRC, NATIVE_DST)
+    shutil.rmtree(NATIVE_DST, ignore_errors=True)   # may not go on Windows (OneDrive, read-only files): overwrite
+    shutil.copytree(NATIVE_SRC, NATIVE_DST, dirs_exist_ok=True, copy_function=overwrite)
+
+
+def overwrite(src, dst):
+    """shutil.copy2 that also replaces a read-only file left in place."""
+    if os.path.exists(dst):
+        os.chmod(dst, stat.S_IWRITE | stat.S_IREAD)
+    return shutil.copy2(src, dst)
 
 
 def say(text):
