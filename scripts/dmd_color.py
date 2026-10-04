@@ -268,7 +268,13 @@ def color_file(job):
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
         shutil.copyfile(dst, tmp)
-        os.replace(tmp, cached)
+        try:
+            os.replace(tmp, cached)
+        except PermissionError:
+            # Windows: another worker cached the same picture (same key, same bytes) and has it open
+            if not os.path.exists(cached):
+                raise
+            os.remove(tmp)
     return dst
 
 
