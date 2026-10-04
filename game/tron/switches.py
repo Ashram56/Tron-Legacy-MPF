@@ -42,6 +42,13 @@ class SwitchLayer:
         self.machine = os_.machine
         self.lspin = {"pending": 0, "last": 0, "total": 0}
         self.rspin = {"pending": 0, "last": 0, "total": 0}
+        # deffs 41 / 42 [0x01029c74 / 0x01029fd8]: "LEFT/RIGHT SPINNER =", the last spin's points and the
+        # session total, read from RAM on every redraw; deff 43 [0x0101c65c]: the pop hits still needed and
+        # the player's score (the points of its first hit are passed at its start)
+        os_.deff_live((41,), lambda: {"last": self.lspin["last"], "total": self.lspin["total"]})
+        os_.deff_live((42,), lambda: {"last": self.rspin["last"], "total": self.rspin["total"]})
+        os_.deff_live((43,), lambda: {"hits_left": os_.pd.pop_hits_left if os_.game else 0,
+                                      "score": os_.current_score()})
         self.orbit_post = 0
         sc = self.machine.switch_controller
         for num, name in SW.items():
@@ -399,13 +406,13 @@ class SwitchLayer:
         if hits_left not in (0, 1):
             value = min(10000 + 2500 * level, 50000)
             points = os_.score_add(value * mult)
+            pd.pop_hits_left = hits_left - 1          # (set after the deff in the ROM; the deff reads it live)
             if os_.display.running(43):               # a running deff 43 takes the new values
                 os_.display.extend(43)
             else:
                 os_.deff_start(43, hits_left=hits_left - 1, value=value, mult=mult, points=points)
             os_.leff_start(41, lamp=POP_LAMP[sw])
             os_.sound(0x50 if mult == 1 else 0x51)
-            pd.pop_hits_left = hits_left - 1
         else:
             value = min(100000 + 25000 * level, 500000)
             pd.pop_levels_done = min(pd.pop_levels_done + 1, 0xff)

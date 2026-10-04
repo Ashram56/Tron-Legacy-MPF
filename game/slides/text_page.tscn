@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]
-[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_variable.gd" id="var"]
+[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]
 
 [node name="text_page" type="Control"]
 layout_mode = 3
@@ -16,41 +16,152 @@ offset_right = 128.0
 offset_bottom = 32.0
 color = Color(0, 0, 0, 1)
 
-[node name="Line0" type="Label" parent="."]
+[node name="OneLine" type="Label" parent="."]
 layout_mode = 0
-offset_top = 0.0
-offset_right = 128.0
-offset_bottom = 11.0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
-theme_override_font_sizes/font_size = 8
-horizontal_alignment = 1
-vertical_alignment = 1
-script = ExtResource("var")
+script = ExtResource("text")
 variable_type = 1
 variable_name = "line0"
+rom_font = 15
+rom_x = 84
+rom_y = 20
+rom_flags = 2
+fit_fonts = PackedInt32Array(15, 12, 6)
+fit_ys = PackedInt32Array(20, 19, 19)
+fit_width = 87
+screens = PackedInt32Array(0)
 
-[node name="Line1" type="Label" parent="."]
+[node name="Credits" type="Label" parent="."]
 layout_mode = 0
-offset_top = 11.0
-offset_right = 128.0
-offset_bottom = 21.0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
-theme_override_font_sizes/font_size = 8
-horizontal_alignment = 1
-vertical_alignment = 1
-script = ExtResource("var")
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 12
+rom_x = 84
+rom_y = 19
+rom_flags = 2
+screens = PackedInt32Array(1)
+
+[node name="TwoLines0" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 15
+rom_x = 84
+rom_y = 12
+rom_flags = 2
+fit_fonts = PackedInt32Array(15, 12, 6)
+fit_ys = PackedInt32Array(12, 12, 12)
+fit_width = 87
+screens = PackedInt32Array(2)
+
+[node name="TwoLines1" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
 variable_type = 1
 variable_name = "line1"
+rom_font = 15
+rom_x = 84
+rom_y = 26
+rom_flags = 2
+fit_fonts = PackedInt32Array(15, 12, 6)
+fit_ys = PackedInt32Array(26, 26, 26)
+fit_width = 87
+screens = PackedInt32Array(2)
 
-[node name="Line2" type="Label" parent="."]
+[node name="ThreeLines0" type="Label" parent="."]
 layout_mode = 0
-offset_top = 21.0
-offset_right = 128.0
-offset_bottom = 32.0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
-theme_override_font_sizes/font_size = 8
-horizontal_alignment = 1
-vertical_alignment = 1
-script = ExtResource("var")
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 12
+rom_x = 84
+rom_y = 9
+rom_flags = 2
+fit_fonts = PackedInt32Array(12, 6)
+fit_ys = PackedInt32Array(9, 9)
+fit_width = 87
+screens = PackedInt32Array(3)
+
+[node name="ThreeLines1" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line1"
+rom_font = 12
+rom_x = 84
+rom_y = 19
+rom_flags = 2
+fit_fonts = PackedInt32Array(12, 6)
+fit_ys = PackedInt32Array(19, 19)
+fit_width = 87
+screens = PackedInt32Array(3)
+
+[node name="ThreeLines2" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
 variable_type = 1
 variable_name = "line2"
+rom_font = 12
+rom_x = 84
+rom_y = 29
+rom_flags = 2
+fit_fonts = PackedInt32Array(12, 6)
+fit_ys = PackedInt32Array(29, 29)
+fit_width = 87
+screens = PackedInt32Array(3)
+
+[node name="InitialsTitle" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 2
+rom_x = 64
+rom_y = 4
+rom_flags = 2
+screens = PackedInt32Array(4)
+
+[node name="Initials" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line1"
+rom_font = 14
+rom_x = 64
+rom_y = 21
+rom_flags = 2
+screens = PackedInt32Array(4)
+
+[node name="SecondsLeft" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line2"
+rom_font = 2
+rom_x = 0
+rom_y = 21
+rom_flags = 1
+screens = PackedInt32Array(4)
+
+[node name="SecondsRight" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line2"
+rom_font = 2
+rom_x = 127
+rom_y = 21
+rom_flags = 4
+screens = PackedInt32Array(4)
