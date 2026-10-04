@@ -198,6 +198,8 @@ class Display:
             self._after_fg()
         elif self.bg == deff_id:
             self.bg = None
+            if self.fg is None:
+                self.refresh()                     # the rules' background deff comes back (deff 19)
 
     def set_hold_tail(self, deff_id, seconds):
         """deff_hold_frames(n, 0x20) [0x01024460] when a deff's hold is not the usual 10 ticks: for its last
@@ -276,6 +278,11 @@ class Display:
         if self.show:
             self._end_show()
         self._pump()
+        if self.fg is None and self.bg is None:
+            # nothing left on the display: the deff rules [0x000198a8] put the background deff back (the
+            # score display, or the mode's), as after every effect (traces/flynns_arcade.jsonl 19.36 s,
+            # end_of_line_multiball.jsonl 38.60 s: deff 19 as the effect in front ends)
+            self.refresh()
 
     def _end_show(self):
         show, self.show = self.show, None
