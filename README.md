@@ -92,6 +92,7 @@ any layout.
 - `--no-free-play`: coins as on the factory settings.
 - `--scenario NAME`: plays a rule trace from `assets/rules/traces/` in real time.
 - `--hw proc`: the real machine on a Multimorphic P-ROC ([docs/hardware.md](docs/hardware.md)).
+- `--hw vpx`: the Visual Pinball X table, with MPF instead of PinMAME (Windows; `setup.py --vpx` first, [docs/vpx.md](docs/vpx.md)).
 - `--dmd classic`: the original 128x32 dots instead of the HD DMD (the default on the desktop); `TRON_DMD=classic`
   in the environment does the same for every run.
 - `--dmd-size 1920x480`: the DMD window's size (HD scales to any size). `--dmd-dots 2`: an HD dot-matrix look.
@@ -112,4 +113,5 @@ You can also run the install line again. Both are safe to repeat; setup only red
   tests and checks, the asset sync).
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
+- [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.

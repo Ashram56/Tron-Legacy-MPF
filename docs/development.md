@@ -13,7 +13,7 @@ built from the reverse-engineered rules, media and effects in
 | `assets/` | Git submodule: [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption), the rules specs, MPF config and media read from the ROM. Never copy files out of it; reference them, so a sync never leaves stale copies. |
 | `game/` | The MPF machine folder and the Godot (GMC) project in one: `config/`, `modes/`, `slides/`, `project.godot`, `gmc.cfg`. Kept apart from `assets/` so Godot does not import the asset repo's 12,000 files. |
 | `scripts/` | Workspace setup (`setup.py`, `toolchain.py`, the prerequisite installers in `install/`), the launcher (`run.py`), the render check and the asset sync. |
-| `docs/` | `requirements.md`: what a computer needs, per OS. `hardware.md`: the two hardware configs (virtual + MPF Monitor, and the real machine on a Multimorphic P-ROC). |
+| `docs/` | `requirements.md`: what a computer needs, per OS. `hardware.md`: the two hardware configs (virtual + MPF Monitor, and the real machine on a Multimorphic P-ROC). `vpx.md`: the Visual Pinball X table played by MPF. |
 | `docker/` | The optional Docker setup for Linux hosts: one container per window (DMD, MPF, MPF Monitor). |
 
 ## What is in git, what is not
@@ -108,6 +108,7 @@ UI). Godot's log is `game/logs/godot.log`.
 | `python scripts/run.py --monitor` | The same plus MPF Monitor (`mpf monitor`, layout in `game/monitor/`): click switches, see lamps and coils. |
 | `python scripts/run.py --scenario NAME` | Plays `assets/rules/traces/NAME.txt` in real time on smart_virtual. |
 | `python scripts/run.py --hw proc` | The real machine: Multimorphic P-ROC on the Stern SAM IO board; Godot gets `-- --proc-dmd` for the DMD. |
+| `python scripts/run.py --hw vpx` | Visual Pinball X plays the VPW table and MPF replaces PinMAME, through the `TronMPF.Controller` bridge (Windows). Set-up, device map and checks: [docs/vpx.md](vpx.md). |
 
 **Playing on the desktop.** With the DMD window focused, keys close the machine's switches (`game/gmc.cfg`,
 `[keyboard]`); in MPF Monitor, click a switch instead (`s_coin`, `s_start_button` and the other cabinet

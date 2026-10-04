@@ -3,6 +3,7 @@
 
     python scripts/setup.py                 # everything, MPF Monitor included; safe to re-run (steps in place are skipped)
     python scripts/setup.py --no-monitor    # without MPF Monitor (mpf-monitor, Qt)
+    python scripts/setup.py --vpx           # also the Visual Pinball X bridge's packages (docs/vpx.md)
     python scripts/setup.py --dry-run       # print the plan (URLs, paths) and change nothing
     python scripts/setup.py --dry-run --os windows --arch x86_64   # the plan for another host
 
@@ -70,11 +71,14 @@ class Setup:
         reqs = list(tc.REQUIREMENTS)
         if self.args.monitor:
             reqs += tc.MONITOR_REQUIREMENTS
+        if getattr(self.args, "vpx", False):
+            reqs += tc.VPX_REQUIREMENTS
         if not os.path.exists(py) or self.dry:
             self.run([sys.executable, "-m", "venv", tc.venv_dir()])
         missing = self.dry or (not os.path.exists(mpf) or self.args.upgrade
                                or (self.args.monitor and not self.has_module(py, "mpfmonitor"))
-                               or not self.has_module(py, "fontTools"))
+                               or not self.has_module(py, "fontTools")
+                               or (getattr(self.args, "vpx", False) and not self.has_module(py, "olefile")))
         if missing:
             self.run([py, "-m", "pip", "install", "--quiet", "--upgrade", "pip"])
             self.run([py, "-m", "pip", "install", "--quiet"] + reqs)
@@ -245,6 +249,8 @@ def main(argv=None):
                    help="install MPF Monitor {} (the default)".format(tc.MPF_MONITOR_VERSION))
     p.add_argument("--no-monitor", dest="monitor", action="store_false", help="leave MPF Monitor out")
     p.set_defaults(monitor=True)
+    p.add_argument("--vpx", action="store_true",
+                   help="also install the Visual Pinball X bridge's packages (olefile; pywin32 on Windows)")
     p.add_argument("--upgrade", action="store_true", help="re-run pip install even if MPF is there")
     p.add_argument("--skip-godot", action="store_true", help="no Godot, GMC or Godot import (MPF and tests only)")
     p.add_argument("--skip-media", action="store_true", help="no generated media (config only)")
@@ -266,6 +272,9 @@ def main(argv=None):
         if not args.skip_media and not s.dry:
             tc.write_media_stamp()          # scripts/run.py regenerates when this no longer matches
     s.say("Done. Run `python scripts/run.py` (Godot + MPF), or `python scripts/render_check.py` without a screen.")
+    if args.vpx:
+        s.say("Visual Pinball X (docs/vpx.md): register the bridge once, as Administrator: "
+              "`python scripts/vpx_bridge.py --register`, then `python scripts/vpx_table.py <table.vpx>`.")
     return 0
 
 
