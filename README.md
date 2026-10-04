@@ -98,7 +98,8 @@ any layout.
 - `--dmd classic`: the original 128x32 dots instead of the HD DMD (the default on the desktop); `TRON_DMD=classic`
   in the environment does the same for every run.
 - `--dmd-size 1920x480`: the DMD window's size (HD scales to any size). `--dmd-dots 2`: an HD dot-matrix look.
-- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow.
+- `--dmd-tint orange`: the HD DMD in the original orange instead of Tron blue.
+- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (none by default).
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.
 
