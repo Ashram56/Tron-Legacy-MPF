@@ -156,7 +156,9 @@ match one of the pack's DMD captures, 33 more share the video of their feature, 
 default Tron palette (cyan to white). Orange marks CLU, Rinzler and the light cycles, red the Recognizer,
 cyan and blue the Grid. Only the measured hues are kept, in `game/tools/dmd_colormap.json`
 (`scripts/pup_colormap.py` measures them from a local copy of the pack, which is not needed to build); the
-frames are coloured at build time by `scripts/dmd_color.py` into `game/media/dmd_hd_color/`. Text drawn
+frames are coloured at build time by `scripts/dmd_color.py` into `game/media/dmd_hd_color/`, at twice the
+DMD's size (256x64): Scale2x pixel-art doubling (each dot 2x2, diagonal edges one step finer) drawn with
+nearest filtering, so the busy film clips stay crisp (the grey HD frames use the smoother 8x filter). Text drawn
 live (scores, values, letters) is not coloured by this; text baked into the captured pictures (BALL SAVED,
 GAME OVER, the lines of an intro, the status panel) is found by drawing the ROM's lines with their fonts
 and takes a dark blue palette. `--dmd-color off` (or `TRON_DMD_COLOR=off`, or `tron/dmd/color="off"` in

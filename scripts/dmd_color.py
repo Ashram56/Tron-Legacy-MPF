@@ -11,9 +11,10 @@ A palette is 16 colours (ramp): shade 0 black; the dim shades 1-7 (the ROM's fil
 in the main hue, getting brighter; the bright shades 12-15 (the foreground: lines, objects, logos) in the
 accent hue, getting lighter, 15 almost white (the highlight). The art never uses shades 8-11; they blend.
 
-The frames are upscaled as the HD grey frames are (scripts/dmd_hd.py: one smoothed mask per shade), each
-shade's mask laid over the lower ones in the shade's colour, so the edge between two shades blends their
-two colours (and a palette of greys gives back the grey HD frame).
+The colour frames are 2x (COLOR_SCALE, 256x64): Scale2x (EPX) on the shades, each dot 2x2 with diagonal
+edges one step finer, every shade then in its colour, shown with nearest filtering (crisp dots). At
+scale 8 they are upscaled as the HD grey frames are instead (scripts/dmd_hd.py: one smoothed mask per
+shade, laid over the lower ones in the shade's colour), smoother but softer in busy film clips.
 Text: an effect played from the emulator's capture shows its ROM text lines inside the picture (and the
 status panel left of x 41 when the deff draws it). Each line is drawn with the ROM font at its layout
 (scripts/rom_layout.py); in each frame that shows it (TEXT_MATCH of its dots lit, TEXT_BG of the black
@@ -21,7 +22,7 @@ cells or outlines around them dark), its lit dots take the text palette, as do t
 captured frame drawn in a single shade is a text screen (GAME OVER, BALL SAVED, TILT): all text. Other
 frames in a single shade (logos, line art: DAFT PUNK) keep their top shades coloured (flat_palette).
 
-    .venv/bin/python scripts/dmd_color.py DEFF IN.png OUT.png [scale]   # one classic frame in DEFF's colours
+    .venv/bin/python scripts/dmd_color.py DEFF IN.png OUT.png [scale]   # one classic frame in DEFF's colours (2 or 8)
 """
 import colorsys
 import hashlib
@@ -31,8 +32,9 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
-VERSION = "1"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
+VERSION = "2"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
 TEXT_MATCH = 0.9
+COLOR_SCALE = 2          # colour frames: 2x (Scale2x, crisp, 256x64), the default; 8 = the smooth per-shade filter
 
 HUES = {"cyan": 188, "blue": 212, "deep blue": 232, "violet": 275, "red": 4, "orange": 28, "amber": 48, "green": 125}
 # (shade, saturation, value) of the main hue (dim shades) and of the accent hue (bright shades)
@@ -85,6 +87,47 @@ def text_palette(cmap=None):
 
 def palette_hex(pal):
     return ["#%02x%02x%02x" % c for c in pal]
+
+
+def scale2x(rows):
+    """Scale2x (EPX), the pixel-art doubling: rows of values -> rows twice as wide and high. Each dot becomes
+    2x2; a corner takes the neighbours' value where two neighbours agree across it (a diagonal edge), so
+    staircases get one step finer while every flat area and one-dot line stays crisp and exact."""
+    h, w = len(rows), len(rows[0])
+    out = [[0] * (2 * w) for _ in range(2 * h)]
+    for y in range(h):
+        up, row, down = rows[max(0, y - 1)], rows[y], rows[min(h - 1, y + 1)]
+        for x in range(w):
+            p = row[x]
+            a, d = up[x], down[x]
+            c, b = row[max(0, x - 1)], row[min(w - 1, x + 1)]
+            e0 = e1 = e2 = e3 = p
+            if c != b and a != d:
+                e0 = a if c == a else p
+                e1 = b if a == b else p
+                e2 = c if d == c else p
+                e3 = d if b == d else p
+            out[2 * y][2 * x], out[2 * y][2 * x + 1] = e0, e1
+            out[2 * y + 1][2 * x], out[2 * y + 1][2 * x + 1] = e2, e3
+    return out
+
+
+def upscale_color_2x(img, pal, text_pal=None, text_dots=None):
+    """A classic effect frame -> 'RGB' frame 2x larger (COLOR_SCALE): Scale2x on the 16 shades (text dots
+    as their own values, so text edges stay text), each shade then drawn in its palette colour. Shown
+    with nearest filtering: crisp dots, no blur."""
+    from PIL import Image
+    import dmd_hd
+    grey = dmd_hd.grey(img)
+    w, h = grey.size
+    g = grey.tobytes()
+    t = text_dots if (text_dots is not None and text_pal is not None) else bytes(w * h)
+    vals = [min(15, round(v / 17)) + (16 if v and m else 0) for v, m in zip(g, t)]
+    big = scale2x([vals[y * w:(y + 1) * w] for y in range(h)])
+    lut = [tuple(pal[k]) for k in range(16)] + [tuple((text_pal or pal)[k]) for k in range(16)]
+    out = Image.new("RGB", (2 * w, 2 * h))
+    out.putdata([lut[v] for row in big for v in row])
+    return out
 
 
 def upscale_color(img, pal, f, text_pal=None, text_dots=None):
@@ -207,8 +250,11 @@ def color_file(job):
         shutil.copyfile(cached, dst)
         return dst
     img = Image.open(src)
-    dots = Image.frombytes("L", img.size, mask) if mask else None
-    upscale_color(img, pal, f, text_pal, dots).save(dst, compress_level=6)
+    if f == 2:
+        upscale_color_2x(img, pal, text_pal, mask).save(dst, compress_level=6)
+    else:
+        dots = Image.frombytes("L", img.size, mask) if mask else None
+        upscale_color(img, pal, f, text_pal, dots).save(dst, compress_level=6)
     if cached:
         os.makedirs(cache, exist_ok=True)
         tmp = cached + ".%d.tmp" % os.getpid()
@@ -265,8 +311,9 @@ def main(argv):
         return 2
     from PIL import Image
     import dmd_hd
-    upscale_color(Image.open(argv[1]), palette(int(argv[0])), int(argv[3]) if len(argv) > 3 else dmd_hd.FRAME_SCALE
-                  ).save(argv[2])
+    f = int(argv[3]) if len(argv) > 3 else COLOR_SCALE
+    img = Image.open(argv[1])
+    (upscale_color_2x(img, palette(int(argv[0]))) if f == 2 else upscale_color(img, palette(int(argv[0])), f)).save(argv[2])
     return 0
 
 

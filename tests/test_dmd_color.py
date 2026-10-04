@@ -72,6 +72,34 @@ class TestColormap(unittest.TestCase):
 
 
 class TestColorUpscale(unittest.TestCase):
+    def test_scale2x(self):
+        self.assertEqual([[5, 5], [5, 5]], dmd_color.scale2x([[5]]))
+        flat = [[1, 1, 1], [1, 1, 1]]
+        self.assertEqual([[1] * 6] * 4, dmd_color.scale2x(flat))
+        diag = [[0, 0, 0], [0, 9, 9], [0, 9, 9]]                       # a corner: rounded one step finer
+        big = dmd_color.scale2x(diag)
+        self.assertEqual(0, big[2][2])                                  # the outer half of the corner dot
+        self.assertEqual(9, big[3][3])
+        line = [[0, 0, 0], [7, 7, 7], [0, 0, 0]]                       # a one-dot line stays two pixels wide
+        self.assertEqual([0, 0, 7, 7, 0, 0], [r[3] for r in dmd_color.scale2x(line)])
+
+    def test_colour_2x(self):
+        rows = [[0] * 16 for _ in range(10)]
+        for y in range(2, 8):
+            for x in range(2, 14):
+                rows[y][x] = 255 if x >= 8 else 68
+        pal = dmd_color.ramp("orange", "cyan")
+        out = dmd_color.upscale_color_2x(image(rows), pal)
+        self.assertEqual((32, 20), out.size)
+        self.assertEqual(pal[4], out.getpixel((8, 10)))
+        self.assertEqual(pal[15], out.getpixel((22, 10)))
+        self.assertLessEqual(len(out.getcolors(64)), 3)                 # flat colours: crisp, no blur
+        text = bytes(255 if x >= 8 and 2 <= y < 8 else 0 for y in range(10) for x in range(16))
+        tpal = dmd_color.text_palette()
+        out = dmd_color.upscale_color_2x(image(rows), pal, tpal, text)
+        self.assertEqual(tpal[15], out.getpixel((22, 10)))
+        self.assertEqual(pal[4], out.getpixel((8, 10)))
+
     def test_grey_palette_gives_the_grey_frame(self):
         """With a palette of greys the colour upscale is the HD grey frame, to edge rounding."""
         from PIL import ImageChops
@@ -146,7 +174,8 @@ class TestColorMedia(unittest.TestCase):
             rel = os.path.relpath(src, os.path.join(GAME, "media", "dmd"))
             big = Image.open(os.path.join(GAME, "media", "dmd_hd_color", rel))
             self.assertEqual("RGB", big.mode)
-            self.assertEqual(Image.open(os.path.join(GAME, "media", "dmd_hd", rel)).size, big.size)
+            w, h = Image.open(src).size
+            self.assertEqual((w * dmd_color.COLOR_SCALE, h * dmd_color.COLOR_SCALE), big.size)
         self.assertEqual([], glob.glob(os.path.join(GAME, "media", "dmd_hd_color", "*", "solid*.png")))
 
 

@@ -19,7 +19,7 @@ extends Node
 ## Colour (HD only): --dmd-color=on|off (scripts/run.py --dmd-color; or TRON_DMD_COLOR=on|off, or the project
 ## setting tron/dmd/color, default "on"). On, the effects' animation frames show their colour twins of
 ## media/dmd_hd_color/ (scripts/dmd_color.py: each effect's 16 shades mapped to a palette inspired by the
-## PuP-Pack video of that moment) drawn untinted; off, the grey HD frames tinted as in classic mode. Text
+## PuP-Pack video of that moment; 2x, 256x64, made with Scale2x, drawn with nearest filtering) untinted; off, the grey HD frames tinted as in classic mode. Text
 ## drawn live (tron/rom_text.gd, letter_panel.gd, score_display.gd) is not touched.
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
@@ -34,6 +34,7 @@ var hd := false
 var dots := 0
 var color := false
 var frame_scale := 8
+var color_scale := 2
 var _frames_hd := {}
 var _colored := {}
 
@@ -87,6 +88,10 @@ func _enter_tree() -> void:
 	color = choose_color(args, OS.get_environment("TRON_DMD_COLOR"),
 		str(ProjectSettings.get_setting("tron/dmd/color", "on"))) \
 		and FileAccess.file_exists(MEDIA_COLOR + "palettes.json")
+	if color:
+		var cinfo = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_COLOR + "palettes.json"))
+		if cinfo is Dictionary:
+			color_scale = int(cinfo.get("scale", color_scale))
 	if FileAccess.file_exists(MEDIA_HD + "scale.json"):
 		var info = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "scale.json"))
 		if info is Dictionary:
@@ -165,9 +170,13 @@ func _on_node_added(node: Node) -> void:
 		var sprite := node as AnimatedSprite2D
 		if sprite.sprite_frames and sprite.sprite_frames != _hd_frames(sprite.sprite_frames):
 			sprite.sprite_frames = _hd_frames(sprite.sprite_frames)
-			sprite.scale = sprite.scale / frame_scale
 			if _colored.has(sprite.sprite_frames):     # the colours are in the frames: no DMD tint
+				sprite.scale = sprite.scale / color_scale
 				sprite.modulate = Color(1, 1, 1, sprite.modulate.a)
+				if color_scale <= 2:                   # 2x pixel art (Scale2x): crisp dots, not blurred
+					sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			else:
+				sprite.scale = sprite.scale / frame_scale
 	elif node is Sprite2D:
 		var s := node as Sprite2D
 		var big := hd_texture(s.texture)

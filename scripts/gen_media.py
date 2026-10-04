@@ -11,8 +11,8 @@ Generated (all git-ignored, rebuilt by scripts/setup.py):
 - game/media/dmd_hd/deff_NNN/*.png    the same frames and letter sprites upscaled FRAME_SCALE times
                                       (scripts/dmd_hd.py) for the HD display mode (game/tools/dmd_mode.gd);
                                       cached by content in .cache/dmd_hd/, so a rebuild redoes only new art
-- game/media/dmd_hd_color/deff_NNN/   the HD effect frames in colour (scripts/dmd_color.py, the palettes of
-                                      game/tools/dmd_colormap.json) for the HD colour DMD
+- game/media/dmd_hd_color/deff_NNN/   the effect frames in colour at 2x (256x64, Scale2x; scripts/dmd_color.py,
+                                      the palettes of game/tools/dmd_colormap.json) for the HD colour DMD
 
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
@@ -362,9 +362,8 @@ def build_hd_frames(scale=None):
 def build_color_frames(scale=None):
     """game/media/dmd_hd_color: the HD effect frames coloured with each effect's palette (dmd_color.build)."""
     import dmd_color
-    import dmd_hd
     return dmd_color.build(os.path.join(GAME, "media", "dmd"), os.path.join(GAME, "media", "dmd_hd_color"),
-                           scale or dmd_hd.FRAME_SCALE,
+                           scale or dmd_color.COLOR_SCALE,
                            os.path.join(ROOT, ".cache", "dmd_hd"))
 
 
