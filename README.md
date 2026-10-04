@@ -40,6 +40,9 @@ You can change where the files go, and what is installed:
   Windows, `~/Tron-Legacy-MPF-PuP` elsewhere.
 - **Branch / repository:** `TRON_BRANCH` and `TRON_REPO`, the same way. A folder that already holds a clone is
   updated with `git pull --ff-only` instead.
+- **Private repositories:** if the assets (or the game) repository is private, the installer asks first for a
+  GitHub token that can read it (github.com > Settings > Developer settings > Personal access tokens; a
+  fine-grained token with Contents: read-only), instead of a password. Or set `TRON_GITHUB_TOKEN` before the line.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
   `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.
@@ -105,7 +108,6 @@ any layout.
 - `--dmd-size 1920x480`: the DMD window's size (HD scales to any size). `--dmd-dots 2`: an HD dot-matrix look.
 - `--dmd-tint orange`: the HD DMD in the original orange instead of Tron blue.
 - `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (none by default).
-- `--dmd-color off`: the HD animations in the DMD's single colour instead of the film's palette.
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.
 
@@ -145,4 +147,5 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
+- [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.
