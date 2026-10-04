@@ -89,6 +89,10 @@ class MediaBridge:
         # (deff, line, ROM text) of every printf line left blank because the rules gave no value for it
         # (tests/test_dmd_text.py: a value line drawn without its value shows a bare label, "RIGHT SPINNER =")
         self.missing = []
+        # the DMD keeps its last frame while no effect draws (the ROM never clears it between effects): the
+        # last deff / text slide stays up until the next one plays, never GMC's base slide below them all
+        self.shown = set()                         # deff and text slides playing now
+        self.kept = None                           # the last one, stopped but left up until the next plays
 
     # ------------------------------------------------------------------ transport
 
@@ -158,12 +162,26 @@ class MediaBridge:
         self._send("slides_play", {slide: {"action": "play", "key": slide, "expire": None,
                                            "priority": priority}},
                    priority=priority, **self.deff_lines(deff_id, args))
+        self._played(slide)
 
     def deff_stop(self, deff_id):
         info = self.data["deffs"].get(deff_id) if self.data else None
         self.active.discard(deff_id)
         if info:
-            self._send("slides_play", {info["slide"]: {"action": "remove", "key": info["slide"], "expire": None}})
+            self._remove(info["slide"])
+
+    def _played(self, slide):
+        self.shown.add(slide)
+        kept, self.kept = self.kept, None
+        if kept and kept != slide:
+            self._send("slides_play", {kept: {"action": "remove", "key": kept, "expire": None}}, need_data=False)
+
+    def _remove(self, slide):
+        self.shown.discard(slide)
+        if not self.shown:
+            self.kept = slide                      # nothing else up: its last frame stays (see self.kept)
+            return
+        self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
 
     # ------------------------------------------------------------------ score display (deff 19)
 
@@ -265,9 +283,10 @@ class MediaBridge:
         self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
         self._send("slides_play", {slide: {"action": "play", "key": slide, "expire": None, "priority": priority}},
                    priority=priority, need_data=False, **lines, **extra)
+        self._played(slide)
 
     def text_hide(self, slide):
-        self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
+        self._remove(slide)
 
     def service_show(self, lines, draw=None):
         """Service menu screen (tron/service.py), above every deff: the ROM draw list `draw` (tron/rom_draw.py,
@@ -282,7 +301,9 @@ class MediaBridge:
 
     def service_hide(self):
         self.service_shown = False
-        self.text_hide("service")
+        self.shown.discard("service")               # the menu goes away: the attract effects take over
+        self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
+                   need_data=False)
 
     # ------------------------------------------------------------------ sounds
 

@@ -201,6 +201,9 @@ class TronOS(CustomCode):
         ev = self.machine.events
         ev.add_handler("game_starting", self._game_starting, priority=1000)
         ev.add_handler("ball_starting", self._ball_starting, priority=1000)
+        # the ROM starts the next ball (and deff 19) as soon as the bonus ends [0x00020658]; MPF first waits
+        # for an empty playfield, so the score display comes back here (the screen was empty until then)
+        ev.add_handler("ball_will_start", lambda **kwargs: self.display.refresh())
         ev.add_handler("ball_started", self._ball_started, priority=1000)
         ev.add_handler("ball_drain", self._ball_drain, priority=1000)
         ev.add_handler("ball_ending", self._ball_ending, priority=1000)
