@@ -102,7 +102,7 @@ for merges.
 - MPF always serves BCP on 127.0.0.1:5051 (MPF Monitor's port) and **waits for GMC on 5050**: start Godot first.
 - `bcp_trigger()` only reaches clients that registered the event name; GMC registers none for sounds,
   so every sound was dropped. Use `bcp_trigger_client()` addressed to `local_display`.
-- Duplicate YAML keys are silently merged: the package's switches/lights files lost 8 devices that way.
+- Duplicate YAML keys are silently merged (PyYAML keeps the last): an early package lost 8 switches and 8 lamps that way. Check generated YAML for duplicates.
 - An autofire device marks the playfield active itself; remove `playfield_active` from those switches.
 - `driverboards: sternSAM` goes under `hardware:`; under `p_roc:` MPF lowercases it and pypinproc rejects it.
 - Platform classes use `__slots__`: patch at class level, not per instance.

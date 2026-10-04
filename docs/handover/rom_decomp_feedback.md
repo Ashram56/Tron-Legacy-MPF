@@ -41,9 +41,12 @@ Ordered by impact. "Recovered" means rebuilt from code or captures, at real cost
 ## 3. Package defects found (fix at the source)
 
 - Generated MPF YAML has no `#config_version=6` header (MPF refuses it); the build adds it.
-- Duplicate YAML keys in `switches.yaml` / `lights.yaml` silently drop 8 switches and 8 lamps.
-- `event_map.csv` `mode_by_code_location` is often wrong; `asset_audit.md` and dev guide section 6 lag the package.
-- 17 audio streams were never exported (samples 0x09-0x14, 0x16-0x19, music 0x44d): 44 sound calls have no pool (per dev guide section 6; not re-checked against the latest package).
+- `event_map.csv` `mode_by_code_location` is often wrong.
+- **Stale audit notes**: `rules/work/asset_audit.md` (W3, W5) and `developer_guide.md` section 6 still
+  report two defects the package has since fixed (checked at `e712f62`): the duplicate keys in
+  `switches.yaml` / `lights.yaml` (none left) and the 17 unexported audio streams (samples 0x09-0x14,
+  0x16-0x19 and music 0x44d are now in `media/sounds/` and `sounds.yaml`). Mark them resolved so the
+  next agent does not work around problems that are gone.
 - Package `leff_NNN` are ramp **tube shows**, not lamp-matrix leffs; naming them `tube_show_NNN` would avoid the mix-up.
 - Unverified in MPF: shaker gating by settings, music looping, `settings.yaml` defaults.
 
