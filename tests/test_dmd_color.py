@@ -171,9 +171,18 @@ class TestColorMedia(unittest.TestCase):
         for d in deffs:
             entry = info["deffs"]["deff_%03d" % int(d)]
             self.assertEqual(16, len(entry["palette"]))
-            self.assertEqual("pup" if d in cmap["deffs"] else "default", entry["source"])
-        self.assertGreaterEqual(sum(1 for e in info["deffs"].values() if e["source"] == "pup"), 90)
-        self.assertGreater(sum(1 for e in info["deffs"].values() if e.get("text_frames")), 20)
+            if entry["source"] != "serum":
+                self.assertEqual("pup" if d in cmap["deffs"] else "default", entry["source"])
+        if info.get("serum"):
+            # the Serum colourisation colours most effects; the others keep their PuP hues
+            serum = [e for e in info["deffs"].values() if e["source"] == "serum"]
+            self.assertGreaterEqual(len(serum), 60)
+            self.assertGreaterEqual(sum(e["serum_frames"] for e in serum), 1500)
+            self.assertGreaterEqual(sum(e["serum_frames"] + e["near_frames"] + e["shade_frames"] for e in serum), 2000)
+            self.assertGreaterEqual(sum(1 for e in info["deffs"].values() if e["source"] == "pup"), 30)
+        else:
+            self.assertGreaterEqual(sum(1 for e in info["deffs"].values() if e["source"] == "pup"), 90)
+            self.assertGreater(sum(1 for e in info["deffs"].values() if e.get("text_frames")), 20)
 
     def test_every_effect_frame_has_a_colour_twin(self):
         from PIL import Image

@@ -22,6 +22,18 @@ cells or outlines around them dark), its lit dots take the text palette, as do t
 captured frame drawn in a single shade is a text screen (GAME OVER, BALL SAVED, TILT): all text. Other
 frames in a single shade (logos, line art: DAFT PUNK) keep their top shades coloured (flat_palette).
 
+Serum (this branch): with the Serum colourisation serum/trn_174h.cRZ (scripts/serum.py), an effect frame
+the colourisation knows (by its CRC, as PinMAME finds it) takes the colours of the Serum frame instead:
+its own 64 colours per dot (cframes, dynamic zones by shade, sprites), doubled by Scale2x on the colour
+indices. A frame it does not know (the art without the score or text the ROM draws over it: the colour DMD
+shows a frame with its text) is compared with every Serum frame (serum.Serum.nearest); when one is the same
+art (correlation NEAR_MIN and up), the frame takes its shade colours: per shade, the colour that frame's
+dots of the shade have most often. Other frames of an effect with known or near frames take the effect's
+shade colours (the same, over all of them). Only an effect with neither keeps its PuP-hue palette above.
+Serum frames can show art of their own (a photo of Flynn, a new logo): exact frames show it, near frames
+keep the ROM's art in the Serum colours. palettes.json records each effect's source ("serum", or "pup" /
+"default") and its serum, near and shade frame counts.
+
     .venv/bin/python scripts/dmd_color.py DEFF IN.png OUT.png [scale]   # one classic frame in DEFF's colours (2 or 8)
 """
 import colorsys
@@ -32,7 +44,7 @@ import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 COLORMAP = os.path.join(ROOT, "game", "tools", "dmd_colormap.json")
-VERSION = "3"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
+VERSION = "5"            # bump when the colouring changes: the cache (.cache/dmd_hd) keys on it
 TEXT_MATCH = 0.9
 COLOR_SCALE = 2          # colour frames: 2x (Scale2x, crisp, 256x64), the default; 8 = the smooth per-shade filter
 
@@ -240,6 +252,139 @@ def flat_palette(pal):
     return list(pal[:13]) + [pal[13]] * 3
 
 
+# ---------------------------------------------------------------------- Serum
+
+SERUM = os.path.join(ROOT, "serum", "trn_174h.cRZ")
+_serum = None
+
+
+def _serum_init(crom):
+    global _serum
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import serum
+    _serum = serum.Serum(crom)
+
+
+def scale_indices(vals, w, h, f):
+    """Rows of colour indices (or shades) doubled by Scale2x until f times larger (2, 4, 8)."""
+    rows = [list(vals[y * w:(y + 1) * w]) for y in range(h)]
+    while f > 1:
+        rows, f = scale2x(rows), f // 2
+    return rows
+
+
+def rgb_image(rows, lut):
+    from PIL import Image
+    img = Image.new("RGB", (len(rows[0]), len(rows)))
+    img.putdata([tuple(lut[v]) for row in rows for v in row])
+    return img
+
+
+def shade_colours(found, fallback):
+    """The 16 colours of an effect's shades from its Serum frames [(shades, colour indices, palette), ...]:
+    per shade, the colour its dots have most often (the fallback palette for a shade never seen)."""
+    from collections import Counter
+    counts = [Counter() for _ in range(16)]
+    for shades, idx, pal in found:
+        for v, c in zip(shades, idx):
+            counts[v][pal[c]] += 1
+    return [counts[k].most_common(1)[0][0] if counts[k] else tuple(fallback[k]) for k in range(16)]
+
+
+def serum_deff(job):
+    """(folder, dst folder, scale, crom sha1, cache dir) -> palettes.json entry of the effect, its frames
+    written in Serum colours; None when the colourisation knows none of its frames (writes nothing)."""
+    import glob
+    import shutil
+    import serum
+    from PIL import Image
+    folder, dst, f, crom_key, cache = job
+    frames = sorted(glob.glob(os.path.join(folder, "f*.png")))
+    if not frames:
+        return None
+    srcs = []
+    for p in frames:
+        with open(p, "rb") as fp:
+            srcs.append(fp.read())
+    key = hashlib.sha1(b"|".join([b"serum", VERSION.encode(), crom_key.encode(), str(f).encode(),
+                               str(serum.NEAR_MIN).encode()] + srcs)).hexdigest()
+    cached = os.path.join(cache, "serum_" + key) if cache else None
+    names = [os.path.basename(p) for p in frames]
+    if cached and os.path.exists(os.path.join(cached, "entry.json")):
+        entry = json.load(open(os.path.join(cached, "entry.json"), encoding="utf-8"))
+        if entry is not None:
+            os.makedirs(dst, exist_ok=True)
+            for n in names:
+                shutil.copyfile(os.path.join(cached, n), os.path.join(dst, n))
+        return entry
+    s = _serum
+    s.reset()
+    w, h = s.width, s.height
+    shaded, found = [], []
+    for p in frames:
+        sh = serum.shades(Image.open(p))
+        fid = s.identify(sh)
+        if fid != serum.NO_FRAME and s.activeframes[fid]:
+            idx = s.colorize_frame(sh, fid)
+            for hit in s.find_sprites(sh, fid):
+                s.draw_sprite(idx, hit)
+            shaded.append((sh, idx, s.palette(fid), fid))
+            found.append((sh, idx, s.palette(fid)))
+        else:
+            shaded.append((sh, None, None, None))
+    deff = int(os.path.basename(folder).split("_")[1])
+    near = {}
+    for k, (sh, idx, _, _) in enumerate(shaded):
+        if idx is None:
+            fid, corr = s.nearest(sh)
+            if fid != serum.NO_FRAME and corr >= serum.NEAR_MIN:
+                near[k] = (sh, s.colorize_frame(sh, fid), s.palette(fid), fid)
+    entry = None
+    if found or near:
+        pal = shade_colours(found + [v[:3] for v in near.values()], palette(deff))
+        os.makedirs(dst, exist_ok=True)
+        ids = []
+        for k, (n, (sh, idx, fpal, fid)) in enumerate(zip(names, shaded)):
+            if idx is not None:
+                img = rgb_image(scale_indices(idx, w, h, f), fpal)
+                ids.append(fid)
+            elif k in near:
+                img = rgb_image(scale_indices(sh, w, h, f), shade_colours([near[k][:3]], pal))
+                ids.append(near[k][3])
+            else:
+                img = rgb_image(scale_indices(sh, w, h, f), pal)
+            img.save(os.path.join(dst, n), compress_level=6)
+        entry = {"palette": palette_hex(pal), "source": "serum", "serum_frames": len(found),
+                 "near_frames": len(near), "shade_frames": len(frames) - len(found) - len(near),
+                 "serum_ids": [min(ids), max(ids)]}
+    if cached:
+        tmp = cached + ".%d.tmp" % os.getpid()
+        os.makedirs(tmp, exist_ok=True)
+        if entry is not None:
+            for n in names:
+                shutil.copyfile(os.path.join(dst, n), os.path.join(tmp, n))
+        with open(os.path.join(tmp, "entry.json"), "w", encoding="utf-8") as fp:
+            json.dump(entry, fp)
+        try:
+            os.replace(tmp, cached)
+        except OSError:
+            # another worker cached the same effect (same key, same frames) first
+            shutil.rmtree(tmp, ignore_errors=True)
+    return entry
+
+
+def serum_build(folders, dst_root, scale, crom, cache=None, processes=None):
+    """{folder name: palettes.json entry} of the effects whose frames the Serum file knows, written in
+    dst_root (serum_deff); the others are left to the PuP-hue colouring."""
+    import multiprocessing
+    with open(crom, "rb") as fp:
+        crom_key = hashlib.sha1(fp.read()).hexdigest()
+    jobs = [(fo, os.path.join(dst_root, os.path.basename(fo)), scale, crom_key, cache) for fo in folders]
+    with multiprocessing.Pool(processes or os.cpu_count() or 2, initializer=_serum_init, initargs=(crom,)) as pool:
+        entries = pool.map(serum_deff, jobs, chunksize=1)
+    return {os.path.basename(fo): e for fo, e in zip(folders, entries) if e is not None}
+
+
 # ---------------------------------------------------------------------- build
 
 def color_file(job):
@@ -278,9 +423,10 @@ def color_file(job):
     return dst
 
 
-def build(src_root, dst_root, scale, cache=None, processes=None):
+def build(src_root, dst_root, scale, cache=None, processes=None, crom=None):
     """Every effect frame (f*.png) of src_root (game/media/dmd) upscaled in colour into dst_root (same
-    names); the letter sprites stay out (tron/letter_panel.gd draws them: text). Returns the frame count."""
+    names); the letter sprites stay out (tron/letter_panel.gd draws them: text). crom: the Serum
+    colourisation (serum_build) for the effects it knows. Returns the frame count."""
     import glob
     import shutil
     from PIL import Image
@@ -291,10 +437,14 @@ def build(src_root, dst_root, scale, cache=None, processes=None):
     folders = sorted(glob.glob(os.path.join(src_root, "deff_*")))
     masks = text_masks()
     jobs, palettes = [], {}
+    by_serum = serum_build(folders, dst_root, scale, crom, cache, processes) if crom and os.path.exists(crom) else {}
     for folder in folders:
         name = os.path.basename(folder)
         deff = int(name.split("_")[1])
         frames = sorted(glob.glob(os.path.join(folder, "f*.png")))
+        if name in by_serum:
+            palettes[name] = by_serum[name]
+            continue
         pal = palette(deff, cmap)
         palettes[name] = {"palette": palette_hex(pal), "source": "pup" if str(deff) in cmap["deffs"] else "default"}
         if not frames:
@@ -312,12 +462,17 @@ def build(src_root, dst_root, scale, cache=None, processes=None):
             palettes[name]["text_frames"] = text_frames
     os.makedirs(dst_root, exist_ok=True)
     with open(os.path.join(dst_root, "palettes.json"), "w", encoding="utf-8", newline="\n") as f:
-        json.dump({"scale": scale, "text": palette_hex(tpal), "deffs": palettes}, f, indent=0, sort_keys=True)
+        json.dump({"scale": scale, "text": palette_hex(tpal), "deffs": palettes,
+                   "serum": os.path.basename(crom) if by_serum else None}, f, indent=0, sort_keys=True)
+    if not jobs:
+        return sum(e["serum_frames"] + e["near_frames"] + e["shade_frames"] for e in by_serum.values())
     if len(jobs) < 8:
-        return len([color_file(j) for j in jobs])
-    import multiprocessing
-    with multiprocessing.Pool(processes or os.cpu_count() or 2) as pool:
-        return len(pool.map(color_file, jobs, chunksize=4))
+        done = len([color_file(j) for j in jobs])
+    else:
+        import multiprocessing
+        with multiprocessing.Pool(processes or os.cpu_count() or 2) as pool:
+            done = len(pool.map(color_file, jobs, chunksize=4))
+    return done + sum(e["serum_frames"] + e["near_frames"] + e["shade_frames"] for e in by_serum.values())
 
 
 def main(argv):
