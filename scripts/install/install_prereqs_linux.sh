@@ -20,7 +20,7 @@ OS_RELEASE="${TRON_OS_RELEASE:-/etc/os-release}"     # tests point this at a fak
 UV_VERSION="${UV_VERSION:-0.12.22}"
 UDEV_RULE=/etc/udev/rules.d/99-pinproc.rules
 
-DRY=0 YES=0 MONITOR=1 PROC=0 XVFB=0 SETUP=1 PY_ANY=0
+DRY=0 YES=0 MONITOR= PROC=0 XVFB=0 SETUP=1 PY_ANY=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -245,7 +245,7 @@ if [ "$XVFB" = 0 ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; th
 fi
 
 WANT=("${PKG_BASE[@]}" "${PKG_GODOT[@]}")
-[ "$MONITOR" = 1 ] && WANT+=("${PKG_QT[@]}")
+[ "$MONITOR" != 0 ] && WANT+=("${PKG_QT[@]}")
 [ "$XVFB" = 1 ] && WANT+=("${PKG_XVFB[@]}")
 [ "$PROC" = 1 ] && WANT+=("${PKG_PROC[@]}")
 
@@ -290,7 +290,7 @@ fi
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
+    case "$MONITOR" in 1) ARGS+=(--monitor) ;; 0) ARGS+=(--no-monitor) ;; esac  # empty: setup.py default (with)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then
@@ -327,6 +327,6 @@ fi
 
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
-    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
+    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" != 0 ] && echo ' --monitor')"
     note "Run the tests:   .venv/bin/python -m pytest -q tests"
 fi

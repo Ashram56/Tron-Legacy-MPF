@@ -21,7 +21,7 @@ PYORG_PKG="python-${PYORG_VERSION}-macos11.pkg"
 PYORG_URL="https://www.python.org/ftp/python/${PYORG_VERSION}/${PYORG_PKG}"
 PYORG_PY="/Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11"
 
-DRY=0 YES=0 MONITOR=1 PROC=0 SETUP=1 PYORG=0
+DRY=0 YES=0 MONITOR= PROC=0 SETUP=1 PYORG=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -146,7 +146,7 @@ fi
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
+    case "$MONITOR" in 1) ARGS+=(--monitor) ;; 0) ARGS+=(--no-monitor) ;; esac  # empty: setup.py default (with)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then
@@ -166,6 +166,6 @@ fi
 
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
-    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" = 1 ] && echo ' --monitor')"
+    note "Start the game:  .venv/bin/python scripts/run.py$([ "$MONITOR" != 0 ] && echo ' --monitor')"
     note "Run the tests:   .venv/bin/python -m pytest -q tests"
 fi
