@@ -17,7 +17,7 @@ Arguments that are not options of this script go to setup.py (for example --skip
 .PARAMETER DryRun
 Print the plan, change nothing.
 .PARAMETER Monitor
-Also install MPF Monitor (setup.py --monitor).
+MPF Monitor is now installed by default (setup.py); the switch is kept for old commands.
 .PARAMETER Proc
 The real machine: also the Visual C++ 2015-2022 runtime that MPF's pypinproc needs, and a check for FTDI's D2XX driver.
 .PARAMETER NoSetup

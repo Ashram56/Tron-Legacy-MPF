@@ -3,7 +3,7 @@
 # Debian/Ubuntu (apt), Fedora/RHEL (dnf) and Arch (pacman); x86_64 or arm64. Safe to re-run.
 #
 #   scripts/install/install_prereqs_linux.sh                 # prerequisites, then setup.py
-#   scripts/install/install_prereqs_linux.sh --monitor       # ... plus MPF Monitor (and the Qt libraries it needs)
+#   scripts/install/install_prereqs_linux.sh --no-monitor    # ... without MPF Monitor and its Qt libraries (default: with)
 #   scripts/install/install_prereqs_linux.sh --proc          # ... plus libpinproc/pypinproc and the P-ROC udev rule
 #   scripts/install/install_prereqs_linux.sh --dry-run       # print the plan, change nothing
 #   scripts/install/install_prereqs_linux.sh -- --skip-media # arguments after -- go to setup.py
@@ -20,7 +20,7 @@ OS_RELEASE="${TRON_OS_RELEASE:-/etc/os-release}"     # tests point this at a fak
 UV_VERSION="${UV_VERSION:-0.12.22}"
 UDEV_RULE=/etc/udev/rules.d/99-pinproc.rules
 
-DRY=0 YES=0 MONITOR=0 PROC=0 XVFB=0 SETUP=1 PY_ANY=0
+DRY=0 YES=0 MONITOR=1 PROC=0 XVFB=0 SETUP=1 PY_ANY=0
 SETUP_ARGS=()
 
 usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -30,6 +30,7 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY=1 ;;
         -y|--yes) YES=1 ;;
         --monitor) MONITOR=1 ;;
+        --no-monitor) MONITOR=0 ;;
         --proc) PROC=1 ;;
         --xvfb) XVFB=1 ;;
         --no-setup) SETUP=0 ;;
@@ -289,7 +290,7 @@ fi
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
     ARGS=()
-    [ "$MONITOR" = 1 ] && ARGS+=(--monitor)
+    [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
     ARGS+=(${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"})
     if [ "$DRY" = 1 ] && ! have_tool "$PY"; then

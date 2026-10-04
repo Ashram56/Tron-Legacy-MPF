@@ -106,7 +106,8 @@ private, `setup.py` fetches `assets/`), one `pup_setup` call each in `scripts/se
 Two upstream changes are not hooks and would be best made upstream too: Godot 4.6.3 instead of 4.5.2
 (`scripts/toolchain.py`, the docs and tests that name it; the native video add-on needs 4.6) and
 `empty_dir` in `scripts/gen_media.py` (on Windows a re-run of setup stopped on DMD frame folders it could not
-delete). Everything else is in its own files, so a merge seldom conflicts.
+delete), MPF Monitor installed by default (`setup.py --no-monitor` and the installers' `--no-monitor` skip it)
+and `run.py --monitor` stopping with a message when it is missing. Everything else is in its own files, so a merge seldom conflicts.
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 
