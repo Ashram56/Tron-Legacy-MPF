@@ -171,6 +171,9 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if hw == "proc" and "--proc-dmd" not in gargs:
         gargs = (gargs + ["--proc-dmd"]) if "--" in gargs else (gargs + ["--", "--proc-dmd"])
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
+    if monitor and subprocess.run([tc.python(), "-c", "import mpfmonitor"], capture_output=True).returncode:
+        # without it `mpf monitor` runs `mpf game` on game/monitor/ and dies on "Could not find file ...config.yaml"
+        raise SystemExit("MPF Monitor is not installed: run `python scripts/setup.py --monitor` first")
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
