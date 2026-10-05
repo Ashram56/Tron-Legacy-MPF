@@ -84,6 +84,23 @@ borderless=true
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as
   in the DMD window.
 
+**Linux cabinet (Jetson).** Use an X11 session (on Ubuntu's login screen, the gear icon: "Ubuntu on Xorg"):
+Godot places one window per monitor only on X11. Nobody touches a keyboard or mouse while playing, so the
+screens must not blank: `install_jetson_hwdec.sh` turns off GNOME's idle blanking, dimming, lock and suspend
+for the cabinet user (`--keep-blanking` leaves them), and `run.py` turns off the X screen saver and DPMS for
+the session. To start without a login, turn on automatic login in `/etc/gdm3/custom.conf`:
+
+```ini
+[daemon]
+AutomaticLoginEnable=true
+# the cabinet user's name
+AutomaticLogin=cabinet
+# an X11 session by default
+WaylandEnable=false
+```
+
+(GDM's file takes no comments at the end of a line.)
+
 ## How it works
 
 1. **Triggers.** The pack's `triggers.pup`, `playlists.pup` and `screens.pup` are read as they are, so a new
