@@ -1,30 +1,40 @@
 #!/usr/bin/env bash
 # NVIDIA Jetson (JetPack 5 or 6): installs libnvmpi, which GDE GoZen's FFmpeg loads to decode the PuP videos on
-# the hardware decoder (pup_addons/gde_gozen/README.md). Safe to re-run. install_prereqs_linux.sh runs it by
-# itself on a Jetson (TRON_HWDEC=0 skips it); on its own:
+# the hardware decoder (pup_addons/gde_gozen/README.md), and everything it and Godot need on the Jetson, so it
+# also works from a minimal or stripped root image. Safe to re-run. install_prereqs_linux.sh runs it by itself on
+# a Jetson (TRON_HWDEC=0 skips it); on its own:
 #
 #   bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF-PuP/main/scripts/install/install_jetson_hwdec.sh)
 #
 #   ... --test      also build a small ffmpeg (no system install) and decode a pack video with h264_nvmpi
-#   ... --dry-run   print the plan, change nothing
+#   ... --no-x      leave the X server alone (Godot's GPU driver is still checked)
+#   ... --dry-run   print the checks and the plan, change nothing
 #
-# Steps: the build packages and the Jetson Multimedia API (apt), jetson-ffmpeg at the revision GoZen was built
-# with (scripts/build_gozen.sh) in ~/.cache/tron-legacy-mpf/, its libnvmpi built and installed in /usr/local/lib.
+# Steps: checks (root or sudo, apt, clock, disk), the build tools (Ubuntu apt), NVIDIA's L4T apt source if the
+# image lost it, the Multimedia API and libraries, the loader path, the decoder device and the video group, the
+# NVIDIA GL/Vulkan/X driver and an X server for Godot, then jetson-ffmpeg at the revision GoZen was built with
+# (scripts/build_gozen.sh) in ~/.cache/tron-legacy-mpf/, its libnvmpi built and installed in /usr/local/lib.
 set -euo pipefail
 
 JETSON_FFMPEG_URL=https://github.com/gjrtimmer/jetson-ffmpeg
 JETSON_FFMPEG_REV=8d70c17efeee57f4d956df500fec78a73f8c27d4      # same as scripts/build_gozen.sh
+NV_REPO=https://repo.download.nvidia.com/jetson
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/tron-legacy-mpf"
 SRC="$CACHE/jetson-ffmpeg"
 TEST_VIDEO="${TRON_DIR:-$HOME/Tron-Legacy-MPF-PuP}/pup_pack/trn_174h/Drain/Drain1.mp4"
 MMAPI=/usr/src/jetson_multimedia_api
+# overridable for the tests (tests/test_install.py)
+NV_RELEASE="${TRON_NV_RELEASE:-/etc/nv_tegra_release}"
+DT="${TRON_DEVICE_TREE:-/proc/device-tree}"
+ARCH="${TRON_ARCH:-$(uname -m)}"
 
-DRY=0 TEST=0
+DRY=0 TEST=0 X=1
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY=1 ;;
         --test) TEST=1 ;;
-        -h|--help) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --no-x) X=0 ;;
+        -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
     esac
 done
@@ -32,7 +42,41 @@ done
 say() { printf '\n== %s\n' "$*"; }
 note() { printf '   %s\n' "$*"; }
 run() { printf '   $ %s\n' "$*"; [ "$DRY" = 1 ] || "$@"; }
-root() { if [ "$(id -u)" = 0 ]; then run "$@"; else run sudo "$@"; fi; }
+SUDO=""; [ "$(id -u)" = 0 ] || SUDO=sudo
+root() { run $SUDO "$@"; }
+# root_write FILE TEXT
+root_write() {
+    printf '   $ write %s: %s\n' "$1" "$2"
+    [ "$DRY" = 1 ] || printf '%s\n' "$2" | $SUDO tee "$1" >/dev/null
+}
+# a failed check stops the install; a dry run reports it and goes on
+fail() {
+    echo "   ERROR: $*" >&2
+    [ "$DRY" = 1 ] || exit 1
+}
+APT_UPDATED=0
+apt_install() {   # reinstalls too: on a stripped image a package can be "installed" with its files gone
+    [ $# -gt 0 ] || return 0
+    if [ "$APT_UPDATED" = 0 ]; then root apt-get update; APT_UPDATED=1; fi
+    root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --reinstall "$@"
+}
+# need WHAT PACKAGE: WHAT is a command, or an absolute path that must exist; adds PACKAGE to $MISSING if not
+MISSING=()
+need() {
+    local ok=0
+    case "$1" in
+        /*) compgen -G "$1" >/dev/null && ok=1 ;;
+        *) command -v "$1" >/dev/null 2>&1 && ok=1 ;;
+    esac
+    if [ "$ok" = 0 ]; then
+        note "missing: $1"
+        case " ${MISSING[*]-} " in *" $2 "*) ;; *) MISSING+=("$2") ;; esac
+    fi
+}
+install_missing() {   # install_missing LABEL
+    if [ ${#MISSING[@]} -eq 0 ]; then note "$1: in place"; else apt_install "${MISSING[@]}"; fi
+    MISSING=()
+}
 
 # ------------------------------------------------------------------ is this a Jetson with JetPack 5+?
 
@@ -42,36 +86,143 @@ if [ "${TRON_HWDEC:-1}" = 0 ]; then
 fi
 
 say "Jetson"
-if [ "$(uname -m)" != aarch64 ] || [ ! -f /etc/nv_tegra_release ]; then
+if [ "$ARCH" != aarch64 ] || [ ! -f "$NV_RELEASE" ]; then
     echo "   not an NVIDIA Jetson (no /etc/nv_tegra_release): nothing to do, GoZen decodes in software here"
     exit 0
 fi
-L4T="$(sed -n 's/^# R\([0-9]*\) (release), REVISION: \([0-9.]*\).*/\1.\2/p' /etc/nv_tegra_release)"
-note "L4T R${L4T:-?} ($( (tr -d '\0' < /proc/device-tree/model) 2>/dev/null || echo unknown model))"
-case "${L4T%%.*}" in
+L4T="$(sed -n 's/^# R\([0-9]*\) (release), REVISION: \([0-9.]*\).*/\1.\2/p' "$NV_RELEASE")"
+L4T_MAJOR="${L4T%%.*}"
+note "L4T R${L4T:-?} ($( (tr -d '\0' < "$DT/model") 2>/dev/null || echo unknown model))"
+case "$L4T_MAJOR" in
     35|36|3[7-9]) ;;
     *) echo "   L4T R${L4T:-?} is JetPack 4 or older: Godot 4.6 needs JetPack 5 or newer (glibc 2.28+)" >&2; exit 1 ;;
 esac
+# NVIDIA's apt repos are per SoC and per L4T release (R35.4.1 -> r35.4)
+COMPAT="$( (tr '\0' ' ' < "$DT/compatible") 2>/dev/null || true)"
+case "$COMPAT" in
+    *tegra194*) SOC=t194 ;;   # Xavier NX / AGX Xavier
+    *tegra234*) SOC=t234 ;;   # Orin
+    *) SOC="" ;;
+esac
+L4T_REL="r${L4T_MAJOR}.$(echo "${L4T#*.}" | cut -d. -f1)"
+note "SoC ${SOC:-unknown}, NVIDIA apt release $L4T_REL"
+# JetPack 6 moved the Tegra libraries from tegra/ to nvidia/
+if [ "$L4T_MAJOR" -ge 36 ]; then TEGRA=/usr/lib/aarch64-linux-gnu/nvidia; else TEGRA=/usr/lib/aarch64-linux-gnu/tegra; fi
 
-# ------------------------------------------------------------------ packages
+# ------------------------------------------------------------------ checks
 
-say "Build packages and the Jetson Multimedia API"
-PKGS=(git cmake build-essential pkg-config)
-[ -d "$MMAPI/include" ] || PKGS+=(nvidia-l4t-jetson-multimedia-api)
-MISSING=()
-for p in "${PKGS[@]}"; do
-    dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "install ok installed" || MISSING+=("$p")
-done
-if [ ${#MISSING[@]} -eq 0 ]; then
-    note "in place"
+say "Checks"
+if [ -n "$SUDO" ] && ! command -v sudo >/dev/null 2>&1; then
+    fail "not root and no sudo: run this as root (su -), or install sudo first"
+fi
+command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1 \
+    || fail "apt-get/dpkg not found: this needs JetPack's Ubuntu (apt) root file system"
+# no RTC battery and no network time: TLS (apt, git, curl) refuses certificates "not yet valid"
+if [ "$(date +%Y)" -lt 2025 ]; then
+    fail "the clock says $(date): set it first (sudo date -s '2026-01-01 12:00', or enable systemd-timesyncd)"
+fi
+NEED_MB=1500; [ "$TEST" = 1 ] && NEED_MB=4000
+FREE_MB="$(df -Pm "$HOME" 2>/dev/null | awk 'NR == 2 { print $4 }' || true)"
+if [ -n "$FREE_MB" ] && [ "$FREE_MB" -lt "$NEED_MB" ]; then
+    note "warning: ${FREE_MB} MB free in $HOME, the build wants about ${NEED_MB} MB"
 else
-    root apt-get update
-    root apt-get install -y --no-install-recommends "${MISSING[@]}"
+    note "${FREE_MB:-?} MB free in $HOME"
 fi
-if [ "$DRY" = 0 ] && [ ! -d "$MMAPI/include" ]; then
-    echo "   $MMAPI is still missing: check that the NVIDIA apt sources are enabled (JetPack)" >&2
-    exit 1
+note "root: $([ -z "$SUDO" ] && echo yes || echo "through sudo")"
+
+# ------------------------------------------------------------------ build tools (Ubuntu)
+
+say "Build tools"
+need /etc/ssl/certs/ca-certificates.crt ca-certificates
+need curl curl
+need git git
+need cmake cmake
+need make make
+need gcc gcc
+need g++ g++
+need /usr/include/stdio.h libc6-dev
+need pkg-config pkg-config
+need awk mawk
+need /usr/lib/aarch64-linux-gnu/libjpeg.so.8 libjpeg-turbo8    # libnvmpi's JPEG code links it
+install_missing "build tools"
+
+# ------------------------------------------------------------------ NVIDIA's apt source
+
+say "NVIDIA L4T apt source ($NV_REPO)"
+if grep -rqs 'repo.download.nvidia.com/jetson' /etc/apt/sources.list /etc/apt/sources.list.d/; then
+    note "in place"
+elif [ -z "$SOC" ]; then
+    fail "no NVIDIA apt source and unknown SoC ($DT/compatible: ${COMPAT:-unreadable}); add JetPack's" \
+         "/etc/apt/sources.list.d/nvidia-l4t-apt-source.list by hand"
+else
+    root curl -fsSL -o /etc/apt/trusted.gpg.d/jetson-ota-public.asc "$NV_REPO/jetson-ota-public.asc" \
+        || fail "could not download NVIDIA's apt key from $NV_REPO: check the network"
+    root_write /etc/apt/sources.list.d/nvidia-l4t-apt-source.list \
+        "deb $NV_REPO/common $L4T_REL main"$'\n'"deb $NV_REPO/$SOC $L4T_REL main"
+    APT_UPDATED=0
 fi
+
+# ------------------------------------------------------------------ Multimedia API and libraries
+
+say "Jetson Multimedia API and libraries"
+need "$MMAPI/include/NvVideoDecoder.h" nvidia-l4t-jetson-multimedia-api
+need "$MMAPI/samples/common/classes/NvVideoDecoder.cpp" nvidia-l4t-jetson-multimedia-api
+need "$TEGRA/libnvv4l2.so" nvidia-l4t-multimedia
+need "$TEGRA/libnvjpeg.so" nvidia-l4t-multimedia
+need "$TEGRA/libnvbufsurface.so*" nvidia-l4t-multimedia-utils
+need "$TEGRA/libnvbufsurftransform.so*" nvidia-l4t-multimedia-utils
+install_missing "Multimedia API and libraries"
+if [ "$DRY" = 0 ]; then
+    [ -f "$MMAPI/include/NvVideoDecoder.h" ] || fail "$MMAPI is still missing after apt"
+    [ -f "$TEGRA/libnvv4l2.so" ] || fail "$TEGRA/libnvv4l2.so is still missing after apt"
+fi
+
+say "Loader path"
+if command -v ldconfig >/dev/null 2>&1 && ldconfig -p | grep -q 'libnvv4l2\.so'; then
+    note "the Tegra libraries are in the loader cache"
+else
+    note "$TEGRA is not in the loader cache"
+    root_write /etc/ld.so.conf.d/nvidia-tegra.conf "$TEGRA"
+    root ldconfig
+fi
+
+# ------------------------------------------------------------------ decoder device and permissions
+
+say "Decoder device"
+if compgen -G "/dev/nvhost-nvdec*" >/dev/null || [ -e /dev/v4l2-nvdec ]; then
+    note "$(ls -d /dev/nvhost-nvdec* /dev/v4l2-nvdec 2>/dev/null | tr '\n' ' ')"
+else
+    note "warning: no /dev/nvhost-nvdec* or /dev/v4l2-nvdec: the hardware decoder needs JetPack's kernel and"
+    note "device tree (check 'lsmod | grep nvhost' / dmesg); GoZen falls back to software decoding until then"
+fi
+USER_NAME="${SUDO_USER:-$(id -un)}"
+if [ "$USER_NAME" != root ] && getent group video >/dev/null; then
+    if id -nG "$USER_NAME" | tr ' ' '\n' | grep -qx video; then
+        note "$USER_NAME is in the video group"
+    else
+        root usermod -aG video "$USER_NAME"
+        note "$USER_NAME added to the video group: log out and back in before starting the game"
+    fi
+fi
+
+# ------------------------------------------------------------------ Godot's GPU driver and X server
+
+say "Godot's GPU driver (NVIDIA GL, EGL, Vulkan)$([ "$X" = 1 ] && echo ' and X server')"
+need "$TEGRA/libGLX_nvidia.so.0" nvidia-l4t-3d-core
+need "$TEGRA/libEGL_nvidia.so.0" nvidia-l4t-3d-core
+need "/etc/vulkan/icd.d/nvidia_icd.json" nvidia-l4t-3d-core
+need "/usr/lib/aarch64-linux-gnu/libGLX.so.0" libglx0
+need "/usr/lib/aarch64-linux-gnu/libEGL.so.1" libegl1
+need "/usr/lib/aarch64-linux-gnu/libvulkan.so.1" libvulkan1
+if [ "$X" = 1 ]; then
+    # Godot places one window per monitor only on X11 (docs/pup.md)
+    need "/usr/lib/xorg/modules/drivers/nvidia_drv.so" nvidia-l4t-x11
+    need Xorg xserver-xorg-core
+    need "/usr/lib/xorg/modules/input/libinput_drv.so" xserver-xorg-input-libinput
+    need xinit xinit
+    need xrandr x11-xserver-utils
+fi
+install_missing "GPU driver$([ "$X" = 1 ] && echo ' and X server')"
 
 # ------------------------------------------------------------------ libnvmpi
 
@@ -89,8 +240,7 @@ if [ "$DRY" = 0 ]; then
     if ldconfig -p | grep -q 'libnvmpi\.so '; then
         note "installed: $(ldconfig -p | grep 'libnvmpi\.so ' | sed 's/.*=> //')"
     else
-        echo "   libnvmpi.so is not in the loader cache (ldconfig -p): GoZen would decode in software" >&2
-        exit 1
+        fail "libnvmpi.so is not in the loader cache (ldconfig -p): GoZen would decode in software"
     fi
 fi
 
@@ -110,5 +260,5 @@ if [ "$TEST" = 1 ]; then
 fi
 
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
-note "Start the game (python scripts/run.py): Godot's log says 'GoZen: hardware decoder h264_nvmpi' per video,"
-note "and 'sudo tegrastats' shows NVDEC busy while they play."
+note "Start the game (python scripts/run.py) from an X session (startx, or a display manager): Godot's log"
+note "says 'GoZen: hardware decoder h264_nvmpi' per video, and 'sudo tegrastats' shows NVDEC busy while they play."

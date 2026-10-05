@@ -49,6 +49,26 @@ class TestShellScripts(unittest.TestCase):
         self.assertEqual(0, r.returncode, r.stderr)
         self.assertIn("not an NVIDIA Jetson", r.stdout)
 
+    def test_jetson_hwdec_plan_on_a_stripped_xavier(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        with open(release, "w") as f:
+            f.write("# R35 (release), REVISION: 4.1, GCID: 1, BOARD: t186ref, EABI: aarch64\n")
+        with open(os.path.join(tmp, "model"), "w") as f:
+            f.write("NVIDIA Jetson Xavier NX Developer Kit\0")
+        with open(os.path.join(tmp, "compatible"), "w") as f:
+            f.write("nvidia,p3509-0000+p3668-0001\0nvidia,tegra194\0")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"],
+               env={"TRON_ARCH": "aarch64", "TRON_NV_RELEASE": release, "TRON_DEVICE_TREE": tmp})
+        self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+        self.assertIn("SoC t194, NVIDIA apt release r35.4", r.stdout)
+        if os.path.exists("/usr/src/jetson_multimedia_api/include/NvVideoDecoder.h"):
+            return  # a real Jetson: nothing is missing
+        self.assertIn("nvidia-l4t-jetson-multimedia-api", r.stdout)
+        self.assertIn("nvidia-l4t-3d-core", r.stdout)
+        self.assertIn("scripts/build.sh --no-stubs --install", r.stdout)
+
     def os_release(self, text):
         f = tempfile.NamedTemporaryFile("w", suffix=".os-release", delete=False)
         f.write(text)

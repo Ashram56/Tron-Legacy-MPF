@@ -32,9 +32,14 @@ On its own, one line on the Jetson:
 bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF-PuP/main/scripts/install/install_jetson_hwdec.sh)
 ```
 
-It installs the build packages and the Jetson Multimedia API (apt), then builds jetson-ffmpeg's libnvmpi (at
-the revision this GoZen was built with) into `/usr/local/lib`. `--test` also builds a small ffmpeg (not installed
-system-wide) and decodes a pack video with `h264_nvmpi` to prove the hardware path.
+It works from a minimal or stripped JetPack root image: it checks that it can get root (directly or through
+sudo), that apt is there, that the clock is set (TLS fails otherwise) and that there is disk space, then installs
+whatever is missing among the build tools, NVIDIA's L4T apt source (for the board's SoC and L4T release), the
+Jetson Multimedia API and libraries, the Tegra loader path, the video group for your user, NVIDIA's GL/EGL/Vulkan
+and X driver and an X server (`--no-x` leaves X alone). Then it builds jetson-ffmpeg's libnvmpi (at the revision
+this GoZen was built with) into `/usr/local/lib`. `--dry-run` prints every check and step without changing
+anything. `--test` also builds a small ffmpeg (not installed system-wide) and decodes a pack video with
+`h264_nvmpi` to prove the hardware path.
 
 When the game starts, Godot's log (`game/logs/` or the terminal) says for each video either
 `GoZen: hardware decoder h264_nvmpi` or `GoZen: hardware decoder h264_nvmpi unavailable, using software`.
