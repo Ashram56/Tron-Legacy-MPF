@@ -35,14 +35,18 @@ class TestPupFiles(unittest.TestCase):
 
 
 class TestSetup(unittest.TestCase):
-    def test_native_video_on_windows_only(self):
+    def test_native_video_on_windows_and_macos(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
         import pup_setup
-        self.assertTrue(pup_setup.native_video("windows"))
-        self.assertFalse(pup_setup.native_video("linux"))
-        self.assertFalse(pup_setup.native_video("macos"))
+        with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": ""}):
+            self.assertTrue(pup_setup.native_video("windows"))
+            self.assertTrue(pup_setup.native_video("macos"))
+            self.assertFalse(pup_setup.native_video("linux"))
+        with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": "0"}):
+            self.assertFalse(pup_setup.native_video("windows"))
         for name in ("native_video.gdextension", "native_video.windows.release.x86_64.dll",
-                     "native_video.windows.debug.x86_64.dll"):
+                     "native_video.windows.debug.x86_64.dll", "libnative_video.macos.debug.dylib",
+                     "libnative_video.macos.release.dylib"):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
 
     def test_gozen_on_linux_only(self):

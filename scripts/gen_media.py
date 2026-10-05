@@ -11,8 +11,6 @@ Generated (all git-ignored, rebuilt by scripts/setup.py):
 - game/media/dmd_hd/deff_NNN/*.png    the same frames and letter sprites upscaled FRAME_SCALE times
                                       (scripts/dmd_hd.py) for the HD display mode (game/tools/dmd_mode.gd);
                                       cached by content in .cache/dmd_hd/, so a rebuild redoes only new art
-- game/media/dmd_hd_color/deff_NNN/   the effect frames in colour at 2x (256x64, Scale2x; scripts/dmd_color.py,
-                                      the palettes of game/tools/dmd_colormap.json) for the HD colour DMD
 
 Display effects whose ROM text has no values ("BALL SAVED / KEEP SHOOTING") use the emulator's
 reference capture, which includes the ROM fonts. Effects that print values (scores, counts) use the
@@ -421,6 +419,7 @@ def build_hd_frames(scale=None):
     src_root = os.path.join(GAME, "media", "dmd")
     dst_root = os.path.join(GAME, "media", "dmd_hd")
     fsutil.remove_dir(dst_root)
+    fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))    # the colour frames of earlier versions
     jobs = []
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
@@ -434,14 +433,6 @@ def build_hd_frames(scale=None):
     return len(dmd_hd.upscale_files(jobs))
 
 
-def build_color_frames(scale=None):
-    """game/media/dmd_hd_color: the HD effect frames coloured with each effect's palette (dmd_color.build)."""
-    import dmd_color
-    return dmd_color.build(os.path.join(GAME, "media", "dmd"), os.path.join(GAME, "media", "dmd_hd_color"),
-                           scale or dmd_color.COLOR_SCALE,
-                           os.path.join(ROOT, ".cache", "dmd_hd"))
-
-
 def main():
     import gen_fonts
     only_data = "--only-data" in sys.argv
@@ -449,16 +440,13 @@ def main():
     if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
         gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
-    # written before the HD and colour frames: dmd_color.text_masks reads the deffs' text from it
-    with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
-        json.dump(data, f, indent=0, sort_keys=True)
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
         fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
         fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
-        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))
     if hd and not only_data:
         print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
-        print("media: {} HD colour frames in game/media/dmd_hd_color".format(build_color_frames()), flush=True)
+    with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(data, f, indent=0, sort_keys=True)
     print("media: {} sound pools, {} display effects".format(len(data["pools"]), len(data["deffs"])))
 
 

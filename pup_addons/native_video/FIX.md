@@ -29,3 +29,6 @@ Live session: `run_batch1.py --attempts 1`: 12/12 modules PASS, 0 native_video c
 - `media_video_slide.gd` `_start_clip()` retry helper kept (harmless, a 0.3 s timer per clip start); with the fixed DLL no retry was needed in the suites. May be removed later by the Godot developer.
 - Sample: 80 + 40 smoke opens and one live suite, all green. No 32-bit/arm64 DLLs rebuilt.
 - Scratch dir `C:\qa_nv` (222 MB: Zig, Godot 4.6, sources) could not be deleted by this agent (path protected); delete it manually.
+
+## macOS (2026-10-04)
+The macOS dylibs are rebuilt from the same sources with the same fix by `.github/workflows/native_video_macos.yml` (the fix file: `pup_addons/native_video_build/heap.zig`).

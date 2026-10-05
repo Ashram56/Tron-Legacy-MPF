@@ -22,12 +22,15 @@ installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
-**Windows: native mp4 playback.** On Windows, `setup.py` installs the `native_video` add-on
+**Windows and macOS: native mp4 playback.** On Windows and macOS, `setup.py` installs the `native_video` add-on
 (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
-they are, with hardware decoding: nothing is converted, `gen_pup.py --native` only lists the videos. This
-build carries a fix for a heap overrun in the upstream release (`pup_addons/native_video/FIX.md`), so do not
-replace it with an upstream zip. The add-on needs Godot 4.6+ and a RenderingDevice renderer (the game uses
-Mobile). Without it loaded the PuP plays the converted Theora videos, as on macOS.
+they are, with hardware decoding (Media Foundation, AVFoundation): nothing is converted, `gen_pup.py --native`
+only lists the videos. This build carries a fix for a heap overrun in the upstream release
+([issue 26](https://github.com/claytercek/godot-native-video/issues/26), `pup_addons/native_video_build/`), so do
+not replace it with an upstream zip: the macOS dylibs come from the `native_video macOS build` workflow, the
+Windows DLLs from `pup_addons/native_video/FIX.md`. The add-on needs Godot 4.6+ and a RenderingDevice renderer
+(the game uses Mobile). `TRON_NATIVE_VIDEO=0` in the environment for `setup.py` converts the videos instead and
+removes the add-on; without it loaded the PuP plays the converted Theora videos.
 
 **Linux: GDE GoZen.** On Linux (x86_64 and arm64), `setup.py` installs GDE GoZen (`pup_addons/gde_gozen`,
 copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
