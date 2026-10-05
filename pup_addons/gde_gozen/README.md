@@ -50,7 +50,9 @@ this GoZen was built with) into `/usr/local/lib`. `--dry-run` prints every check
 anything. `--test` also builds a small ffmpeg (not installed system-wide) and decodes a pack video with
 `h264_nvmpi` to prove the hardware path.
 
-It handles Xavier (t194, JetPack 5, R35, libraries in `tegra/`) and Orin (t234, JetPack 6, R36, libraries in
+**Tested platform: Jetson AGX Orin (t234), L4T R36.4.3 / JetPack 6.2** (hardware decoding of all three PuP
+screens, loops and video switches). Xavier NX / AGX Xavier (t194, L4T R35, JetPack 5) is handled by the same
+script but not tested on a board yet. The script handles Xavier (libraries in `tegra/`) and Orin (libraries in
 `nvidia/`). NVIDIA's apt release (for example `r36.4`) carries every point release and its newest is apt's
 default, so the NVIDIA packages it installs are pinned to the board's own release from `/etc/nv_tegra_release`
 (R36.4.3 installs 36.4.3, not 36.4.7). Upgrading the board's BSP stays a separate `sudo apt upgrade`.

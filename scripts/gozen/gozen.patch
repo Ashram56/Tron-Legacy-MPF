@@ -1,3 +1,8 @@
+Patch to GDE GoZen (github.com/VoylinsGamedevJourney/gde_gozen) at f9448619, applied by scripts/build_gozen.sh
+(git apply ignores this text): asks FFmpeg for <codec>_nvmpi (the Jetson's hardware decoder) first and falls back
+to software; SConstruct lean=yes. Hardware decoding tested on Jetson AGX Orin, L4T R36.4.3 / JetPack 6.2;
+Xavier NX (L4T R35) not tested yet. Software decoding: any Linux x86_64 / arm64.
+
 diff --git a/SConstruct b/SConstruct
 index 5e7fcdf..923d50c 100644
 --- a/SConstruct
