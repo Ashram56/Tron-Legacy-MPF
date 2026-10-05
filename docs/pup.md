@@ -36,7 +36,8 @@ removes the add-on; without it loaded the PuP plays the converted Theora videos.
 copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
 nothing is converted. On a Jetson (JetPack 5 or 6) it uses the hardware decoder once libnvmpi is installed
 (the Linux install line does it, or `scripts/install/install_jetson_hwdec.sh`, see
-`pup_addons/gde_gozen/README.md`); everywhere else FFmpeg decodes in software.
+`pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md) for the fixes it needs); everywhere else FFmpeg
+decodes in software.
 `TRON_GOZEN=0 python scripts/setup.py` goes back to Theora. The binaries are rebuilt from pinned sources with
 `scripts/build_gozen.sh` (Docker).
 

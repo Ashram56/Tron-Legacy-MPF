@@ -57,6 +57,9 @@ script but not tested on a board yet. The script handles Xavier (libraries in `t
 default, so the NVIDIA packages it installs are pinned to the board's own release from `/etc/nv_tegra_release`
 (R36.4.3 installs 36.4.3, not 36.4.7). Upgrading the board's BSP stays a separate `sudo apt upgrade`.
 
+Every Jetson fix (this add-on, the FFmpeg wrapper, libnvmpi), why and how it was checked, and the checklist for
+another board: [`docs/jetson.md`](../../docs/jetson.md).
+
 When the game starts, Godot's log (`game/logs/` or the terminal) says for each video either
 `GoZen: hardware decoder h264_nvmpi` or `GoZen: hardware decoder h264_nvmpi unavailable, using software`.
 `sudo tegrastats` shows `NVDEC` busy while videos play.
