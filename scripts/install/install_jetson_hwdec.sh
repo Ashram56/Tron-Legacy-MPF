@@ -11,8 +11,8 @@
 #   ... --dry-run   print the checks and the plan, change nothing
 #
 # Steps: checks (root or sudo, apt, clock, disk), the build tools (Ubuntu apt), NVIDIA's L4T apt source if the
-# image lost it, the Multimedia API and libraries, the loader path, the decoder device and the video group, the
-# NVIDIA GL/Vulkan/X driver and an X server for Godot, then jetson-ffmpeg at the revision GoZen was built with
+# image lost it, the Multimedia API and libraries, the decoder device and the video group, the NVIDIA
+# GL/Vulkan/X driver and an X server for Godot, the loader path for NVIDIA's libraries, then jetson-ffmpeg at the revision GoZen was built with
 # (scripts/build_gozen.sh) in ~/.cache/tron-legacy-mpf/, its libnvmpi built and installed in /usr/local/lib.
 set -euo pipefail
 
@@ -108,6 +108,7 @@ L4T_REL="r${L4T_MAJOR}.$(echo "${L4T#*.}" | cut -d. -f1)"
 note "SoC ${SOC:-unknown}, NVIDIA apt release $L4T_REL"
 # JetPack 6 moved the Tegra libraries from tegra/ to nvidia/
 if [ "$L4T_MAJOR" -ge 36 ]; then TEGRA=/usr/lib/aarch64-linux-gnu/nvidia; else TEGRA=/usr/lib/aarch64-linux-gnu/tegra; fi
+EGL_DIR=/usr/lib/aarch64-linux-gnu/tegra-egl   # both releases
 
 # ------------------------------------------------------------------ checks
 
@@ -177,15 +178,6 @@ if [ "$DRY" = 0 ]; then
     [ -f "$TEGRA/libnvv4l2.so" ] || fail "$TEGRA/libnvv4l2.so is still missing after apt"
 fi
 
-say "Loader path"
-if command -v ldconfig >/dev/null 2>&1 && ldconfig -p | grep -q 'libnvv4l2\.so'; then
-    note "the Tegra libraries are in the loader cache"
-else
-    note "$TEGRA is not in the loader cache"
-    root_write /etc/ld.so.conf.d/nvidia-tegra.conf "$TEGRA"
-    root ldconfig
-fi
-
 # ------------------------------------------------------------------ decoder device and permissions
 
 say "Decoder device"
@@ -209,7 +201,7 @@ fi
 
 say "Godot's GPU driver (NVIDIA GL, EGL, Vulkan)$([ "$X" = 1 ] && echo ' and X server')"
 need "$TEGRA/libGLX_nvidia.so.0" nvidia-l4t-3d-core
-need "$TEGRA/libEGL_nvidia.so.0" nvidia-l4t-3d-core
+need "$EGL_DIR/libEGL_nvidia.so.0" nvidia-l4t-3d-core
 need "/etc/vulkan/icd.d/nvidia_icd.json" nvidia-l4t-3d-core
 need "/usr/lib/aarch64-linux-gnu/libGLX.so.0" libglx0
 need "/usr/lib/aarch64-linux-gnu/libEGL.so.1" libegl1
@@ -223,6 +215,25 @@ if [ "$X" = 1 ]; then
     need xrandr x11-xserver-utils
 fi
 install_missing "GPU driver$([ "$X" = 1 ] && echo ' and X server')"
+
+say "Loader path"
+# nvidia-l4t-core and -3d-core ship these directories but not always the loader config for them (tegra-egl's
+# link is made when the image is built, not by the package); look for a library from each in the cache, by
+# directory, since libnvv4l2.so is cached under its soname libv4l2.so.0
+loader_dir() {   # loader_dir DIR CONF
+    [ -d "$1" ] || [ "$DRY" = 1 ] || return 0
+    if command -v ldconfig >/dev/null 2>&1 && ldconfig -p | grep -q "=> $1/"; then
+        note "$1 is in the loader cache"
+    else
+        note "$1 is not in the loader cache"
+        root_write "$2" "$1"
+        LDCONFIG=1
+    fi
+}
+LDCONFIG=0
+loader_dir "$TEGRA" /etc/ld.so.conf.d/nvidia-tegra.conf
+loader_dir "$EGL_DIR" /etc/ld.so.conf.d/aarch64-linux-gnu_EGL.conf
+[ "$LDCONFIG" = 0 ] || root ldconfig
 
 # ------------------------------------------------------------------ libnvmpi
 

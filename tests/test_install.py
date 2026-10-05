@@ -67,6 +67,9 @@ class TestShellScripts(unittest.TestCase):
             return  # a real Jetson: nothing is missing
         self.assertIn("nvidia-l4t-jetson-multimedia-api", r.stdout)
         self.assertIn("nvidia-l4t-3d-core", r.stdout)
+        # EGL lives in tegra-egl, which the 3d-core package does not add to the loader path
+        self.assertIn("tegra-egl/libEGL_nvidia.so.0", r.stdout)
+        self.assertIn("aarch64-linux-gnu_EGL.conf: /usr/lib/aarch64-linux-gnu/tegra-egl", r.stdout)
         self.assertIn("scripts/build.sh --no-stubs --install", r.stdout)
 
     def os_release(self, text):
