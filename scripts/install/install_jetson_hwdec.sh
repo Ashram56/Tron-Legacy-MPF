@@ -8,6 +8,7 @@
 #
 #   ... --test      also build a small ffmpeg (no system install) and decode a pack video with h264_nvmpi
 #   ... --no-x      leave the X server alone (Godot's GPU driver is still checked)
+#   ... --keep-blanking  leave GNOME's screen blanking, dimming and lock as they are (turned off by default)
 #   ... --dry-run   print the checks and the plan, change nothing
 #
 # Steps: checks (root or sudo, apt, clock, disk), the build tools (Ubuntu apt), NVIDIA's L4T apt source if the
@@ -28,13 +29,14 @@ NV_RELEASE="${TRON_NV_RELEASE:-/etc/nv_tegra_release}"
 DT="${TRON_DEVICE_TREE:-/proc/device-tree}"
 ARCH="${TRON_ARCH:-$(uname -m)}"
 
-DRY=0 TEST=0 X=1
+DRY=0 TEST=0 X=1 BLANK=0
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY=1 ;;
         --test) TEST=1 ;;
         --no-x) X=0 ;;
-        -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --keep-blanking) BLANK=1 ;;
+        -h|--help) sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
     esac
 done
@@ -232,6 +234,34 @@ if [ "$X" = 1 ]; then
     need xrandr x11-xserver-utils
 fi
 install_missing "GPU driver$([ "$X" = 1 ] && echo ' and X server')"
+
+# ------------------------------------------------------------------ screen blanking (GNOME)
+
+# A cabinet has no keyboard or mouse in use while people play, so GNOME blanked and locked the screens mid-game
+# on the Orin. Turned off for the cabinet user (their dconf settings, so a GNOME session started later keeps it):
+# the values checked on the board, plus no suspend on idle. Without GNOME (no gsettings schema) nothing to do.
+if [ "$X" = 1 ] && [ "$BLANK" = 0 ]; then
+    say "Screen blanking, dimming and lock (GNOME, user $USER_NAME)"
+    if ! command -v gsettings >/dev/null 2>&1 || ! gsettings list-schemas 2>/dev/null | grep -x org.gnome.desktop.session >/dev/null; then
+        note "no GNOME settings here: nothing to change"
+    else
+        GS=(gsettings)
+        if [ "$USER_NAME" != "$(id -un)" ]; then
+            GS=(sudo -u "$USER_NAME" env HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)" dbus-run-session -- gsettings)
+        elif [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+            GS=(dbus-run-session -- gsettings)   # over SSH: no session bus, dconf is written all the same
+        fi
+        for kv in "org.gnome.desktop.session idle-delay 0" \
+                  "org.gnome.desktop.screensaver lock-enabled false" \
+                  "org.gnome.desktop.screensaver idle-activation-enabled false" \
+                  "org.gnome.settings-daemon.plugins.power idle-dim false" \
+                  "org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing"; do
+            read -r schema key value <<< "$kv"
+            run "${GS[@]}" set "$schema" "$key" "$value" || note "warning: could not set $schema $key"
+        done
+        note "--keep-blanking leaves these alone; for a cabinet also turn on automatic login (docs/pup.md)"
+    fi
+fi
 
 say "Loader path"
 # nvidia-l4t-core and -3d-core ship these directories but not always the loader config for them (tegra-egl's

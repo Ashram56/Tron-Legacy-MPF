@@ -147,6 +147,15 @@ def godot_command(godot_args, virtual_display=None):
     return cmd
 
 
+def keep_screen_on():
+    """Linux on a real X display: the X server's own screen saver and DPMS power-off off for this X session (GNOME's
+    idle blanking and lock are turned off by install_jetson_hwdec.sh); a cabinet's players use no keyboard or mouse."""
+    if IS_WINDOWS or sys.platform == "darwin" or not os.environ.get("DISPLAY") or tc.needs_virtual_display():
+        return
+    if shutil.which("xset"):
+        subprocess.run(["xset", "s", "off", "-dpms"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def user_arg(gargs, arg):
     """gargs plus arg after Godot's "--" (the args game scripts read with OS.get_cmdline_user_args)."""
     return list(gargs) + [arg] if "--" in gargs else list(gargs) + ["--", arg]
@@ -240,6 +249,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         env["TRON_TRACE"] = trace
     godot = mpf = mon = None
     print(pup_setup.status()[1], flush=True)  # PuP Pack: docs/pup.md
+    if not virtual_display:
+        keep_screen_on()
     try:
         godot = spawn(godot_command(gargs, virtual_display), log=godot_log, group=True)
         print("Godot started (log: {}), waiting for GMC on port {}".format(godot_log, tc.BCP_PORT), flush=True)
