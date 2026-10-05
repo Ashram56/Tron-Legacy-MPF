@@ -41,6 +41,11 @@ this GoZen was built with) into `/usr/local/lib`. `--dry-run` prints every check
 anything. `--test` also builds a small ffmpeg (not installed system-wide) and decodes a pack video with
 `h264_nvmpi` to prove the hardware path.
 
+It handles Xavier (t194, JetPack 5, R35, libraries in `tegra/`) and Orin (t234, JetPack 6, R36, libraries in
+`nvidia/`). NVIDIA's apt release (for example `r36.4`) carries every point release and its newest is apt's
+default, so the NVIDIA packages it installs are pinned to the board's own release from `/etc/nv_tegra_release`
+(R36.4.3 installs 36.4.3, not 36.4.7). Upgrading the board's BSP stays a separate `sudo apt upgrade`.
+
 When the game starts, Godot's log (`game/logs/` or the terminal) says for each video either
 `GoZen: hardware decoder h264_nvmpi` or `GoZen: hardware decoder h264_nvmpi unavailable, using software`.
 `sudo tegrastats` shows `NVDEC` busy while videos play.

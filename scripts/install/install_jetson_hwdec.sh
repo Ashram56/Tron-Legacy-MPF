@@ -58,7 +58,21 @@ APT_UPDATED=0
 apt_install() {   # reinstalls too: on a stripped image a package can be "installed" with its files gone
     [ $# -gt 0 ] || return 0
     if [ "$APT_UPDATED" = 0 ]; then root apt-get update; APT_UPDATED=1; fi
-    root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --reinstall "$@"
+    root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --reinstall \
+        ${L4T_PIN:+-o "Dir::Etc::Preferences=$L4T_PIN"} "$@"
+}
+# NVIDIA's apt release (r36.4) carries every point release (36.4.0 ... 36.4.7) and its newest is the candidate,
+# so a plain install would put newer NVIDIA libraries next to the installed BSP (kernel, firmware, nvidia-l4t-core).
+# l4t_pin pins nvidia-l4t-* to the release in /etc/nv_tegra_release for this script's installs only; upgrading the
+# BSP stays NVIDIA's apt upgrade.
+L4T_PIN=""
+l4t_pin() {
+    [ -n "${L4T_FULL:-}" ] || return 0
+    L4T_PIN="$CACHE/l4t-pin.pref"
+    printf '   $ write %s: nvidia-l4t-* %s-*\n' "$L4T_PIN" "$L4T_FULL"
+    [ "$DRY" = 1 ] && return 0
+    mkdir -p "$CACHE"
+    printf 'Package: nvidia-l4t-*\nPin: version %s-*\nPin-Priority: 1001\n' "$L4T_FULL" > "$L4T_PIN"
 }
 # need WHAT PACKAGE: WHAT is a command, or an absolute path that must exist; adds PACKAGE to $MISSING if not
 MISSING=()
@@ -109,6 +123,7 @@ note "SoC ${SOC:-unknown}, NVIDIA apt release $L4T_REL"
 # JetPack 6 moved the Tegra libraries from tegra/ to nvidia/
 if [ "$L4T_MAJOR" -ge 36 ]; then TEGRA=/usr/lib/aarch64-linux-gnu/nvidia; else TEGRA=/usr/lib/aarch64-linux-gnu/tegra; fi
 EGL_DIR=/usr/lib/aarch64-linux-gnu/tegra-egl   # both releases
+case "$L4T" in *.*.*) L4T_FULL="$L4T"; l4t_pin ;; esac
 
 # ------------------------------------------------------------------ checks
 
