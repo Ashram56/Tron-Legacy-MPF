@@ -162,6 +162,16 @@ case "$(uname -m)" in
     *) if [ "$DRY" = 1 ]; then ARCH=x86_64; else die "unsupported CPU $(uname -m): x86_64 or arm64 only"; fi ;;
 esac
 
+# MPF Monitor needs PyQt6. Its arm64 wheels need glibc 2.39 from 6.8 on, so scripts/toolchain.py takes 6.7 on
+# Linux arm64, whose wheels need glibc 2.28 (JetPack 5: 2.31, JetPack 6: 2.35). Older than that, pip falls back
+# to a source build that fails, so the monitor is left out
+GLIBC="$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{ print $2 }' || true)"
+if [ "$MONITOR" = 1 ] && [ "$ARCH" = aarch64 ] && [ -n "$GLIBC" ] \
+   && [ "$(printf '%s\n' 2.28 "$GLIBC" | sort -V | head -n 1)" != 2.28 ]; then
+    MONITOR=0
+    MONITOR_SKIPPED="glibc $GLIBC < 2.28 on arm64: PyQt6 has no wheel for it"
+fi
+
 # ------------------------------------------------------------------ packages per family
 
 case "$FAMILY" in
@@ -238,6 +248,17 @@ install_pkgs() {    # install the packages of "$@" that are missing
         if [ "$APT_UPDATED" = 0 ]; then root apt-get update -qq; APT_UPDATED=1; fi
         local i
         for i in "${!missing[@]}"; do missing[i]="$(apt_name "${missing[i]}")"; done
+        # libdecor (Wayland window decorations, optional for Godot) is not in Ubuntu 20.04 / JetPack 5
+        for i in "${!missing[@]}"; do
+            case "${missing[i]}" in libdecor-0-0*)
+                if have_tool apt-cache && ! apt_known "${missing[i]}"; then
+                    note "${missing[i]} is not in this release: skipped (Godot only uses it on Wayland)"
+                    unset 'missing[i]'
+                fi ;;
+            esac
+        done
+        missing=("${missing[@]}")
+        [ ${#missing[@]} -gt 0 ] || return 0
     fi
     note "missing: ${missing[*]}"
     if [ "$DRY" = 0 ] && [ "$YES" = 0 ] && [ -t 0 ]; then
@@ -284,8 +305,15 @@ apt_has_python311() {   # a final (not release candidate) python3.11 in the conf
 deadsnakes() {
     say "Python 3.11 from the deadsnakes PPA (Ubuntu)"
     install_pkgs software-properties-common
-    root add-apt-repository -y ppa:deadsnakes/ppa
+    # set -e is off in a function called with ||: check each step, or Ubuntu 22.04's own python3.11
+    # (3.11.0 release candidate) gets installed when the PPA could not be added
+    root add-apt-repository -y ppa:deadsnakes/ppa || return 1
     APT_UPDATED=0
+    if [ "$DRY" = 0 ]; then
+        root apt-get update -qq || return 1
+        APT_UPDATED=1
+        apt_has_python311 || return 1
+    fi
     install_pkgs "${PKG_PY[@]}"
 }
 
@@ -389,6 +417,7 @@ fi
 
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
+    [ -z "${MONITOR_SKIPPED:-}" ] || note "MPF Monitor left out: $MONITOR_SKIPPED"
     ARGS=()
     [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
@@ -425,6 +454,7 @@ if [ "$PROC" = 1 ]; then
     fi
 fi
 
+[ ! -f /etc/nv_tegra_release ] || "$HERE/install_jetson_hwdec.sh" $([ "$DRY" = 1 ] && echo --dry-run) || true  # PuP: Jetson decoder
 say "Done$([ "$DRY" = 1 ] && echo ' (dry run: nothing was changed)')"
 if [ "$SETUP" = 1 ]; then
     note "In $ROOT:"

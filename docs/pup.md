@@ -30,7 +30,16 @@ only lists the videos. This build carries a fix for a heap overrun in the upstre
 not replace it with an upstream zip: the macOS dylibs come from the `native_video macOS build` workflow, the
 Windows DLLs from `pup_addons/native_video/FIX.md`. The add-on needs Godot 4.6+ and a RenderingDevice renderer
 (the game uses Mobile). `TRON_NATIVE_VIDEO=0` in the environment for `setup.py` converts the videos instead and
-removes the add-on; without it loaded the PuP plays the converted Theora videos, as on Linux.
+removes the add-on; without it loaded the PuP plays the converted Theora videos.
+
+**Linux: GDE GoZen.** On Linux (x86_64 and arm64), `setup.py` installs GDE GoZen (`pup_addons/gde_gozen`,
+copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
+nothing is converted. On a Jetson (JetPack 5 or 6) it uses the hardware decoder once libnvmpi is installed
+(the Linux install line does it, or `scripts/install/install_jetson_hwdec.sh`, see
+`pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md) for the fixes it needs); everywhere else FFmpeg
+decodes in software.
+`TRON_GOZEN=0 python scripts/setup.py` goes back to Theora. The binaries are rebuilt from pinned sources with
+`scripts/build_gozen.sh` (Docker).
 
 ## The three screens
 
@@ -75,6 +84,23 @@ borderless=true
   The game's own 128x32 window is minimised (`hide_main_window`); it stays the source of the DMD picture, so
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as
   in the DMD window.
+
+**Linux cabinet (Jetson).** Use an X11 session (on Ubuntu's login screen, the gear icon: "Ubuntu on Xorg"):
+Godot places one window per monitor only on X11. Nobody touches a keyboard or mouse while playing, so the
+screens must not blank: `install_jetson_hwdec.sh` turns off GNOME's idle blanking, dimming, lock and suspend
+for the cabinet user (`--keep-blanking` leaves them), and `run.py` turns off the X screen saver and DPMS for
+the session. To start without a login, turn on automatic login in `/etc/gdm3/custom.conf`:
+
+```ini
+[daemon]
+AutomaticLoginEnable=true
+# the cabinet user's name
+AutomaticLogin=cabinet
+# an X11 session by default
+WaylandEnable=false
+```
+
+(GDM's file takes no comments at the end of a line.)
 
 ## How it works
 

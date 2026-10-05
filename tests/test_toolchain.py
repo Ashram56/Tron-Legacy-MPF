@@ -176,6 +176,13 @@ class TestRun(unittest.TestCase):
             s.listen()
             self.assertTrue(run.port_in_use(port))
 
+    def test_scenario_path(self):
+        # this repo's scenarios/ first, then the asset repo's traces (by name, as live_scenario.py finds them)
+        self.assertEqual(run.scenario_path("full_game_to_portal"),
+                         os.path.join(ROOT, "scenarios", "full_game_to_portal.txt"))
+        self.assertEqual(run.scenario_path("game_flow"), "game_flow")
+        self.assertTrue(os.path.isabs(run.scenario_path("my_game.txt")))   # MPF runs in game/
+
     def test_wait_for_port_log_marker(self):
         with tempfile.TemporaryDirectory() as d:
             log = os.path.join(d, "godot.log")

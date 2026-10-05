@@ -8,6 +8,8 @@ extends Control
 ##   the running video has the same priority;
 ## - when a video ends the background comes back; a pop-up layer (ForcePopBack) with no background hides.
 
+const GozenPlayer := preload("res://pup/gozen_player.gd")
+
 var number: int
 var player: Node                    # the PuP player autoload (media, playlists)
 var popup := false                  # ForcePop / ForcePopBack: visible only while something plays
@@ -21,7 +23,7 @@ var fg = null                       # {playlist, file, path, priority, loop, vol
 var bg = null                       # {playlist, file}
 var bg_playing := false
 
-var _video: VideoStreamPlayer
+var _video: Control                 # VideoStreamPlayer, or gozen_player.gd (player.gozen: Linux, GDE GoZen)
 var _image: TextureRect
 var _audio: AudioStreamPlayer
 var _aspect := 16.0 / 9.0
@@ -48,8 +50,11 @@ func setup(p_player: Node, p_number: int, opts: Dictionary) -> void:
 		_audio.finished.connect(_on_finished.bind(-1))
 		add_child(_audio)
 	else:
-		_video = VideoStreamPlayer.new()
-		_video.expand = true
+		if player.gozen:
+			_video = GozenPlayer.new()
+		else:
+			_video = VideoStreamPlayer.new()
+			_video.expand = true
 		_video.bus = bus
 		_video.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_video.finished.connect(_on_finished.bind(-1))
@@ -164,16 +169,20 @@ func _start(path: String, loop: bool, volume: float) -> void:
 			_aspect = float(_image.texture.get_width()) / maxf(1.0, _image.texture.get_height())
 		_layout()
 		return
-	var stream: VideoStream = player.video_stream(path)
 	_image.hide()
-	_video.stop()
-	_video.stream = stream
-	_video.volume_db = db
-	if "loop" in _video:
-		_video.loop = loop
 	_aspect = player.aspect_of(path)
 	_video.show()
 	_layout()
+	if player.gozen:
+		# no stop() first: the previous video's last frame stays up while the next one opens (in the background,
+		# a moment with the Jetson's hardware decoder), instead of a black screen; a stopped player shows nothing
+		_video.open(path, loop, db)
+		return
+	_video.stop()
+	_video.stream = player.video_stream(path)
+	_video.volume_db = db
+	if "loop" in _video:
+		_video.loop = loop
 	_video.play()
 
 

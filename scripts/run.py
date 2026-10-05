@@ -5,7 +5,7 @@
     python scripts/run.py --monitor                # ... plus MPF Monitor (setup.py installs it)
     python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD)
     python scripts/run.py --hw vpx                 # Visual Pinball X plays the table (docs/vpx.md); MPF waits for it
-    python scripts/run.py --scenario NAME          # play assets/rules/traces/NAME.txt in real time
+    python scripts/run.py --scenario NAME          # play scenarios/NAME.txt or assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
     python scripts/run.py --no-free-play           # factory pricing: coins needed (virtual defaults to free play)
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
@@ -147,6 +147,15 @@ def godot_command(godot_args, virtual_display=None):
     return cmd
 
 
+def keep_screen_on():
+    """Linux on a real X display: the X server's own screen saver and DPMS power-off off for this X session (GNOME's
+    idle blanking and lock are turned off by install_jetson_hwdec.sh); a cabinet's players use no keyboard or mouse."""
+    if IS_WINDOWS or sys.platform == "darwin" or not os.environ.get("DISPLAY") or tc.needs_virtual_display():
+        return
+    if shutil.which("xset"):
+        subprocess.run(["xset", "s", "off", "-dpms"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def user_arg(gargs, arg):
     """gargs plus arg after Godot's "--" (the args game scripts read with OS.get_cmdline_user_args)."""
     return list(gargs) + [arg] if "--" in gargs else list(gargs) + ["--", arg]
@@ -216,6 +225,15 @@ def monitor_settings():
         shutil.copyfile(dst + ".default", dst)
 
 
+def scenario_path(name):
+    """--scenario NAME: scenarios/NAME.txt (this repo's own) or assets/rules/traces/NAME.txt; a *.txt path is made
+    absolute, since MPF runs in game/."""
+    if name.endswith(".txt"):
+        return os.path.abspath(name)
+    own = os.path.join(tc.ROOT, "scenarios", name + ".txt")
+    return own if os.path.exists(own) else name
+
+
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
@@ -235,11 +253,13 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
     if scenario:
-        env["TRON_LIVE_SCENARIO"] = scenario
+        env["TRON_LIVE_SCENARIO"] = scenario_path(scenario)
     if trace:
         env["TRON_TRACE"] = trace
     godot = mpf = mon = None
     print(pup_setup.status()[1], flush=True)  # PuP Pack: docs/pup.md
+    if not virtual_display:
+        keep_screen_on()
     try:
         godot = spawn(godot_command(gargs, virtual_display), log=godot_log, group=True)
         print("Godot started (log: {}), waiting for GMC on port {}".format(godot_log, tc.BCP_PORT), flush=True)
@@ -289,7 +309,7 @@ def main(argv=None):
     p.add_argument("--hw", choices=["virtual", "proc", "vpx"], default="virtual",
                    help="hardware overlay: game/config/hw_<hw>.yaml (default virtual)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
-    p.add_argument("--scenario", help="play assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
+    p.add_argument("--scenario", help="play scenarios/NAME.txt or assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
                                       "(smart_virtual)")
     p.add_argument("--seconds", type=float, help="stop after this many seconds")
     p.add_argument("--trace", help="write MPF's trace (jsonl) to this file")

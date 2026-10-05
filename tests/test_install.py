@@ -34,13 +34,67 @@ def sh(args, env=None):
 
 @unittest.skipUnless(BASH and POSIX, "needs bash on Linux or macOS")
 class TestShellScripts(unittest.TestCase):
-    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh"]
+    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh"]
 
     def test_syntax(self):
         for name in self.SCRIPTS + [os.path.join("..", "..", "docker", "tron.sh")]:
             with self.subTest(script=name):
                 r = sh(["-n", os.path.join(INSTALL, name)])
                 self.assertEqual(0, r.returncode, r.stderr)
+
+    def test_jetson_hwdec_skips_other_machines(self):
+        if os.path.exists("/etc/nv_tegra_release"):
+            self.skipTest("on a Jetson")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"])
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn("not an NVIDIA Jetson", r.stdout)
+
+    def test_jetson_hwdec_plan_on_a_stripped_xavier(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        with open(release, "w") as f:
+            f.write("# R35 (release), REVISION: 4.1, GCID: 1, BOARD: t186ref, EABI: aarch64\n")
+        with open(os.path.join(tmp, "model"), "w") as f:
+            f.write("NVIDIA Jetson Xavier NX Developer Kit\0")
+        with open(os.path.join(tmp, "compatible"), "w") as f:
+            f.write("nvidia,p3509-0000+p3668-0001\0nvidia,tegra194\0")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"],
+               env={"TRON_ARCH": "aarch64", "TRON_NV_RELEASE": release, "TRON_DEVICE_TREE": tmp})
+        self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+        self.assertIn("SoC t194, NVIDIA apt release r35.4", r.stdout)
+        if os.path.exists("/usr/src/jetson_multimedia_api/include/NvVideoDecoder.h"):
+            return  # a real Jetson: nothing is missing
+        self.assertIn("nvidia-l4t-jetson-multimedia-api", r.stdout)
+        self.assertIn("nvidia-l4t-3d-core", r.stdout)
+        # EGL lives in tegra-egl, which the 3d-core package does not add to the loader path
+        self.assertIn("tegra-egl/libEGL_nvidia.so.0", r.stdout)
+        self.assertIn("aarch64-linux-gnu_EGL.conf: /usr/lib/aarch64-linux-gnu/tegra-egl", r.stdout)
+        self.assertIn("scripts/build.sh --no-stubs --install", r.stdout)
+
+    def test_jetson_hwdec_plan_on_an_orin(self):
+        """JetPack 6 (AGX Orin, R36.4.3): t234 repo, nvidia/ library folder, installs pinned to 36.4.3."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        with open(release, "w") as f:
+            f.write("# R36 (release), REVISION: 4.3, GCID: 38968081, BOARD: generic, EABI: aarch64, "
+                    "DATE: Wed Jan 8 01:49:37 UTC 2025\n# KERNEL_VARIANT: oot\nTARGET_USERSPACE_LIB_DIR=nvidia\n")
+        with open(os.path.join(tmp, "model"), "w") as f:
+            f.write("NVIDIA Jetson AGX Orin Developer Kit\0")
+        with open(os.path.join(tmp, "compatible"), "w") as f:
+            f.write("nvidia,p3737-0000+p3701-0005\0nvidia,p3701-0005\0nvidia,tegra234\0")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"],
+               env={"TRON_ARCH": "aarch64", "TRON_NV_RELEASE": release, "TRON_DEVICE_TREE": tmp,
+                    "XDG_CACHE_HOME": tmp})
+        self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+        self.assertIn("SoC t234, NVIDIA apt release r36.4", r.stdout)
+        self.assertIn("l4t-pin.pref: nvidia-l4t-* 36.4.3-*", r.stdout)
+        self.assertFalse(os.path.exists(os.path.join(tmp, "tron-legacy-mpf", "l4t-pin.pref")))  # dry run
+        if os.path.exists("/usr/src/jetson_multimedia_api/include/NvVideoDecoder.h"):
+            return  # a real Jetson: nothing is missing
+        self.assertIn("/usr/lib/aarch64-linux-gnu/nvidia/libnvv4l2.so", r.stdout)
+        self.assertIn("Dir::Etc::Preferences=", r.stdout)
 
     def os_release(self, text):
         f = tempfile.NamedTemporaryFile("w", suffix=".os-release", delete=False)
