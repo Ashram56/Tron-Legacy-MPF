@@ -1,0 +1,54 @@
+diff --git a/ffmpeg/dev/common/libavcodec/nvmpi_dec.c b/ffmpeg/dev/common/libavcodec/nvmpi_dec.c
+index a11f1d7..aad8b8b 100644
+--- a/ffmpeg/dev/common/libavcodec/nvmpi_dec.c
++++ b/ffmpeg/dev/common/libavcodec/nvmpi_dec.c
+@@ -112,6 +112,7 @@ typedef struct {
+ 	int disable_dpb;       //skip DPB reordering (low-latency, default off)
+ 	int wait_timeout;      //blocking wait timeout in ms (0 = default 500ms)
+ 	int output_format;     //requested output pixel format (AVPixelFormat; NONE = auto)
++	nvDecParam param;      //what the decoder was created with, to recreate it on flush
+ } nvmpiDecodeContext;
+ 
+ /* ------------------------------------------------------------------ */
+@@ -364,6 +365,7 @@ static int nvmpi_init_decoder(AVCodecContext *avctx)
+ 		nvmpi_context->bufFrame = NULL;
+ 	}
+ 
++	nvmpi_context->param = param;
+ 	nvmpi_context->ctx=nvmpi_create_decoder(&param);
+ 
+ 	if(!nvmpi_context->ctx)
+@@ -448,6 +450,9 @@ static int nvmpi_decode(AVCodecContext *avctx, AVFrame *data, int *got_frame, AV
+ 	int res;
+ 	int decode_ret = avpkt->size;
+ 
++	if(!nvmpi_context->ctx)   //recreating it on flush failed
++		return AVERROR_EXTERNAL;
++
+ 	//Feed the compressed packet (if any — FFmpeg sends empty packets while
+ 	//draining). libnvmpi memcpy's the payload, so avpkt stays caller-owned.
+ 	if(avpkt->size)
+@@ -648,7 +653,22 @@ static void nvmpi_flush_decoder(AVCodecContext *avctx)
+ {
+ 	nvmpiDecodeContext *nvmpi_context = avctx->priv_data;
+ 
+-	nvmpi_decoder_flush(nvmpi_context->ctx);
++	if(!nvmpi_context->ctx)
++		return;
++
++	//Recreate the decoder rather than nvmpi_decoder_flush(): after the
++	//in-place reset (STREAMOFF/ON) the V4L2 decoder sends no new
++	//resolution-change event for the same stream, at least on JetPack 6
++	//(L4T R36.4), so the capture plane never restarts and the next
++	//put_packet blocks forever in the OUTPUT-plane dqBuffer. A new decoder
++	//takes ~20 ms on an AGX Orin and starts exactly like the first one.
++	nvmpi_decoder_close(nvmpi_context->ctx);
++	nvmpi_context->ctx = nvmpi_create_decoder(&nvmpi_context->param);
++	if(!nvmpi_context->ctx)
++	{
++		av_log(avctx, AV_LOG_ERROR, "nvmpi: could not recreate the decoder on flush\n");
++		return;
++	}
+ 
+ 	if(avctx->extradata && avctx->extradata_size >= 4 &&
+ 	   avctx->extradata_size < (1 << 20) &&
