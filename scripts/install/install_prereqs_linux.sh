@@ -170,6 +170,17 @@ install_pkgs() {    # install the packages of "$@" that are missing
         if [ "$APT_UPDATED" = 0 ]; then root apt-get update -qq; APT_UPDATED=1; fi
         local i
         for i in "${!missing[@]}"; do missing[i]="$(apt_name "${missing[i]}")"; done
+        # libdecor (Wayland window decorations, optional for Godot) is not in Ubuntu 20.04 / JetPack 5
+        for i in "${!missing[@]}"; do
+            case "${missing[i]}" in libdecor-0-0*)
+                if have_tool apt-cache && ! apt_known "${missing[i]}"; then
+                    note "${missing[i]} is not in this release: skipped (Godot only uses it on Wayland)"
+                    unset 'missing[i]'
+                fi ;;
+            esac
+        done
+        missing=("${missing[@]}")
+        [ ${#missing[@]} -gt 0 ] || return 0
     fi
     note "missing: ${missing[*]}"
     if [ "$DRY" = 0 ] && [ "$YES" = 0 ] && [ -t 0 ]; then
