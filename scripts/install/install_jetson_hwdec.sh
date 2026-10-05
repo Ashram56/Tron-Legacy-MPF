@@ -239,13 +239,20 @@ say "Loader path"
 # directory, since libnvv4l2.so is cached under its soname libv4l2.so.0
 loader_dir() {   # loader_dir DIR CONF
     [ -d "$1" ] || [ "$DRY" = 1 ] || return 0
-    if command -v ldconfig >/dev/null 2>&1 && ldconfig -p | grep -q "=> $1/"; then
+    if ld_cache | grep -F "=> $1/" >/dev/null; then
         note "$1 is in the loader cache"
     else
         note "$1 is not in the loader cache"
         root_write "$2" "$1"
         LDCONFIG=1
     fi
+}
+# the loader cache, read whole: with pipefail, "ldconfig -p | grep -q" fails when grep stops early on a match and
+# ldconfig, with more output left than a pipe holds (a full JetPack image), dies of SIGPIPE
+ld_cache() {
+    local out
+    out="$( (command -v ldconfig >/dev/null 2>&1 && ldconfig -p || /sbin/ldconfig -p) 2>/dev/null || true)"
+    printf '%s\n' "$out"
 }
 LDCONFIG=0
 loader_dir "$TEGRA" /etc/ld.so.conf.d/nvidia-tegra.conf
@@ -265,8 +272,9 @@ run git -C "$SRC" checkout --quiet --force "$JETSON_FFMPEG_REV"
 # --no-stubs: fail rather than build the non-working stub library when the Multimedia API is missing
 run "$SRC/scripts/build.sh" --no-stubs --install
 if [ "$DRY" = 0 ]; then
-    if ldconfig -p | grep -q 'libnvmpi\.so '; then
-        note "installed: $(ldconfig -p | grep 'libnvmpi\.so ' | sed 's/.*=> //')"
+    NVMPI="$(ld_cache | grep 'libnvmpi\.so ' | sed 's/.*=> //' || true)"
+    if [ -n "$NVMPI" ]; then
+        note "installed: $NVMPI"
     else
         fail "libnvmpi.so is not in the loader cache (ldconfig -p): GoZen would decode in software"
     fi
