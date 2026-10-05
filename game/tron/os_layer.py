@@ -64,6 +64,10 @@ SPECIAL_LAMP = 8            # DAT_00039178: the special insert, the left outlane
 SPECIAL_OVER_LIMIT_SCORE = 5000000
 LOST_BALL_SEARCH = 5        # ball_search_start(5) with adj 63 LOST BALL RECOVERY: a lost ball is fed [0x0001f79c]
 COINDOOR_SAVE_TICKS, COINDOOR_GRACE_TICKS = 0x138, 0xbb     # coin door opened in play, adj 41 [0x0001ff74]
+POWER_OFF_DEFF = 4          # "50V / 20V DISABLED / CLOSE COIN DOOR ..." while the door is open [0x01036f1c]
+POWER_OFF_DIM_TICKS = 8 + 10 * 8 + 1875     # deff 4: shown, title blinks 10 x 8 ticks, 1875 ticks, then dimmed
+POWER_OFF_DIM_LEVEL = 6                     # palette_fill(6) of the dimmed screen [0x01036fd4]
+POWER_OFF_CANCEL_SOUND = 0x009              # BACK takes the warning away [0x0000fc20]
 DYNAMIC_REPLAY_MIN = 5000000                                # dynamic replay floor [0x000231a4]
 
 
@@ -224,6 +228,8 @@ class TronOS(CustomCode):
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
         sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
         sw.add_switch_handler("s_coin_door_open", self._coin_door_opened)
+        sw.add_switch_handler("s_coin_door_open", self._coin_door_closed, state=0)
+        self._power_off_run = 0     # counts deff 4 starts, so a dim timer of an earlier start does nothing
         sw.add_switch_handler("s_service_select", self._service_select)
         self.in_service = False     # the service menu (mode tron_service) is running
 
@@ -1183,9 +1189,15 @@ class TronOS(CustomCode):
         return bool(self.machine.switch_controller.is_active(self.machine.switches["s_coin_door_open"]))
 
     def _service_back(self):
-        """Coin-door BACK outside the service menu: a service credit [0x0000fc20]."""
-        if not self.in_service:
-            self.credit_model.service_credit()
+        """Coin-door BACK outside the service menu [0x0000fc20]: with the "50V / 20V DISABLED" warning up it
+        takes the warning away (deff_stop(4), sound 0x009); otherwise a service credit."""
+        if self.in_service:
+            return
+        if self.display.running(POWER_OFF_DEFF):
+            self.deff_stop(POWER_OFF_DEFF)
+            self.sound(POWER_OFF_CANCEL_SOUND)
+            return
+        self.credit_model.service_credit()
 
     def _service_select(self):
         """Coin-door SELECT in attract mode (no game): the service menu (tron/service.py)."""
@@ -1193,11 +1205,46 @@ class TronOS(CustomCode):
             self.machine.modes["tron_service"].start()
 
     def _coin_door_opened(self):
-        """Coin door opened [0x0001ffac]: with adj 41 COINDOOR BALL SAVER, in play, every ball in play is
-        saved: multiball_start(balls in play, 0, 312, 187) [0x0001ff74 / 0x0001ea28]."""
+        """Coin door opened: the door interlock cuts the 50 V and 20 V, so the IO board's power status (RAM
+        0x3727c & 3) is no longer 3 and the power handler FUN_00007bc4 (table 0x040d748c, from FUN_00007c24)
+        runs: event 0x3d, then the "50V / 20V DISABLED" warning, deff 4.
+        Event 0x3d [0x0001ffac]: with adj 41 COINDOOR BALL SAVER, in play, every ball in play is saved:
+        multiball_start(balls in play, 0, 312, 187) [0x0001ff74 / 0x0001ea28]."""
         if self.adj_value(41) == 1 and self.game and not self.state & 0x214:
             self.multiball_start(max(1, self.rom_balls_in_play()), COINDOOR_SAVE_TICKS, COINDOOR_GRACE_TICKS)
             self._coindoor_save = True
+        self._power_off_warning()
+
+    def _coin_door_closed(self):
+        """Coin door closed, power back (FUN_00007c08): event 0x3d, and the warning goes if it is still the
+        running deff."""
+        self._power_off_run += 1
+        if self.display.fg == POWER_OFF_DEFF:
+            self.deff_stop(POWER_OFF_DEFF)
+
+    def _power_off_warning(self):
+        """FUN_00007bc4: deff 4 at priority 247, unless a higher one has the display (the volume display 248;
+        the service menu, deff 3 at 253, which is why nothing shows when the door opens inside the menu).
+        Deff 4 [0x01036f1c] never ends by itself: "50V / 20V DISABLED" blinks five times with sound 0x010,
+        stays lit for 1875 ticks, then the whole screen dims to palette level 6 until the door is closed or
+        BACK is pressed. Its captured frames hold the first part; the dimmed screen is drawn as the ROM draws it."""
+        if self.in_service:
+            return
+        self._power_off_run += 1
+        run = self._power_off_run
+        if self.display.start(POWER_OFF_DEFF, hold=True, media=True):
+            self.after(POWER_OFF_DIM_TICKS, lambda: self._power_off_dim(run))
+
+    def _power_off_dim(self, run):
+        if run != self._power_off_run or self.display.fg != POWER_OFF_DEFF:
+            return
+        from tron import rom_draw as rd
+        level = POWER_OFF_DIM_LEVEL
+        draw = [rd.text("50V / 20V DISABLED", 8, 64, 9, level=level)]
+        draw += [rd.text(t, 2, 64, y, level=level) for t, y in (("CLOSE COIN DOOR", 16),
+                                                               ("OR PULL INTERLOCK SWITCH", 22),
+                                                               ("TO RESTORE POWER", 28))]
+        self.media.deff_draw(POWER_OFF_DEFF, self.display.prio.get(POWER_OFF_DEFF, 0), draw)
 
     def _flipper_launch(self, side):
         """Flipper button with a ball waiting in the shooter lane [0x0002dcc0]: adj 40 FLIPPER BALL LAUNCH

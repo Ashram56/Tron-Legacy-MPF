@@ -43,8 +43,8 @@ switches:
     number: -1
   s_service_select:     # swEnter (keyEnter, key 0)
     number: 0
-  s_coin_door_open:     # SAM has no coin door switch PinMAME or the table could set; stays closed
-    number: door
+  s_coin_door_open:     # PinMAME toggles the door with its End key; sam.vbs has no switch for it, so the table
+    number: -4          # script that scripts/vpx_table.py writes toggles -4 (DED #20, as on the P-ROC) with End
   s_disc_opto:          # the table closes 41 while the ball is on the disc (sw41_Hit = 1), like every other
     type: NO            # switch, so here it is not inverted (rom/switches.yaml: NC, unverified on hardware)
 

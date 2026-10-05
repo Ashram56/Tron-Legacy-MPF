@@ -10,8 +10,10 @@ with PinMAME again. Needs olefile (`python scripts/setup.py --vpx`). docs/vpx.md
 
 The change, in the script: `LoadVPM "...", "sam.VBS", ...` (which creates VPinMAME.Controller) becomes
 `LoadMPF "sam.VBS"`: the same VPinMAME helper scripts (core.vbs, sam.vbs: keys, timers, ball stacks, fast flips)
-with the TronMPF.Controller COM object (scripts/vpx_bridge.py) as the controller. Everything else in the table
-script stays as it is, since MPF answers the controller calls the way PinMAME does (game/tron/vpx_hardware.py).
+with the TronMPF.Controller COM object (scripts/vpx_bridge.py) as the controller. One line goes into the table's
+KeyDown sub: End opens and closes the coin door (switch -4, game/config/hw_vpx.yaml), which VPinMAME does by
+itself and sam.vbs has no switch for. Everything else in the table script stays as it is, since MPF answers the
+controller calls the way PinMAME does (game/tron/vpx_hardware.py).
 """
 import argparse
 import os
@@ -20,6 +22,12 @@ import struct
 import sys
 
 MARKER = "' Tron MPF bridge:"
+KEYDOWN = re.compile(r'^([ \t]*)Sub[ \t]+\w+_KeyDown[ \t]*\([ \t]*(?:ByVal[ \t]+)?(\w+)[ \t]*\)[^\r\n]*(?=\r?$)',
+                     re.I | re.M)
+KEY_END = 207           # DirectInput DIK_END: PinMAME's coin door key
+SW_COIN_DOOR = -4       # game/config/hw_vpx.yaml s_coin_door_open
+COIN_DOOR_LINE = ("{indent}\tIf {var} = {key} Then Controller.Switch({sw}) = Not Controller.Switch({sw}) : Exit Sub"
+                  "\t{marker} End opens and closes the coin door, as in PinMAME")
 LOADVPM = re.compile(r'^([ \t]*)LoadVPM[ \t]+"[^"\r\n]*"[ \t]*,[ \t]*"(sam\.vbs)"[^\r\n]*(?=\r?$)', re.I | re.M)
 
 LOADER = '''{indent}{marker} the game runs in MPF (github.com/Ashram56/Tron-Legacy-MPF), not PinMAME. Written by
@@ -74,7 +82,13 @@ def patch_script(text):
     m = matches[0]
     newline = "\r\n" if "\r\n" in text else "\n"
     loader = LOADER.format(indent=m.group(1), marker=MARKER, original=m.group(0).strip(), vbs=m.group(2))
-    return text[:m.start()] + loader.replace("\n", newline).rstrip(newline) + text[m.end():]
+    text = text[:m.start()] + loader.replace("\n", newline).rstrip(newline) + text[m.end():]
+    keydown = list(KEYDOWN.finditer(text))
+    if len(keydown) != 1:
+        return text                     # no table KeyDown sub to hook: the coin door stays closed
+    k = keydown[0]
+    line = COIN_DOOR_LINE.format(indent=k.group(1), var=k.group(2), key=KEY_END, sw=SW_COIN_DOOR, marker=MARKER)
+    return text[:k.end()] + newline + line + text[k.end():]
 
 
 def main(argv=None):

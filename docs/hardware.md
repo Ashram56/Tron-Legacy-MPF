@@ -208,8 +208,8 @@ so every coil uses the ROM's drive time on every platform. The Pro decompile sho
 - **Coin door open**: SAM reads the door from the IO board's interlock status register (20 V / 50 V
   present), which the P-ROC cannot read. `s_coin_door_open` is on DED #20, SAM's spare dedicated input. Wire
   a switch that closes while the door is open (for example a spare contact on the door interlock switch) to
-  that input. Unwired, the door always reads closed. Only adj 41 (coin door ball saver) and adj 64 (tilt
-  with the door open) use it.
+  that input. Unwired, the door always reads closed. It shows the ROM's "50V / 20V DISABLED" warning (deff 4)
+  and drives adj 41 (coin door ball saver) and adj 64 (tilt with the door open).
 - **Ramp light tubes**: see below. Unless they are enabled, the fiber optic ramps stay dark.
 
 ### Ramp light tubes (experimental, off by default)
