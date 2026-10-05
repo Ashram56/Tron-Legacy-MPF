@@ -234,8 +234,34 @@ bank (addresses 0-3). To check it:
    0xB, and that the data matches the colour.
 4. Only then turn coil power back on.
 
-Also confirm which tube is left and which is right. The ROM's console calls strobe 0x10 the left tube, but
-PinMAME's comment says the opposite.
+Also confirm which tube is left and which is right (see "Wiring" below).
+
+#### Wiring (IO board 520-5249-00 schematic and Stern's "Tron Premium (C2) Fiber Optic LED wiring", June 2011)
+
+Traced through the bus nets on the schematic, not the latch's internal pin labels (the latches take the data
+bus in a shuffled order):
+
+| Signal | Latch | Data bit | Connector | Wire | Ramp LED board (511-6927-01) |
+|---|---|---|---|---|---|
+| Blue | U7 (AUX DRV, address 6) Q4 | bit 3 (0x08) | J2-5 "AUX Out 4" | ORG-YEL | pin 4, both ramps |
+| Green | U7 Q0 | bit 4 (0x10) | J2-6 "AUX Out 5" | ORG-GRN | pin 5, both ramps |
+| Red | U7 Q1 | bit 5 (0x20) | J2-7 "AUX Out 6" | ORG-BLU | pin 6, both ramps |
+| BSTB | U21 (strobe latch, address 0xB) Q7 | bit 3 | J3-9 | | not used |
+| CSTB: tube 0x10 | U21 Q6 | bit 4 | J3-10 | GRN-WHT | pin 3 of one ramp |
+| DSTB: tube 0x20 | U21 Q5 | bit 5 | J3-11 | BLU-WHT | pin 3 of the other ramp |
+| ESTB | U21 Q4 | bit 6 | J3-12 | | aux coil latch (ticket outputs 33-35) |
+
+J3 is on sheet 4 (page 113), right of the 74HC245 U24: pins 1-8 are the aux inputs, pins 9-12 the strobes BSTB,
+CSTB, DSTB, ESTB from U21. Bit 0 of the strobe latch is the GI relay, bit 7 ASTB (J2-10). The ramp boards get
++5 V on pin 1 and ground on pin 7. The colour bits and strobes are the ones `tron/proc_hardware.py` writes, and
+the colour order (R bit 5, G bit 4, B bit 3) matches the ROM and PinMAME. Which LED each ORG wire lights is inside
+the LED board; the diagram does not say.
+
+Left or right is still open. The ROM's console and tube test call 0x10 (CSTB) the left tube. The wiring diagram
+draws J3-10 (CSTB) to the right ramp and J3-11 (DSTB) to the left, as PinMAME's comment has it, but the wire
+colours say the reverse: J3-10 is GRN-WHT and the left ramp's pin 3 is GRN-WHT; J3-11 is BLU-WHT and the right
+ramp's pin 3 is BLU-WHT. The game follows the ROM. On a machine, the colour of the wire on the left ramp board's
+pin 3 settles it; if it is BLU-WHT, swap the two entries of `TUBES` in `tron/proc_hardware.py`.
 
 ### First power-up (safety)
 
