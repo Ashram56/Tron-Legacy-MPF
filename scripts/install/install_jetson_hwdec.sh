@@ -269,6 +269,17 @@ else
     run git clone --quiet "$JETSON_FFMPEG_URL" "$SRC"
 fi
 run git -C "$SRC" checkout --quiet --force "$JETSON_FFMPEG_REV"
+# the FFmpeg wrapper's flush fix (scripts/gozen/nvmpi_flush.patch, as in GoZen's build): only the --test ffmpeg
+# below uses it, libnvmpi is unchanged. Next to this script in a clone, else from GitHub ($TRON_BRANCH).
+NVMPI_PATCH="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../gozen/nvmpi_flush.patch"
+if [ "$TEST" = 1 ]; then
+    if [ ! -f "$NVMPI_PATCH" ]; then
+        NVMPI_PATCH="$CACHE/nvmpi_flush.patch"
+        run curl -fsSL -o "$NVMPI_PATCH" \
+            "https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF-PuP/${TRON_BRANCH:-main}/scripts/gozen/nvmpi_flush.patch"
+    fi
+    run git -C "$SRC" apply "$NVMPI_PATCH"
+fi
 # --no-stubs: fail rather than build the non-working stub library when the Multimedia API is missing
 run "$SRC/scripts/build.sh" --no-stubs --install
 if [ "$DRY" = 0 ]; then

@@ -53,4 +53,4 @@ When the game starts, Godot's log (`game/logs/` or the terminal) says for each v
 ## Licence
 
 GDE GoZen and FFmpeg are LGPL 2.1 (`LICENSE`); FFmpeg is linked statically into `libgozen*.so`. The sources are
-the pinned revisions in `scripts/build_gozen.sh` plus `scripts/gozen/gozen.patch`.
+the pinned revisions in `scripts/build_gozen.sh` plus `scripts/gozen/gozen.patch` and `scripts/gozen/nvmpi_flush.patch`.

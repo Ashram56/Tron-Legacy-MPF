@@ -9,7 +9,9 @@
 #   SConstruct lean=yes (no libvpx/libaom/LibreSSL);
 # - jetson-ffmpeg (github.com/gjrtimmer/jetson-ffmpeg) at JETSON_FFMPEG_REV patches GoZen's FFmpeg 7.1. Its
 #   decoders load libnvmpi.so at run time, so nothing NVIDIA is needed here; on the Jetson, libnvmpi is built
-#   from the same repository (pup_addons/gde_gozen/README.md).
+#   from the same repository (pup_addons/gde_gozen/README.md). scripts/gozen/nvmpi_flush.patch makes its
+#   decoders recreate the hardware decoder on flush: flushing in place hangs the next decode on JetPack 6, and
+#   GoZen flushes on every seek, so every looping video froze.
 set -euo pipefail
 GOZEN_REV=f9448619324ad7d0d4e79d3bd501bde477ea4b7f
 JETSON_FFMPEG_REV=8d70c17efeee57f4d956df500fec78a73f8c27d4
@@ -31,6 +33,7 @@ git submodule update --init --depth 1 ffmpeg godot_cpp
 git -C ffmpeg checkout -q --force . && git -C ffmpeg clean -qfd
 git apply "$ROOT/scripts/gozen/gozen.patch"
 git -C "$WORK/jetson-ffmpeg" checkout -q --force "$JETSON_FFMPEG_REV"
+git -C "$WORK/jetson-ffmpeg" apply "$ROOT/scripts/gozen/nvmpi_flush.patch"
 "$WORK/jetson-ffmpeg/scripts/ffpatch.sh" "$WORK/gde_gozen/ffmpeg"
 
 for arch in "${ARCHS[@]}"; do
