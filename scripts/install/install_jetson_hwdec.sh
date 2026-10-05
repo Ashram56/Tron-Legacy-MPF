@@ -55,11 +55,13 @@ fail() {
     [ "$DRY" = 1 ] || exit 1
 }
 APT_UPDATED=0
-apt_install() {   # reinstalls too: on a stripped image a package can be "installed" with its files gone
+# reinstalls too: on a stripped image a package can be "installed" with its files gone; a config file already on
+# the system (/etc/nv_tegra_release, X config) is kept rather than asked about, which would stop a piped install
+apt_install() {
     [ $# -gt 0 ] || return 0
     if [ "$APT_UPDATED" = 0 ]; then root apt-get update; APT_UPDATED=1; fi
     root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --reinstall \
-        ${L4T_PIN:+-o "Dir::Etc::Preferences=$L4T_PIN"} "$@"
+        -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold ${L4T_PIN:+-o "Dir::Etc::Preferences=$L4T_PIN"} "$@"
 }
 # NVIDIA's apt release (r36.4) carries every point release (36.4.0 ... 36.4.7) and its newest is the candidate,
 # so a plain install would put newer NVIDIA libraries next to the installed BSP (kernel, firmware, nvidia-l4t-core).
