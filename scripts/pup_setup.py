@@ -48,10 +48,13 @@ GOZEN_DST = os.path.join(tc.GAME, "addons", "gde_gozen")
 
 
 def native_video(os_name=None):
-    """True where the PuP plays the pack's mp4s with the native_video add-on (Windows, Godot 4.6+): Godot's
-    own player only does Theora, so elsewhere the videos are converted (or played by GoZen, gozen())."""
+    """True where the PuP plays the pack's mp4s with the native_video add-on (Windows and macOS, Godot 4.6+):
+    Godot's own player only does Theora, so elsewhere the videos are converted (or played by GoZen, gozen()).
+    TRON_NATIVE_VIDEO=0 converts them everywhere."""
     godot = tuple(int(n) for n in tc.GODOT_VERSION.split(".")[:2])
-    return tc.host_os(os_name) == "windows" and godot >= NATIVE_MIN_GODOT
+    if os.environ.get("TRON_NATIVE_VIDEO") == "0":
+        return False
+    return tc.host_os(os_name) in ("windows", "macos") and godot >= NATIVE_MIN_GODOT
 
 
 def gozen(os_name=None, arch=None):
@@ -111,8 +114,9 @@ def setup(py=None, dry=False):
     elif gozen():
         install_gozen()
     else:
-        if os.path.isdir(GOZEN_DST):
-            fsutil.remove_dir(GOZEN_DST)    # TRON_GOZEN=0: Godot would still load it
+        for addon in (GOZEN_DST, NATIVE_DST):   # a loaded add-on would play the mp4s instead of the conversions
+            if os.path.isdir(addon):
+                fsutil.remove_dir(addon)
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode

@@ -60,6 +60,74 @@ run() {
     if [ "$DRY" = 0 ]; then "$@"; fi
 }
 
+# ------------------------------------------------------------------ GitHub access (private repositories)
+# The game repository or its assets submodule may be private: git then needs a GitHub token instead of a
+# password. Give it as TRON_GITHUB_TOKEN (or GITHUB_TOKEN / GH_TOKEN), or paste it when asked. It is used for
+# this run only (git's url.insteadOf in the environment, inherited by setup.py), and handed to git's
+# credential helper, if one is set up (the macOS keychain, for example), so later `git pull`s work too.
+ASSETS_URL="${TRON_ASSETS_REPO:-https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption.git}"
+PUP_URL="${TRON_PUP_REPO:-https://github.com/Ashram56/Tron-LE-PuP-Pack.git}"   # the pup_pack submodule (PuP fork)
+TOKEN="${TRON_GITHUB_TOKEN:-${GITHUB_TOKEN:-${GH_TOKEN:-}}}"
+
+public_repo() { GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git -c credential.helper= ls-remote "$1" HEAD >/dev/null 2>&1; }
+
+github_auth() {
+    AUTH_DONE=1
+    say "GitHub access"
+    if [ "$DRY" = 1 ]; then
+        note "(dry run) a private repository asks for a GitHub token here$([ -n "$TOKEN" ] && echo ': using the one given')"
+        return
+    fi
+    # only the repositories nobody can read without a login need the token: a token that cannot read a public
+    # repository (a fine-grained one for other repositories, an expired one) would make git fail on it
+    local url private=()
+    for url in "$REPO_URL" "$ASSETS_URL" "$PUP_URL"; do public_repo "$url" || private+=("$url"); done
+    if [ ${#private[@]} = 0 ]; then
+        note "the repositories are public: no token needed"
+        return
+    fi
+    if [ -z "$TOKEN" ]; then
+        local readable=1
+        for url in "${private[@]}"; do GIT_TERMINAL_PROMPT=0 git ls-remote "$url" HEAD >/dev/null 2>&1 || readable=0; done
+        if [ "$readable" = 1 ]; then
+            note "a private repository, readable with the GitHub credentials git already has"
+            return
+        fi
+        [ "$YES" = 0 ] && [ -r /dev/tty ] || die "a repository is private: set TRON_GITHUB_TOKEN to a GitHub token that can read it"
+        note "Private: ${private[*]}"
+        note "Paste a GitHub token that can read it (github.com > Settings > Developer settings > Personal access"
+        note "tokens; a fine-grained token with Contents: read-only on these repositories)."
+        printf '    token (not shown): ' >/dev/tty
+        IFS= read -rs TOKEN </dev/tty
+        printf '\n' >/dev/tty
+    fi
+    # a token copied from a text editor can carry spaces or a line break; GitHub tokens have none
+    TOKEN="$(printf '%s' "$TOKEN" | tr -d '[:space:]')"
+    [ -n "$TOKEN" ] || die "no token given"
+    local prefix=unknown
+    case "$TOKEN" in github_pat_*) prefix=github_pat_ ;; gh?_*) prefix="${TOKEN:0:4}" ;; esac
+    note "token: ${#TOKEN} characters, type $prefix (a fine-grained token is about 93, a classic one 40)"
+    # the token goes into the private repositories' URLs only (git's url.insteadOf, inherited by setup.py)
+    local i=0
+    for url in "${private[@]}"; do
+        export "GIT_CONFIG_KEY_$i=url.https://x-access-token:${TOKEN}@${url#https://}.insteadOf" "GIT_CONFIG_VALUE_$i=$url"
+        i=$((i + 1))
+    done
+    export GIT_CONFIG_COUNT=$i
+    for url in "${private[@]}"; do
+        GIT_TERMINAL_PROMPT=0 git ls-remote "$url" HEAD >/dev/null 2>&1 \
+            || die "the GitHub token cannot read $url (check its repository access and expiry)"
+    done
+    printf 'protocol=https\nhost=github.com\nusername=x-access-token\npassword=%s\n\n' "$TOKEN" \
+        | git credential approve 2>/dev/null || true
+    note "token accepted"
+}
+
+# first thing, so a token is asked before the long installs (later, once git is installed, if it is missing)
+AUTH_DONE=0
+if command -v git >/dev/null 2>&1; then github_auth; fi
+
+
 if [ "$(id -u)" = 0 ]; then
     SUDO=()
 else
@@ -322,6 +390,8 @@ if [ -z "$PY" ]; then
     fi
     note "Python: $PY"
 fi
+
+[ "$AUTH_DONE" = 1 ] || github_auth    # git was missing at the start
 
 # ------------------------------------------------------------------ repository (run on its own: clone it)
 

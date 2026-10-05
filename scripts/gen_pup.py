@@ -5,8 +5,8 @@
     python scripts/gen_pup.py --max-height 720 # smaller videos for a slower PC
     python scripts/gen_pup.py --only "Drain/*" # some files (testing)
 
-Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis); with --native (Windows,
-the native_video add-on: pup_addons/native_video) the videos are only probed and Godot plays the pack's mp4s. The OST mp3s and the pictures
+Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis); with --native (Windows and
+macOS, the native_video add-on: pup_addons/native_video) the videos are only probed and Godot plays the pack's mp4s. The OST mp3s and the pictures
 are copied as they are: Godot loads them at run time. manifest.json lists each file with its converted path,
 size and length; the Godot PuP player (game/pup/pup_player.gd) reads it, and without it the PuP stays off.
 

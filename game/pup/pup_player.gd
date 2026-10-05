@@ -29,7 +29,7 @@ var windows := {}
 var _next := {}                     # playlist -> next index (AlphaSort playlists)
 var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
-## The native_video add-on (Windows, pup_addons/native_video): plays the pack's mp4s without conversion
+## The native_video add-on (Windows and macOS, pup_addons/native_video): plays the pack's mp4s without conversion
 var native_video := ClassDB.class_exists("NativeVideoStream")
 ## GDE GoZen (Linux, pup_addons/gde_gozen): FFmpeg, plays the pack's mp4s without conversion, with the Jetson's
 ## hardware decoder when libnvmpi is installed; the screens then use game/pup/gozen_player.gd
