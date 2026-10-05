@@ -42,6 +42,10 @@ avcodec_send_packet(ctx, pkt);   // never returns
 
 The same flush also happens on every loop of `ffmpeg -stream_loop 9 -c:v h264_nvmpi -i in.mp4 -f null -`.
 
+A complete program: [`repro/nvmpi_seek_close.c`](repro/nvmpi_seek_close.c) (build line at its top).
+`./nvmpi_seek_close in.mp4 flush` prints `pass 0: 100 frames` and then hangs, checked with libnvmpi at
+`8d70c17`.
+
 ## Workaround we use
 
 In `ffmpeg/dev/common/libavcodec/nvmpi_dec.c`, the flush closes the decoder (`nvmpi_decoder_close()`), and the

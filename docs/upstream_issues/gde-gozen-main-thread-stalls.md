@@ -37,7 +37,9 @@ game's DMD.
 - `close()` hands the last reference to the closed `GoZenVideo` to a worker task (`_release_video`), so it is
   freed there. `_exit_tree()` waits for those tasks.
 
-With these changes, 2 and 5 minute games on the Orin had no visible stall on video switches or loops.
+Measured with timing logs over a 2-minute game on the Orin (hardware decoding), the longest video step on the
+main thread went from 2.4 s (a `close()`; opening averaged 0.8 s) to 10 ms. With software decoding, the same
+steps took up to about 0.1 s before the changes.
 
 Our copy of the file, with the changes:
 https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/pup_addons/gde_gozen/video_playback.gd

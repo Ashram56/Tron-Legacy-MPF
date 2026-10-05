@@ -20,10 +20,10 @@ closed right after it was created or recreated. During that time the `dec_captur
 `dqEvent()` slices, and when `closing` is set it exits without waiting for a resolution-change event. Close now
 takes about 55 ms.
 
-## 2. Closing mid-stream crashes about 1 time in 20
+## 2. Closing mid-stream sometimes crashes
 
-When a decoder is closed while a video is still playing, NVIDIA's decoder thread crashes inside
-`libnvmmlite_video` about 1 close in 20 (between 1 in 10 and 1 in 20 depending on the run). The crash happens
+When a decoder is closed while a video is still playing, NVIDIA's decoder thread sometimes crashes (SIGSEGV)
+inside `libnvmmlite_video`: 9 of 100 runs of the repro below crashed with libnvmpi at `8d70c17`. The crash happens
 inside `v4l2_close`, or after the CAPTURE DMA buffers were freed. It looks like the decoder still writes a frame
 into a buffer that `deinitDecoderCapturePlane()` has already destroyed.
 
@@ -35,7 +35,17 @@ into a buffer that `deinitDecoderCapturePlane()` has already destroyed.
    freeing the CAPTURE DMA buffers and the frame pool. `deinitDecoderCapturePlane()` skips that part when `dec`
    is already gone.
 
-After this change there were 0 crashes in 100 mid-stream closes on the board, and 2 and 5 minute games ran clean.
+After this change there were 0 crashes in 100 runs of the same repro on the board, and 2 and 5 minute games
+ran clean.
+
+## How to reproduce
+
+[`repro/nvmpi_seek_close.c`](repro/nvmpi_seek_close.c) (build line at its top), with any H.264 mp4:
+
+- `./nvmpi_seek_close in.mp4 close` prints the close time: 1061 ms for a decoder that got no packet yet,
+  17 ms after 30 decoded frames.
+- `./nvmpi_seek_close in.mp4 crash` decodes 100 frames and closes the decoder mid-stream, three times. Run it
+  in a loop: `for i in $(seq 100); do ./nvmpi_seek_close in.mp4 crash > /dev/null || echo crashed; done`
 
 Patch (against `8d70c17`, `src/` part):
 https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/scripts/gozen/nvmpi_flush.patch
