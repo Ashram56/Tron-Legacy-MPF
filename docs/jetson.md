@@ -131,7 +131,8 @@ JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
 **Checked without the board** (an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with L4T R35.4.1 and
 NVIDIA's r35.4 apt packages): the full Linux install (`install_prereqs_linux.sh --yes`) passes, including Python
 3.11 from uv, MPF Monitor, Godot 4.6.3 arm64, the PuP Pack and the Godot import; `nvmpi_flush.patch` applies and
-libnvmpi builds with NvUtils against R35.4.1 and links NVIDIA's own `libv4l2.so.0`. The GoZen arm64 `.so` needs
+libnvmpi builds with NvUtils against R35.4.1 and links NVIDIA's own `libv4l2.so.0`. The self-test's ffmpeg 7.1 with nvmpi and
+both repro programs build and link there too. The GoZen arm64 `.so` needs
 glibc 2.29 at most (Ubuntu 20.04 has 2.31). Decoding itself needs the board.
 
 To bring one up:

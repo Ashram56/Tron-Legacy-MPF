@@ -56,6 +56,12 @@ if [ ! -f "$VIDEO" ] && [ "$DRY" = 0 ]; then
     exit 1
 fi
 note "video: $VIDEO"
+# without these NVIDIA's libraries crash rather than fail (as in game/pup/gozen_player.gd)
+NO_DEVICE=0
+if [ ! -e /dev/nvmap ] || ! { compgen -G "/dev/nvhost-nvdec*" >/dev/null || [ -e /dev/v4l2-nvdec ]; }; then
+    note "no decoder device (/dev/nvmap, /dev/nvhost-nvdec* or /dev/v4l2-nvdec): building only, nothing can decode"
+    NO_DEVICE=1
+fi
 
 # build_tree NAME SRC FFDIR: the ffmpeg 7.1 tree with nvmpi in FFDIR, from the jetson-ffmpeg checkout SRC
 build_tree() {
@@ -66,7 +72,10 @@ build_tree() {
     fi
     say "Building the $name ffmpeg tree (takes a while)"
     if [ "$name" = patched ]; then
-        run bash "$HERE/install_jetson_hwdec.sh" --test --no-x --keep-blanking || return 1
+        # its decode test failing is reported by the checks below; only a missing tree stops here
+        run bash "$HERE/install_jetson_hwdec.sh" --test --no-x --keep-blanking \
+            || note "install_jetson_hwdec.sh --test did not finish cleanly: checking the ffmpeg tree"
+        [ "$DRY" = 1 ] || [ -f "$ffdir/ffmpeg7.1/libavcodec/libavcodec.a" ] || return 1
     else
         [ -d "$src/.git" ] || run git clone --quiet https://github.com/gjrtimmer/jetson-ffmpeg "$src" || return 1
         local rev
@@ -162,6 +171,11 @@ PATCHED_FF="$CACHE/ffmpeg-src"
 build_tree patched "$CACHE/jetson-ffmpeg" "$PATCHED_FF" /usr/local || { echo "   ERROR: the patched build failed" >&2; exit 1; }
 say "Repro programs (patched)"
 build_repros "$PATCHED_FF" "$CACHE/selftest/bin-patched" /usr/local || { echo "   ERROR: could not build the repro programs" >&2; exit 1; }
+if [ "$NO_DEVICE" = 1 ] && [ "$DRY" = 0 ]; then
+    say "Result"
+    note "the ffmpeg tree and the repro programs build; run this on the board with JetPack's kernel to check decoding"
+    exit 0
+fi
 run_checks patched "$CACHE/selftest/bin-patched" /usr/local/lib
 
 if [ "$STOCK" = 1 ]; then
