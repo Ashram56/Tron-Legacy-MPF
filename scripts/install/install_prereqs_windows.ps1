@@ -176,8 +176,12 @@ function Invoke-GitHubAuth([string]$GitExe) {
         Write-Note 'tokens; a fine-grained token with Contents: read-only on these repositories).'
         $secure = Read-Host '    token (not shown)' -AsSecureString
         $token = [System.Net.NetworkCredential]::new('', $secure).Password
-        if (-not $token) { throw 'no token given' }
     }
+    # a token copied from a text editor can carry spaces or a line break; GitHub tokens have none
+    $token = ($token -replace '\s', '')
+    if (-not $token) { throw 'no token given' }
+    $prefix = if ($token -match '^(github_pat_|gh[pousr]_)') { $Matches[1] } else { 'unknown' }
+    Write-Note "token: $($token.Length) characters, type $prefix (a fine-grained token is about 93, a classic one 40)"
     # the token goes into the private repositories' URLs only (git's url.insteadOf, inherited by setup.py)
     for ($i = 0; $i -lt $private.Count; $i++) {
         Set-Item "Env:GIT_CONFIG_KEY_$i" ("url.https://x-access-token:$token@" + $private[$i].Substring(8) + '.insteadOf')

@@ -100,8 +100,13 @@ github_auth() {
         printf '    token (not shown): ' >/dev/tty
         IFS= read -rs TOKEN </dev/tty
         printf '\n' >/dev/tty
-        [ -n "$TOKEN" ] || die "no token given"
     fi
+    # a token copied from a text editor can carry spaces or a line break; GitHub tokens have none
+    TOKEN="$(printf '%s' "$TOKEN" | tr -d '[:space:]')"
+    [ -n "$TOKEN" ] || die "no token given"
+    local prefix=unknown
+    case "$TOKEN" in github_pat_*) prefix=github_pat_ ;; gh?_*) prefix="${TOKEN:0:4}" ;; esac
+    note "token: ${#TOKEN} characters, type $prefix (a fine-grained token is about 93, a classic one 40)"
     # the token goes into the private repositories' URLs only (git's url.insteadOf, inherited by setup.py)
     local i=0
     for url in "${private[@]}"; do
