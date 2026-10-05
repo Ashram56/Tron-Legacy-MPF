@@ -13,7 +13,31 @@ var _playback: Control
 var _loop := false
 
 
+## The Jetson device nodes the hardware decoder needs (in /dev). Without them, libnvmpi's NVIDIA libraries do not
+## fail cleanly (seen with libnvmpi installed and no decoder: NvRmMemInit failed, then Godot crashed), so GoZen
+## gets GOZEN_HWDEC=0 and decodes in software. Set GOZEN_HWDEC yourself to override.
+const HWDEC_MEM := "nvmap"
+const HWDEC_DEVICES: Array[String] = ["nvhost-nvdec", "v4l2-nvdec"]
+
+static var _hwdec_checked := false
+
+
+static func _check_hwdec() -> void:
+	if _hwdec_checked or OS.has_environment("GOZEN_HWDEC"):
+		return
+	_hwdec_checked = true
+	# FileAccess.file_exists() is false for device nodes; a listing of /dev has them
+	var dev := DirAccess.get_files_at("/dev")
+	var dec := Array(dev).any(func(f: String) -> bool:
+		return HWDEC_DEVICES.any(func(d: String) -> bool: return f.begins_with(d)))
+	if not (dec and HWDEC_MEM in dev):
+		OS.set_environment("GOZEN_HWDEC", "0")
+		print("GoZen: no Jetson decoder device (/dev/%s, /dev/%s*): software decoding"
+				% [HWDEC_MEM, "*, /dev/".join(HWDEC_DEVICES)])
+
+
 func _ready() -> void:
+	_check_hwdec()
 	_playback = load(PLAYBACK).new()
 	_playback.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_playback.mouse_filter = Control.MOUSE_FILTER_IGNORE
