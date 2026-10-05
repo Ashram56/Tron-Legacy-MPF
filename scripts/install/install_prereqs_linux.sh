@@ -236,8 +236,15 @@ apt_has_python311() {   # a final (not release candidate) python3.11 in the conf
 deadsnakes() {
     say "Python 3.11 from the deadsnakes PPA (Ubuntu)"
     install_pkgs software-properties-common
-    root add-apt-repository -y ppa:deadsnakes/ppa
+    # set -e is off in a function called with ||: check each step, or Ubuntu 22.04's own python3.11
+    # (3.11.0 release candidate) gets installed when the PPA could not be added
+    root add-apt-repository -y ppa:deadsnakes/ppa || return 1
     APT_UPDATED=0
+    if [ "$DRY" = 0 ]; then
+        root apt-get update -qq || return 1
+        APT_UPDATED=1
+        apt_has_python311 || return 1
+    fi
     install_pkgs "${PKG_PY[@]}"
 }
 
