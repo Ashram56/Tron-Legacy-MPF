@@ -170,13 +170,15 @@ func _start(path: String, loop: bool, volume: float) -> void:
 		_layout()
 		return
 	_image.hide()
-	_video.stop()
 	_aspect = player.aspect_of(path)
 	_video.show()
 	_layout()
 	if player.gozen:
+		# no stop() first: the previous video's last frame stays up while the next one opens (in the background,
+		# a moment with the Jetson's hardware decoder), instead of a black screen; a stopped player shows nothing
 		_video.open(path, loop, db)
 		return
+	_video.stop()
 	_video.stream = player.video_stream(path)
 	_video.volume_db = db
 	if "loop" in _video:

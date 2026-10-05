@@ -15,6 +15,15 @@ This build differs from upstream GoZen in two ways (`scripts/gozen/gozen.patch`,
 - FFmpeg is trimmed to what a PuP Pack uses (mp4/mkv/ogg; H.264, HEVC, MPEG-4, VP8, VP9, Theora; AAC, MP3,
   Vorbis, Opus, FLAC), with no libvpx, libaom or TLS.
 
+`scripts/gozen/nvmpi_flush.patch` changes jetson-ffmpeg, for this FFmpeg and for the libnvmpi the Jetson install
+builds: a flush (a seek, a loop) recreates the decoder, which JetPack 6 cannot reset in place, and libnvmpi closes a
+decoder in about 50 ms instead of about 1 s, without crashing when it is closed mid-video.
+
+`video_playback.gd` is upstream's with three changes, so that switching videos does not stall Godot's main
+thread (every PuP screen and the DMD) with the Jetson's decoder: the audio stream opens on the worker thread with
+the video and the main thread only takes the result once that is done; a closed video is freed on a worker thread;
+`restart()` goes back to the first frame on a worker thread (looping, and `gozen_player.gd`'s `play()`).
+
 | File | Built for |
 |---|---|
 | `bin/libgozen.linux.template_release.arm64.so` | Linux arm64 (Jetson, Raspberry Pi), glibc 2.31+ (JetPack 5, Ubuntu 20.04+) |

@@ -73,6 +73,9 @@ var _resolution: Vector2i = Vector2i.ZERO
 var _shader_material: ShaderMaterial = null
 
 var _video_thread: int = -1
+var _opened_audio: AudioStreamFFmpeg = null ## Opened by _open_video() on the worker thread, set on the main one.
+var _release_tasks: Array[int] = [] ## Worker tasks freeing closed videos (see close()).
+var _restart_thread: int = -1 ## Worker task seeking back to the first frame (see restart()).
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
 var _ignore_path_setter: bool = false
@@ -114,6 +117,9 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	close()
+	for task: int in _release_tasks:
+		WorkerThreadPool.wait_for_task_completion(task)
+	_release_tasks.clear()
 	AudioServer.remove_bus(AudioServer.get_bus_index(audio_player.bus))
 
 
@@ -148,9 +154,8 @@ func set_video_path(new_path: String) -> void:
 	else:
 		video.disable_debug()
 
-	_video_thread = WorkerThreadPool.add_task(_open_video)
-	if enable_audio:
-		_open_audio()
+	# The audio stream opens on the worker thread too: opening either on the main thread stalls every frame drawn
+	_video_thread = WorkerThreadPool.add_task(_open_video.bind(enable_audio))
 
 
 ## Update the video manually by providing a GoZenVideo instance and an optional AudioStreamWAV.
@@ -293,11 +298,19 @@ func close() -> void:
 		if error != OK:
 			printerr("Something went wrong waiting for task completion! %s" % error)
 		_video_thread = -1
+	if _restart_thread != -1:
+		WorkerThreadPool.wait_for_task_completion(_restart_thread)
+		_restart_thread = -1
 
 	if video != null:
 		if is_playing:
 			pause()
+		# Freeing a video closes its decoder, which takes tens of ms with the Jetson's hardware decoder: let a
+		# worker thread drop the last reference instead of the main one
+		var holder: Array = [video]
 		video = null
+		_release_tasks.append(WorkerThreadPool.add_task(_release_video.bind(holder)))
+	_opened_audio = null
 
 	if audio_player:
 		audio_player.stop()
@@ -306,6 +319,18 @@ func close() -> void:
 
 #------------------------------------------------ PLAYBACK HANDLING
 func _process(delta: float) -> void:
+	if _restart_thread != -1:
+		# Showing the last frame until the worker has gone back to the first one
+		if not WorkerThreadPool.is_task_completed(_restart_thread):
+			return
+		WorkerThreadPool.wait_for_task_completion(_restart_thread)
+		_restart_thread = -1
+		current_frame = 0
+		_time_elapsed = 0.0
+		_set_frame_image()
+		play()
+		return
+
 	if is_playing:
 		_skips = 1
 		_time_elapsed += delta
@@ -343,17 +368,39 @@ func _process(delta: float) -> void:
 			video_ended.emit()
 
 			if loop:
-				seek_frame(0)
-				play()
-	elif _video_thread != -1:
+				restart()
+	elif _video_thread != -1 and WorkerThreadPool.is_task_completed(_video_thread):
+		# Only once the worker is done: waiting for it here would stall the frame while the file opens
 		var error: int = WorkerThreadPool.wait_for_task_completion(_video_thread)
 		if error != OK:
 			printerr("Something went wrong waiting for task completion! %s" % error)
 
 		_video_thread = -1
+		if _opened_audio != null:
+			audio_player.stream = _opened_audio
+			_opened_audio = null
 		_update_video(video)
 		if enable_auto_play:
 			play()
+
+	while not _release_tasks.is_empty() and WorkerThreadPool.is_task_completed(_release_tasks[0]):
+		WorkerThreadPool.wait_for_task_completion(_release_tasks.pop_front())
+
+
+## Plays from the first frame again, like [code]seek_frame(0)[/code] then [code]play()[/code], but seeking on a worker
+## thread: going back to the start recreates the decoder with the Jetson's hardware decoder, about 0.1 s that would
+## otherwise stall every frame drawn. The video shows its current frame until then.
+func restart() -> void:
+	if !is_open() or _restart_thread != -1:
+		return
+	if is_playing:
+		pause()
+	_restart_thread = WorkerThreadPool.add_task(_seek_start)
+
+
+func _seek_start() -> void:
+	if video.seek_frame(0):
+		printerr("Couldn't seek frame!")
 
 
 ## Start the video playback. This will play until reaching the end of the video and then pause and go back to the start.
@@ -544,9 +591,20 @@ func duration_to_formatted_string(duration_in_seconds: float) -> String:
 	return "%02d:%02d:%02d" % [hours, minutes, seconds]
 
 
-func _open_video() -> void:
+func _open_video(with_audio: bool = false) -> void:
 	if video.open(path):
 		printerr("Error opening video!")
+	if with_audio:
+		var stream: AudioStreamFFmpeg = AudioStreamFFmpeg.new()
+		if stream.open(path, -1) != OK:
+			printerr("Failed to open AudioStreamFFmpeg for: %s" % path)
+		else:
+			_opened_audio = stream
+
+
+## On a worker thread (close()): drops the last reference to a closed video, which frees it and its decoder.
+static func _release_video(holder: Array) -> void:
+	holder.clear()
 
 
 func _open_audio(stream_id: int = -1) -> void:

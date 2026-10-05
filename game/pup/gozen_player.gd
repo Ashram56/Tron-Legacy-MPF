@@ -60,9 +60,7 @@ func open(path: String, loop: bool, volume_db: float) -> void:
 
 ## From the first frame again (pup_screen.gd's restart of a looping file or background).
 func play() -> void:
-	if _playback.is_open():
-		_playback.seek_frame(0)
-		_playback.play()
+	_playback.restart()
 
 
 func stop() -> void:
