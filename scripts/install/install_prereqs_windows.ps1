@@ -234,6 +234,12 @@ try {
         if (-not $DryRun -and -not (Find-Git)) { throw 'Git is still missing after the install' }
     }
     $authGit = Find-Git
+    # setup.py runs `git` from the PATH (to fetch the submodules): a Git found only at its install folder is
+    # put on this session's PATH
+    if ($authGit -and -not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $env:Path = (Split-Path -Parent $authGit) + ';' + $env:Path
+        Write-Note "Git added to this session's PATH: $(Split-Path -Parent $authGit)"
+    }
     Invoke-GitHubAuth $(if ($authGit) { $authGit } else { 'git' })
 
     # ---------------------------------------------------------------- Python 3.11
