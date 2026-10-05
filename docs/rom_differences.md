@@ -26,6 +26,8 @@ departs from the ROM, for example a new mode.
 | Text glow | none | none by default; optional glow | default (`--dmd-text-glow X` adds one) |
 | Pricing on the desktop | coins (factory settings) | free play with virtual hardware | `run.py --no-free-play` |
 | Hardware | SAM CPU board | MPF on virtual hardware, a P-ROC, or the Visual Pinball X table | `--hw proc` drives the original driver boards |
+| Machine | LE 1.74 ROM, LE hardware only | Pro hardware by default (the Pro 1.74 IO assignments, `assets/docs/PRO_VS_LE.md`) running the LE 1.74 rules; LE selectable. The Pro rules are not ported, so on a Pro: the TRON standups use the LE drop-target code with no reset coil; End of Line multiball and the LE-only adjustments stay; the Pro's light cycle ramp extra ball adjustments are missing. Pro coil behaviour follows the Pro decompile: ramp flashers on 19 / 25, lower flashers 22 / 23 fired with them (left/right pairing inferred) | `--machine le` (`hw_proc_le`, `hw_virtual_le`; `hw_vpx` is the LE). docs/hardware.md, "Pro or LE" |
+| Fiber optics on a Pro | none (Pro ROM: no ramp light tube driver) | off by default; can be driven (the IO board's aux driver is there) | default (`fiber_optics` overlay turns them on) |
 
 No scoring or rules departures yet.
 
@@ -33,5 +35,6 @@ No scoring or rules departures yet.
 
 | What you see | Why it is right | Source |
 |---|---|---|
+| Shaker runs 200 / 384 / 1024 ms, longer than older notes said (75 / 265 / 1100 ms) | ROM table 0x040d3998, measured 203 / 390 / 1040 ms in the emulator | `assets/rom_data/io/README.md`, `game/tron/os_layer.py` `SHAKER_MS` |
 | Disc Multiball: Gem, the ramps, the inner loops and the orbits all show "JACKPOT" with points | Only the spinning disc collects the Jackpot. The other blue shots score their own value and add it to the Jackpot, but the ROM plays the same "DISC MULTIBALL / JACKPOT" screen (deff 48) for them | `assets/rules/modes/disc_multiball.md` (blue shot row); the disc_multiball trace: a left-ramp hit grows the Jackpot 250k to 350k, only sw41 pays it; `game/tron/features/disc_multiball.py` `disc_mb_shot` |
 | Sea of Simulation: completing a stage with its shot (e.g. the VUK for FLYNN, the right inner loop for GEM) pays only the shot value (100,000 x stage), not the (stage) million that a skipped stage pays | The (stage) x 1,000,000 bonus is only for stages skipped because their item was already collected, once per player (deff 115). A stage played by its shots pays (stage) x 100,000 per needed shot with deff 116+stage; collecting the item at the end of the stage only bumps its audit and item level, no score | `assets/rules/modes/sea_of_simulation.md:4,75-77`; `assets/code/tron_game_decompiled_v2.c:91908` (`sos_stage0_flynn_shot`: 0x186a0 = 100,000), `:93802` (`simulation_shot`: audit + `item_level_add`, no score), `:79822` (`item_level_add`); `assets/rules/traces/sea_of_simulation.jsonl:13683` (FLYNN VUK 100,000), `:16698` (GEM 200,000), `:17600` (CLU skipped 3,000,000), `:21323` (last ZUSE target 400,000, ZUSE collected, no bonus); `tests/test_wizard.py` `test_ladder_from_switches_to_portal` |

@@ -85,9 +85,9 @@ def adjustment_defaults(settings_path):
     return {n: tuple(v) for n, v in out.items()}
 
 
-# shaker_run(strength, min_setting): strength 1/2/3 runs the motor (coil 8) about 75/265/1100 ms
-# (assets/mpf_package/config/shaker.yaml, observed on coil 8 in emulated play)
-SHAKER_MS = {1: 75, 2: 265, 3: 1100}
+# shaker_run(strength, min_setting): strength 1/2/3 runs the motor (coil 8) 200/384/1024 ms (ROM table 0x040d3998,
+# assets/rom_data/io/coils.csv; same table on the Pro, assets/docs/PRO_VS_LE.md)
+SHAKER_MS = {1: 200, 2: 384, 3: 1024}
 SHAKER_ADJ = 86              # adjustment 86 SHAKER MOTOR: 0 none, 1 minimal, 2 moderate, 3 maximal
 
 
@@ -581,11 +581,17 @@ class TronOS(CustomCode):
         if self.adj[SHAKER_ADJ] < min_setting or self.state & 0x310 or not self.game:
             return False
         ms = SHAKER_MS.get(strength, SHAKER_MS[1])
+        now = self.machine.clock.get_time()
+        if now + ms / 1000.0 <= getattr(self, "_shaker_until", 0):
+            return True             # a new run only replaces a shorter one (assets/mpf_package/config/shows/shaker_*)
+        self._shaker_until = now + ms / 1000.0
         coil = self.machine.coils.get("c_shaker_motor_optional")
         if coil is not None:
             try:
                 coil.enable()
-                self.machine.clock.schedule_once(lambda: coil.disable(), ms / 1000.0)
+                if getattr(self, "_shaker_stop", None):
+                    self.machine.clock.unschedule(self._shaker_stop)
+                self._shaker_stop = self.machine.clock.schedule_once(lambda: coil.disable(), ms / 1000.0)
             except Exception:       # noqa: BLE001 (a disabled driver in a test machine)
                 pass
         self.lamps.coil_log(8, ms)

@@ -103,6 +103,25 @@ class TestVpx(TronTestCase, MpfBcpTestCase):
         self.assertTrue(self.vpx("stop"))           # the table closed (no quit: the bridge did not start MPF)
 
 
+class TestVpxPro(TestVpx):
+    """hw_vpx_pro.yaml: the Pro's numbers on the table (assets/docs/PRO_VS_LE.md), ramp tubes off."""
+
+    def get_config_file(self):
+        return "../../tests/machine_vpx_pro.yaml"
+
+    def test_numbers_match_pinmame(self):
+        self.assertEqual("pro", self.machine.variables.get_machine_var("machine_variant"))
+        self.assertEqual("4", self.machine.switches["s_tron_t"].hw_switch.number)        # standups, reversed
+        self.assertEqual("3", self.machine.coils["c_disc_direction_relay"].hw_driver.number)
+        self.assertEqual("1-matrix", self.machine.lights["l_start_button"].hw_drivers["white"][0].number)
+
+    def test_ramp_tubes_are_rgb_lamps(self):
+        self.machine.lights["l_left_ramp_tube"].color([255, 0, 128])
+        self.advance_time_and_run(.1)
+        lamps = dict(self.vpx("changed_lamps"))
+        self.assertEqual([0, 0, 0], [lamps.get(n, 0) for n in (101, 102, 103)])     # fiber_optics 0
+
+
 class TestTableScript(TronTestCase):
 
     SCRIPT = ('Option Explicit\r\nConst UseVPMModSol = True\r\nLoadVPM "01560000", "sam.VBS", 3.10\r\n'
