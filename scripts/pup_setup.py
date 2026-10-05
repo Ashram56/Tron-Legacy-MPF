@@ -43,10 +43,13 @@ NATIVE_MIN_GODOT = (4, 6)           # native_video.gdextension compatibility_min
 
 
 def native_video(os_name=None):
-    """True where the PuP plays the pack's mp4s with the native_video add-on (Windows, Godot 4.6+): Godot's
-    own player only does Theora, so elsewhere the videos are converted."""
+    """True where the PuP plays the pack's mp4s with the native_video add-on (Windows and macOS, Godot 4.6+):
+    Godot's own player only does Theora, so elsewhere the videos are converted. TRON_NATIVE_VIDEO=0 converts
+    them everywhere."""
     godot = tuple(int(n) for n in tc.GODOT_VERSION.split(".")[:2])
-    return tc.host_os(os_name) == "windows" and godot >= NATIVE_MIN_GODOT
+    if os.environ.get("TRON_NATIVE_VIDEO") == "0":
+        return False
+    return tc.host_os(os_name) in ("windows", "macos") and godot >= NATIVE_MIN_GODOT
 
 
 def install_native_video():
@@ -89,6 +92,8 @@ def setup(py=None, dry=False):
     if native:
         install_native_video()
     else:
+        if os.path.isdir(NATIVE_DST):           # a loaded add-on would play the mp4s instead of the conversions
+            fsutil.remove_dir(NATIVE_DST)
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode

@@ -29,7 +29,7 @@ var windows := {}
 var _next := {}                     # playlist -> next index (AlphaSort playlists)
 var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
-## The native_video add-on (Windows, pup_addons/native_video): plays the pack's mp4s without conversion
+## The native_video add-on (Windows and macOS, pup_addons/native_video): plays the pack's mp4s without conversion
 var native_video := ClassDB.class_exists("NativeVideoStream")
 
 
