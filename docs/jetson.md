@@ -5,7 +5,7 @@ without freezes or crashes: what was wrong, the fix, where it lives and how it w
 bringing up another Jetson, such as the Xavier NX.
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
-4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it.
+4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
 **Not tested yet:** Xavier NX / AGX Xavier (t194, L4T R35 / JetPack 5). See [Xavier NX checklist](#xavier-nx-checklist).
 
 ## The video stack
@@ -116,8 +116,8 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
   [nvmpi_concurrent.c](upstream_issues/repro/nvmpi_concurrent.c) (`in.mp4 3 40 10`).
 - Decode speed: 1080p H.264 at about 350 fps on NVDEC, against about 70 fps on one CPU core.
 - Games on the board: `scripts/run.py --scenario clu_hurryup --seconds 120`, with Godot's log showing
-  `GoZen: hardware decoder h264_nvmpi` per video. `scenarios/full_game_to_portal.txt` plays a whole game to
-  Portal Multiball in about 10 minutes.
+  `GoZen: hardware decoder h264_nvmpi` per video. `scripts/run.py --scenario full_game_to_portal`
+  (`scenarios/full_game_to_portal.txt`) plays a whole game to Portal Multiball in about 10 minutes.
 
 ## Xavier NX checklist
 JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
@@ -130,10 +130,23 @@ JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
 To bring one up:
 1. `bash scripts/install/install_jetson_hwdec.sh --test` (or the full Linux install), and check that libnvmpi is in
    `ldconfig -p`.
-2. Build the repro programs against `~/.cache/tron-legacy-mpf/ffmpeg-src/ffmpeg7.1` (the `--test` ffmpeg) and run
-   `flush`, `close` and `crash` (a loop of 100) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs). Expect what is
-   written above.
-3. Play `scripts/run.py --scenario clu_hurryup --seconds 120`, then `scenarios/full_game_to_portal.txt`, on the
+2. Build the repro programs against `~/.cache/tron-legacy-mpf/ffmpeg-src/ffmpeg7.1` (the `--test` ffmpeg), with
+   `-L/usr/lib/aarch64-linux-gnu/tegra` in place of `.../nvidia`, and run `flush`, `close` and `crash` (a loop of
+   100) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs). Expect what is written above. To learn which bugs R35
+   has on its own, run them once more with libnvmpi built at `8d70c17` without the patch, and note the result
+   under "Not checked yet on JetPack 5" in the matching report.
+3. Play `scripts/run.py --scenario clu_hurryup --seconds 120`, then `scripts/run.py --scenario full_game_to_portal`, on the
    screen. Watch for freezes and black screens, and check `game/logs/godot.log` for `h264_nvmpi` and errors.
 4. Record the result in the "Tested" line at the top of this page and in the headers of `nvmpi_flush.patch` and
    `gozen.patch`.
+5. If a hunk does not apply or behaves differently on R35, change `nvmpi_flush.patch` and re-run step 1; when its
+   `ffmpeg/` part changes, also rebuild GoZen (`bash scripts/build_gozen.sh arm64`) and commit the `.so`.
+
+## Updating a pin
+To move jetson-ffmpeg or GDE GoZen to a newer revision:
+1. Change `JETSON_FFMPEG_REV` / `GOZEN_REV` in `scripts/build_gozen.sh` and the jetson-ffmpeg revision in
+   `scripts/install/install_jetson_hwdec.sh`. Both must name the same jetson-ffmpeg revision: the wrapper in GoZen
+   and the library on the board have to match.
+2. Check that both patches still apply (`git apply --check`) and drop the hunks upstream has fixed (see the reports
+   in `upstream_issues/`).
+3. Rebuild GoZen, re-run the Jetson install, then repeat steps 2 and 3 of the checklist.
