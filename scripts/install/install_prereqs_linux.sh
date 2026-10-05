@@ -94,6 +94,15 @@ case "$(uname -m)" in
     *) if [ "$DRY" = 1 ]; then ARCH=x86_64; else die "unsupported CPU $(uname -m): x86_64 or arm64 only"; fi ;;
 esac
 
+# MPF Monitor needs PyQt6, whose arm64 wheels need glibc 2.39 (Ubuntu 24.04): on older arm64 systems
+# (JetPack 5 and 6) pip falls back to a source build that fails, so the monitor is left out there
+GLIBC="$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{ print $2 }' || true)"
+if [ "$MONITOR" = 1 ] && [ "$ARCH" = aarch64 ] && [ -n "$GLIBC" ] \
+   && [ "$(printf '%s\n' 2.39 "$GLIBC" | sort -V | head -n 1)" != 2.39 ]; then
+    MONITOR=0
+    MONITOR_SKIPPED="glibc $GLIBC < 2.39 on arm64: PyQt6 has no wheel for it"
+fi
+
 # ------------------------------------------------------------------ packages per family
 
 case "$FAMILY" in
@@ -330,6 +339,7 @@ fi
 
 if [ "$SETUP" = 1 ]; then
     say "Workspace (scripts/setup.py)"
+    [ -z "${MONITOR_SKIPPED:-}" ] || note "MPF Monitor left out: $MONITOR_SKIPPED"
     ARGS=()
     [ "$MONITOR" = 1 ] || ARGS+=(--no-monitor)
     [ "$DRY" = 1 ] && ARGS+=(--dry-run)
