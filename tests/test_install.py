@@ -34,7 +34,8 @@ def sh(args, env=None):
 
 @unittest.skipUnless(BASH and POSIX, "needs bash on Linux or macOS")
 class TestShellScripts(unittest.TestCase):
-    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh"]
+    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh",
+               "jetson_selftest.sh"]
 
     def test_syntax(self):
         for name in self.SCRIPTS + [os.path.join("..", "..", "docker", "tron.sh")]:
@@ -71,6 +72,29 @@ class TestShellScripts(unittest.TestCase):
         self.assertIn("tegra-egl/libEGL_nvidia.so.0", r.stdout)
         self.assertIn("aarch64-linux-gnu_EGL.conf: /usr/lib/aarch64-linux-gnu/tegra-egl", r.stdout)
         self.assertIn("scripts/build.sh --no-stubs --install", r.stdout)
+
+    def test_jetson_selftest_plan(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        script = os.path.join(INSTALL, "jetson_selftest.sh")
+        r = sh([script, "--dry-run"], env={"TRON_NV_RELEASE": release})
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn("not an NVIDIA Jetson", r.stdout)
+        for rev, libs in (("R35 (release), REVISION: 4.1", "tegra"), ("R36 (release), REVISION: 4.3", "nvidia")):
+            with self.subTest(release=rev):
+                with open(release, "w") as f:
+                    f.write("# %s, GCID: 1, BOARD: generic, EABI: aarch64\n" % rev)
+                r = sh([script, "--dry-run", "--stock", "--runs", "10"],
+                       env={"TRON_NV_RELEASE": release, "XDG_CACHE_HOME": tmp})
+                self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+                self.assertIn("-L/usr/lib/aarch64-linux-gnu/%s " % libs, r.stdout)
+                self.assertIn("nvmpi_seek_close.c", r.stdout)
+                self.assertIn("10 runs of:", r.stdout)
+                self.assertIn("2 runs of:", r.stdout)
+                self.assertIn("nvmpi_concurrent", r.stdout)
+                self.assertIn("Checks, stock build", r.stdout)
+                self.assertIn("--prefix %s/tron-legacy-mpf/stock/prefix" % tmp, r.stdout)
 
     def test_jetson_hwdec_plan_on_an_orin(self):
         """JetPack 6 (AGX Orin, R36.4.3): t234 repo, nvidia/ library folder, installs pinned to 36.4.3."""

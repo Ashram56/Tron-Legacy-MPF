@@ -114,6 +114,7 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
 - Repro programs, built against GoZen's patched FFmpeg (build line at the top of each):
   [nvmpi_seek_close.c](upstream_issues/repro/nvmpi_seek_close.c) (`flush`, `close`, `crash` modes) and
   [nvmpi_concurrent.c](upstream_issues/repro/nvmpi_concurrent.c) (`in.mp4 3 40 10`).
+  `scripts/install/jetson_selftest.sh` builds and runs them all on a board.
 - Decode speed: 1080p H.264 at about 350 fps on NVDEC, against about 70 fps on one CPU core.
 - Games on the board: `scripts/run.py --scenario clu_hurryup --seconds 120`, with Godot's log showing
   `GoZen: hardware decoder h264_nvmpi` per video. `scripts/run.py --scenario full_game_to_portal`
@@ -121,20 +122,26 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
 
 ## Xavier NX checklist
 JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
-- NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` (the install handles it) and libnvmpi may build on
-  the legacy `nvbuf_utils` path instead of NvUtils (`WITH_NVUTILS`). Fixes 2 to 4 change code shared by both paths;
-  check that libnvmpi builds and run all repro modes.
+- NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` instead of `.../nvidia/` (the install and the
+  self-test handle it). R35's Multimedia API already has `nvbufsurface.h`, so libnvmpi builds on the same NvUtils
+  path (`WITH_NVUTILS`) as on the Orin, not on the legacy `nvbuf_utils` one.
 - The in-place reset (fix 1) may work on R35. Recreating the decoder still works there, so keep it.
 - The Xavier NX has fewer NVDEC sessions and less memory than the AGX Orin: check three screens decoding at once.
 
+**Checked without the board** (an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with L4T R35.4.1 and
+NVIDIA's r35.4 apt packages): the full Linux install (`install_prereqs_linux.sh --yes`) passes, including Python
+3.11 from uv, MPF Monitor, Godot 4.6.3 arm64, the PuP Pack and the Godot import; `nvmpi_flush.patch` applies and
+libnvmpi builds with NvUtils against R35.4.1 and links NVIDIA's own `libv4l2.so.0`. The GoZen arm64 `.so` needs
+glibc 2.29 at most (Ubuntu 20.04 has 2.31). Decoding itself needs the board.
+
 To bring one up:
-1. `bash scripts/install/install_jetson_hwdec.sh --test` (or the full Linux install), and check that libnvmpi is in
+1. `bash scripts/install/install_jetson_hwdec.sh` (or the full Linux install), and check that libnvmpi is in
    `ldconfig -p`.
-2. Build the repro programs against `~/.cache/tron-legacy-mpf/ffmpeg-src/ffmpeg7.1` (the `--test` ffmpeg), with
-   `-L/usr/lib/aarch64-linux-gnu/tegra` in place of `.../nvidia`, and run `flush`, `close` and `crash` (a loop of
-   100) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs). Expect what is written above. To learn which bugs R35
-   has on its own, run them once more with libnvmpi built at `8d70c17` without the patch, and note the result
-   under "Not checked yet on JetPack 5" in the matching report.
+2. `bash scripts/install/jetson_selftest.sh --stock`: builds the `--test` ffmpeg and the repro programs, then runs
+   `flush`, `close`, `crash` (100 runs) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs), each with a time limit,
+   against our patched build and then against jetson-ffmpeg without the patch. The patched build must pass every
+   check (exit status 0); the stock results show which bugs R35 has on its own: note them under "Not checked yet
+   on JetPack 5" in the matching report. Logs: `~/.cache/tron-legacy-mpf/selftest/`.
 3. Play `scripts/run.py --scenario clu_hurryup --seconds 120`, then `scripts/run.py --scenario full_game_to_portal`, on the
    screen. Watch for freezes and black screens, and check `game/logs/godot.log` for `h264_nvmpi` and errors.
 4. Record the result in the "Tested" line at the top of this page and in the headers of `nvmpi_flush.patch` and
