@@ -54,7 +54,7 @@ class TestVpx(TronTestCase, MpfBcpTestCase):
         for name, number in (("s_left_flipper", "84"), ("s_right_flipper", "82"), ("s_plumb_bob_tilt", "-7"),
                              ("s_slam_tilt", "-6"), ("s_coin", "65"), ("s_start_button", "16"),
                              ("s_service_back", "-3"), ("s_service_select", "0"), ("s_trough_1_r", "21"),
-                             ("s_disc_opto", "41")):
+                             ("s_disc_opto", "41"), ("s_coin_door_open", "-4")):
             self.assertEqual(number, sw[name].hw_switch.number, name)
         self.assertEqual("1", self.machine.coils["c_trough_up_kicker"].hw_driver.number)
         self.assertEqual("17", self.machine.coils["f_zen_flasher"].hw_driver.number)
@@ -89,6 +89,26 @@ class TestVpx(TronTestCase, MpfBcpTestCase):
         self.assertTrue(self.vpx("set_switch", number=66, value=True))      # coin 2: not wired, no error
         self.assertFalse(self.vpx("get_switch", number=66))
         self.assertTrue(self.vpx("get_switch", number=18))
+
+    def test_coin_door_cuts_the_coils(self):
+        for number in TROUGH:
+            self.set_switch(number, True)
+        self.advance_time_and_run(2)
+        self.set_switch(16, True)
+        self.set_switch(16, False, run=3)
+        self.assertModeRunning("game")
+        self.assertEqual(255, self.solenoids().get(33))
+        self.set_switch(-4, True)                   # End: the door opens (the table script toggles -4)
+        self.assertTrue(self.vpx("get_switch", number=-4))
+        self.assertEqual(4, self.machine.tron.display.fg)              # "50V / 20V DISABLED"
+        self.assertEqual(0, self.solenoids().get(33))                  # fast flips off: no flipper power
+        self.machine.coils["c_left_slingshot"].pulse()
+        self.set_switch(84, True)
+        self.assertEqual({}, {n: v for n, v in self.solenoids().items() if v})   # nothing drives
+        self.set_switch(84, False)
+        self.set_switch(-4, False)                  # closed: power back, the flippers with it
+        self.assertEqual(255, self.solenoids().get(33))
+        self.assertNotEqual(4, self.machine.tron.display.fg)
 
     def test_ramp_tubes_are_rgb_lamps(self):
         self.machine.lights["l_left_ramp_tube"].color([255, 0, 128])
@@ -125,7 +145,8 @@ class TestVpxPro(TestVpx):
 class TestTableScript(TronTestCase):
 
     SCRIPT = ('Option Explicit\r\nConst UseVPMModSol = True\r\nLoadVPM "01560000", "sam.VBS", 3.10\r\n'
-              'Const cGameName = "trn_174h"\r\nSub Table_Init\r\n\t.Run GetPlayerHWnd\r\nEnd Sub\r\n')
+              'Const cGameName = "trn_174h"\r\nSub Table_Init\r\n\t.Run GetPlayerHWnd\r\nEnd Sub\r\n'
+              'Sub Table_KeyDown(ByVal keycode)\r\n\tIf vpmKeyDown(keycode) Then Exit Sub\r\nEnd Sub\r\n')
 
     def test_loader_swapped(self):
         out = vpx_table.patch_script(self.SCRIPT)
@@ -134,8 +155,11 @@ class TestTableScript(TronTestCase):
         self.assertIn('CreateObject("TronMPF.Controller")', out)
         self.assertIn("Was: LoadVPM \"01560000\", \"sam.VBS\", 3.10", out)
         self.assertNotIn("\n\n", out.replace("\r\n", "\r"))          # line ends stay CRLF
-        self.assertTrue(out.endswith('Const cGameName = "trn_174h"\r\nSub Table_Init\r\n\t.Run GetPlayerHWnd\r\n'
-                                     'End Sub\r\n'))
+        self.assertIn('Const cGameName = "trn_174h"\r\nSub Table_Init\r\n\t.Run GetPlayerHWnd\r\nEnd Sub\r\n', out)
+        # End toggles the coin door (switch -4) before core.vbs sees the key
+        self.assertIn('Sub Table_KeyDown(ByVal keycode)\r\n\tIf keycode = 207 Then Controller.Switch(-4) = '
+                      'Not Controller.Switch(-4) : Exit Sub', out)
+        self.assertTrue(out.endswith('\r\n\tIf vpmKeyDown(keycode) Then Exit Sub\r\nEnd Sub\r\n'))
         with self.assertRaises(ValueError):                        # twice is refused
             vpx_table.patch_script(out)
         with self.assertRaises(ValueError):
