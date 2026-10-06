@@ -221,6 +221,9 @@ class TestRunSwitches(unittest.TestCase):
             run.dmd_args([], text_color="blue")
         self.assertEqual(["--", "--dmd-tint=orange"], run.dmd_args([], tint="orange"))
         self.assertEqual(["--", "--dmd-font=orbitron"], run.dmd_args([], font="orbitron"))
+        self.assertEqual(["--", "--dmd-text-scale=0.9"], run.dmd_args([], text_scale=0.9))
+        with self.assertRaises(SystemExit):
+            run.dmd_args([], text_scale=3.0)
         ttf = os.path.join(GAME, "fonts_ttf", "Orbitron.ttf")
         self.assertEqual(["--", "--dmd-font=" + os.path.abspath(ttf)],
                          run.dmd_args([], font=os.path.relpath(ttf)))      # a font file: its absolute path
@@ -301,7 +304,7 @@ class TestGodotModes(unittest.TestCase):
 
     def test_hd_draws_text_at_window_resolution(self):
         from PIL import Image
-        out = self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"])
+        out = self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-text-scale=1"], ["--resolution", "1280x320"])
         frame = Image.open(os.path.join(out, "deff_025", "frame_00000.png")).convert("L")
         self.assertEqual((1280, 320), frame.size)
         box = frame.point(lambda p: 255 if p > 40 else 0).getbbox()
@@ -323,7 +326,7 @@ class TestGodotModes(unittest.TestCase):
             return frame.point(lambda p: 255 if p > 90 else 0).getbbox(), frame
         boxes = {}
         for font in ["rajdhani", "orbitron", "godot", "rom"]:
-            b, frame = box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=" + font],
+            b, frame = box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-text-scale=1", "--dmd-font=" + font],
                                        ["--resolution", "1280x320"]))
             boxes[font] = b
             # "50,000", font 15: centred on x 84 (dots, 10 px each), 42 dots wide, capitals 10 dots high on row 26
@@ -332,7 +335,13 @@ class TestGodotModes(unittest.TestCase):
             self.assertTrue(abs(b[1] - 170) <= 8, (font, b))              # capitals' top: row 17
             self.assertGreater(len(frame.getcolors(256)), 20, font)      # smooth edges
         self.assertEqual(len({boxes[f] for f in boxes}), 4, boxes)          # four different looks
-        self.assertEqual(boxes["orbitron"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"]))[0])
+        self.assertEqual(boxes["orbitron"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],
+                                                            env={"TRON_DMD_TEXT_SCALE": "1"}))[0])
+        # the default size, 0.85: smaller, about the same middle
+        b, _ = box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"]))
+        full = boxes["orbitron"]
+        self.assertTrue(0.8 < (b[2] - b[0]) / (full[2] - full[0]) < 0.9, (b, full))
+        self.assertTrue(abs((b[0] + b[2]) - (full[0] + full[2])) <= 6, (b, full))
         self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],
                                                        env={"TRON_DMD_FONT": "rom"}))[0])
         self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=/nowhere/x.ttf"],

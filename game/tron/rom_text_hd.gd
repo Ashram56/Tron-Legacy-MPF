@@ -87,6 +87,12 @@ static func style() -> Dictionary:
 	return {"color": Color("#2a6cff"), "glow_color": Color("#22b8ff"), "glow": 0.0}
 
 
+## The clean fonts' size (dmd_mode.gd text_scale): 1 = capitals as tall as the ROM's, never wider than its text.
+static func text_scale() -> float:
+	var dmd = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("DmdMode")
+	return float(dmd.text_scale) if dmd and "text_scale" in dmd else 1.0
+
+
 ## The clean font of the HD mode: {"font", "cap" (capital height / em)}, or {} for the ROM's own fonts.
 static func clean() -> Dictionary:
 	var dmd = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("DmdMode")
@@ -189,23 +195,24 @@ func clean_layout() -> Array:
 	var c := clean()
 	if c.is_empty() or text == "":
 		return []
+	var s := text_scale()
 	var cap := float(info(font_id).get("cap", font_size))
-	var k := cap / (float(c["cap"]) * CLEAN_SIZE)
+	var k := s * cap / (float(c["cap"]) * CLEAN_SIZE)
 	var font: Font = c["font"]
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * k
 	var sx := k
-	var room := box_width - 1.0      # a dot of air: clean letters reach their box's edges, ROM letters do not
+	var room := s * (box_width - 1.0)  # a dot of air: clean letters reach their box's edges, ROM letters do not
 	var x := 0.0
 	if box_width > 0 and w > room:
 		sx = k * room / w
 		w = room
-		x = 0.5
+		x = (box_width - w) / 2.0
 	elif box_width > 0:
 		if flags & 2:
 			x = (box_width - w) / 2.0
 		elif flags & 4:
 			x = box_width - w
-	return [font, Vector2(x, ascent), sx, k]
+	return [font, Vector2(x, ascent - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
 
 
 func _draw_clean(item: CanvasItem, color: Color, outline_dots: float) -> void:

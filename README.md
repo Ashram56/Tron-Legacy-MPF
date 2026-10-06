@@ -103,7 +103,8 @@ any layout.
 - `--dmd-size 1920x480`: the DMD window's size (HD scales to any size). `--dmd-dots 2`: an HD dot-matrix look.
 - `--dmd-tint orange`: the HD DMD in the original orange instead of Tron blue.
 - `--dmd-font NAME`: the HD text font: `orbitron` (default, Tron style), `rajdhani` (clean, narrower), `godot` (Godot's
-  default font), a `.ttf`/`.otf` file, or `rom` (the ROM's own dot fonts, smoothed).
+  default font), a `.ttf`/`.otf` file, or `rom` (the ROM's own dot fonts, smoothed). `--dmd-text-scale X`: its
+  size, 1 = the ROM's capital height (default 0.85).
 - `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (0.8 by default; `--dmd-text-glow 0` turns it off).
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.

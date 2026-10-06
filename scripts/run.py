@@ -13,6 +13,7 @@
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
     python scripts/run.py --dmd-font orbitron      # hd text font: orbitron (default), rajdhani, godot, rom (ROM dots) or a .ttf
+    python scripts/run.py --dmd-text-scale 0.85    # hd text size (1 = the ROM's capital height; default 0.85)
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
     python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0.8; 0 = none)
 
@@ -160,11 +161,13 @@ def engine_arg(gargs, *args):
     return gargs[:at] + list(args) + gargs[at:]
 
 
-def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None, tint=None, font=None):
+def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None, tint=None, font=None,
+             text_scale=None):
     """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, the window
     size (Godot's --resolution WxH), the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
-    --dmd-text-glow=X) and the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE). None leaves the
-    choice to TRON_DMD... / the project settings (hd, blue, glow 0.8, orbitron)."""
+    --dmd-text-glow=X), the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE) and its size
+    (--dmd-text-scale=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, glow 0.8,
+    orbitron, 0.85)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
     if font:
@@ -184,6 +187,10 @@ def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=N
         gargs = user_arg(gargs, "--dmd-text-color=#" + text_color.lstrip("#"))
     if text_glow is not None:
         gargs = user_arg(gargs, "--dmd-text-glow={:g}".format(text_glow))
+    if text_scale is not None:
+        if not 0.5 <= text_scale <= 1.5:
+            raise SystemExit("--dmd-text-scale: expected 0.5 to 1.5, not {:g}".format(text_scale))
+        gargs = user_arg(gargs, "--dmd-text-scale={:g}".format(text_scale))
     return gargs
 
 
@@ -343,6 +350,9 @@ def main(argv=None):
                    help="hd only: font of the DMD text: orbitron (default, Tron style), rajdhani (clean, narrower), "
                         "godot (Godot's default font), rom (the ROM's own dot fonts, smoothed) or a .ttf/.otf "
                         "file. Clean fonts keep the ROM's placement. Also TRON_DMD_FONT")
+    p.add_argument("--dmd-text-scale", type=float, metavar="X",
+                   help="hd only, clean fonts: text size, 1 = capitals as tall as the ROM's (default 0.85; 0.5-1.5). "
+                        "Also TRON_DMD_TEXT_SCALE")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     text_ui = args.text_ui
@@ -352,7 +362,7 @@ def main(argv=None):
                scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
-                                                     args.dmd_font),
+                                                     args.dmd_font, args.dmd_text_scale),
                trace=args.trace and os.path.abspath(args.trace))
 
 
