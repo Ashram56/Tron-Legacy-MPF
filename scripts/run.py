@@ -3,7 +3,8 @@
 
     python scripts/run.py                          # virtual hardware (hw_virtual: smart_virtual, trough full)
     python scripts/run.py --monitor                # ... plus MPF Monitor (setup.py installs it)
-    python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD)
+    python scripts/run.py --hw proc                # the real machine on the P-ROC (Godot feeds the DMD), a Pro
+    python scripts/run.py --hw proc --machine le   # the same on an LE (docs/hardware.md, "Pro or LE")
     python scripts/run.py --hw vpx                 # Visual Pinball X plays the table (docs/vpx.md); MPF waits for it
     python scripts/run.py --scenario NAME          # play scenarios/NAME.txt or assets/rules/traces/NAME.txt in real time
     python scripts/run.py --seconds 20             # stop everything after 20 s
@@ -11,8 +12,10 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
+    python scripts/run.py --dmd-font orbitron      # hd text font: orbitron (default), rajdhani, godot, rom (ROM dots) or a .ttf
+    python scripts/run.py --dmd-text-scale 0.85    # hd text size (1 = the ROM's capital height; default 0.85)
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
-    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0 = none)
+    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0.8; 0 = none)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -168,12 +171,17 @@ def engine_arg(gargs, *args):
     return gargs[:at] + list(args) + gargs[at:]
 
 
-def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None, tint=None):
+def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None, tint=None, font=None,
+             text_scale=None):
     """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, the window
-    size (Godot's --resolution WxH), and the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
-    --dmd-text-glow=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, no glow)."""
+    size (Godot's --resolution WxH), the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
+    --dmd-text-glow=X), the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE) and its size
+    (--dmd-text-scale=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, glow 0.8,
+    orbitron, 0.85)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
+    if font:
+        gargs = user_arg(gargs, "--dmd-font=" + (os.path.abspath(font) if os.path.isfile(font) else font))
     if tint:
         gargs = user_arg(gargs, "--dmd-tint=" + tint)
     if dots is not None:
@@ -189,15 +197,33 @@ def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=N
         gargs = user_arg(gargs, "--dmd-text-color=#" + text_color.lstrip("#"))
     if text_glow is not None:
         gargs = user_arg(gargs, "--dmd-text-glow={:g}".format(text_glow))
+    if text_scale is not None:
+        if not 0.5 <= text_scale <= 1.5:
+            raise SystemExit("--dmd-text-scale: expected 0.5 to 1.5, not {:g}".format(text_scale))
+        gargs = user_arg(gargs, "--dmd-text-scale={:g}".format(text_scale))
     return gargs
 
 
-def mpf_args(hw, scenario=None, text_ui=False, free_play=None):
+DEFAULT_MACHINE = {"virtual": "pro", "proc": "pro", "vpx": "le"}     # hw_vpx.yaml is the LE: the VPW table is one
+
+
+def overlay(hw, machine=None, scenario=None):
+    """The hardware overlay for a machine: hw_proc / hw_virtual are the Pro, hw_vpx the LE; the other machine adds
+    _le / _pro. Scenarios replay the LE ROM's traces, so they default to the LE."""
+    default = DEFAULT_MACHINE[hw]
+    machine = machine or ("le" if scenario else default)
+    return "hw_" + hw + ("" if machine == default else "_" + machine)
+
+
+def mpf_args(hw, scenario=None, text_ui=False, free_play=None, machine=None, fiber_optics=False):
     """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine and VPX,
-    off for scenarios (the ROM traces insert a coin) and the real machine."""
+    off for scenarios (the ROM traces insert a coin) and the real machine. machine: "pro" or "le" (overlay());
+    fiber_optics: add config/fiber_optics.yaml (drive the ramp light tubes on a Pro)."""
     if free_play is None:
         free_play = hw in ("virtual", "vpx") and not scenario
-    args = ["game", ".", "-c", "config,hw_" + hw + (",free_play" if free_play else "")]
+    configs = ["config", overlay(hw, machine, scenario)] + (["fiber_optics"] if fiber_optics else []) + (
+        ["free_play"] if free_play else [])
+    args = ["game", ".", "-c", ",".join(configs)]
     if not text_ui:
         args.append("-t")
     if scenario:
@@ -235,7 +261,8 @@ def scenario_path(name):
 
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
-        godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False):
+        godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
+        fiber_optics=False):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -269,8 +296,9 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
                 tc.BCP_PORT, " (Godot exited)" if godot.poll() is not None else "", godot_log,
                 log_tail(godot_log)))
         print("GMC is listening", flush=True)
-        print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
-        mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
+        margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics)
+        print("Starting MPF: mpf " + " ".join(margs), flush=True)
+        mpf = spawn(tc.mpf_command() + margs, log=mpf_log, cwd=tc.GAME, env=env)
         if hw == "vpx":
             print("MPF waits for the Visual Pinball X table (TronMPF.Controller) on port {}: start the table "
                   "now (docs/vpx.md)".format(tc.MONITOR_PORT), flush=True)
@@ -308,6 +336,11 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--hw", choices=["virtual", "proc", "vpx"], default="virtual",
                    help="hardware overlay: game/config/hw_<hw>.yaml (default virtual)")
+    p.add_argument("--machine", choices=["pro", "le"],
+                   help="Tron Legacy Pro or LE IO assignments (default pro; le with --hw vpx, the VPW table, and with "
+                        "--scenario, the LE ROM's traces)")
+    p.add_argument("--fiber-optics", action="store_true",
+                   help="drive the ramp light tubes on a Pro too (always on with an LE)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
     p.add_argument("--scenario", help="play scenarios/NAME.txt or assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
                                       "(smart_virtual)")
@@ -333,16 +366,25 @@ def main(argv=None):
     p.add_argument("--dmd-text-color", metavar="#RRGGBB",
                    help="hd only: text colour (default the tint's: #2a6cff). Also TRON_DMD_TEXT_COLOR")
     p.add_argument("--dmd-text-glow", type=float, metavar="X",
-                   help="hd only: strength of the glow around the text (default 0 = none; 0.8 is soft). Also "
+                   help="hd only: strength of the glow around the text (default 0.8, soft; 0 = none). Also "
                         "TRON_DMD_TEXT_GLOW")
+    p.add_argument("--dmd-font", metavar="NAME",
+                   help="hd only: font of the DMD text: orbitron (default, Tron style), rajdhani (clean, narrower), "
+                        "godot (Godot's default font), rom (the ROM's own dot fonts, smoothed) or a .ttf/.otf "
+                        "file. Clean fonts keep the ROM's placement. Also TRON_DMD_FONT")
+    p.add_argument("--dmd-text-scale", type=float, metavar="X",
+                   help="hd only, clean fonts: text size, 1 = capitals as tall as the ROM's (default 0.85; 0.5-1.5). "
+                        "Also TRON_DMD_TEXT_SCALE")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
-    return run(args.hw, monitor=args.monitor, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
+    return run(args.hw, machine=args.machine, fiber_optics=args.fiber_optics, monitor=args.monitor,
+               scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
-                                                     args.dmd_text_color, args.dmd_text_glow, args.dmd_tint),
+                                                     args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
+                                                     args.dmd_font, args.dmd_text_scale),
                trace=args.trace and os.path.abspath(args.trace))
 
 
