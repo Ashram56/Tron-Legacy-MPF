@@ -30,7 +30,7 @@ dmd/mode="hd"
 dmd/dots=0
 dmd/tint="blue"
 dmd/text_glow=0.8
-dmd/font="orbitron"
+dmd/font="rajdhani"
 dmd/text_scale=0.85
 
 [editor_plugins]

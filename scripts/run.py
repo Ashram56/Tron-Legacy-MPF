@@ -12,7 +12,7 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
-    python scripts/run.py --dmd-font orbitron      # hd text font: orbitron (default), rajdhani, godot, rom (ROM dots) or a .ttf
+    python scripts/run.py --dmd-font orbitron      # hd text font: rajdhani (default), orbitron, godot, rom (ROM dots) or a .ttf
     python scripts/run.py --dmd-text-scale 0.85    # hd text size (1 = the ROM's capital height; default 0.85)
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
     python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0.8; 0 = none)
@@ -167,7 +167,7 @@ def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=N
     size (Godot's --resolution WxH), the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
     --dmd-text-glow=X), the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE) and its size
     (--dmd-text-scale=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, glow 0.8,
-    orbitron, 0.85)."""
+    rajdhani, 0.85)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
     if font:
@@ -347,7 +347,7 @@ def main(argv=None):
                    help="hd only: strength of the glow around the text (default 0.8, soft; 0 = none). Also "
                         "TRON_DMD_TEXT_GLOW")
     p.add_argument("--dmd-font", metavar="NAME",
-                   help="hd only: font of the DMD text: orbitron (default, Tron style), rajdhani (clean, narrower), "
+                   help="hd only: font of the DMD text: rajdhani (default, clean), orbitron (Tron style, wider), "
                         "godot (Godot's default font), rom (the ROM's own dot fonts, smoothed) or a .ttf/.otf "
                         "file. Clean fonts keep the ROM's placement. Also TRON_DMD_FONT")
     p.add_argument("--dmd-text-scale", type=float, metavar="X",
