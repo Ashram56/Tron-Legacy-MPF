@@ -30,6 +30,9 @@ extends Node
 ## place (tron/rom_text_hd.gd: same lines, same alignment, the ROM's letter height, never wider than the ROM's
 ## text): orbitron (default), rajdhani, godot (Godot's own default font) or a .ttf/.otf file; or rom (the ROM's
 ## dot fonts traced to smooth outlines, the look before the clean fonts).
+## Text size (HD only, clean fonts): --dmd-text-scale=X (or TRON_DMD_TEXT_SCALE, or tron/dmd/text_scale), 0.5-1.5:
+## 1 = capitals as tall as the ROM's and lines never wider than the ROM's text; default 0.85, a bit smaller,
+## so stacked lines and the glow keep apart. Lines shrink about the middle of their capitals.
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
 
@@ -42,6 +45,7 @@ const DEFAULT_TEXT_COLOR := "#2a6cff"
 const DEFAULT_GLOW_COLOR := "#22b8ff"
 const DEFAULT_GLOW := 0.8
 const DEFAULT_FONT := "orbitron"
+const DEFAULT_TEXT_SCALE := 0.85
 
 var mode := "classic"
 var hd := false
@@ -51,6 +55,7 @@ var text_color := Color(DEFAULT_TEXT_COLOR)
 var glow_color := Color(DEFAULT_GLOW_COLOR)
 var glow := DEFAULT_GLOW
 var font := DEFAULT_FONT
+var text_scale := DEFAULT_TEXT_SCALE
 var _frames_hd := {}
 
 
@@ -119,6 +124,21 @@ static func choose_font(args: PackedStringArray, env_font: String, setting: Stri
 	return DEFAULT_FONT
 
 
+## The clean fonts' size (first valid match wins): --dmd-text-scale=, TRON_DMD_TEXT_SCALE, tron/dmd/text_scale,
+## 0.85; clamped to 0.5-1.5.
+static func choose_text_scale(args: PackedStringArray, env_scale: String, setting: String) -> float:
+	var values: Array = []
+	for a in args:
+		if a.begins_with("--dmd-text-scale="):
+			values.append(a.trim_prefix("--dmd-text-scale="))
+	values += [env_scale, setting]
+	for v in values:
+		var t := str(v).strip_edges()
+		if t.is_valid_float() and t.to_float() > 0.0:
+			return clampf(t.to_float(), 0.5, 1.5)
+	return DEFAULT_TEXT_SCALE
+
+
 ## The DMD text style (tron/rom_text_hd.gd and the text drawers): {"color", "glow_color", "glow"}.
 func text_style() -> Dictionary:
 	return {"color": text_color, "glow_color": glow_color, "glow": glow}
@@ -163,6 +183,8 @@ func _enter_tree() -> void:
 	text_color = st["color"]
 	glow_color = st["glow_color"]
 	glow = st["glow"]
+	text_scale = choose_text_scale(args, OS.get_environment("TRON_DMD_TEXT_SCALE"),
+		str(ProjectSettings.get_setting("tron/dmd/text_scale", "")))
 	font = choose_font(args, OS.get_environment("TRON_DMD_FONT"), str(ProjectSettings.get_setting("tron/dmd/font", "")))
 	if FileAccess.file_exists(MEDIA_HD + "scale.json"):
 		var info = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "scale.json"))
@@ -174,8 +196,8 @@ func _enter_tree() -> void:
 	root.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
 	root.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	get_tree().node_added.connect(_on_node_added)
-	print("DMD: hd mode, window %s%s, text %s in %s, glow %s x%.2f" % [root.size,
-		(", dot-matrix look %d" % dots) if dots > 0 else "", text_color.to_html(false), font, glow_color.to_html(false),
+	print("DMD: hd mode, window %s%s, text %s in %s x%.2f, glow %s x%.2f" % [root.size,
+		(", dot-matrix look %d" % dots) if dots > 0 else "", text_color.to_html(false), font, text_scale, glow_color.to_html(false),
 		glow])
 
 

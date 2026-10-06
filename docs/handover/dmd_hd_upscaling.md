@@ -52,7 +52,8 @@ or Rajdhani Bold; or Godot's own default font, or any `.ttf`/`.otf`), chosen wit
 `TRON_DMD_FONT` / `tron/dmd/font`; `rom` keeps the traced fonts. `rom_text_hd.gd` keeps the ROM's layout:
 the callers pass the ROM's text width and alignment flags, the letters are scaled so the font's capital
 height (measured from its "H") equals the ROM font's `cap`, the line is aligned in the ROM's box and squeezed
-horizontally (leaving one dot of air) when wider. Shaded fonts are drawn flat at their top level; instead of
+horizontally (leaving one dot of air) when wider. `--dmd-text-scale` (default 0.85) then shrinks each line
+about the middle of its capitals, so stacked lines and the glow keep apart. Shaded fonts are drawn flat at their top level; instead of
 the ROM's black cell the text gets a black outline (1 dot for outlined ROM fonts, 0.5 otherwise); the glow is
 five widening outlines added in the glow colour.
 
