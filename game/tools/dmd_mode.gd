@@ -28,7 +28,7 @@ extends Node
 ## orange #ff730d (glow #ff9a3c), the classic DMD's.
 ## Text font (HD only): --dmd-font=NAME (or TRON_DMD_FONT, or tron/dmd/font): a clean font drawn in the ROM's
 ## place (tron/rom_text_hd.gd: same lines, same alignment, the ROM's letter height, never wider than the ROM's
-## text): orbitron (default), rajdhani, godot (Godot's own default font) or a .ttf/.otf file; or rom (the ROM's
+## text): rajdhani (default), orbitron, godot (Godot's own default font) or a .ttf/.otf file; or rom (the ROM's
 ## dot fonts traced to smooth outlines, the look before the clean fonts).
 ## Text size (HD only, clean fonts): --dmd-text-scale=X (or TRON_DMD_TEXT_SCALE, or tron/dmd/text_scale), 0.5-1.5:
 ## 1 = capitals as tall as the ROM's and lines never wider than the ROM's text; default 0.85, a bit smaller,
@@ -44,7 +44,7 @@ const DEFAULT_TINT := "blue"
 const DEFAULT_TEXT_COLOR := "#2a6cff"
 const DEFAULT_GLOW_COLOR := "#22b8ff"
 const DEFAULT_GLOW := 0.8
-const DEFAULT_FONT := "orbitron"
+const DEFAULT_FONT := "rajdhani"
 const DEFAULT_TEXT_SCALE := 0.85
 
 var mode := "classic"
@@ -110,7 +110,7 @@ static func choose_text_style(args: PackedStringArray, env: Dictionary, settings
 	return out
 
 
-## The HD text font (first match wins): the user arg --dmd-font=, TRON_DMD_FONT, tron/dmd/font, orbitron.
+## The HD text font (first match wins): the user arg --dmd-font=, TRON_DMD_FONT, tron/dmd/font, rajdhani.
 static func choose_font(args: PackedStringArray, env_font: String, setting: String) -> String:
 	var values: Array = []
 	for a in args:

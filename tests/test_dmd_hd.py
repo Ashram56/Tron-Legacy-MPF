@@ -316,7 +316,7 @@ class TestGodotModes(unittest.TestCase):
         self.assertEqual((1280, 320), score.size)
 
     def test_clean_fonts_keep_the_rom_layout(self):
-        """HD text in a clean font (default orbitron) sits in the ROM's box: as tall as the ROM's capitals, centred
+        """HD text in a clean font (default rajdhani) sits in the ROM's box: as tall as the ROM's capitals, centred
         where the ROM centres, never wider than the ROM's text (orbitron, wider, is squeezed); --dmd-font=rom
         and TRON_DMD_FONT=rom give the ROM's traced dots instead, a missing font file falls back to them."""
         from PIL import Image
@@ -335,11 +335,11 @@ class TestGodotModes(unittest.TestCase):
             self.assertTrue(abs(b[1] - 170) <= 8, (font, b))              # capitals' top: row 17
             self.assertGreater(len(frame.getcolors(256)), 20, font)      # smooth edges
         self.assertEqual(len({boxes[f] for f in boxes}), 4, boxes)          # four different looks
-        self.assertEqual(boxes["orbitron"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],
+        self.assertEqual(boxes["rajdhani"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],
                                                             env={"TRON_DMD_TEXT_SCALE": "1"}))[0])
         # the default size, 0.85: smaller, about the same middle
         b, _ = box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"]))
-        full = boxes["orbitron"]
+        full = boxes["rajdhani"]
         self.assertTrue(0.8 < (b[2] - b[0]) / (full[2] - full[0]) < 0.9, (b, full))
         self.assertTrue(abs((b[0] + b[2]) - (full[0] + full[2])) <= 6, (b, full))
         self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],

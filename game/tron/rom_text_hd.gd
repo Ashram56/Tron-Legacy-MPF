@@ -9,7 +9,7 @@ extends Node2D
 ## (fonts/hd/rom_font_NN_glow.fnt, blurred lit dots, added to what is under it) and the lit dots in the
 ## text colour (shaded fonts: one layer per level, brighter over dimmer). The ROM's per-line brightness
 ## and blinking (the parent's modulate) apply to every layer.
-## Clean fonts (dmd_mode.gd font, default orbitron): the lit dots are replaced by an ordinary font (fonts_ttf/),
+## Clean fonts (dmd_mode.gd font, default rajdhani): the lit dots are replaced by an ordinary font (fonts_ttf/),
 ## kept in the ROM's place: letters as tall as the ROM font's capitals, the line aligned as the ROM aligns it
 ## (left, centred or right, flags as tron/rom_text.gd) inside the ROM's text box and squeezed to its width when
 ## wider, in the top level of shaded fonts, with a black outline instead of the ROM's cell (wider for outlined fonts).
@@ -197,11 +197,17 @@ func clean_layout() -> Array:
 		return []
 	var s := text_scale()
 	var cap := float(info(font_id).get("cap", font_size))
+	var base := float(ascent)
+	var air := 1.0                     # a dot of air: clean letters reach their box's edges, ROM letters do not
+	if info(font_id).get("outline", false):
+		cap -= 2.0                     # the ROM's cap counts the black border above and below the lit dots,
+		base -= 1.0                    # whose bottom row is the baseline row
+		air = 2.0
 	var k := s * cap / (float(c["cap"]) * CLEAN_SIZE)
 	var font: Font = c["font"]
 	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * k
 	var sx := k
-	var room := s * (box_width - 1.0)  # a dot of air: clean letters reach their box's edges, ROM letters do not
+	var room := s * (box_width - air)
 	var x := 0.0
 	if box_width > 0 and w > room:
 		sx = k * room / w
@@ -212,7 +218,7 @@ func clean_layout() -> Array:
 			x = (box_width - w) / 2.0
 		elif flags & 4:
 			x = box_width - w
-	return [font, Vector2(x, ascent - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
+	return [font, Vector2(x, base - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
 
 
 func _draw_clean(item: CanvasItem, color: Color, outline_dots: float) -> void:

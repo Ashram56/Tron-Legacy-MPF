@@ -47,8 +47,8 @@ filter; vector outlines replaced them because they stay sharp at any size.
 ### Clean fonts (default)
 
 The traced ROM fonts keep the ROM's 5x7-style letter shapes, which look soft and blobby on a big LCD. By
-default HD draws the text in an ordinary font instead (`game/fonts_ttf/`, SIL OFL: Orbitron at weight 700, the default,
-or Rajdhani Bold; or Godot's own default font, or any `.ttf`/`.otf`), chosen with `--dmd-font` /
+default HD draws the text in an ordinary font instead (`game/fonts_ttf/`, SIL OFL: Rajdhani Bold, the default, or
+Orbitron at weight 700; or Godot's own default font, or any `.ttf`/`.otf`), chosen with `--dmd-font` /
 `TRON_DMD_FONT` / `tron/dmd/font`; `rom` keeps the traced fonts. `rom_text_hd.gd` keeps the ROM's layout:
 the callers pass the ROM's text width and alignment flags, the letters are scaled so the font's capital
 height (measured from its "H") equals the ROM font's `cap`, the line is aligned in the ROM's box and squeezed
