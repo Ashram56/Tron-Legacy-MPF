@@ -18,3 +18,4 @@ game/fonts/
 /game/monitor/settings.ini
 /game/monitor/settings.ini.lock
 .cache/
+game/fonts_ttf/*.import

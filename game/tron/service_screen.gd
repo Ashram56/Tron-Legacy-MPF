@@ -114,7 +114,7 @@ func _add_text(s: String, font_id: int, x: int, y: int, flags: int, level: int =
 		label.self_modulate = Color(1, 1, 1, 0)
 		label.set_meta("dmd_text_hd", true)            # drawn by the child: not a plain label (dmd_mode.gd)
 		var line := RomTextHd.new()
-		line.set_line(shown, font_id, int(m["ascent"]), line_h)
+		line.set_line(shown, font_id, int(m["ascent"]), line_h, w, flags)
 		label.add_child(line)
 	if level < 15:                                   # a dimmed palette (e.g. deff 4 after its first 30 s)
 		label.modulate = Color(level / 15.0, level / 15.0, level / 15.0, 1)

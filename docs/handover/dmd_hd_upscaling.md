@@ -44,6 +44,25 @@ The glow atlas is a BMFont of each glyph's lit dots blurred twice (sigma 0.45 an
 advances, drawn additively behind the text. The first version used 16x bitmap atlases from the same
 filter; vector outlines replaced them because they stay sharp at any size.
 
+### Clean fonts (default)
+
+The traced ROM fonts keep the ROM's 5x7-style letter shapes, which look soft and blobby on a big LCD. By
+default HD draws the text in an ordinary font instead (`game/fonts_ttf/`, SIL OFL: Rajdhani Bold, Orbitron
+at weight 700; or Godot's own default font, or any `.ttf`/`.otf`), chosen with `--dmd-font` /
+`TRON_DMD_FONT` / `tron/dmd/font`; `rom` keeps the traced fonts. `rom_text_hd.gd` keeps the ROM's layout:
+the callers pass the ROM's text width and alignment flags, the letters are scaled so the font's capital
+height (measured from its "H") equals the ROM font's `cap`, the line is aligned in the ROM's box and squeezed
+horizontally (leaving one dot of air) when wider. Shaded fonts are drawn flat at their top level; instead of
+the ROM's black cell the text gets a black outline (1 dot for outlined ROM fonts, 0.5 otherwise); the glow is
+five widening outlines added in the glow colour.
+
+![before / after](../images/hd_clean_fonts_before_after.png)
+
+Rendering: multichannel signed distance field (MSDF) at a fixed size of 64 scaled by the canvas transform, so
+fractional sizes and any window size stay sharp. Godot's MSDF edges get jagged when the field's pixel range
+is large compared to `msdf_size`, and outlines can only grow as wide as the range: so two copies, `font`
+(range 16 of 256, the letters) and `wide` (range 192, outlines and glow).
+
 ### Runtime (`dmd_mode.gd`)
 
 Mode precedence, first match wins: `--proc-dmd` (classic) → user arg `--dmd=hd|classic` → render
