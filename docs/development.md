@@ -148,8 +148,9 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 | `--dmd-dots N` (or `TRON_DMD_DOTS=N`) | HD with a dot-matrix look: N round dots per DMD dot (1 = the 128x32 grid; 2 looks good from 1280 px up; 0 = off, the default) |
 | `--dmd-size WxH` | the window size, for example `1920x480` (default 1024x256; HD scales to any size, classic in whole steps) |
 | `--dmd-tint blue\|orange` (or `TRON_DMD_TINT`, `tron/dmd/tint`) | HD DMD colour, text and animations: Tron blue (default) or the original orange |
+| `--dmd-font NAME` (or `TRON_DMD_FONT`, `tron/dmd/font`) | HD text font: `orbitron` (default), `rajdhani`, `godot` (Godot's default font), a `.ttf`/`.otf` file, or `rom` (the ROM's dot fonts traced to smooth outlines). Clean fonts keep the ROM layout: same lines and alignment, the ROM's capital height, squeezed to the ROM's text width when wider |
 | `--dmd-text-color "#RRGGBB"` (or `TRON_DMD_TEXT_COLOR`, `tron/dmd/text_color`) | HD text colour (default the tint's, `#2a6cff`): ROM text, score display, service menu, ZUSE/TRON letters, attract pages |
-| `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0 = none; 0.8 is a soft glow); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
+| `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0.8, a soft glow; 0 = none); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
 
 `--hw proc` is always classic: the P-ROC drives the machine's own 128x32 DMD. Godot reads the same choice
 from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
