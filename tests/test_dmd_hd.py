@@ -313,7 +313,7 @@ class TestGodotModes(unittest.TestCase):
         self.assertEqual((1280, 320), score.size)
 
     def test_clean_fonts_keep_the_rom_layout(self):
-        """HD text in a clean font (default rajdhani) sits in the ROM's box: as tall as the ROM's capitals, centred
+        """HD text in a clean font (default orbitron) sits in the ROM's box: as tall as the ROM's capitals, centred
         where the ROM centres, never wider than the ROM's text (orbitron, wider, is squeezed); --dmd-font=rom
         and TRON_DMD_FONT=rom give the ROM's traced dots instead, a missing font file falls back to them."""
         from PIL import Image
@@ -323,7 +323,8 @@ class TestGodotModes(unittest.TestCase):
             return frame.point(lambda p: 255 if p > 90 else 0).getbbox(), frame
         boxes = {}
         for font in ["rajdhani", "orbitron", "godot", "rom"]:
-            b, frame = box(self.render(["--dmd=hd", "--dmd-font=" + font], ["--resolution", "1280x320"]))
+            b, frame = box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=" + font],
+                                       ["--resolution", "1280x320"]))
             boxes[font] = b
             # "50,000", font 15: centred on x 84 (dots, 10 px each), 42 dots wide, capitals 10 dots high on row 26
             self.assertTrue(abs((b[0] + b[2]) / 2 - 84.5 * 10) < 15, (font, b))
@@ -331,10 +332,10 @@ class TestGodotModes(unittest.TestCase):
             self.assertTrue(abs(b[1] - 170) <= 8, (font, b))              # capitals' top: row 17
             self.assertGreater(len(frame.getcolors(256)), 20, font)      # smooth edges
         self.assertEqual(len({boxes[f] for f in boxes}), 4, boxes)          # four different looks
-        self.assertEqual(boxes["rajdhani"], box(self.render(["--dmd=hd"], ["--resolution", "1280x320"]))[0])
-        self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd"], ["--resolution", "1280x320"],
+        self.assertEqual(boxes["orbitron"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"]))[0])
+        self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"],
                                                        env={"TRON_DMD_FONT": "rom"}))[0])
-        self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-font=/nowhere/x.ttf"],
+        self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=/nowhere/x.ttf"],
                                                        ["--resolution", "1280x320"]))[0])
 
     def test_hd_default_is_single_colour(self):
@@ -353,16 +354,16 @@ class TestGodotModes(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(GAME, "media", "dmd_hd_color")))
 
     def test_text_style(self):
-        """HD text is in the text colour (default the Tron blue #2a6cff), without glow by default; the effect
-        frames, the letters and the score panel follow; --dmd-tint=orange is the original colour;
-        --dmd-text-glow adds a glow of the glow colour; --dmd-text-color / TRON_DMD_TEXT_GLOW change them."""
+        """HD text is in the text colour (default the Tron blue #2a6cff), with a glow of the glow colour by default
+        (--dmd-text-glow=0 takes it away); the effect frames, the letters and the score panel follow;
+        --dmd-tint=orange is the original colour; --dmd-text-color / TRON_DMD_TEXT_GLOW change them."""
         from PIL import Image
 
         def strokes(path):
             img = Image.open(path).convert("RGB")
             px = img.load()
             return img, px
-        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
+        out = self.render(["--dmd=hd", "--dmd-text-glow=0"], ["--resolution", "1280x320"])
         img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
         core = [px[x, y] for x in range(img.width) for y in range(img.height) if px[x, y][2] > 200]
         self.assertGreater(len(core), 2000)
@@ -386,8 +387,8 @@ class TestGodotModes(unittest.TestCase):
         art, ap = strokes(os.path.join(out, "deff_046", "frame_00002.png"))
         lit = [ap[x, y] for x in range(0, art.width, 3) for y in range(0, art.height, 3) if sum(ap[x, y]) > 200]
         self.assertTrue(lit and all(r > b for r, g, b in lit))
-        # the glow: blue-cyan light around the strokes, in the dots between the digits' black cells and beyond
-        out = self.render(["--dmd=hd", "--dmd-text-glow=0.8"], ["--resolution", "1280x320"])
+        # the default glow: blue-cyan light around the strokes
+        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
         img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
         halo = [px[x, box[1] - 8] for x in range(box[0], box[2])]
         self.assertTrue(any(b > 30 and b > r for r, g, b in halo), halo[::40])

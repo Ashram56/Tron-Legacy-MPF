@@ -12,9 +12,9 @@
     python scripts/run.py --dmd classic            # the original 128x32 DMD dots (default: hd, smooth text and art)
     python scripts/run.py --dmd-size 1920x480      # DMD window size (hd scales to any size; resize it freely)
     python scripts/run.py --dmd-dots 2             # hd with a dot-matrix look (2 dots per DMD dot, 1 = 128x32)
-    python scripts/run.py --dmd-font orbitron      # hd text font: rajdhani (default), orbitron, godot, rom (ROM dots) or a .ttf
+    python scripts/run.py --dmd-font orbitron      # hd text font: orbitron (default), rajdhani, godot, rom (ROM dots) or a .ttf
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
-    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0 = none)
+    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0.8; 0 = none)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -164,7 +164,7 @@ def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=N
     """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, the window
     size (Godot's --resolution WxH), the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
     --dmd-text-glow=X) and the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE). None leaves the
-    choice to TRON_DMD... / the project settings (hd, blue, no glow, rajdhani)."""
+    choice to TRON_DMD... / the project settings (hd, blue, glow 0.8, orbitron)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
     if font:
@@ -337,10 +337,10 @@ def main(argv=None):
     p.add_argument("--dmd-text-color", metavar="#RRGGBB",
                    help="hd only: text colour (default the tint's: #2a6cff). Also TRON_DMD_TEXT_COLOR")
     p.add_argument("--dmd-text-glow", type=float, metavar="X",
-                   help="hd only: strength of the glow around the text (default 0 = none; 0.8 is soft). Also "
+                   help="hd only: strength of the glow around the text (default 0.8, soft; 0 = none). Also "
                         "TRON_DMD_TEXT_GLOW")
     p.add_argument("--dmd-font", metavar="NAME",
-                   help="hd only: font of the DMD text: rajdhani (default, clean), orbitron (clean, Tron style), "
+                   help="hd only: font of the DMD text: orbitron (default, Tron style), rajdhani (clean, narrower), "
                         "godot (Godot's default font), rom (the ROM's own dot fonts, smoothed) or a .ttf/.otf "
                         "file. Clean fonts keep the ROM's placement. Also TRON_DMD_FONT")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")

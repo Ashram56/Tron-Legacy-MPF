@@ -9,7 +9,7 @@ extends Node2D
 ## (fonts/hd/rom_font_NN_glow.fnt, blurred lit dots, added to what is under it) and the lit dots in the
 ## text colour (shaded fonts: one layer per level, brighter over dimmer). The ROM's per-line brightness
 ## and blinking (the parent's modulate) apply to every layer.
-## Clean fonts (dmd_mode.gd font, default rajdhani): the lit dots are replaced by an ordinary font (fonts_ttf/),
+## Clean fonts (dmd_mode.gd font, default orbitron): the lit dots are replaced by an ordinary font (fonts_ttf/),
 ## kept in the ROM's place: letters as tall as the ROM font's capitals, the line aligned as the ROM aligns it
 ## (left, centred or right, flags as tron/rom_text.gd) inside the ROM's text box and squeezed to its width when
 ## wider, in the top level of shaded fonts, with a black outline instead of the ROM's cell (wider for outlined fonts).

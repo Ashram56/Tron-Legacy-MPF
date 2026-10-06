@@ -22,9 +22,9 @@ departs from the ROM, for example a new mode.
 | Area | ROM | This game | Back to the ROM |
 |---|---|---|---|
 | DMD look | 128x32 orange dots | HD by default: vector fonts and upscaled animations, drawn at any window size | `run.py --dmd classic` (exact ROM output; always used on the P-ROC and for render checks) |
-| DMD text font (HD) | the ROM's dot fonts | a clean TrueType font (Rajdhani by default; Orbitron or Godot's default font selectable) in the ROM's place: same lines, alignment and capital height, never wider than the ROM's text (squeezed when wider), black outline instead of the ROM's black cell, shaded big digits drawn flat at their top level | `--dmd-font rom` (the ROM's dots, smoothed), or `--dmd classic` |
+| DMD text font (HD) | the ROM's dot fonts | a clean TrueType font (Orbitron by default; Rajdhani or Godot's default font selectable) in the ROM's place: same lines, alignment and capital height, never wider than the ROM's text (squeezed when wider), black outline instead of the ROM's black cell, shaded big digits drawn flat at their top level | `--dmd-font rom` (the ROM's dots, smoothed), or `--dmd classic` |
 | DMD colour | orange | Tron blue, text and animations | `--dmd-tint orange` |
-| Text glow | none | none by default; optional glow | default (`--dmd-text-glow X` adds one) |
+| Text glow | none | a soft glow around HD text by default (0.8) | `--dmd-text-glow 0` |
 | Pricing on the desktop | coins (factory settings) | free play with virtual hardware | `run.py --no-free-play` |
 | Hardware | SAM CPU board | MPF on virtual hardware, a P-ROC, or the Visual Pinball X table | `--hw proc` drives the original driver boards |
 | Machine | LE 1.74 ROM, LE hardware only | Pro hardware by default (the Pro 1.74 IO assignments, `assets/docs/PRO_VS_LE.md`) running the LE 1.74 rules; LE selectable. The Pro rules are not ported, so on a Pro: the TRON standups use the LE drop-target code with no reset coil; End of Line multiball and the LE-only adjustments stay; the Pro's light cycle ramp extra ball adjustments are missing. Pro coil behaviour follows the Pro decompile: ramp flashers on 19 / 25, lower flashers 22 / 23 fired with them (left/right pairing inferred) | `--machine le` (`hw_proc_le`, `hw_virtual_le`; `hw_vpx` is the LE). docs/hardware.md, "Pro or LE" |

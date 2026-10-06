@@ -23,12 +23,12 @@ extends Node
 ##   tint         --dmd-tint=blue|orange        TRON_DMD_TINT             tron/dmd/tint             (blue)
 ##   colour       --dmd-text-color=#RRGGBB      TRON_DMD_TEXT_COLOR       tron/dmd/text_color       (the tint's)
 ##   glow colour  --dmd-text-glow-color=#RRGGBB TRON_DMD_TEXT_GLOW_COLOR  tron/dmd/text_glow_color  (the tint's)
-##   glow         --dmd-text-glow=X             TRON_DMD_TEXT_GLOW        tron/dmd/text_glow        (0 = none)
+##   glow         --dmd-text-glow=X             TRON_DMD_TEXT_GLOW        tron/dmd/text_glow        (0.8; 0 = none)
 ## (first match wins, left to right). The tint picks the default colours: blue #2a6cff (glow #22b8ff), or
 ## orange #ff730d (glow #ff9a3c), the classic DMD's.
 ## Text font (HD only): --dmd-font=NAME (or TRON_DMD_FONT, or tron/dmd/font): a clean font drawn in the ROM's
 ## place (tron/rom_text_hd.gd: same lines, same alignment, the ROM's letter height, never wider than the ROM's
-## text): rajdhani (default), orbitron, godot (Godot's own default font) or a .ttf/.otf file; or rom (the ROM's
+## text): orbitron (default), rajdhani, godot (Godot's own default font) or a .ttf/.otf file; or rom (the ROM's
 ## dot fonts traced to smooth outlines, the look before the clean fonts).
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
@@ -40,8 +40,8 @@ const TINTS := {"blue": ["#2a6cff", "#22b8ff"], "orange": ["#ff730d", "#ff9a3c"]
 const DEFAULT_TINT := "blue"
 const DEFAULT_TEXT_COLOR := "#2a6cff"
 const DEFAULT_GLOW_COLOR := "#22b8ff"
-const DEFAULT_GLOW := 0.0
-const DEFAULT_FONT := "rajdhani"
+const DEFAULT_GLOW := 0.8
+const DEFAULT_FONT := "orbitron"
 
 var mode := "classic"
 var hd := false
@@ -105,7 +105,7 @@ static func choose_text_style(args: PackedStringArray, env: Dictionary, settings
 	return out
 
 
-## The HD text font (first match wins): the user arg --dmd-font=, TRON_DMD_FONT, tron/dmd/font, rajdhani.
+## The HD text font (first match wins): the user arg --dmd-font=, TRON_DMD_FONT, tron/dmd/font, orbitron.
 static func choose_font(args: PackedStringArray, env_font: String, setting: String) -> String:
 	var values: Array = []
 	for a in args:
