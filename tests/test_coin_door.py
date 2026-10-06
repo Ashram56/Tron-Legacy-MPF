@@ -85,3 +85,44 @@ class TestCoinDoor(AdjCase):
         self.assertEqual([], drawn)                             # the first opening's timer did nothing
         self.advance_time_and_run(20)
         self.assertEqual(1, len(drawn))
+
+
+class TestServiceInGame(AdjCase):
+    """SELECT in a game (not in the ROM, which suspends the game): a second SELECT ends it into the menu."""
+
+    def confirms(self):
+        seen = []
+        media = self.tron.media
+        media.confirm_show = lambda draw: seen.append([d["t"] for d in draw])
+        media.confirm_hide = lambda: seen.append(None)
+        return seen
+
+    def test_select_twice_ends_the_game_into_the_menu(self):
+        os_ = self.start_game()
+        shown = self.confirms()
+        self.hit_and_release_switch("s_service_select")
+        self.advance_time_and_run(0.5)
+        self.assertEqual([["END GAME?", "PRESS 'SELECT' FOR SERVICE MENU", "PRESS 'BACK' TO CANCEL"]], shown)
+        self.assertModeRunning("game")
+        self.hit_and_release_switch("s_service_select")
+        self.advance_time_and_run(2)
+        self.assertModeNotRunning("game")
+        self.assertTrue(os_.in_service)
+        self.assertNotIn(38, self.deffs())                     # no match
+
+    def test_back_or_timeout_keeps_the_game(self):
+        os_ = self.start_game()
+        shown = self.confirms()
+        self.hit_and_release_switch("s_service_select")
+        self.advance_time_and_run(0.5)
+        self.hit_and_release_switch("s_service_back")          # no
+        self.advance_time_and_run(0.5)
+        self.assertEqual(None, shown[-1])
+        self.assertEqual(0, os_.audits[0x24])                  # and no service credit
+        self.hit_and_release_switch("s_service_select")
+        self.advance_time_and_run(6)                           # unanswered: the question goes away
+        self.assertEqual(None, shown[-1])
+        self.hit_and_release_switch("s_service_select")        # so this is a new first press
+        self.advance_time_and_run(0.5)
+        self.assertModeRunning("game")
+        self.assertFalse(os_.in_service)

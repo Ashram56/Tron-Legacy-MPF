@@ -322,6 +322,16 @@ class MediaBridge:
         self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
                    need_data=False)
 
+    def confirm_show(self, draw):
+        """The end-the-game question before the service menu opens in a game (tron/os_layer.py, not in the
+        ROM), above every deff."""
+        self.text_show("service_confirm", [], SERVICE_PRIORITY, draw=draw)
+
+    def confirm_hide(self):
+        self.shown.discard("service_confirm")
+        self._send("slides_play", {"service_confirm": {"action": "remove", "key": "service_confirm",
+                                                       "expire": None}}, need_data=False)
+
     # ------------------------------------------------------------------ sounds
 
     def sound_stop(self, call):
