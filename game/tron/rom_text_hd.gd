@@ -38,6 +38,8 @@ var ascent := 0
 var font_size := 1
 var box_width := -1              # the ROM's text width in dots (-1: unknown, no fitting)
 var flags := 0                   # 2 = centred, 4 = right aligned, else left (tron/rom_text.gd rom_flags)
+var first := 0                   # clean fonts: only the characters first.. (count) of the line are drawn,
+var count := -1                  # where they sit in the whole line (-1: to the end)
 var _glow: Node2D
 var _ink: Node2D
 
@@ -175,10 +177,13 @@ func _init() -> void:
 
 ## Shows text s in ROM font id; line_ascent and line_height in dots (fonts.json ascent, ascent + descent);
 ## width: the ROM's text width in dots, align_flags: the ROM's alignment (both for the clean fonts).
-func set_line(s: String, id: int, line_ascent: int, line_height: int, width := -1, align_flags := 0) -> void:
+func set_line(s: String, id: int, line_ascent: int, line_height: int, width := -1, align_flags := 0,
+		from := 0, n := -1) -> void:
 	if s == text and id == font_id and line_ascent == ascent and line_height == font_size and width == box_width \
-			and align_flags == flags:
+			and align_flags == flags and from == first and n == count:
 		return
+	first = from
+	count = n
 	text = s
 	font_id = id
 	ascent = line_ascent
@@ -218,7 +223,14 @@ func clean_layout() -> Array:
 			x = (box_width - w) / 2.0
 		elif flags & 4:
 			x = box_width - w
+	if first > 0:
+		x += font.get_string_size(text.left(first), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * sx
 	return [font, Vector2(x, base - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
+
+
+## The characters drawn in the clean font: the whole line, or its part first.. (count).
+func shown_text() -> String:
+	return text.substr(first, count) if first > 0 or count >= 0 else text
 
 
 func _draw_clean(item: CanvasItem, color: Color, outline_dots: float) -> void:
@@ -227,10 +239,10 @@ func _draw_clean(item: CanvasItem, color: Color, outline_dots: float) -> void:
 		return
 	item.draw_set_transform(l[1], 0.0, Vector2(l[2], l[3]))
 	if outline_dots > 0.0:
-		item.draw_string_outline(clean()["wide"], Vector2.ZERO, text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE,
+		item.draw_string_outline(clean()["wide"], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE,
 			maxi(1, roundi(2.0 * outline_dots / l[3])), color)
 	else:
-		item.draw_string(l[0], Vector2.ZERO, text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE, color)
+		item.draw_string(l[0], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE, color)
 	item.draw_set_transform(Vector2.ZERO)
 
 

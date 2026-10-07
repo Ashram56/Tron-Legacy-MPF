@@ -151,7 +151,7 @@ def godot_command(*args):
 # game/tron/media_data.json; all git-ignored) are made from: a change to any of these after a pull leaves
 # the workspace showing the old display effects until they are generated and imported again.
 MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py",
-                                                       "dmd_hd.py", "font_outline.py")] \
+                                                       "dmd_hd.py", "font_outline.py", "frame_text.py")] \
     + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
     + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
 MEDIA_STAMP = os.path.join(GAME, "media", ".generated")

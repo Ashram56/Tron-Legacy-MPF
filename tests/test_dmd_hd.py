@@ -16,6 +16,7 @@ import unittest.mock
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import dmd_hd  # noqa: E402
+import frame_text  # noqa: E402,F401
 import gen_fonts  # noqa: E402
 import run  # noqa: E402
 import toolchain as tc  # noqa: E402
@@ -206,6 +207,48 @@ class TestHdMedia(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(GAME, "fonts", "hd", "rom_font_%02d_glow.fnt" % n)))
 
 
+@unittest.skipUnless(GENERATED, "HD media not generated (scripts/gen_media.py)")
+class TestFrameText(unittest.TestCase):
+    """scripts/frame_text.py: the ROM-font text of the recorded effects, cleared from their HD frames and listed
+    in media/dmd_hd/text.json for the HD mode to draw live."""
+
+    @classmethod
+    def setUpClass(cls):
+        import frame_text
+        cls.ft = frame_text
+        cls.fonts = frame_text.load_fonts()
+        cls.text = json.load(open(os.path.join(GAME, "media", "dmd_hd", "text.json"), encoding="utf-8"))
+
+    def lines(self, deff, frame):
+        from PIL import Image
+        path = os.path.join(GAME, "media", "dmd", deff, frame)
+        return [(t, fid, x, b) for t, fid, x, b, *_ in self.ft.frame_text(Image.open(path), self.fonts)]
+
+    def test_finds_the_rom_text(self):
+        self.assertEqual([("HIGH SCORE #1", 12, 43, 9), ("55,000,000", 12, 55, 29)], self.lines("deff_001", "f004.png")[:2])
+        # O or 0 by the rest of the word
+        self.assertIn(("50V / 20V DISABLED", 8, 16, 10), self.lines("deff_004", "f000.png"))
+        self.assertIn(("PLEASE TRY AGAIN!", 12), [l[:2] for l in self.lines("deff_034", "f001.png")]
+                      + [l[:2] for l in self.lines("deff_034", "f000.png")])
+
+    def test_text_json_and_cleared_frames(self):
+        from PIL import Image
+        self.assertEqual([["BALL SAVED", 15]], [l[:2] for l in self.text["deff_020/f001.png"]])
+        # a line half hidden by the art shows its letters at their place in the whole line
+        part = [l for l in self.text["deff_063/f003.png"] if l[0] == "MULTIBALL"][0]
+        self.assertEqual((3, 6), (part[6], part[7]))
+        # the letters are gone from the HD frame (classic keeps them)
+        t, fid, x, base, lv, w = self.text["deff_020/f001.png"][0][:6]
+        cap = self.fonts[fid]["ascent"]
+        classic = Image.open(os.path.join(GAME, "media", "dmd", "deff_020", "f001.png")).convert("L")
+        hd = Image.open(os.path.join(GAME, "media", "dmd_hd", "deff_020", "f001.png")).convert("L")
+        f = hd.width // 128
+        self.assertGreater(classic.crop((x, base - cap + 1, x + w, base + 1)).getextrema()[1], 200)
+        self.assertLess(hd.crop((x * f + f, (base - cap + 2) * f, (x + w - 1) * f, base * f)).getextrema()[1], 30)
+        # the ZEN zoom: the final line drawn larger on the frames before
+        self.assertEqual([2.25], [l[8] for l in self.text["deff_100/f004.png"]])
+
+
 class TestRunSwitches(unittest.TestCase):
     def test_dmd_args(self):
         self.assertEqual(["--", "--dmd=classic"], run.dmd_args([], "classic"))
@@ -346,6 +389,30 @@ class TestGodotModes(unittest.TestCase):
                                                        env={"TRON_DMD_FONT": "rom"}))[0])
         self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=/nowhere/x.ttf"],
                                                        ["--resolution", "1280x320"]))[0])
+
+    def test_recorded_text_drawn_live(self):
+        """HD: the text of a recorded effect (deff 20, BALL SAVED) is drawn live in the clean font at its place:
+        smooth, in the text colour, centred where the ROM's line is."""
+        from PIL import Image
+        out = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, out, True)
+        job = os.path.join(out, "job.json")
+        with open(job, "w") as f:
+            json.dump([{"slide": "deff_020", "times_ms": [0], "out": os.path.join(out, "hd")}], f)
+        subprocess.run(run.godot_command(["--rendering-driver", "opengl3", "--resolution", "1280x320",
+                                          "res://tools/slide_capture.tscn", "--", "--job=" + job, "--dmd=hd",
+                                          "--dmd-text-glow=0"]),
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
+        frame = Image.open(os.path.join(out, "hd", "frame_00000.png")).convert("RGB")
+        text = json.load(open(os.path.join(GAME, "media", "dmd_hd", "text.json"), encoding="utf-8"))
+        first = sorted(k for k in text if k.startswith("deff_020/"))[0]
+        line = [l for l in text[first] if l[0] == "BALL SAVED"][0]
+        top = frame.crop((0, 0, 1280, 160)).convert("L").point(lambda p: 255 if p > 60 else 0).getbbox()
+        self.assertTrue(abs((top[0] + top[2]) / 2 - (line[2] + line[5] / 2) * 10) < 20, (top, line))
+        self.assertGreater(len(frame.getcolors(1 << 16)), 20)
+        px = frame.load()
+        core = [px[x, y] for x in range(top[0], top[2]) for y in range(top[1], top[3]) if px[x, y][2] > 200]
+        self.assertTrue(core and all(b > r for r, g, b in core))
 
     def test_hd_default_is_single_colour(self):
         """The HD animations are in the DMD's one colour (Tron blue, level for level), never multicoloured:

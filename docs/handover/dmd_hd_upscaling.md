@@ -64,6 +64,28 @@ fractional sizes and any window size stay sharp. Godot's MSDF edges get jagged w
 is large compared to `msdf_size`, and outlines can only grow as wide as the range: so two copies, `font`
 (range 16 of 256, the letters) and `wide` (range 192, outlines and glow).
 
+### Text in the recorded animations
+
+50 effects are shown from the emulator's reference capture, with the ROM's text baked into the frames.
+`scripts/frame_text.py` finds that text at build time: runs of glyphs of one ROM font that match a frame
+dot for dot (lit dots at one level, the glyph cell's cleared dots dark, the ROM's spacing; `O`/`0` decided
+by the rest of the word), biggest first, no two sharing a dot. Runs of punctuation, of thin strokes only
+(`I`, `1`) or of two letters seen in a single frame are taken for art. Per effect, a run that is part of a
+longer line (same font and baseline) becomes that line's part: the letters from the first to the last the
+frame shows (a letter half drawn counts when most of its dots are), at their place in the whole line; when
+the missing letters run off the frame (text sliding in) the whole line is drawn and the window clips it.
+The HD frames are made with those letters' dots cleared, and `media/dmd_hd/text.json` lists the lines per
+frame; `dmd_mode.gd` (`FrameText`) adds a `rom_text_hd.gd` line per entry over the animation, synced to its
+frame, at the recorded level. Results are cached by frame content in `.cache/frame_text/` (about a minute on
+4 cores the first time). `ZOOMS` handles text that zooms rather than being drawn in a ROM font (deff 100,
+ZEN): HD draws the final line scaled about its middle. Classic frames keep the recorded text.
+
+![recorded text, classic / HD](../images/hd_recorded_text.png)
+
+The ZUSE/TRON target letters (deffs 91, 92, 94, 107) are ROM pictures; with a clean font `letter_panel.gd`
+draws each in the font instead (`CleanLetter`: solid = a 0.75-bright fill in a bright outline with the glow,
+hollow = the dim outline), 20 dots tall times the text scale.
+
 ### Runtime (`dmd_mode.gd`)
 
 Mode precedence, first match wins: `--proc-dmd` (classic) → user arg `--dmd=hd|classic` → render
@@ -88,4 +110,6 @@ Plain labels and letter sprites get their glow from a SubViewport + `tools/dmd_g
 - Without fontTools the HD fonts are skipped and HD falls back to classic; `gen_media.py --no-hd` skips HD.
 - Identical frames share a cache key; on Windows/OneDrive a parallel worker may hold the entry: keep the
   existing file instead of replacing it.
-- Text baked into captured frames and text drawn live go through the same filter, so they match.
+- Text baked into captured frames is cleared from the HD frames and drawn live (`frame_text.py`); with
+  `--dmd-font rom` it is drawn in the traced ROM fonts at the recorded dots. Bump `frame_text.VERSION`
+  when the matching changes (the cache keys on it).
