@@ -54,6 +54,7 @@ TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
 # collected letters `lit`, the new one `new` (bit 0 = first letter). Frame = `ticks` ROM ticks; the new
 # letter shows on frames where (frame >> shift) & 1, and on every frame after `solid_after`.
 # all_new: every letter blinks solid (deff 92: a set completed).
+LETTER_IMAGE0, LETTER_CHARS = 2603, "CELNORSTUZ"   # the solid images' letters (HD draws them in the clean font)
 ZUSE = (2612, 2611, 2609, 2604)
 TRON = (2610, 2608, 2607, 2606)
 # deff 94 (deff_094_zfs_intro 0x01032510): the solid letters at y 1 (x as above: matched on the capture)
@@ -249,7 +250,8 @@ def letter_nodes(deff_id, spec, folder_rel):
             nodes += ['', '[node name="{}{}" type="Sprite2D" parent="."]'.format(kind, i),
                       'modulate = {}'.format(level_color(level)), 'texture = ExtResource("{}")'.format(rid),
                       'centered = false',
-                      'position = Vector2({}, {})'.format(LETTER_X + LETTER_DX * i, spec.get("y", LETTER_Y))]
+                      'position = Vector2({}, {})'.format(LETTER_X + LETTER_DX * i, spec.get("y", LETTER_Y)),
+                      'metadata/letter = "{}"'.format(LETTER_CHARS[solid - LETTER_IMAGE0])]
     nodes += ['', '[node name="LetterPanel" type="Node" parent="."]', 'script = ExtResource("letters")',
               'lit_key = "{}"'.format(spec.get("lit", "")), 'new_key = "{}"'.format(spec.get("new", "")),
               'all_new = {}'.format("true" if spec.get("all_new") else "false"),
@@ -411,25 +413,36 @@ def build_deffs(only_data):
     return out
 
 
-def build_hd_frames(scale=None):
+def build_hd_frames(scale=None, deffs=None):
     """game/media/dmd_hd: every picture of game/media/dmd upscaled (dmd_hd.upscale_file), same names.
-    Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black."""
+    Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black. The
+    recorded effects' frames (deffs: build_deffs, source "reference") lose their ROM-font letters, which
+    the HD mode draws live (scripts/frame_text.py, media/dmd_hd/text.json)."""
     import dmd_hd
+    import frame_text
     scale = scale or dmd_hd.FRAME_SCALE
     src_root = os.path.join(GAME, "media", "dmd")
     dst_root = os.path.join(GAME, "media", "dmd_hd")
     fsutil.remove_dir(dst_root)
     fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))    # the colour frames of earlier versions
-    jobs = []
+    recorded = {info["slide"] for info in (deffs or {}).values() if info["source"] == "reference"}
+    texts = frame_text.process_files(sorted(p for d in recorded for p in glob.glob(os.path.join(src_root, d, "*.png"))),
+                                     os.path.join(ROOT, ".cache", "frame_text"))
+    jobs, lines = [], {}
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
         os.makedirs(out, exist_ok=True)
         for src in sorted(glob.glob(os.path.join(folder, "*.png"))):
             name = os.path.basename(src)
             kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
-            jobs.append((src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
+            found, cleared = texts.get(src, ([], None))
+            if found:
+                lines[os.path.basename(folder) + "/" + name] = found
+            jobs.append((cleared or src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
     with open(os.path.join(dst_root, "scale.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"scale": scale}, f)
+    with open(os.path.join(dst_root, "text.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(lines, f, indent=0, sort_keys=True)
     return len(dmd_hd.upscale_files(jobs))
 
 
@@ -444,7 +457,7 @@ def main():
         fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
         fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
     if hd and not only_data:
-        print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames()), flush=True)
+        print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames(deffs=data["deffs"])), flush=True)
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
     print("media: {} sound pools, {} display effects".format(len(data["pools"]), len(data["deffs"])))

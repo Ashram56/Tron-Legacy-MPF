@@ -57,6 +57,7 @@ var glow := DEFAULT_GLOW
 var font := DEFAULT_FONT
 var text_scale := DEFAULT_TEXT_SCALE
 var _frames_hd := {}
+var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' text lines (FrameText)
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -255,12 +256,122 @@ func _on_node_added(node: Node) -> void:
 		if sprite.sprite_frames and sprite.sprite_frames != _hd_frames(sprite.sprite_frames):
 			sprite.sprite_frames = _hd_frames(sprite.sprite_frames)
 			sprite.scale = sprite.scale / frame_scale
+			if _has_frame_text(sprite.sprite_frames):
+				_add_frame_text.call_deferred(sprite)
 	elif node is Sprite2D:
 		var s := node as Sprite2D
 		var big := hd_texture(s.texture)
 		if big:
 			s.texture = big
 			s.scale = s.scale / frame_scale
+
+
+## The text lines found in the recorded frames (scripts/frame_text.py): {"deff_NNN/fNNN.png": [[text, font id,
+## x, baseline, level, width, first shown, count shown], ...]}. Their HD frames have those letters cleared;
+## FrameText draws them.
+func frame_text() -> Dictionary:
+	if _frame_text == null:
+		_frame_text = {}
+		if FileAccess.file_exists(MEDIA_HD + "text.json"):
+			var data = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "text.json"))
+			if data is Dictionary:
+				_frame_text = data
+	return _frame_text
+
+
+static func frame_key(tex: Texture2D) -> String:
+	return tex.resource_path.trim_prefix(MEDIA_HD) if tex else ""
+
+
+func _has_frame_text(frames: SpriteFrames) -> bool:
+	var lines := frame_text()
+	for anim in frames.get_animation_names():
+		for i in frames.get_frame_count(anim):
+			if lines.has(frame_key(frames.get_frame_texture(anim, i))):
+				return true
+	return false
+
+
+func _add_frame_text(sprite: AnimatedSprite2D) -> void:
+	if not is_instance_valid(sprite) or sprite.get_parent() == null or sprite.has_meta("dmd_frame_text"):
+		return
+	sprite.set_meta("dmd_frame_text", true)
+	var overlay := FrameText.new(sprite, frame_text(), frame_scale)
+	sprite.add_sibling(overlay)
+
+
+## The text of a recorded effect, drawn live over its HD frames (whose letters are cleared): for the frame
+## the sprite shows, one tron/rom_text_hd.gd line per text line found in it, at the ROM's place and level,
+## centred on the recorded line (so the clean fonts' scale shrinks it in place; a line against the DMD's edge
+## stays against it); a line the frame shows only
+## part of (letters covered by the art, or not yet drawn) shows those letters where they sit in the line.
+class FrameText extends Node2D:
+	const RomText = preload("res://tron/rom_text.gd")
+	const RomTextHd = preload("res://tron/rom_text_hd.gd")
+	var sprite: AnimatedSprite2D
+	var lines: Dictionary
+	var _key := "-"
+
+	func _init(of: AnimatedSprite2D, text_lines: Dictionary, frame_scale: int) -> void:
+		sprite = of
+		lines = text_lines
+		name = sprite.name + "Text"
+		position = sprite.position
+		scale = sprite.scale * frame_scale
+		sprite.frame_changed.connect(_sync)
+		sprite.animation_changed.connect(_sync)
+		sprite.visibility_changed.connect(_sync)
+
+	func _ready() -> void:
+		_sync()
+
+	func _sync() -> void:
+		visible = sprite.visible
+		var tex := sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame) if sprite.sprite_frames else null
+		var key := tex.resource_path.trim_prefix(MEDIA_HD) if tex else ""
+		if key == _key:
+			return
+		_key = key
+		for c in get_children():
+			c.queue_free()
+		var clean := not RomTextHd.clean().is_empty()
+		for l in lines.get(key, []):
+			var m := RomText.font_metrics(int(l[1]))
+			if m.is_empty():
+				continue
+			var whole := str(l[0])
+			var from := int(l[6])
+			var n := int(l[7])
+			var ascent := int(m["ascent"])
+			var line := Node2D.new()
+			line.position = Vector2(float(l[2]), float(l[3]) - ascent + 1)
+			var lv := float(l[4]) / 15.0
+			line.modulate = Color(lv, lv, lv, 1)
+			var hd: Node2D = RomTextHd.new()
+			line.add_child(hd)
+			if clean:          # aligned as the recorded line: against an edge of the DMD, else centred on it
+				var align := 4 if int(l[2]) + int(l[5]) >= 127 else (0 if int(l[2]) <= 1 else 2)
+				hd.set_line(whole, int(l[1]), ascent, ascent + int(m["descent"]), int(l[5]), align, from, n)
+			else:              # the ROM's dot font: the part shown, where the ROM draws it
+				var part := whole.substr(from, n)
+				if from > 0:
+					line.position.x += RomText.rom_width(m, whole.left(from)) + int(m["spacing"])
+				hd.set_line(part, int(l[1]), ascent, ascent + int(m["descent"]), RomText.rom_width(m, part), 0)
+			if l.size() > 9:   # a zoomed line (scripts/frame_text.py ZOOMS): about its middle, clipped
+				var z := float(l[8])
+				var left := float(l[9])
+				var mid := line.position + Vector2(float(l[5]) / 2.0, ascent - int(m["cap"]) / 2.0)
+				line.position = mid + (line.position - mid) * z - Vector2(left, 0)
+				line.scale = Vector2(z, z)
+				var clip := Control.new()
+				clip.clip_contents = true
+				clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				clip.position = Vector2(left, 0)
+				clip.size = Vector2(128 - left, 32)
+				clip.add_child(line)
+				add_child(clip)
+				continue
+			add_child(line)
 
 
 ## A plain label on the DMD (game/slides/text_page.tscn: attract pages, initials entry): the text colour, and
