@@ -54,7 +54,7 @@ TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
 # collected letters `lit`, the new one `new` (bit 0 = first letter). Frame = `ticks` ROM ticks; the new
 # letter shows on frames where (frame >> shift) & 1, and on every frame after `solid_after`.
 # all_new: every letter blinks solid (deff 92: a set completed).
-LETTER_IMAGE0, LETTER_CHARS = 2603, "CELNORSTUZ"   # the solid images' letters (HD draws them in the clean font)
+LETTER_IMAGE0, LETTER_CHARS = 2603, "CELNORSTUZ"   # the solid images' letters (metadata/letter)
 ZUSE = (2612, 2611, 2609, 2604)
 TRON = (2610, 2608, 2607, 2606)
 # deff 94 (deff_094_zfs_intro 0x01032510): the solid letters at y 1 (x as above: matched on the capture)
