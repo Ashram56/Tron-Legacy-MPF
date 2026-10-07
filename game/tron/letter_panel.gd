@@ -18,7 +18,6 @@ extends Node
 ## hide_after_ms: no letter from then on (0 = never; deff 94 moves on to its next screen)
 @export var hide_after_ms := 0
 
-const RomTextHd = preload("res://tron/rom_text_hd.gd")
 const GLOW_DOTS := 4            # glow margin around a letter, in dots
 const GLOW_PX := 2              # glow texture pixels per dot (it is soft: filtering enlarges it cleanly)
 
@@ -43,7 +42,6 @@ func _style_hd() -> void:
 	if not (dmd and dmd.hd):
 		return
 	var st: Dictionary = dmd.text_style()
-	var clean := not RomTextHd.clean().is_empty()
 	for i in 4:
 		for n in ["Solid%d" % i, "Hollow%d" % i]:
 			var sprite := get_parent().get_node_or_null(n) as Sprite2D
@@ -51,13 +49,6 @@ func _style_hd() -> void:
 				continue
 			var level: float = sprite.get_meta("dmd_classic_tint", sprite.modulate).r   # orange times the palette level
 			sprite.modulate = Color(1, 1, 1, 1)
-			if clean and sprite.has_meta("letter"):
-				sprite.self_modulate = Color(1, 1, 1, 0)       # the picture's place only: the letter is drawn
-				var letter := CleanLetter.new(str(sprite.get_meta("letter")), n.begins_with("Solid"), level)
-				letter.position = sprite.texture.get_size() / 2.0
-				letter.scale = Vector2.ONE / sprite.scale
-				sprite.add_child(letter, false, INTERNAL_MODE_FRONT)
-				continue
 			sprite.self_modulate = dmd.text_tint(Color(level, 0, 0, 1))
 			var tex := glow_texture(sprite.texture)
 			if tex == null or float(st["glow"]) <= 0.0:
@@ -76,64 +67,6 @@ func _style_hd() -> void:
 			add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 			glow.material = add
 			sprite.add_child(glow, false, INTERNAL_MODE_BACK)
-
-
-## HD with a clean font (tron/rom_text_hd.gd): a target letter drawn in it, centred on the ROM letter's box,
-## LETTER_CAP dots tall (times the text scale). Solid (collected): filled (FILL) inside a bright outline,
-## as the ROM's letter, with the text glow; hollow (still to get): the outline only, at its dim level.
-class CleanLetter extends Node2D:
-	const LETTER_CAP := 20.0
-	const EDGE_DOTS := 0.6
-	const HOLLOW_DOTS := 0.8
-	const FILL := 0.75             # the solid letter's inside, of its outline's brightness
-	var ch: String
-	var solid: bool
-	var level: float
-	var _glow: Node2D
-
-	func _init(c: String, is_solid: bool, lv: float) -> void:
-		ch = c
-		solid = is_solid
-		level = lv
-		_glow = Node2D.new()
-		var add := CanvasItemMaterial.new()
-		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		_glow.material = add
-		_glow.draw.connect(_draw_glow)
-		_glow.show_behind_parent = true
-		add_child(_glow)
-
-	func _place(item: CanvasItem) -> float:
-		var c := RomTextHd.clean()
-		var cap := LETTER_CAP * RomTextHd.text_scale()
-		var k := cap / (float(c["cap"]) * RomTextHd.CLEAN_SIZE)
-		var w: float = (c["font"] as Font).get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, RomTextHd.CLEAN_SIZE).x * k
-		item.draw_set_transform(Vector2(-w / 2.0, cap / 2.0), 0.0, Vector2(k, k))
-		return k
-
-	func _outline(item: CanvasItem, dots: float, color: Color) -> void:
-		var k := _place(item)
-		item.draw_string_outline(RomTextHd.clean()["wide"], Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			RomTextHd.CLEAN_SIZE, maxi(1, roundi(2.0 * dots / k)), color)
-		item.draw_set_transform(Vector2.ZERO)
-
-	func _draw() -> void:
-		var color: Color = RomTextHd.style()["color"] * level
-		color.a = 1.0
-		_outline(self, EDGE_DOTS if solid else HOLLOW_DOTS, color)
-		if solid:                      # the inside, over the outline's inner half
-			_place(self)
-			draw_string(RomTextHd.clean()["font"], Vector2.ZERO, ch, HORIZONTAL_ALIGNMENT_LEFT, -1,
-				RomTextHd.CLEAN_SIZE, Color(color.r * FILL, color.g * FILL, color.b * FILL, 1))
-			draw_set_transform(Vector2.ZERO)
-
-	func _draw_glow() -> void:
-		var st := RomTextHd.style()
-		if not solid or float(st["glow"]) <= 0.0:
-			return
-		var g: Color = st["glow_color"] * float(st["glow"]) * level
-		for r in [2.4, 1.8, 1.3, 0.9]:
-			_outline(_glow, r, Color(g.r * 0.3, g.g * 0.3, g.b * 0.3, 1))
 
 
 ## The letter's size in dots (its picture's size times the sprite's scale).

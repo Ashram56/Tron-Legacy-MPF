@@ -82,9 +82,9 @@ ZEN): HD draws the final line scaled about its middle. Classic frames keep the r
 
 ![recorded text, classic / HD](../images/hd_recorded_text.png)
 
-The ZUSE/TRON target letters (deffs 91, 92, 94, 107) are ROM pictures; with a clean font `letter_panel.gd`
-draws each in the font instead (`CleanLetter`: solid = a 0.75-bright fill in a bright outline with the glow,
-hollow = the dim outline), 20 dots tall times the text scale.
+The ZUSE/TRON target letters (deffs 91, 92, 94, 107) stay the ROM's stylised pictures, upscaled: drawn in
+Rajdhani they looked worse (Vincent, 2026-10-07). Each sprite carries `metadata/letter` should a matching
+Tron-style font turn up.
 
 ### Runtime (`dmd_mode.gd`)
 
