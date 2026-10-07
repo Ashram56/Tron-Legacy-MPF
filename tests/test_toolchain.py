@@ -225,7 +225,17 @@ class TestRun(unittest.TestCase):
         self.assertEqual(["game", ".", "-c", "config,hw_virtual,free_play", "-t"], run.mpf_args("virtual"))
         self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t"], run.mpf_args("virtual", free_play=False))
         self.assertEqual(["game", ".", "-c", "config,hw_proc"], run.mpf_args("proc", text_ui=True))
-        self.assertEqual(["game", ".", "-c", "config,hw_virtual", "-t", "-X"], run.mpf_args("virtual", "zuse"))
+        self.assertEqual(["game", ".", "-c", "config,hw_virtual_le", "-t", "-X"], run.mpf_args("virtual", "zuse"))
+
+    def test_mpf_args_machine(self):
+        """Pro by default; the VPW table and the ROM traces are the LE."""
+        self.assertEqual("config,hw_proc_le", run.mpf_args("proc", machine="le")[3])
+        self.assertEqual("config,hw_proc,fiber_optics", run.mpf_args("proc", fiber_optics=True)[3])
+        self.assertEqual("config,hw_vpx,free_play", run.mpf_args("vpx")[3])
+        self.assertEqual("config,hw_vpx_pro,free_play", run.mpf_args("vpx", machine="pro")[3])
+        self.assertEqual("config,hw_virtual,free_play", run.mpf_args("virtual", machine="pro")[3])
+        for name in ("hw_proc_le", "hw_vpx_pro", "hw_virtual_le", "fiber_optics"):
+            self.assertTrue(os.path.exists(os.path.join(ROOT, "game", "config", name + ".yaml")), name)
 
     def test_xvfb_only_without_display(self):
         with mock.patch.dict(os.environ, {"GODOT": sys.executable}):
