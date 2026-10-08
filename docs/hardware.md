@@ -80,7 +80,8 @@ GMC on port 5050 (`bcp: connections: local_display`, required), so start Godot f
 every switch, lamp, flasher, coil, flipper, autofire and ball device of this config on it (the layout Vincent
 supplied, renamed to these device names by SAM number and function). `settings.ini.default` holds MPF Monitor's
 window positions; `run.py --monitor` copies it to `settings.ini` (git-ignored, MPF Monitor rewrites it) once. Click a spot to toggle a switch; drag a spot to move it and MPF Monitor saves it in
-monitor.yaml. `scripts/gen_monitor.py` still draws the old labelled grid instead, but it overwrites this
+monitor.yaml. To rebuild the layout from a table: `scripts/vpx_extract.py` and `scripts/vpx_map.py`
+([agents/vpx_extraction.md](agents/vpx_extraction.md)). `scripts/gen_monitor.py` still draws the old labelled grid instead, but it overwrites this
 layout: run it only to start over. `game/monitor/.gdignore` keeps Godot from importing the folder.
 
 This was checked by booting `mpf game . -c config,hw_virtual -t` with Godot on Xvfb, with a BCP client on
