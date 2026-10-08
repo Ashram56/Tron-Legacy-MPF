@@ -10,6 +10,32 @@ example throughout, and every agent file names the Tron result to copy from.
 > `python scripts/vpx_extract.py TABLE.vpx OUT` then `python scripts/vpx_map.py OUT --names <MPF config files>`.
 > Without it, MPF Monitor only has a labelled grid. On Tron it placed 44 switches, 64 lamps and 8 flashers.
 
+## 0. Getting started (once)
+
+The agents are Markdown files in public repositories: there is nothing to install or copy. Claude reads them
+when a repository is attached or when you point it at them.
+
+1. **GitHub.** For Tron, the repositories exist: [Tron-Legacy-MPF](https://github.com/Ashram56/Tron-Legacy-MPF)
+   (game, this plan) and [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption)
+   (ROM extraction). For another game, create two empty repositories of your own, one for the extraction and
+   one for the game, plus a private one if third-party media will be involved. The agents' instructions stay
+   in the Tron repositories and are read from there.
+2. **Connect Claude to GitHub** at [claude.ai/connect-github](https://claude.ai/connect-github) and install the
+   Claude GitHub App on your repositories when asked.
+3. **Create a Claude project** (claude.ai, Projects) and add your repositories to it in the project settings.
+   Put the large inputs in the project's files: the ROM zip(s) and the `.vpx` (section 1).
+4. **Point the project at this plan.** Paste into the project's instructions:
+   > Before any work, read docs/agents/README.md in Ashram56/Tron-Legacy-MPF (the master plan) and follow the
+   > agent file that matches the task. Update that agent file whenever you learn something it should say.
+   >
+   > Project: `<game, ROM set, model>`. Extraction repo: `<owner/repo>`. Game repo: `<owner/repo>`.
+5. **Start one thread per agent** with the message from section 4, in the order of section 3. Each agent
+   names what it needs from you; answer in the thread.
+
+Working in Claude Code on your own computer instead: clone the repositories and run `claude` in one of them.
+Each repository's `CLAUDE.md` loads its agent automatically (`AGENTS.md` in the extraction repository, this
+plan in the game repository), as it also does in a cloud session that has the repository attached.
+
 ## 1. What you provide
 
 | Input | Needed for | Required? | How to hand it over |
