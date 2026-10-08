@@ -25,12 +25,16 @@ when a repository is attached or when you point it at them.
 3. **Create a Claude project** (claude.ai, Projects) and add your repositories to it in the project settings.
    Put the large inputs in the project's files: the ROM zip(s) and the `.vpx` (section 1).
 4. **Point the project at this plan.** Paste into the project's instructions:
-   > Before any work, read docs/agents/README.md in Ashram56/Tron-Legacy-MPF (the master plan) and follow the
-   > agent file that matches the task. Update that agent file whenever you learn something it should say.
+   > Before any work, read docs/agents/README.md in Ashram56/Tron-Legacy-MPF (the master plan). The
+   > coordinator runs the plan: it starts one thread per agent in the order of section 3, briefs each with its
+   > agent file and inputs, starts the next agent when the previous one has delivered what it needs, and
+   > brings back to the project chat only what needs the owner. Every thread follows its agent file and
+   > updates it whenever it learns something the file should say.
    >
    > Project: `<game, ROM set, model>`. Extraction repo: `<owner/repo>`. Game repo: `<owner/repo>`.
-5. **Start one thread per agent** with the message from section 4, in the order of section 3. Each agent
-   names what it needs from you; answer in the thread.
+5. **Post one message in the project chat**: "Run the master plan." The project's coordinator (the Claude
+   that answers in the project chat) starts each agent's thread itself, in order, and you only answer the
+   questions it or the threads bring you. You never brief an agent yourself.
 
 Working in Claude Code on your own computer instead: clone the repositories and run `claude` in one of them.
 Each repository's `CLAUDE.md` loads its agent automatically (`AGENTS.md` in the extraction repository, this
@@ -80,9 +84,12 @@ ROM ──► A ROM extraction ──► C strict recreation ──► E improve
 3. **D** once C boots a game on virtual hardware. **E** any time after C's display works, always switchable.
 4. Every new ROM version or model: A again (A's section 15 ports a second model), then C's asset sync.
 
-## 4. Starting an agent
+## 4. Starting the agents
 
-Start a thread and paste one line, filling in the brackets:
+In a Claude project the coordinator starts them (section 0, step 5): one thread per agent, A and B in
+parallel, then C, then D and E. To run only one agent, ask the coordinator for it by name ("run the VPX
+extraction agent on the new table"). Outside a project (a single Claude Code session), start the agent
+yourself with its line:
 
 | Agent | Message |
 |---|---|
