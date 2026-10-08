@@ -101,6 +101,16 @@ What the second game showed; read before porting a third.
   = "yes" for until stopped, `run_ms`, `coils_pulsed`, `show`, `tag` = code for leffs drawn from game state with
   no show); shows put flasher pulses under `coils:` with `pulse_ms`. Its traces log coil drivers raw (3-17 ms
   slices), so drop Tron's 0.24 s coil hold (`COIL_OFF_DELAY`).
+- **Read a function before trusting its decompile name.** On tf_180, `any_timed_mode_running` [0x01006704]
+  tests the six multiball flags; the timed modes (battle timers, double and fast scoring) are [0x010067bc]. The
+  specs had copied the name, so Energon looked frozen during battles; the switches trace showed it is not.
+- **Drive scenarios on the reference's input times** (each hit, drain and button waits until the reference
+  input's time after "ready"). Otherwise timing drifts up to 0.4 s across a long trace and every timed rule
+  looks wrong. Forced random picks come from watched variables. Ignore values that are uninitialised RAM
+  (0xffff before the game starts).
+- **Switch flags matter.** The captive ball (flags 0x1fff0000) runs its handler on both edges, 3 ticks after
+  each. Mode-total deffs reload the ball-search countdown ([0x0100664c]), and a search near a drain delays the
+  bonus.
 
 ## 6. Tron status and open work
 
@@ -117,4 +127,4 @@ coin door and in-game service (PR #17). Open:
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
 
-Last updated 2026-10-08 (section 5: Transformers Pro).
+Last updated 2026-10-08 (section 5: Transformers Pro, battles).
