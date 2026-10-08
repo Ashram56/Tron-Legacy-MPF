@@ -6,17 +6,23 @@
 OUTDIR is vpx_extract.py's output. VPX object names are arbitrary; the switch, lamp and flasher numbers live in
 script.vbs. This reads the patterns most PinMAME tables use (comments stripped first):
 
-    switch     Sub <obj>_Hit / _Spin / _Slingshot ... Controller.Switch(n) = 1 or PulseSw n ... End Sub
+    switch     Sub <obj>_Hit / _Spin / _Slingshot ... Controller.Switch(n) = 1, PulseSw n, STHit n or DTHit n ... End Sub
+    targets    (new StandupTarget)(obj, prim, n, ...)  (new DropTarget)(obj, objb, prim, n, ...)   (VPW, n mod 100)
     drops      .InitDrop Array(objs), Array(nums)                         (zipped pairwise)
     kickers    Set X = New cvpmBallStack ... .InitSw a,b,... ... .InitKick obj
                (first slot is the entry switch, zeros dropped; one number left = the kick object,
                 several = the trough, stacked at the kick object)
+               .InitSaucer obj, n, ...
+    trough     Set X = New cvpmTrough ... .InitSwitches Array(a,b,...) ... .InitExit obj   (stacked at obj)
     lamps      Lampz.MassAssign(n) = obj   (main object: l<n> / l0<n>, else the first Light)
-               vpmMapLights <collection>   (the light's TimerInterval is its lamp number)
+               vpmMapLights <collection>   (the light's TimerInterval is its lamp number; only the collection's
+                                            members when items.json lists collections)
     flashers   ModLampz.MassAssign(n) = obj   (solenoid numbers)
+               Sol[Mod]Callback(n) = "vpmFlasher obj,"   or = "<sub>" whose body calls [Mod]FlashFlasher k
+               (Flupper domes: Flasherlight<k>, else Flasherflash<k> / Flasherbase<k>)
 
-A table that uses other patterns (cvpmTrough, Controller.Switch set from a sub named after something else) needs
-them added here: read script.vbs first. Mechanism switches have no playfield object of their own; place them
+A table that uses other patterns (Controller.Switch set from a sub named after something else) needs them added
+here: read script.vbs first. Mechanism switches have no playfield object of their own; place them
 with --mech NUMBER:OBJECT (only if the number is still unmapped).
 
 --names reads MPF config files (switches:, lights:, coils:, flashers: with number:) and names each device by its number;
@@ -82,7 +88,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     d = args.outdir
     with open(os.path.join(d, "items.json"), encoding="utf-8") as f:
-        items = json.load(f)["items"]
+        data = json.load(f)
+    items = data["items"]
     by_name = {it["name"].lower(): it for it in items if it.get("name") and it.get("nx") is not None}
     with open(os.path.join(d, "script.vbs"), "rb") as f:
         script = strip_comments(f.read().decode("cp1252", errors="replace"))
@@ -96,22 +103,37 @@ def main(argv=None):
 
     for m in re.finditer(r"^\s*Sub\s+(\w+?)_(Hit|Spin|Slingshot)\b(.*?)\bEnd\s+Sub", script, re.I | re.M | re.S):
         body = m.group(3)
-        k = re.search(r"Controller\.Switch\s*\(\s*(\d+)\s*\)\s*=\s*(1|True)|PulseSw\s*\(?\s*(\d+)", body, re.I)
+        k = re.search(r"Controller\.Switch\s*\(\s*(\d+)\s*\)\s*=\s*(1|True)|PulseSw\s*\(?\s*(\d+)"
+                      r"|\b[SD]THit\s*\(?\s*(\d+)", body, re.I)
         if k:
-            add_sw(int(k.group(1) or k.group(3)), m.group(1), m.group(2).lower())
+            add_sw(int(k.group(1) or k.group(3) or k.group(4)) % 100, m.group(1), m.group(2).lower())
+    for m in re.finditer(r"\(\s*new\s+StandupTarget\s*\)\s*\(\s*(\w+)\s*,\s*\w+\s*,\s*(\d+)", script, re.I):
+        add_sw(int(m.group(2)) % 100, m.group(1), "standup target")
+    for m in re.finditer(r"\(\s*new\s+DropTarget\s*\)\s*\(\s*(\w+)\s*,\s*\w+\s*,\s*\w+\s*,\s*(\d+)", script, re.I):
+        add_sw(int(m.group(2)) % 100, m.group(1), "drop target")
     for m in re.finditer(r"\.InitDrop\s+Array\(([^)]*)\)\s*,\s*Array\(([^)]*)\)", script, re.I):
         objs = [o.strip() for o in m.group(1).split(",")]
         nums = [int(n) for n in re.findall(r"\d+", m.group(2))]
         for o, n in zip(objs, nums):
             add_sw(n, o, "drop target")
-    stacks = list(re.finditer(r"Set\s+(\w+)\s*=\s*New\s+cvpmBallStack", script, re.I))
+    stacks = list(re.finditer(r"Set\s+(\w+)\s*=\s*New\s+(cvpmBallStack|cvpmTrough|cvpmSaucer)", script, re.I))
     for i, m in enumerate(stacks):
         seg = script[m.end():stacks[i + 1].start() if i + 1 < len(stacks) else len(script)]
-        sw = re.search(r"\.InitSw\s+([\d,\s]+)", seg)
-        kick = re.search(r"\.InitKick\s+(\w+)", seg)
-        if not (sw and kick):
+        saucer = re.search(r"\.InitSaucer\s+(\w+)\s*,\s*(\d+)", seg, re.I)
+        if saucer:
+            add_sw(int(saucer.group(2)), saucer.group(1), "saucer {}".format(m.group(1)))
             continue
-        nums = [int(n) for n in sw.group(1).split(",")[1:] if n.strip() and int(n) != 0]
+        sw = re.search(r"\.InitSw\s+([\d,\s]+)", seg, re.I)
+        kick = re.search(r"\.InitKick\s+(\w+)", seg, re.I)
+        trough = re.search(r"\.InitSwitches\s+Array\s*\(([\d,\s]+)\)", seg, re.I)
+        exit_ = re.search(r"\.InitExit\s+(\w+)", seg, re.I)
+        if trough and exit_:                    # cvpmTrough: no entry slot, every number is a ball position
+            nums = [int(n) for n in trough.group(1).split(",") if n.strip() and int(n) != 0]
+            kick = exit_
+        elif sw and kick:
+            nums = [int(n) for n in sw.group(1).split(",")[1:] if n.strip() and int(n) != 0]
+        else:
+            continue
         for k, n in enumerate(nums):
             slot = " slot {}".format(k + 1) if len(nums) > 1 else ""
             add_sw(n, kick.group(1), "ball stack {}{}".format(m.group(1), slot))
@@ -124,10 +146,26 @@ def main(argv=None):
                            (r"ModLampz\.MassAssign\s*\(\s*(\d+)\s*\)\s*=\s*(\w+)", flashers)):
         for m in re.finditer(pattern, script, re.I):
             table.setdefault(int(m.group(1)), []).append(m.group(2).lower())
-    if re.search(r"^\s*vpmMapLights\b", script, re.I | re.M):
+    collections = {k.lower(): {n.lower() for n in v} for k, v in data.get("collections", {}).items()}
+    for m in re.finditer(r"^\s*vpmMapLights\s+(\w+)", script, re.I | re.M):
+        members = collections.get(m.group(1).lower())        # None: an older items.json, take every Light
         for it in by_name.values():
-            if it["type"] == "Light" and it.get("timer_interval", 0) > 0:
+            if (it["type"] == "Light" and it.get("timer_interval", 0) > 0
+                    and (members is None or it["name"].lower() in members)):
                 lamps.setdefault(it["timer_interval"], []).append(it["name"].lower())
+    subs = {m.group(1).lower(): m.group(2) for m in
+            re.finditer(r"^\s*Sub\s+(\w+)\b(.*?)\bEnd\s+Sub", script, re.I | re.M | re.S)}
+    for m in re.finditer(r"Sol(?:Mod)?Callback\s*\(\s*(\d+)\s*\)\s*=\s*\"([^\"]*)\"", script, re.I):
+        n, cb = int(m.group(1)), m.group(2).strip()
+        f = re.match(r"vpmFlasher\s+(?:Array\s*\(([^)]*)\)|(\w+))", cb, re.I)
+        if f:
+            objs = [o.strip().lower() for o in (f.group(1) or f.group(2)).split(",")]
+        else:
+            k = re.search(r"\b(?:Mod)?FlashFlasher\s*\(?\s*(\d+)", subs.get(cb.lower(), ""), re.I)
+            objs = [p + k.group(1) for p in ("flasherlight", "flasherflash", "flasherbase")] if k else []
+        objs = [o for o in objs if o in by_name]
+        if objs:
+            flashers.setdefault(n, []).extend(objs[:1] if not f else objs)
 
     def main_obj(n, objs, prefix):
         objs = [o for o in objs if o in by_name]

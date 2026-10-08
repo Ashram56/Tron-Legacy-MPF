@@ -8,7 +8,8 @@ Game agnostic (VPX 10.x tables). The .vpx is only read. OUTDIR gets:
     playfield.png       the playfield image (GameData IMAG, else the largest "playfield"/"pf*" image, or --image)
     script.vbs          the table script, byte for byte
     images/             every embedded image, as its original file (PNG, JPG, WebP ...)
-    items.json          every object: type, name, x/y in table units, nx/ny as fractions of the playfield
+    items.json          every object: type, name, x/y in table units, nx/ny as fractions of the playfield;
+                        collections: {name: [member names]} (vpmMapLights reads one)
     switches_all.csv    switch candidates: triggers, targets, kickers, bumpers, spinners, gates, flippers,
                         plungers, and walls/rubbers/primitives with hit events
     lights_all.csv      lights and flashers (timer_interval is the lamp number on vpmMapLights tables)
@@ -20,7 +21,7 @@ second step, per table (docs/agents/vpx_extraction.md). Needs olefile and Pillow
 --vpx`, or `pip install olefile pillow`).
 
 Format (docs/agents/vpx_extraction.md, "The .vpx format"): an OLE compound file; streams GameStg/GameData,
-GameStg/GameItemN, GameStg/ImageN hold BIFF records (int32 length counting the 4-byte tag, tag, payload).
+GameStg/GameItemN, GameStg/ImageN, GameStg/CollectionN hold BIFF records (int32 length counting the 4-byte tag, tag, payload).
 CODE is the exception: its length is 4 and the script's own int32 length follows the tag.
 """
 import argparse
@@ -204,6 +205,20 @@ def read_item(data):
     return item
 
 
+def read_collection(data):
+    """One Collection stream: its NAME and the names of its ITEMs (both UTF-16LE, like item names)."""
+    name, members = "", []
+    for tag, p, _ in records(data):
+        try:
+            if tag == "NAME" and not name:
+                name = wstr(p)
+            elif tag == "ITEM":
+                members.append(wstr(p))
+        except struct.error:
+            pass
+    return name, members
+
+
 def pick_playfield(images, wanted, imag):
     by_name = {im.get("NAME", "").lower(): im for im in images if im.get("DATA")}
     for name in (wanted, imag):
@@ -260,6 +275,7 @@ def main(argv=None):
         gd = read_gamedata(ole)
         images = read_images(ole)
         items = [read_item(ole.openstream(s).read()) for s in numbered(ole, "GameItem")]
+        collections = dict(read_collection(ole.openstream(s).read()) for s in numbered(ole, "Collection"))
 
     left, top = gd.get("LEFT", 0.0), gd.get("TOPX", 0.0)
     w, h = gd.get("RGHT", 1.0) - left, gd.get("BOTM", 1.0) - top
@@ -302,7 +318,7 @@ def main(argv=None):
     write_csv(os.path.join(args.outdir, "lights_all.csv"), li_rows, cols)
     with open(os.path.join(args.outdir, "items.json"), "w", encoding="utf-8") as f:
         json.dump({"bounds": [left, top, left + w, top + h], "playfield_image": pf and pf.get("NAME"),
-                   "items": items}, f, indent=1)
+                   "items": items, "collections": collections}, f, indent=1)
 
     # MPF Monitor's own file uses singular section keys (switch:, light:, coil: ...) with x/y fractions of
     # the playfield picture; the names must become the machine config's device names before use.
@@ -320,8 +336,8 @@ def main(argv=None):
     script_lines = gd["CODE"].count(b"\n") + 1 if "CODE" in gd else 0
     print("table bounds {:g},{:g} .. {:g},{:g}".format(left, top, left + w, top + h))
     print("playfield: {} ({}x{}, {})".format(pf and pf.get("NAME"), pf and pf.get("WDTH"), pf and pf.get("HGHT"), why))
-    print("{} images ({} legacy BITS not decoded), {} items, script {} lines".format(
-        len(images), legacy, len(items), script_lines))
+    print("{} images ({} legacy BITS not decoded), {} items, {} collections, script {} lines".format(
+        len(images), legacy, len(items), len(collections), script_lines))
     print("{} switch candidates, {} lights/flashers -> {}".format(len(sw_rows), len(li_rows), args.outdir))
     return 0
 

@@ -64,7 +64,22 @@ python scripts/vpx_map.py out --names assets/mpf_package/config/{switches,lights
   below the playfield, the start and tournament button lamps) and 8 flashers (solenoids 17, 18, 21, 26, 27, 29, 31, 32).
 - First rows: `1,s_tron_t,sw01,Wall,81.0,1140.1,0.0851,0.5391,drop target` and
   `1,l_tron_n,l1,lamp,Light,180.0,970.5,0.189,0.4589,also: l1a`.
-- With `--names`, every device gets its config name. The committed `game/monitor/monitor.yaml` came from this
+- With `--names`, every device gets its config name.
+
+Transformers Pro (verified 2026-10-08 on `Transformers Pro (Stern 2011) v.2.4.vpx`, VR-Hybrid mod, ROM
+`tf_180`; outputs in Ashram56/Transformers-MPF `docs/vpx/`):
+
+```
+python scripts/vpx_extract.py "Transformers Pro (Stern 2011) v.2.4.vpx" out
+python scripts/vpx_map.py out --mech 43:opr,44:opr
+```
+
+- Bounds 0, 0, 952, 2164; playfield `pf` 3608x8192 (GameData IMAG); 386 images; 1,106 items; 31 collections;
+  `script.vbs` 4,891 lines; `switches_all.csv` 529 rows, `lights_all.csv` 251.
+- 42 switches: 1-8, 10-14, 18-32, 34, 35, 37-41, 43-46, 49-51 (trough 18-21 cvpmTrough at `BallRelease`,
+  Megatron lock 38-41 at `KickerMegaTron`, saucer 3, VPW standups 2/37/46/49/50, Optimus ramp 43/44 by `--mech`).
+- 61 lamps (1-62 without 56; 1 and 2 below the playfield), 12 flashers (17-21, 23, 25-28, 31, 32; six Flupper domes).
+- Before the collection filter, `vpmMapLights` turned 90 GI and flasher lights (TimerInterval 100) into a lamp 100. The committed `game/monitor/monitor.yaml` came from this
   pipeline: 116 devices match it at the same position (median difference 0); the rest were moved by hand.
 
 ## 4. The `.vpx` format (what `vpx_extract.py` relies on)
@@ -82,6 +97,9 @@ python scripts/vpx_map.py out --names assets/mpf_package/config/{switches,lights
   nested: their `VCEN` must not overwrite the item's own; an item with no `VCEN`/`VPOS` uses their average.
   Position: `VCEN` (most), `VPOS` (primitives, targets), `FLAX`/`FLAY` (flashers). `HTEV` = has hit event;
   `TMIN` = timer interval (the lamp number on `vpmMapLights` tables). Wrap field parsing in `try/except struct.error`.
+- **Collection stream**: `NAME` then one `ITEM` per member (both UTF-16LE), `EVNT`, `SSNG`, `GREL`, `ENDB`.
+  `items.json` lists them under `collections`. `vpmMapLights AllLamps` maps only that collection's members:
+  GI bulbs and flasher lights also carry a TimerInterval (100 on Transformers) and must not become lamps.
 - **Strings**: item `NAME` is length-prefixed **UTF-16LE**; image names, paths, `IMAG`, `SURF` are **ANSI**.
   Some ANSI records hold binary data or a bad length: return `""` unless the text is printable ASCII (one of
   the two bugs fixed on the first real run).
@@ -101,15 +119,22 @@ that the patterns it uses are the ones `vpx_map.py` reads (comments are stripped
 
 | Device | Script pattern | Result |
 |---|---|---|
-| Switch | `Sub <obj>_Hit / _Spin / _Slingshot ... End Sub` (one-line subs too) containing `Controller.Switch(n) = 1` or `PulseSw n` | obj → n |
+| Switch | `Sub <obj>_Hit / _Spin / _Slingshot ... End Sub` (one-line subs too) containing `Controller.Switch(n) = 1`, `PulseSw n`, or VPW's `STHit n` / `DTHit n` | obj → n (mod 100) |
+| VPW targets | `(new StandupTarget)(obj, prim, n, ...)`, `(new DropTarget)(obj, objb, prim, n, ...)` | obj → n mod 100 |
 | Drop targets | `.InitDrop Array(objs), Array(nums)` | zipped pairwise |
 | Kickers, trough | `Set X = New cvpmBallStack` ... `.InitSw a,b,...` ... `.InitKick obj` | first slot is the entry switch, zeros dropped; one number left = the kick object; several = the trough, stacked at the kick object (`ny` + 0.006 per ball) |
+| Saucer | `.InitSaucer obj, n, ...` | obj → n |
+| Trough (cvpmTrough) | `Set X = New cvpmTrough` ... `.InitSwitches Array(a,b,...)` ... `.InitExit obj` | every number, stacked at the exit object |
 | Lamps | `Lampz.MassAssign(n) = obj` (several objects per lamp) | main object `l<n>`/`l0<n>`, else the first Light; others in `note` |
-| Lamps (older tables) | `vpmMapLights <collection>` | the Light's TimerInterval is its lamp number |
+| Lamps (older tables) | `vpmMapLights <collection>` | the Light's TimerInterval is its lamp number, members of that collection only |
 | Flashers | `ModLampz.MassAssign(n) = obj` | **solenoid** numbers |
+| Flashers | `SolModCallback(n)` / `SolCallback(n)` = `"vpmFlasher obj,"` (or `Array(...)`) | solenoid n → obj |
+| Flupper domes | `SolModCallback(n) = "<sub>"`, the sub calls `ModFlashFlasher k` / `FlashFlasher k` | solenoid n → `Flasherlight<k>` (else `Flasherflash<k>`, `Flasherbase<k>`) |
 
-Not handled yet (add them when a table uses them): `SolCallback(n)` objects for coils, `cvpmTrough`,
-`Controller.Switch(n)` set from a sub named after another object, GI strings (`GiCallback`; usually leave out).
+Not handled yet (add them when a table uses them): `SolCallback(n)` objects for coils,
+`Controller.Switch(n)` set from a sub named after another object or from a timer (Transformers' Optimus ramp
+43/44: use `--mech`), GI strings (`GiCallback`; usually leave out). Script comments next to `SolModCallback`
+can be wrong (Transformers' "Slingshot (Left)" dome sits on the right): trust the object, say so.
 
 **Mechanism switches have no object of their own**: pass them with `--mech NUMBER:OBJECT`, per table. Tron:
 52/53 (3-bank up/down) at `motorbank`, 54-56 (Recognizer position) at `recognizer`, 22 (trough jam) at
@@ -149,5 +174,9 @@ made, and the overlay verdict. List what needs the owner's eye as a short number
 - 2026-10-08: rebuilt into this repo from those notes as `scripts/vpx_extract.py` and the generic
   `scripts/vpx_map.py` (Tron's hand-placed mechanisms became `--mech`, names from the config by number);
   reproduces the first run's counts exactly. `tests/test_vpx_extract.py`.
+- 2026-10-08: second table, Transformers Pro v2.4 (cloud, from the project's files). Added collections to
+  `items.json` and to `vpmMapLights`, cvpmTrough, `InitSaucer`, VPW `StandupTarget`/`DropTarget`/`STHit`/`DTHit`,
+  and `SolModCallback` flashers (vpmFlasher and Flupper domes). Not re-run on the Tron table (not in that
+  project): Tron uses `Lampz`/`ModLampz`, so only a `vpmFlasher` callback in its script could add rows.
 
 Last updated 2026-10-08.
