@@ -23,18 +23,25 @@ when a repository is attached or when you point it at them.
 2. **Connect Claude to GitHub** at [claude.ai/connect-github](https://claude.ai/connect-github) and install the
    Claude GitHub App on your repositories when asked.
 3. **Create a Claude project** (claude.ai, Projects) and add your repositories to it in the project settings.
-   Put the large inputs in the project's files: the ROM zip(s) and the `.vpx` (section 1).
-4. **Point the project at this plan.** Paste into the project's instructions:
+4. **Point the project at this plan.** Paste into the project's instructions, as is (it is the same for every
+   game; nothing about your game goes here):
    > Before any work, read docs/agents/README.md in Ashram56/Tron-Legacy-MPF (the master plan). The
-   > coordinator runs the plan: it starts one thread per agent in the order of section 3, briefs each with its
-   > agent file and inputs, starts the next agent when the previous one has delivered what it needs, and
-   > brings back to the project chat only what needs the owner. Every thread follows its agent file and
-   > updates it whenever it learns something the file should say.
-   >
-   > Project: `<game, ROM set, model>`. Extraction repo: `<owner/repo>`. Game repo: `<owner/repo>`.
-5. **Post one message in the project chat**: "Run the master plan." The project's coordinator (the Claude
-   that answers in the project chat) starts each agent's thread itself, in order, and you only answer the
-   questions it or the threads bring you. You never brief an agent yourself.
+   > coordinator runs the plan: it takes the game details and input files from the owner's kickoff message,
+   > starts one thread per agent in the order of section 3, briefs each with its agent file and the inputs it
+   > needs, starts the next agent when the previous one has delivered what it needs, and brings back to the
+   > project chat only what needs the owner. Every thread follows its agent file and updates it whenever it
+   > learns something the file should say.
+5. **Start the plan with one message in the project chat**, with your inputs (section 1) attached as files:
+   > Run the master plan.
+   > Game: `<game, model, version>`. ROM: `<set name(s)>`. VPX table: `<table name, author, version>`.
+   > Extraction repo: `<owner/repo>`. Game repo: `<owner/repo>`. Private repo: `<owner/repo, if any>`.
+   > Hardware: `<desktop, VPX, P-ROC, ...>`.
+
+   Attach the ROM zip(s) and the `.vpx` to that message. A file too big to attach (a `.vpx` can be
+   150-300 MB) goes in the project's files or as a download link instead; say which in the message. The
+   project's coordinator (the Claude that answers in the project chat) then starts each agent's thread
+   itself, in order, and you only answer the questions it or the threads bring you. You never brief an
+   agent yourself.
 
 Working in Claude Code on your own computer instead: clone the repositories and run `claude` in one of them.
 Each repository's `CLAUDE.md` loads its agent automatically (`AGENTS.md` in the extraction repository, this
@@ -44,13 +51,13 @@ plan in the game repository), as it also does in a cloud session that has the re
 
 | Input | Needed for | Required? | How to hand it over |
 |---|---|---|---|
-| **The game ROM**, one per model (Pro, Premium, LE): the PinMAME set zip, e.g. `trn_174h.zip` (LE 1.74), `trn_17402.zip` (Pro 1.74) | Everything: rules, sounds, DMD, lamp shows, settings, coil timing | **Yes** | Upload it to the ROM extraction thread, or a download link. It is copyrighted: it is never committed to any repository. Say which version and model it is if you know. |
-| **The VPX table** (`.vpx`) of the same game | MPF Monitor layout and playfield picture; playing the game in VPX with MPF instead of PinMAME | Recommended | Tables are 150-300 MB: put it in the project's files (Tron: `Tron Legacy (Stern 2011) VPW Mod v1.1.vpx`), give a download link, or let an agent work on your PC through Remote Control. Say which table it is (author, version) and which model it simulates. |
-| Your target hardware | Which overlays to build: desktop only, VPX, a P-ROC on the original boards, other | Yes (one line) | Tron: P-ROC on the SAM boards, Pro by default, LE selectable; VPX on Windows. |
-| GitHub repositories | Where the agents write | Yes | One for the ROM extraction (asset/spec repo), one for the game. Private work (third-party colourisation) goes in a separate private repo. Connect GitHub to Claude once. |
+| **The game ROM**, one per model (Pro, Premium, LE): the PinMAME set zip, e.g. `trn_174h.zip` (LE 1.74), `trn_17402.zip` (Pro 1.74) | Everything: rules, sounds, DMD, lamp shows, settings, coil timing | **Yes** | Attach it to the kickoff message (section 0, step 5), or give a download link. It is copyrighted: it is never committed to any repository. Say which version and model it is if you know. |
+| **The VPX table** (`.vpx`) of the same game | MPF Monitor layout and playfield picture; playing the game in VPX with MPF instead of PinMAME | Recommended | Attach it to the kickoff message; tables are 150-300 MB, so if it is too big, put it in the project's files (Tron: `Tron Legacy (Stern 2011) VPW Mod v1.1.vpx`), give a download link, or let an agent work on your PC through Remote Control. Say which table it is (author, version) and which model it simulates. |
+| Your target hardware | Which overlays to build: desktop only, VPX, a P-ROC on the original boards, other | Yes (one line) | In the kickoff message. Tron: P-ROC on the SAM boards, Pro by default, LE selectable; VPX on Windows. |
+| GitHub repositories | Where the agents write | Yes | Named in the kickoff message. One for the ROM extraction (asset/spec repo), one for the game. Private work (third-party colourisation) goes in a separate private repo. Connect GitHub to Claude once. |
 | A Windows PC with VPX | Testing the VPX bridge (VPX runs only on Windows) | For the bridge | Run the checks the bridge agent lists, or allow Remote Control on a folder. |
-| Optional: operator manual, switch/lamp matrix | Cross-checking IO numbers | No | Upload the PDF. |
-| Optional: schematics, logic analyzer captures | Hardware work (P-ROC, replacement boards) | No | Upload; say which ROM the machine ran when captured. |
+| Optional: operator manual, switch/lamp matrix | Cross-checking IO numbers | No | Attach the PDF to the kickoff message or a later one. |
+| Optional: schematics, logic analyzer captures | Hardware work (P-ROC, replacement boards) | No | Attach them; say which ROM the machine ran when captured. |
 | Optional: third-party media (videos, colourisation files) | Improvements only | No | Private repo only; never named or described in the public game repo. |
 | Your decisions | Model, defaults, look and feel | As they come up | Agents pick sensible defaults, say which, and ask only for what they cannot decide. |
 
