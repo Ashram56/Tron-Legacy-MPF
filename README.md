@@ -123,3 +123,5 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.
+- [docs/agents/README.md](docs/agents/README.md): the master plan for AI agents: what to provide (ROM, VPX table)
+  and the agents that turn it into this game.
