@@ -12,7 +12,8 @@ carry until upstream has its own are in `scripts/gozen/`.
 | [gde-gozen-main-thread-stalls.md](gde-gozen-main-thread-stalls.md) | [VoylinsGamedevJourney/gde_gozen](https://github.com/VoylinsGamedevJourney/gde_gozen/issues) | `VideoPlayback` opens, loops and frees videos on the main thread |
 
 Platform for all of them: Jetson AGX Orin Developer Kit, L4T R36.4.3 (JetPack 6.2), Ubuntu 22.04, `oot` kernel.
-Not checked yet on Xavier NX (L4T R35, JetPack 5).
+Also checked on a Jetson Xavier NX, L4T R35.6.4 (JetPack 5.1.4): the flush hang, slow close and concurrent-decoder
+bugs are there too; the close crash did not show in 100 runs.
 
 The `native_video` heap overrun is already reported upstream
 ([claytercek/godot-native-video#26](https://github.com/claytercek/godot-native-video/issues/26)).

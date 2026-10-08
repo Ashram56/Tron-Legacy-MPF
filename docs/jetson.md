@@ -6,7 +6,9 @@ bringing up another Jetson, such as the Xavier NX.
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
 4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
-**Not tested yet:** Xavier NX / AGX Xavier (t194, L4T R35 / JetPack 5). See [Xavier NX checklist](#xavier-nx-checklist).
+**Decoder self-test passed:** Jetson Xavier NX Developer Kit (t194), L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04.6,
+on the PuP Pack's 1080p trailer (2026-10-08). The game itself is not played on it yet. See
+[Xavier NX checklist](#xavier-nx-checklist).
 
 ## The video stack
 
@@ -125,8 +127,19 @@ JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
 - NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` instead of `.../nvidia/` (the install and the
   self-test handle it). R35's Multimedia API already has `nvbufsurface.h`, so libnvmpi builds on the same NvUtils
   path (`WITH_NVUTILS`) as on the Orin, not on the legacy `nvbuf_utils` one.
-- The in-place reset (fix 1) may work on R35. Recreating the decoder still works there, so keep it.
 - The Xavier NX has fewer NVDEC sessions and less memory than the AGX Orin: check three screens decoding at once.
+
+**On the board** (Xavier NX Developer Kit, L4T R35.6.4, minimal image, no nvpmodel mode set: 6 CPUs at 1.9 GHz),
+`jetson_selftest.sh --stock` with `pup_pack/trn_174h/AttractMode/AttractMode-Trailer1.mp4` (1080p30 H.264):
+
+| Check | Patched | Stock jetson-ffmpeg `8d70c17` |
+|---|---|---|
+| flush (fix 1) | pass | hang (killed after 60 s): the in-place reset fails on R35 too |
+| close (fix 2) | 59 ms / 48 ms | 1086 ms / 24 ms (no packet / after 30 frames) |
+| crash (fix 3), 100 runs | 0 crashed | 0 crashed (the Orin: 9) |
+| concurrent (fix 4), 20 runs | 0 failed | 5 segfaults (the Orin hung instead) |
+
+So fixes 1, 2 and 4 are needed on JetPack 5 too; fix 3 is kept (no cost).
 
 **Checked without the board** (an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with L4T R35.4.1 and
 NVIDIA's r35.4 apt packages): the full Linux install (`install_prereqs_linux.sh --yes`) passes, including Python
