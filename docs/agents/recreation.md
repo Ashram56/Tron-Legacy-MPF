@@ -97,6 +97,10 @@ What the second game showed; read before porting a third.
 - **Godot imports CSVs as translations**: put a `.gdignore` in `game/config/` when CSVs live there.
 - Scenario runners carry Tron's switch numbers (VUK sw 11, opto sw 41): replace them with the new game's ball
   device holes.
+- **Leff table moved**: Transformers' leffs are in `rom_data/io/lamp_effects.csv` (columns `priority`, `loops`
+  = "yes" for until stopped, `run_ms`, `coils_pulsed`, `show`, `tag` = code for leffs drawn from game state with
+  no show); shows put flasher pulses under `coils:` with `pulse_ms`. Its traces log coil drivers raw (3-17 ms
+  slices), so drop Tron's 0.24 s coil hold (`COIL_OFF_DELAY`).
 
 ## 6. Tron status and open work
 
