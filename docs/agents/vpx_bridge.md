@@ -22,6 +22,10 @@ pieces under `game/tf/`, verified the same way (`tests/test_vpx.py`, `--check` a
 `vpx_table.py` on the v2.4 table); owner test on Windows not done yet. Its `vpx_bridge.py` and `vpx_table.py` are
 the **generic versions**: the game is one block of constants at the top of `vpx_bridge.py` (GAME, PROGID, CLSID,
 ENV, ROM_NAME), and the bridge handles both output modes (see section 4). Copy those, not Tron's, for a third game.
+Its one-line Windows installer (`scripts/install/install_prereqs_windows.ps1`, ported from Tron's) takes `-Vpx`
+(setup.py --vpx, then the COM registration, elevated with `Start-Process -Verb RunAs`) and `-Table <.vpx>` (writes
+the table's script), so the owner's whole Windows set-up is one line; dry-run it on Linux with PowerShell 7
+(`pwsh`, the linux-x64 tarball from PowerShell's GitHub releases) before handing it over.
 
 ## 2. Architecture
 
