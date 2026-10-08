@@ -111,6 +111,23 @@ What the second game showed; read before porting a third.
 - **Switch flags matter.** The captive ball (flags 0x1fff0000) runs its handler on both edges, 3 ticks after
   each. Mode-total deffs reload the ball-search countdown ([0x0100664c]), and a search near a drain delays the
   bonus.
+- **A captured deff starts its own leffs and sounds.** Calling `leff_start` too doubles them in the trace; a
+  helper that starts the rule's leff and first sound only when the capture lacks them (`os.deff_media`) fixes it.
+  Passing `sounds=` replaces the capture's sounds, so use it only for deffs with none. A deff with no capture
+  length never ends and blocks every lower one: give each such deff a length from the traces (`UNCAPTURED`).
+- **Show tasks**: a show ends when another effect replaces its deff; queueing a show task that is already playing
+  replaces it (BALL n LOCKED over the previous lock); a multiball intro waits on its own priority, not on the
+  show playing below it. The replay deff waits for a running award deff above 0x9f.
+- **Sound channels decide some rules.** The Allspark's warning 0x157 is refused while a higher priority sample
+  holds its channel (sample `mask` in samples.csv, low byte of the call's `flags_0x10`), and the ROM then ejects
+  at once after 937 retries (logged). Track the playing samples to know.
+- **MPF ball devices**: a ball that comes back while an eject is unconfirmed is a failed eject to MPF and goes
+  straight out again; keep `eject_timeouts` under the scenario's shortest return (1 s on the left eject, with
+  the ROM's 2 s device task kept in the rules) and lower `exit_count_delay` / `entrance_count_delay` to let a
+  lock release four balls 0.4 s apart. A ball hold must cover every ball the rules keep.
+- **Timers that pause**: the combo window does not count while the eject holds a ball ([0x0103a4f0(3)]).
+- Do not give a feature an attribute and a method of the same name (`side_super`): Python replaces the method
+  silently and the hook dies with "int is not callable" deep in a scenario.
 
 ## 6. Tron status and open work
 
@@ -127,4 +144,4 @@ coin door and in-game service (PR #17). Open:
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
 
-Last updated 2026-10-08 (section 5: Transformers Pro, battles).
+Last updated 2026-10-08 (section 5: Transformers Pro, battles, multiballs and wizard modes).
