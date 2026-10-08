@@ -5,6 +5,9 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 [Ashram56/Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption). It runs on
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
+**Working with Claude, or rebuilding another Stern SAM game this way?** Start at the
+[master plan](docs/agents/README.md): what to provide (ROM, VPX table) and the agents that do the work.
+
 ## Install
 
 Run the line for your OS in a terminal. It installs what is missing (Git, Python 3.11, the libraries), clones
