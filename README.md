@@ -119,6 +119,7 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/development.md](docs/development.md): the workspace in detail (layout, setup options, running by hand,
   tests and checks, the asset sync).
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
+- [docs/install_findings.md](docs/install_findings.md): what testing the one-line installers found (tokens, Windows, Linux arm64).
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
