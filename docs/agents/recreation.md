@@ -69,7 +69,36 @@ the [VPX bridge agent](vpx_bridge.md); the MPF Monitor layout comes from the [VP
   shot; Sea of Simulation stages played by their shots pay the shot value, not the stage million. Both are
   in `rom_differences.md`; future owner reports may be the same kind.
 
-## 5. Tron status and open work
+## 5. Starting a second game (Transformers Pro 1.80, 2026-10-08)
+
+What the second game showed; read before porting a third.
+
+- **Start from the Tron OS, not from scratch.** Compare the new ROM's OS tables with Tron's first (A's
+  `rom_map.json` table registry): on tf_180, deffs 1-39, leffs 1-19, sound calls 0x001-0x019, adjustments 1-64
+  and the audit counter ids have Tron's numbers, priorities and flags. Copy `game/tron` as `game/<tag>` with a
+  rename (`tron` -> tag, `TronOS`, event prefix, env vars), keep the OS modules, and isolate every game value
+  (start/shoot-again lamps, music and speech calls, game-over leff) in one `GAME` dict set to `None` until A's
+  specs say otherwise. The machine boots and plays a full game on virtual hardware in a few hours that way;
+  the boot test (`tests/test_boot.py` in Transformers-MPF) is the first test to write. [code]
+- **One repository** works: A in `rom/`, B in `game/monitor/` + `docs/vpx/`, C everywhere else. Merge A's and
+  B's branches into C's (the first merge needs `--allow-unrelated-histories`); re-merge as they push.
+- **Dedicated switches** come numbered 129-160 in A's package (128 + n): `gen_config.py` turns them into "D<n>".
+- **Read what A has not packaged yet from the ROM yourself**, as interim files under `game/config/interim/`
+  with a generator that needs `TF_ROM` (adjustments, audits, deff and leff tables, the font table), and let the
+  build prefer A's files when they land. It keeps C unblocked without guessing.
+- **Fonts are ROM data**: the font table gives every glyph's image and x/y offsets, so `gen_fonts.py` builds
+  BMFonts straight from `fonts.json` (Tron had to rebuild offsets from captures).
+- **A's per-deff `timing.json` carries every text draw** (`pages[].texts`: string, font, x, y, flags, return
+  address) and image draw. The score display's layout comes from there, not from guesses; the status panel is
+  found by its draw call's return address (`216cc` on tf_180). TF's DMD has a Tron-like status panel (columns
+  0-40, separator at 40).
+- **Music loops**: A exports intro + looped body as one WAV with `loop_start_at`; write a RIFF `smpl` loop into
+  the copied WAV and Godot's importer loops only the body.
+- **Godot imports CSVs as translations**: put a `.gdignore` in `game/config/` when CSVs live there.
+- Scenario runners carry Tron's switch numbers (VUK sw 11, opto sw 41): replace them with the new game's ball
+  device holes.
+
+## 6. Tron status and open work
 
 Built: phases 1-10 (PRs #1-#8), the hardware overlays (P-ROC, virtual + MPF Monitor, VPX), Pro/LE,
 coin door and in-game service (PR #17). Open:
@@ -84,4 +113,4 @@ coin door and in-game service (PR #17). Open:
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
 
-Last updated 2026-10-08.
+Last updated 2026-10-08 (section 5: Transformers Pro).
