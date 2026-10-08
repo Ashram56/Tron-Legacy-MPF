@@ -128,6 +128,11 @@ What the second game showed; read before porting a third.
 - **Timers that pause**: the combo window does not count while the eject holds a ball ([0x0103a4f0(3)]).
 - Do not give a feature an attribute and a method of the same name (`side_super`): Python replaces the method
   silently and the hook dies with "int is not callable" deep in a scenario.
+- **Read the gate, not its name.** A decompile name can say the opposite of the code (Transformers'
+  `any_timed_mode_running` 0x01006704 tests the multiball flags); ask A for the flag list behind every
+  "multiball / timed mode" condition and check it against a trace where only one of them runs.
+- **The shaker** belongs to the deff, not the rule: run it when the deff gets the display (A's `shaker.csv`:
+  deff, pattern, minimum adj level), never when the rule requests it; a new run never cuts a longer one short.
 
 ## 6. Tron status and open work
 
