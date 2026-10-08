@@ -133,6 +133,13 @@ What the second game showed; read before porting a third.
   "multiball / timed mode" condition and check it against a trace where only one of them runs.
 - **The shaker** belongs to the deff, not the rule: run it when the deff gets the display (A's `shaker.csv`:
   deff, pattern, minimum adj level), never when the rule requests it; a new run never cuts a longer one short.
+- **Ball search timing is a reload hunt.** Each search that lands at the wrong time is a missing or extra
+  reload: look 10 s before the ROM's search for the event that reloaded it, then grep the decompile for the
+  reload function's callers (Transformers: score, playfield switches, each show task at queue/start/end, the
+  mode totals, FUN_01006350 deffs; flipper buttons pause it; a scoop eject does not reload). Compare the
+  kicker coil runs per trace (on times, ref vs ours) once scores match: they show every search.
+- **Ball end clears the display, the ROM does not always.** A mode total on screen at the drain plays out
+  before the ball-end total shows again (Transformers fast scoring deff 137); time it from its start.
 
 ## 6. Tron status and open work
 
@@ -149,4 +156,4 @@ coin door and in-game service (PR #17). Open:
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
 
-Last updated 2026-10-08 (section 5: Transformers Pro, battles, multiballs and wizard modes).
+Last updated 2026-10-08 (section 5: Transformers Pro, battles, multiballs, wizard modes, ball search).
