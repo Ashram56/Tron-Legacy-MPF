@@ -14,7 +14,7 @@ page is what an agent needs to continue the work. Labels: **verified** (run), **
 | MPF side `game/tron/vpx_hardware.py` | built, unit-tested |
 | COM bridge `scripts/vpx_bridge.py` (`TronMPF.Controller`) | built; `--check` (its client without COM) verified on Linux against the real game |
 | Script override `scripts/vpx_table.py` | verified on the VPW v1.1 table: one loader line changed, one KeyDown line added, the rest byte for byte |
-| `run.py --hw vpx`, `setup.py --vpx` | built |
+| `run.py --hw vpx`, `setup.py --vpx` | built; the one-line Windows set-up (`-Vpx -Table`) is the [packaging agent](packaging.md)'s, built on Transformers, not yet on Tron |
 | **The table in VPX on Windows** | **owner test, outcome not reported yet** (merged in PR #10, 2026-10-04). Start here: ask the owner for the result of the checklist in docs/vpx.md "To check on Windows" and `game\logs\vpx_bridge.log`. |
 
 ## 2. Architecture
@@ -73,6 +73,8 @@ The ball devices count the table's own trough (18-21), shooter lane (23) and VUK
 4. Generalise what is Tron-specific in `vpx_bridge.py` (ProgID `TronMPF.Controller`, env names) and
    `vpx_hardware.py` (tube lamps, coin door mask) before reusing them.
 5. Check the MPF config repo is reachable before mapping (a stale local copy maps wrong numbers).
+6. Hand the set-up steps (bridge packages, COM registration, the table's `.vbs`) to the
+   [packaging agent](packaging.md), which puts them in the Windows installer's `-Vpx` option.
 
 ## 5. Open items
 
