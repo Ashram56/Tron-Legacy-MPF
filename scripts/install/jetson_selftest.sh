@@ -132,7 +132,7 @@ run_checks() {
     if [ "$DRY" = 0 ]; then
         if [ "$RESULT" = pass ]; then
             local slow
-            slow="$(awk '/^close after/ { gsub(/ ms/, "", $NF); if ($NF + 0 >= 300) print }' "$LOGS/close.log")"
+            slow="$(awk '/^close after/ && $NF == "ms" && $(NF - 1) + 0 >= 300' "$LOGS/close.log")"
             [ -z "$slow" ] || RESULT="slow: $(grep '^close after' "$LOGS/close.log" | tr '\n' ';')"
         fi
         note "close:      $RESULT $(grep '^close after' "$LOGS/close.log" 2>/dev/null | sed 's/close after //' | tr '\n' ' ')"
