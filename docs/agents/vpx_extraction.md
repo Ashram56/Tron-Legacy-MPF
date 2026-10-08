@@ -71,9 +71,12 @@ Transformers Pro (verified 2026-10-08 on `Transformers Pro (Stern 2011) v.2.4.vp
 
 ```
 python scripts/vpx_extract.py "Transformers Pro (Stern 2011) v.2.4.vpx" out
-python scripts/vpx_map.py out --mech 43:opr,44:opr
+python scripts/vpx_map.py out --names rom/mpf_package/config/{switches,lights,coils}.yaml --mech 43:opr,44:opr
 ```
 
+- With the ROM extraction's config (`rom/mpf_package/config/` in the game repo) every placed device is named;
+  the ROM confirms 15/16 are the tournament/start buttons, lamps 1/2 their lamps, lamp 56 unused, 43/44
+  Optimus Prime up/down. The ROM's "slingshot left" flasher (26) is the table's right-side dome.
 - Bounds 0, 0, 952, 2164; playfield `pf` 3608x8192 (GameData IMAG); 386 images; 1,106 items; 31 collections;
   `script.vbs` 4,891 lines; `switches_all.csv` 529 rows, `lights_all.csv` 251.
 - 42 switches: 1-8, 10-14, 18-32, 34, 35, 37-41, 43-46, 49-51 (trough 18-21 cvpmTrough at `BallRelease`,
