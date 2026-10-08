@@ -18,11 +18,13 @@ the worked example (this repo).
 | Lights | lamp states, lamp-matrix effects (captured and code-drawn), flashers, GI, game-specific outputs (Tron: RGB ramp tubes), shaker |
 | Service | **service menu reached as on the machine** (coin door buttons BACK, MINUS, PLUS, SELECT), every adjustment with the ROM's labels, defaults and ranges, audits with their formulas, credits and pricing tables, high scores, coin door open / interlock behaviour, tests the menu offers |
 | Hardware overlays | virtual (desktop + MPF Monitor), the real machine (Tron: P-ROC on the SAM boards), every model of the game (Tron: Pro default, LE), the ROM's coil drive times |
-| Portability | one setup script on Windows, macOS, Linux; installers; CI |
 
 **Out**: anything that changes what the player sees or hears compared with the ROM (HD display, other fonts,
 colour, glow, new modes, rule changes) belongs to the [improvement agent](improvement.md). The VPX bridge is
-the [VPX bridge agent](vpx_bridge.md); the MPF Monitor layout comes from the [VPX extraction agent](vpx_extraction.md).
+the [VPX bridge agent](vpx_bridge.md); the MPF Monitor layout comes from the [VPX extraction agent](vpx_extraction.md);
+installing and starting the game on each platform (`setup.py`, `run.py`, the installers, Docker, CI) is the
+[packaging agent](packaging.md). C adds a `run.py` or `setup.py` option for its own features (a hardware
+overlay, a model) and tells the packaging agent, which carries it to every installer.
 
 ## 2. Read, in this order
 
@@ -59,11 +61,9 @@ the [VPX bridge agent](vpx_bridge.md); the MPF Monitor layout comes from the [VP
   flashers 19/25, lower flashers 22/23 fired with them). docs/hardware.md "Pro or LE". [SAM]
 - **Asset sync**: a scheduled job opens "Sync assets to <sha>" PRs; run setup, the render check and the tests
   on it, then the owner merges. [Tron]
-- **Installers and private repositories**: check read access anonymously first, then ask for a fine-grained
-  token (Contents read-only); never open Git Credential Manager's window; a clone whose branch was deleted
-  moves to `main`. Windows PowerShell 5.1 turns git's stderr into a terminating error: test exit codes only.
-- **OneDrive**: deletes and renames fail transiently; every build-time file operation goes through
-  `scripts/fsutil.py`. Keep the install folder out of OneDrive.
+- **OneDrive**: deletes and renames fail transiently; every build-time file operation (generators included)
+  goes through `scripts/fsutil.py`. Installer lessons (private repositories, PowerShell 5.1) are in
+  [packaging.md](packaging.md).
 - **CI runs only on pushes to `main`**: test locally before pushing a branch, don't wait on CI there.
 - **Answers that matched the ROM** (check before "fixing"): Disc Multiball "JACKPOT" screen on every blue
   shot; Sea of Simulation stages played by their shots pay the shot value, not the stage million. Both are
