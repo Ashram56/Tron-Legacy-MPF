@@ -38,7 +38,10 @@ You can change where the files go, and what is installed:
   updated with `git pull --ff-only` instead.
 - **Private repositories:** if the assets (or the game) repository is private, the installer asks first for a
   GitHub token that can read it (github.com > Settings > Developer settings > Personal access tokens; a
-  fine-grained token with Contents: read-only), instead of a password. Or set `TRON_GITHUB_TOKEN` before the line.
+  fine-grained token with Contents: read-only), instead of a password, and uses it only for the private ones. On
+  Windows, paste it with a right-click: Ctrl+V does not paste into the hidden prompt. Or give it before the line,
+  so nothing is asked: Windows `$env:TRON_GITHUB_TOKEN = "github_pat_..."` first, macOS / Linux
+  `TRON_GITHUB_TOKEN=github_pat_... bash <(curl ...)`.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
   `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.

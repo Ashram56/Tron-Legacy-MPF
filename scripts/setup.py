@@ -74,7 +74,9 @@ class Setup:
         if getattr(self.args, "vpx", False):
             reqs += tc.VPX_REQUIREMENTS
         if not os.path.exists(py) or self.dry:
-            self.run([sys.executable, "-m", "venv", tc.venv_dir()])
+            # a .venv whose Python is gone (the interpreter it was made from was removed or replaced) is remade
+            clear = ["--clear"] if not os.path.exists(py) and os.path.isdir(tc.venv_dir()) else []
+            self.run([sys.executable, "-m", "venv"] + clear + [tc.venv_dir()])
         missing = self.dry or (not os.path.exists(mpf) or self.args.upgrade
                                or (self.args.monitor and not self.has_module(py, "mpfmonitor"))
                                or not self.has_module(py, "fontTools")

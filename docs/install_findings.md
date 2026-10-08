@@ -2,9 +2,8 @@
 
 What running the one-line install commands (README, "Install") taught us, for the core game only. The fixes
 were made and tested in the PuP fork's copy of `scripts/install/` (the fork adds a PuP repository and Jetson
-video decoding, which are left out here). Each item says whether this repository's scripts already have it.
-
-Status: **here** (in this repository's scripts), **not yet** (fixed in the fork, still to port).
+video decoding, which are left out here). All of them are now
+in this repository's scripts too.
 
 Last updated 2026-10-08.
 
@@ -16,7 +15,7 @@ Last updated 2026-10-08.
 | macOS | `bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_macos.sh)` |
 | Linux | `bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_linux.sh)` |
 
-Environment variables read before the line (**here**):
+Environment variables read before the line:
 
 - `TRON_DIR`: install folder (default `~/Tron-Legacy-MPF`, `%USERPROFILE%\Tron-Legacy-MPF`; keep it out of OneDrive).
 - `TRON_BRANCH`, `TRON_REPO`: branch and repository to clone. A folder that already holds a clone is updated
@@ -37,9 +36,9 @@ The one-liner itself only works when this repository is public: `curl`/`irm` get
 raw file. With a private repository, clone first (README, "Clone first"). The token step then covers the clone
 and the assets submodule.
 
-This repository's installers have the **first version** of the token step: one token, written into git's
-`url.insteadOf` for all of `https://github.com/`, checked against the assets repository only. Testing found
-these problems, all fixed in the fork (**not yet** here):
+The first version of the token step wrote one token into git's `url.insteadOf` for all of `https://github.com/`
+and checked it against the assets repository only. Testing found these problems (fixed in
+`scripts/install/install_prereqs_{linux,macos}.sh` and `install_prereqs_windows.ps1`):
 
 1. **Token only for the private repositories.** A token that cannot read a public repository (a fine-grained token
    scoped to other repositories, an expired one) made git fail on that public repository, because the
@@ -63,30 +62,28 @@ these problems, all fixed in the fork (**not yet** here):
    current session's PATH does not have it, and `setup.py` (which runs `git` for the submodules) failed. Fix: add
    Git's folder to `$env:Path` for the session.
 
-Note: `Tron-Legacy-MPF-Private`'s own installers take the token step from the fork, not from here.
-
 ## Linux, Python and the venv
 
-- **apt-cache and pipefail** (**here**): under `set -o pipefail`, `apt-cache ... | grep -q` fails when `grep` exits
+- **apt-cache and pipefail**: under `set -o pipefail`, `apt-cache ... | grep -q` fails when `grep` exits
   early and `apt-cache` gets SIGPIPE. Capture the output in a variable first, then test it.
-- **Python 3.11 order** (**here**): the distribution's package, else the deadsnakes PPA on Ubuntu, else a
+- **Python 3.11 order**: the distribution's package, else the deadsnakes PPA on Ubuntu, else a
   standalone build from uv (no compiler, nothing system-wide; also the only route on Arch).
-- **deadsnakes failure must fall back to uv** (**not yet**): `set -e` is off inside a function called with `||`,
+- **deadsnakes failure must fall back to uv**: `set -e` is off inside a function called with `||`,
   so a failed `add-apt-repository` went on, and on Ubuntu 22.04 apt then installed the distribution's own
   `python3.11` (a 3.11.0 release candidate). Fix: `|| return 1` after `add-apt-repository`, then `apt-get update`
   and check that the PPA's python3.11 is now offered, else return 1 so uv takes over.
-- **Dead `.venv` is remade** (**not yet**, `scripts/setup.py`): when the Python a `.venv` was made from is removed
+- **Dead `.venv` is remade** (`scripts/setup.py`): when the Python a `.venv` was made from is removed
   or replaced (a deadsnakes or uv interpreter swapped), `.venv/bin/python` is a broken link and setup failed.
   Fix: if the venv folder exists but its python does not, run `python -m venv --clear`.
-- **MPF Monitor on Linux arm64** (**not yet**, `scripts/toolchain.py`): PyQt6 6.8 and later ship arm64 wheels for
+- **MPF Monitor on Linux arm64** (`scripts/toolchain.py`): PyQt6 6.8 and later ship arm64 wheels for
   glibc 2.39+ only (Ubuntu 24.04). On older systems (JetPack 5: glibc 2.31, JetPack 6: 2.35) pip falls back to the
   source package, which needs qmake and fails. Fix: add `PyQt6>=6.4.2,<6.8` for `linux`/`aarch64` to
   `MONITOR_REQUIREMENTS`, and leave the monitor out (with a note) when glibc is older than 2.28.
-- **libdecor on Ubuntu 20.04** (**not yet**): `libdecor-0-0` (Wayland window decorations, optional for Godot) does
+- **libdecor on Ubuntu 20.04**: `libdecor-0-0` (Wayland window decorations, optional for Godot) does
   not exist in 20.04 / JetPack 5. Skip it there instead of failing the apt step.
 
 ## Jetson boards
 
 The core game runs on a Jetson (Ubuntu for arm64) with the Linux line above, given the arm64 items in the section
-before. What the fork's Jetson work adds beyond that (NVIDIA hardware video decoding, L4T package pinning,
+before (MPF Monitor needs the PyQt6 pin). What the fork's Jetson work adds beyond that (NVIDIA hardware video decoding, L4T package pinning,
 several video windows) is for PuP videos and is documented in the fork, not here.
