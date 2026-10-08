@@ -24,7 +24,7 @@ instrumented PinMAME. Every fact tagged observed / code / inferred with its ROM 
 
 | Agent | Reads |
 |---|---|
-| [C, strict recreation](recreation.md) | everything; the traces are its acceptance test. Its feedback: [rom_decomp_feedback.md](../handover/rom_decomp_feedback.md) (now folded into `AGENTS.md` section 14). |
+| [C, strict recreation](recreation.md) | everything; the traces are its acceptance test. Its feedback is `AGENTS.md` section 14; [rom_decomp_feedback.md](../handover/rom_decomp_feedback.md) is the dated record it came from. |
 | [B, VPX extraction](vpx_extraction.md) | `mpf_package/config/switches.yaml`, `lights.yaml`, `coils.yaml` for device names by number |
 | [D, VPX bridge](vpx_bridge.md) | the IO tables with PinMAME's numbers next to the ROM's (`AGENTS.md` section 14, item 13) |
 | [E, improvements](improvement.md) | fonts, per-frame text draws in the captures, all ROM images |
@@ -32,4 +32,5 @@ instrumented PinMAME. Every fact tagged observed / code / inferred with its ROM 
 ## Tron status
 
 Done for Tron Legacy LE 1.74 (`trn_174h`) and ported to Pro 1.74 (`trn_17402`); the game repo pins it as a
-submodule and a sync job opens a PR when it moves. Last updated 2026-10-08.
+submodule and a sync job opens a PR when it moves. Transformers Pro 1.80 (`tf_180`) was the second game taken
+apart with `AGENTS.md`; what it taught is merged into that file. Last updated 2026-10-08.

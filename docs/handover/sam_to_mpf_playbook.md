@@ -7,7 +7,7 @@ file paths in `code` are that repo's, use them as templates). Facts are tagged w
 
 ## 1. Inputs and target
 
-Inputs, from a ROM-decompilation repo (see `rom_decomp_feedback.md` for what it should contain):
+Inputs, from a ROM-decompilation repo (what it should contain: the ROM extraction agent's `AGENTS.md`, section 14):
 rules specs per mode, annotated decompiled C, an MPF config package (switches, coils, lights, settings,
 shows, sounds), DMD media (frames, timing, reference captures, `rom_images_all.zip`), IO tables,
 sound-call tables, and **reference traces**: scenario scripts replayed in an instrumented PinMAME,

@@ -9,7 +9,7 @@ your task needs.
 |---|---|---|
 | [sam_to_mpf_playbook.md](sam_to_mpf_playbook.md) | You build or maintain an MPF recreation of **any** Stern SAM game from ROM-derived specs. Architecture, build order, verification loop and every gotcha that cost real time. Game agnostic; Tron is only the worked example. | ~15 min |
 | [dmd_hd_upscaling.md](dmd_hd_upscaling.md) | You work on the optional HD display (128x32 DMD drawn at any window size). Separate from the rules work on purpose. | ~5 min |
-| [rom_decomp_feedback.md](rom_decomp_feedback.md) | Hand this to the agent that decompiles the ROM and produces the asset/spec repo. What the MPF build consumed, what was missing or wrong, and what to deliver for the next game. | ~8 min |
+| [rom_decomp_feedback.md](rom_decomp_feedback.md) | You want the history of what the Tron MPF build had to recover or guess from the asset repo. A dated record: the ROM extraction agent's instructions and deliverables live in its own [`AGENTS.md`](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption/blob/main/AGENTS.md) (section 14). | ~4 min |
 
 ## Token rules for the agent taking over
 

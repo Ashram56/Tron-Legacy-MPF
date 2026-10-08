@@ -1,25 +1,15 @@
-# For the ROM-decompilation agent: what the MPF build needed from your repo
+# ROM extraction feedback from the Tron MPF build (record)
 
-Audience: the agent that decompiled Tron Legacy LE v1.74 (`trn_174h`) and produced
+Written in 2026-10 for the agent that decompiled Tron Legacy LE v1.74 (`trn_174h`) and produced
 `Ashram56/Tron-Legacy-LE-ROM-Decryption`. The MPF recreation (`Ashram56/Tron-Legacy-MPF`) consumed it as a
-submodule. This lists what worked, what the build had to reverse-engineer again or guess, and the
-deliverable list for the next Stern SAM game. Facts are as of the submodule pin `e712f62` (2026-10-04).
+submodule. This is the record of what the build had to reverse-engineer again or guess. Facts are as of the submodule pin `e712f62` (2026-10-04).
 
-## 1. What worked: keep doing it
+**This is a dated record, not instructions.** What worked and the deliverable list for the next SAM game
+were folded into the ROM extraction agent's own file, [`AGENTS.md` section 14](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption/blob/main/AGENTS.md#14-deliverables-checklist-for-the-next-sam-game),
+which is the one to read and update. Every gap below was then extracted into the asset repo's `rom_data/`
+(its `README.md` maps each gap to its file and lists what is still open).
 
-- **Reference traces + compare tool** (`rules/traces/*.txt|.jsonl`, `rules/tools/trace/`). The single most
-  valuable asset: every rules feature was accepted only when its trace matched. The scenario language
-  (`start`, `hit`, `wait`, `mark`, `adj`) was easy to replay on MPF.
-- **ROM addresses everywhere** (task ids, function addresses, table addresses) in specs and in
-  `tron_game_decompiled_v2.c`: every dispute was settled by a grep.
-- **Fact tags** (observed / code / inferred) and the **conflict rule** (rules spec wins on rules, package
-  wins on media and names).
-- **Read order** in `rules/README.md` → `developer_guide.md` → `modes/`, and the "do not build unreachable
-  code" list.
-- `rom_images_all.zip` (all ROM images): enough to rebuild all 44 fonts and the service menu icons.
-- One sound pool per ROM sound call; `timing.json` per deff; `reference_capture.gif` per deff.
-
-## 2. Missing data the build had to recover or guess
+## 1. Missing data the build had to recover or guess
 
 Ordered by impact. "Recovered" means rebuilt from code or captures, at real cost; "guessed" means still unverified.
 
@@ -38,7 +28,7 @@ Ordered by impact. "Recovered" means rebuilt from code or captures, at real cost
 | 11 | Coin door and aux-bus facts: tube strobe 0x10 left or right (your console vs PinMAME disagree); GI latch bit polarity at power-up; DED 22/23 Minus/Plus | Followed PinMAME's input port; tubes off on P-ROC until checked | Unverified |
 | 12 | Multi-player behaviour, rare late states (Sea of Simulation stages 4-8, match odds, slam tilt) | Read from code only | Untraced |
 
-## 3. Package defects found (fix at the source)
+## 2. Package defects found (fix at the source)
 
 - Generated MPF YAML has no `#config_version=6` header (MPF refuses it); the build adds it.
 - `event_map.csv` `mode_by_code_location` is often wrong.
@@ -49,27 +39,3 @@ Ordered by impact. "Recovered" means rebuilt from code or captures, at real cost
   next agent does not work around problems that are gone.
 - Package `leff_NNN` are ramp **tube shows**, not lamp-matrix leffs; naming them `tube_show_NNN` would avoid the mix-up.
 - Unverified in MPF: shaker gating by settings, music looping, `settings.yaml` defaults.
-
-## 4. Deliverables for the next SAM game (machine-readable first)
-
-Prose specs are read once; tables are read by code on every build. For each item give the ROM address it
-came from and an observed/code/inferred tag.
-
-1. **IO**: switches (matrix + dedicated D1-D24), coils with **decoded pulse/hold times**, lamps, flashers,
-   aux-bus outputs; one CSV each, SAM numbers, no duplicate names.
-2. **Fonts**: the font table as JSON (ranges, glyph image id, x/y offset, height, spacing per font).
-3. **Deffs**: one row per deff: priority, run length, background flag, hold, function address, screens
-   (selector → draw calls with font/font list, flags, x, y, format string, argument sources), the leffs,
-   tube shows and sounds it starts with their offsets, randomised parts and their RNG source.
-4. **Leffs**: the lamp-matrix table with each effect's priority and lamp group, and for code-drawn leffs
-   the function and a short pseudo-code; lamp groups as lists.
-5. **Sounds**: call → samples, track (voice/sfx/music), loop flag, channel-stop calls; export every stream.
-6. **Settings**: adjustments (number, name, default, range, value labels, reader address), audits with
-   formulas, pricing tables, the service menu tree with every message text.
-7. **OS model**: tick length, task id names, switch → hook order, show queue thresholds, deff rule and
-   lamp rule lists. These made or broke trace matches.
-8. **Traces**: one per mode as today, plus multi-player, tilt/slam, every random branch (seeded or
-   forced), and lamp + coil events in every trace. Name the RNG and how a scenario forces it.
-9. **Captures**: per deff, the args/RNG that produced it, one run only, and the status-panel region, so a
-   rebuild can compare the rest dot by dot.
-10. Valid MPF YAML (header, unique keys) and a CI check that loads it with `mpf`.

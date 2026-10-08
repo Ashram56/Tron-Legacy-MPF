@@ -73,7 +73,7 @@ plan in the game repository), as it also does in a cloud session that has the re
 
 Reference docs the agents share (not agents themselves): [sam_to_mpf_playbook.md](../handover/sam_to_mpf_playbook.md)
 (how C builds), [dmd_hd_upscaling.md](../handover/dmd_hd_upscaling.md) (how E's HD display works),
-[rom_decomp_feedback.md](../handover/rom_decomp_feedback.md) (what C needed from A),
+[rom_decomp_feedback.md](../handover/rom_decomp_feedback.md) (record of what C needed from A; now in A's `AGENTS.md` section 14),
 [rom_differences.md](../rom_differences.md) (every departure from the ROM), [vpx.md](../vpx.md) (VPX set-up for players).
 
 ## 3. Order
