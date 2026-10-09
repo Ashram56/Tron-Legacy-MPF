@@ -104,6 +104,22 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
   leaves them), and `run.py` runs `xset s off -dpms`. Without both, the screen went black after 5 minutes.
 - GDM automatic login and an X11 session (Godot places one window per monitor only on X11): [pup.md](pup.md).
 
+### 9. 5 FPS on the Xavier NX (libnvmpi, GoZen player script, PuP windows)
+Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as installed, 55.5 FPS (median frame
+16.67 ms, GPU 32%, 7.3 W) with all three fixes. Without the PuP it already ran at 56 FPS.
+- **libnvmpi:** each frame mapped and unmapped every plane of its buffer for the CPU, about 11 ms of kernel time per
+  1080p frame on R35. Now a buffer's planes are mapped once and unmapped when the buffer is destroyed
+  (`nvmpi_flush.patch`): decode 74 -> 203 fps, CPU 17 -> 4 ms per frame.
+- **`video_playback.gd`:** the next frame is decoded on a worker task, one frame ahead, so Godot's main thread only
+  uploads it; a frame not ready yet is shown late instead of waited for. Before, three videos decoding on the main
+  thread fell behind, and the catch-up decoding made it worse.
+- **`pup_player.gd`:** vsync stays on the backglass window only. On the R35 X11 Vulkan driver each vsync'd window
+  waits for its own vertical blank, so four windows made every frame four refreshes long (67 ms). The DMD and
+  topper windows can tear in principle; they redraw every frame anyway.
+- **Audio (Xavier NX devkit):** the system ALSA default (`/etc/asound.conf`) is the APE I2S card, which has nothing
+  connected, so Godot fell back to no sound. A `~/.asoundrc` sending the default to HDMI (`hw:HDA,7` through dmix)
+  fixes it; the install does not write it yet.
+
 ## Known leftovers
 - A recreated decoder can lose up to about 10 trailing frames when it drains at the end of a video.
 - About every 10 to 20 s, around a video switch, the game hitches for about 0.1 s. The same happens with

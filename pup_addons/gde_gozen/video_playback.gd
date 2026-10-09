@@ -76,6 +76,8 @@ var _video_thread: int = -1
 var _opened_audio: AudioStreamFFmpeg = null ## Opened by _open_video() on the worker thread, set on the main one.
 var _release_tasks: Array[int] = [] ## Worker tasks freeing closed videos (see close()).
 var _restart_thread: int = -1 ## Worker task seeking back to the first frame (see restart()).
+var _decode_task: int = -1 ## Worker task decoding the next frame to show (see _process()).
+var _ahead_frame: int = 0 ## The frame the decoded-ahead data is (or, while _decode_task runs, will be).
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
 var _ignore_path_setter: bool = false
@@ -193,6 +195,7 @@ func _update_video(new_video: GoZenVideo) -> void:
 
 	is_playing = false
 	current_frame = 0
+	_ahead_frame = 0
 
 	# Getting video data
 	_padding = video.get_padding()
@@ -270,7 +273,9 @@ func seek_frame(new_frame_nr: int) -> void:
 	if !is_open() and new_frame_nr == current_frame:
 		return
 
+	_wait_decode()
 	current_frame = clamp(new_frame_nr, 0, _frame_count)
+	_ahead_frame = current_frame
 	if video.seek_frame(current_frame):
 		printerr("Couldn't seek frame!")
 	else:
@@ -284,7 +289,9 @@ func seek_frame(new_frame_nr: int) -> void:
 
 ## Seeking frames can be slow, so when you just need to go a couple of frames ahead, you can use next_frame and set skip to false for the last frame.
 func next_frame(skip: bool = false) -> bool:
+	_wait_decode()
 	var success: bool = video.next_frame(skip)
+	_ahead_frame = current_frame
 	if success and !skip:
 		_set_frame_image()
 		next_frame_called.emit(current_frame)
@@ -301,6 +308,7 @@ func close() -> void:
 	if _restart_thread != -1:
 		WorkerThreadPool.wait_for_task_completion(_restart_thread)
 		_restart_thread = -1
+	_wait_decode()
 
 	if video != null:
 		if is_playing:
@@ -326,41 +334,48 @@ func _process(delta: float) -> void:
 		WorkerThreadPool.wait_for_task_completion(_restart_thread)
 		_restart_thread = -1
 		current_frame = 0
+		_ahead_frame = 0
 		_time_elapsed = 0.0
 		_set_frame_image()
 		play()
 		return
 
 	if is_playing:
-		_skips = 1
+		# Frames are decoded one ahead on a worker thread (_decode_ahead()), so the main thread only uploads them:
+		# decoding three 1080p videos on it took most of every frame on a Jetson Xavier NX, and once behind, the
+		# catch-up decoding made it worse (5 FPS). A frame that is not ready yet is shown late instead of waited for.
 		_time_elapsed += delta
 		if _time_elapsed < _frame_time:
 			return
-
-		if _time_elapsed >= _frame_time:
-			var frames: int = roundi(_time_elapsed / _frame_time)
-			_skips = int(frames)
-
-		_time_elapsed -= _skips * _frame_time
-		current_frame += _skips
-
+		if _decode_task != -1:
+			if not WorkerThreadPool.is_task_completed(_decode_task):
+				return
+			WorkerThreadPool.wait_for_task_completion(_decode_task)
+			_decode_task = -1
 		var eof_reached: bool = false
-
-		if _frame_count > 0 and current_frame >= _frame_count:
-			eof_reached = true
+		if _ahead_frame <= current_frame:
+			# nothing decoded ahead yet (playback just started, or the end is reached)
+			if _frame_count > 0 and current_frame + 1 >= _frame_count:
+				eof_reached = true
+			else:
+				_start_decode(current_frame + maxi(1, floori(_time_elapsed / _frame_time)))
+				return
 		else:
+			_skips = _ahead_frame - current_frame
+			_time_elapsed = maxf(_time_elapsed - _skips * _frame_time, 0.0)
+			current_frame = _ahead_frame
+			_set_frame_image()
+			next_frame_called.emit(current_frame)
 			if enable_audio:
 				_sync_audio_video()
-			if _skips > _frame_rate:
-				seek_frame(current_frame)
-			else:
-				while _skips != 1:
-					if not next_frame(true):
-						eof_reached = true
-						break
-					_skips -= 1
-				if not eof_reached and not next_frame():
-					eof_reached = true
+			# the next frame due, further on when this one came late
+			var target: int = current_frame + 1 + floori(_time_elapsed / _frame_time)
+			if _frame_count > 0 and target >= _frame_count:
+				target = _frame_count - 1
+			if target > current_frame:
+				_start_decode(target)
+			elif _frame_count > 0 and current_frame + 1 >= _frame_count:
+				eof_reached = current_frame + 1 >= _frame_count and _time_elapsed >= _frame_time
 		if eof_reached:
 			is_playing = !is_playing
 			if enable_audio and audio_player.stream != null:
@@ -395,12 +410,44 @@ func restart() -> void:
 		return
 	if is_playing:
 		pause()
+	_wait_decode()
 	_restart_thread = WorkerThreadPool.add_task(_seek_start)
 
 
 func _seek_start() -> void:
 	if video.seek_frame(0):
 		printerr("Couldn't seek frame!")
+
+
+## Starts decoding up to [param target] on a worker thread (_process() shows it when it is due).
+func _start_decode(target: int) -> void:
+	var count: int = target - current_frame
+	_ahead_frame = target
+	if count > _frame_rate:
+		_decode_task = WorkerThreadPool.add_task(_decode_seek.bind(target))
+	else:
+		_decode_task = WorkerThreadPool.add_task(_decode_ahead.bind(count))
+
+
+## On a worker thread: decodes [param count] frames, keeping the image of the last one.
+func _decode_ahead(count: int) -> void:
+	for i: int in range(count - 1):
+		video.next_frame(true)
+	video.next_frame(false)
+
+
+## On a worker thread: far behind, seeks instead.
+func _decode_seek(target: int) -> void:
+	if video.seek_frame(target):
+		printerr("Couldn't seek frame!")
+
+
+func _wait_decode() -> void:
+	if _decode_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_decode_task)
+		_decode_task = -1
+	if _ahead_frame > current_frame:
+		_ahead_frame = current_frame
 
 
 ## Start the video playback. This will play until reaching the end of the video and then pause and go back to the start.
