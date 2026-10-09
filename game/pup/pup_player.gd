@@ -32,12 +32,13 @@ var windows := {}
 var _next := {}                     # playlist -> next index (AlphaSort playlists)
 var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
-## The native_video add-on (Windows and macOS, pup_addons/native_video): plays the pack's mp4s without conversion
-var native_video := ClassDB.class_exists("NativeVideoStream")
-## GDE GoZen (Linux, pup_addons/gde_gozen): FFmpeg, plays the pack's mp4s without conversion, with the Jetson's
-## hardware decoder when libnvmpi is installed; the screens then use game/pup/gozen_player.gd
-var gozen := not native_video and ClassDB.class_exists("GoZenVideo") \
-	and ResourceLoader.exists("res://addons/gde_gozen/video_playback.gd")
+## Which add-on plays the pack's mp4s without conversion (_pick_video_player()), else Godot plays the Theora copies:
+## - GDE GoZen (Linux and Windows, pup_addons/gde_gozen): FFmpeg, with the GPU decoding (the Jetson's decoder when
+##   libnvmpi is installed; Direct3D 11 Video / DXVA2 on Windows); the screens then use game/pup/gozen_player.gd;
+## - the native_video add-on (macOS, and Windows' fallback, pup_addons/native_video).
+## [pup] video_player (or TRON_VIDEO_PLAYER) = "native" picks native_video where both are installed (Windows).
+var native_video := false
+var gozen := false
 
 
 func _ready() -> void:
@@ -48,6 +49,7 @@ func _ready() -> void:
 	MPF.server.registered_handlers["pup_hello"] = [Callable(self, "_on_pup_hello")]
 	if not _load_config():
 		return
+	_pick_video_player()
 	var root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
 	pack_dir = root.path_join(setting("pup", "pack_dir", "pup_pack/trn_174h"))
 	media_dir = root.path_join(setting("pup", "media_dir", "pup_media/trn_174h"))
@@ -69,6 +71,18 @@ func _load_config() -> bool:
 	if OS.get_environment("TRON_PUP").to_lower() in ["0", "false", "no", "off"]:
 		return false
 	return bool(setting("pup", "enabled", false))
+
+
+func _pick_video_player() -> void:
+	var has_native := ClassDB.class_exists("NativeVideoStream")
+	var has_gozen := ClassDB.class_exists("GoZenVideo") \
+		and ResourceLoader.exists("res://addons/gde_gozen/video_playback.gd")
+	var want := OS.get_environment("TRON_VIDEO_PLAYER").strip_edges().to_lower()
+	if want.is_empty():
+		want = str(setting("pup", "video_player", "")).strip_edges().to_lower()
+	gozen = has_gozen and not (want == "native" and has_native)
+	native_video = has_native and not gozen
+	print("PuP video player: %s" % ("GDE GoZen" if gozen else ("native_video" if native_video else "Godot (Theora)")))
 
 
 func setting(section: String, key: String, default = null):

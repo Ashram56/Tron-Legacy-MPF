@@ -23,7 +23,7 @@ var fg = null                       # {playlist, file, path, priority, loop, vol
 var bg = null                       # {playlist, file}
 var bg_playing := false
 
-var _video: Control                 # VideoStreamPlayer, or gozen_player.gd (player.gozen: Linux, GDE GoZen)
+var _video: Control                 # VideoStreamPlayer, or gozen_player.gd (player.gozen: GDE GoZen)
 var _image: TextureRect
 var _audio: AudioStreamPlayer
 var _aspect := 16.0 / 9.0

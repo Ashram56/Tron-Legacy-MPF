@@ -1,7 +1,8 @@
 extends Control
 
-## A PuP screen's video player on Linux: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which plays the
-## pack's mp4s as they are and uses the Jetson's hardware decoder when libnvmpi is installed (docs/pup.md). Offers
+## A PuP screen's video player on Linux and Windows: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which
+## plays the pack's mp4s as they are and decodes on the GPU: the Jetson's decoder when libnvmpi is installed,
+## Direct3D 11 Video (else DXVA2) on Windows (docs/pup.md). Offers
 ## the parts of VideoStreamPlayer that pup_screen.gd uses: open(), play() (from the start), stop(), finished.
 
 signal finished
@@ -23,7 +24,7 @@ static var _hwdec_checked := false
 
 
 static func _check_hwdec() -> void:
-	if _hwdec_checked or OS.has_environment("GOZEN_HWDEC"):
+	if _hwdec_checked or OS.has_environment("GOZEN_HWDEC") or OS.get_name() != "Linux":
 		return
 	_hwdec_checked = true
 	# FileAccess.file_exists() is false for device nodes; a listing of /dev has them

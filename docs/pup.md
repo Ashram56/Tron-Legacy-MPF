@@ -22,24 +22,34 @@ installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
-**Windows and macOS: native mp4 playback.** On Windows and macOS, `setup.py` installs the `native_video` add-on
-(`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
-they are, with hardware decoding (Media Foundation, AVFoundation): nothing is converted, `gen_pup.py --native`
-only lists the videos. This build carries a fix for a heap overrun in the upstream release
-([issue 26](https://github.com/claytercek/godot-native-video/issues/26), `pup_addons/native_video_build/`), so do
-not replace it with an upstream zip: the macOS dylibs come from the `native_video macOS build` workflow, the
-Windows DLLs from `pup_addons/native_video/FIX.md`. The add-on needs Godot 4.6+ and a RenderingDevice renderer
-(the game uses Mobile). `TRON_NATIVE_VIDEO=0` in the environment for `setup.py` converts the videos instead and
-removes the add-on; without it loaded the PuP plays the converted Theora videos.
+**Linux and Windows: GDE GoZen.** On Linux (x86_64 and arm64) and Windows (x86_64), `setup.py` installs GDE
+GoZen (`pup_addons/gde_gozen`, copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's
+mp4s play as they are and nothing is converted. Both platforms share the same player (`game/pup/gozen_player.gd`,
+GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV12 upload). The GPU decodes:
+- **Windows**: Direct3D 11 Video, else DXVA2, built into FFmpeg (NVIDIA, AMD and Intel GPUs, nothing to install).
+  Godot's log says `GoZen: hardware decoding h264 (d3d11va)` for each video, or that the GPU cannot decode it
+  and software is used. `GOZEN_HWDEC=0` forces software decoding, `GOZEN_HWDEC=dxva2` asks for DXVA2 only.
+- **Jetson** (JetPack 5 or 6): the hardware decoder once libnvmpi is installed (the Linux install line does it,
+  or `scripts/install/install_jetson_hwdec.sh`, see `pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md)
+  for the fixes it needs); other Linux PCs decode in software.
 
-**Linux: GDE GoZen.** On Linux (x86_64 and arm64), `setup.py` installs GDE GoZen (`pup_addons/gde_gozen`,
-copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
-nothing is converted. On a Jetson (JetPack 5 or 6) it uses the hardware decoder once libnvmpi is installed
-(the Linux install line does it, or `scripts/install/install_jetson_hwdec.sh`, see
-`pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md) for the fixes it needs); everywhere else FFmpeg
-decodes in software.
-`TRON_GOZEN=0 python scripts/setup.py` goes back to Theora. The binaries are rebuilt from pinned sources with
-`scripts/build_gozen.sh` (Docker).
+`python scripts/video_check.py` checks the decoding without the game: it decodes a few pack videos on the GPU,
+then in software (`GOZEN_HWDEC=0`), and prints per video `GPU (NV12)` or `software` and how many times faster
+than real time it decodes (`game/tools/gozen_check.gd`).
+
+`TRON_GOZEN=0 python scripts/setup.py` leaves GoZen out (Linux: back to Theora; Windows: native_video). The
+binaries are rebuilt from pinned sources with `scripts/build_gozen.sh` (Docker).
+
+**macOS, and Windows' fallback: native_video.** On macOS, and on Windows next to GoZen, `setup.py` installs the
+`native_video` add-on (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`), which
+plays the mp4s with the OS's decoder (AVFoundation, Media Foundation). On Windows it plays only when picked:
+`video_player="native"` under `[pup]` in `game/pup.local.cfg`, or `TRON_VIDEO_PLAYER=native` for one run; the
+log says `PuP video player: native_video` (or `GDE GoZen`). This build carries a fix for a heap overrun in the
+upstream release ([issue 26](https://github.com/claytercek/godot-native-video/issues/26),
+`pup_addons/native_video_build/`), so do not replace it with an upstream zip: the macOS dylibs come from the
+`native_video macOS build` workflow, the Windows DLLs from `pup_addons/native_video/FIX.md`. The add-on needs
+Godot 4.6+ and a RenderingDevice renderer (the game uses Mobile). `TRON_NATIVE_VIDEO=0` in the environment for
+`setup.py` leaves it out; with no add-on loaded the PuP plays the converted Theora videos.
 
 ## The three screens
 
