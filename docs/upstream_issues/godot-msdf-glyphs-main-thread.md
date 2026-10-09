@@ -4,7 +4,7 @@
 
 ## Environment
 
-- Godot 4.6.3 stable, Linux arm64, Mobile renderer
+- Godot 4.6.3 stable (also 4.5.2 stable: 2.0 s and 12.9 s with the test project on x86_64), Linux arm64, Mobile renderer
 - Jetson Xavier NX, nvpmodel mode 5 (4 Carmel cores at 1.9 GHz)
 - `FontFile` with `multichannel_signed_distance_field = true`, `msdf_size = 256`, `msdf_pixel_range` 16 and 192
 

@@ -4,7 +4,7 @@
 
 ## Environment
 
-- Godot 4.6.3 stable, Linux arm64, Vulkan, Mobile renderer
+- Godot 4.6.3 stable (also 4.5.2 stable), Linux arm64, Vulkan, Mobile renderer
 - Jetson Xavier NX, L4T R35.6.4 (JetPack 5.1.4), NVIDIA Tegra Vulkan driver, X11
 - `rendering/driver/threads/thread_model=2` (separate render thread)
 
