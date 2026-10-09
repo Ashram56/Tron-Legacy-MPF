@@ -111,6 +111,44 @@ soon as the game repo exists:
 - **CI runs only on pushes to `main`**: test the installers locally in dry-run mode; on Windows only the
   owner can run them for real.
 
+## 5a. Jetson (Xavier NX, AGX Orin): an ARM cabinet with the PuP Pack
+
+The Jetson kit lives in the PuP repository ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP)),
+because it exists for the PuP Pack's videos: its `docs/jetson_xavier_nx.md` has every finding and figure,
+`docs/jetson.md` the video decoding fixes, `docs/performance.md` the measurements. What an installer or launcher
+for a Jetson must do (Tron tested on a Xavier NX Developer Kit, L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04, and an
+AGX Orin, L4T R36.4.3 / JetPack 6.2):
+
+- **Install order:** the Linux one line (arm64; Ubuntu 20.04 ships Python 3.8, so Python 3.11 comes from uv), then
+  `scripts/install/install_jetson_hwdec.sh` (libnvmpi from jetson-ffmpeg with `scripts/gozen/nvmpi_flush.patch`,
+  NVIDIA packages pinned to the board's own L4T release: the r36.4 apt repo also offers 36.4.7; config files kept
+  instead of a dpkg prompt; GNOME idle blanking off), then `scripts/install/jetson_selftest.sh --stock`, which must
+  pass every check. JetPack 5 keeps NVIDIA's libraries in `/usr/lib/aarch64-linux-gnu/tegra/`, JetPack 6 in
+  `.../nvidia/`.
+- **Hardware video decoding** is a GDExtension (GDE GoZen) with FFmpeg and the nvmpi decoders linked in, cross-built
+  in Docker (`scripts/build_gozen.sh arm64`) from a clean work folder; the `.so` is committed with its sha256 in the
+  commit message and needs glibc 2.29 at most. No decoder device in `/dev` means software decoding, never a crash.
+- **Session:** X11 (Godot places one window per monitor only there), autologin, no screen blanking (`run.py` runs
+  `xset s off -dpms`). openbox without a display manager works.
+- **Sound:** the Xavier NX devkit's ALSA default is an I2S card with nothing on it; the hwdec install writes a
+  `~/.asoundrc` to HDMI through dmix when there is no PulseAudio or PipeWire.
+- **Power mode:** `sudo nvpmodel -m 5` (10 W desktop, 4 cores at 1.9 GHz) or 8 (20 W). Per-core speed matters more
+  than cores; the 2- and 4-core 10 W modes are not playable. `jetson_clocks` gains nothing.
+- **Screens:** the devkit's DisplayPort has no DP++ mode, so a passive DP to HDMI adapter never works (an active
+  one does); the USB-C port has no video. A panel's EDID refresh rate cannot be overridden (`CustomEDID` is
+  ignored). Cabinet placement goes in the untracked `game/pup.local.cfg`, never in the tracked defaults.
+- **Setup steps that matter on ARM:** `setup.py` bakes the clean HD fonts' signed distance fields
+  (`game/tools/bake_fonts.gd`, about 2 minutes on a Xavier NX; without it the first text froze the game 20 s and
+  more) and `gen_media.py` imports the HD effect frames VRAM-compressed. Both rerun when their inputs change.
+- **Run options** (the PuP repo's `run.py`; its `docs/upstream_issues/README.md` lists what to port here): `run.py --no-render-thread` / `TRON_RENDER_THREAD=0` (Godot's separate render thread is on by
+  default), `TRON_PIN=0` (core pinning, Linux with 4+ cores), `TRON_PERF_DIR` (the performance probe; use
+  `scripts/perf/run.sh`). Each new run option reaches `docker/entrypoint.py` and `docker/tron.env.example` too.
+- **Testing without the board:** an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with NVIDIA's r35.4
+  apt packages, runs the whole Linux install and builds libnvmpi. When Docker Hub rate-limits, build the base
+  image with `debootstrap focal` and `docker import`. Godot renders headless in the cloud with lavapipe
+  (`VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json`, `--rendering-method mobile`, under `xvfb-run`). Tests
+  that import MPF run on the board.
+
 ## 6. Tron status and open work
 
 Built: `setup.py` and `run.py` on three OSes, the three installers with one-line install, the P-ROC build,
@@ -122,4 +160,4 @@ Docker, CI on three OSes. Open:
    the installed options: not built; the owner runs the command line today.
 3. Transformers has only the Windows installer; macOS and Linux installers, Docker and CI are not ported.
 
-Keep this file current with every installer change and owner test. Last updated 2026-10-08.
+Keep this file current with every installer change and owner test. Last updated 2026-10-09.
