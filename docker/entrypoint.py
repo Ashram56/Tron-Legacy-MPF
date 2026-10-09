@@ -59,6 +59,8 @@ def godot_args(env):
         args += ["--resolution", env["DMD_RESOLUTION"].strip()]
     if truthy(env.get("DMD_FULLSCREEN")):
         args.append("--fullscreen")
+    if env.get("TRON_RENDER_THREAD", "").strip() == "0":
+        args += ["--render-thread", "safe"]   # Godot's separate render thread off (scripts/run.py --no-render-thread)
     args += shlex.split(env.get("GODOT_ARGS", ""))
     if hardware(env) == "proc":
         args += ["--", "--proc-dmd"] if "--" not in args else ["--proc-dmd"]

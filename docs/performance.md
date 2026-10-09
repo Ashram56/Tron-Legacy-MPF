@@ -83,7 +83,8 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   `_texture_2d_update` glyph-cache errors (docs/upstream_issues/godot-separate-render-thread-glyph-cache.md), which
   the summary counts apart. MSDF fonts avoid them but stalled start-up 3 to 7 s, so they are not used. The captures
   (`scripts/render_diff.py`, the tests; renderer opengl3) wrote no frames with it: `scripts/run.py` runs them with
-  `--render-thread safe`.
+  `--render-thread safe`. On by default on every platform; `scripts/run.py --no-render-thread` (or
+  `TRON_RENDER_THREAD=0`, Docker too) turns it off, should a GPU driver misbehave with it.
 - The Vulkan pipeline cache saved while the game runs (`rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1`
   in `game/project.godot`; Godot's default 3 MB): Godot saved it only at exit or when it grew by 3 MB, and with the
   separate render thread its save at exit fails ("finalize can only be called from the render thread"), as does

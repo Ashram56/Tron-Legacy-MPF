@@ -251,6 +251,16 @@ class TestRun(unittest.TestCase):
                              run.godot_command(["--rendering-driver", "opengl3"], virtual_display=False)[3:])
             self.assertNotIn("--render-thread", run.godot_command(["--x"], virtual_display=False))
 
+    def test_render_thread_switch(self):
+        """Godot's separate render thread is on by default; --no-render-thread or TRON_RENDER_THREAD=0 turns it off."""
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable, "TRON_RENDER_THREAD": "0"}):
+            self.assertEqual(["--render-thread", "safe", "--x"], run.godot_command(["--x"], virtual_display=False)[3:])
+        with mock.patch.object(run, "run", return_value=0) as r:
+            run.main(["--no-render-thread", "--no-text-ui"])
+            self.assertEqual(["--render-thread", "safe"], r.call_args.kwargs["godot_args"][:2])
+            run.main(["--no-text-ui"])
+            self.assertNotIn("--render-thread", r.call_args.kwargs["godot_args"])
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux only")
     def test_core_pinning(self):
         """Godot's main thread alone on the last core, its other threads and MPF on the rest; off with TRON_PIN=0,
