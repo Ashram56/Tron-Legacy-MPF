@@ -31,14 +31,20 @@ nothing. `scripts/perf/sampler.py` samples the threads; `tegrastats` runs on a J
 | `av.csv` | once a second per video with sound: audio position minus the shown frame's time |
 | `events.csv` | video opens; black screens over 0.2 s (a PuP window that should show a picture and shows none) |
 | `threads.csv` | CPU % of one core per thread of Godot and MPF, every second; `(main)` marks each main thread |
+| `processes.csv` | Godot's and MPF's resident memory (VmRSS) and its peak (VmHWM), every second |
+| `memory.csv` | Godot's own monitors every second: static memory, video memory and the textures' share of it |
 | `tegrastats.log` | Jetson CPU/GPU load, power (VDD_IN), temperatures, clocks |
 | `godot.log`, `mpf.log` | the game's logs: MPF asks for display effect N (`tron_deff_N`), Godot reports `slide_deff_N_created` |
 
 `summary.md` lists frames (FPS, worst second, median, p99, frames over 2 vblanks and over 100 ms), stalls (frame
 gaps over 300 ms, with their start time), video per screen (shown, skipped, simultaneous switches), A/V drift, black
-screens, the **slowest display effects** (MPF request to slide created), board load and the busiest threads.
+screens, the **slowest display effects** (MPF request to slide created), board load, **memory** (Godot resident at
+10 s, at the end and at peak, Godot video memory, the effects preload's size and time from `godot.log`, board RAM and
+swap from tegrastats) and the busiest threads.
 
 Notes on reading it:
+- Frame times are the gaps between frame start times. Godot's process delta is not used: it read one vblank for a
+  frame held 433 ms. "Over 2 vblanks" counts gaps over 2.5 vblanks (held 3 vblanks or more), as start times jitter.
 - The video decoder figure is the share of tegrastats samples where the decoder clock is on, not its load:
   tegrastats on L4T R35 prints the NVDEC clock only. The real decoder headroom on the Xavier NX is about 5x for
   three 1080p30 videos (parallel `ffmpeg -c:v h264_nvmpi` decodes: 430-446 fps in total).
@@ -75,7 +81,21 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   off the main thread (27-28% of a core instead of 44-46%). 53.4 / 55.7 to 55.7 / 58.1 FPS, p99 33.9 / 31.6 to
   29.1 / 25.0 ms, frames over 2 vblanks 18 / 26 to 16 / 21. Godot calls the mode experimental; it logs harmless
   `_texture_2d_update` glyph-cache errors (docs/upstream_issues/godot-separate-render-thread-glyph-cache.md), which
-  the summary counts apart. MSDF fonts avoid them but stalled start-up 3 to 7 s, so they are not used.
+  the summary counts apart. MSDF fonts avoid them but stalled start-up 3 to 7 s, so they are not used. The captures
+  (`scripts/render_diff.py`, the tests; renderer opengl3) wrote no frames with it: `scripts/run.py` runs them with
+  `--render-thread safe`.
+- Letter glows off Godot's main thread (`game/tron/letter_panel.gd`): the letters of deffs 91, 92, 94 and 107 had their
+  glow made on the main thread when the slide was created (reading the pictures back from the GPU and blurring them
+  in script), even with the glow off (`tron/dmd/text_glow=0`, the default): deff 94's slide took 380 ms to create
+  and deff 95, asked for with it, waited behind it. Now nothing is made with the glow off; with it on, the glows
+  are made on worker threads from the start (the letter pictures load with the effects preload). Deff 94 created
+  380 to 25-36 ms; slowest display effect in the clip suite 0.56 s (deff 95) to 0.19 s, in the full game 0.55 s to
+  0.24 s (every effect under 0.25 s).
+- Preloading every effect (`preload_min_frames=1`) was measured and not kept: 2677 resources instead of 1575,
+  15-16 s instead of 11 s, about 130 MB more video memory (Godot video memory peak 480-518 MB instead of 345-386 MB),
+  and an effect shown during the longer preload waited for it (deff 104 0.49 s); effects shown for the first time
+  later came about 50 ms sooner. Memory with the default (full game, 620 s): Godot resident 972 MB at 10 s,
+  1649 MB peak; Godot video memory peak 466 MB; board RAM 3.0 GB average, 3.2 GB peak of 6.8 GB; no swap.
 
 ## Finding the cause of a hitch
 

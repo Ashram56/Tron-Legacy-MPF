@@ -43,7 +43,7 @@ def pct(values, p):
 
 def frames(d):
     fr = [(float(r["t_ms"]), float(r["delta_ms"]), float(r["draw_ms"]) if r.get("draw_ms") else None)
-          for r in rows(os.path.join(d, "frames.csv"))]
+          for r in rows(os.path.join(d, "frames.csv")) if r.get("delta_ms")]   # the last line can be cut short
     if len(fr) < 10:
         return {}
     stalls, prev = [], None
@@ -53,7 +53,8 @@ def frames(d):
         prev = t
     run = [(t, dt, dr) for t, dt, dr in fr if t >= STARTUP_S * 1000.0]
     ts = [t for t, _, _ in run]
-    dts = [dt for _, dt, _ in run]
+    # frame times from the timestamps: Godot's process delta can read one vblank for a frame held much longer
+    dts = [b - a for a, b in zip(ts, ts[1:])] or [dt for _, dt, _ in run]
     draws = [dr for _, _, dr in run if dr is not None]
     dur = (ts[-1] - ts[0]) / 1000.0 if len(ts) > 1 else 1.0
     per_s = {}
@@ -67,7 +68,7 @@ def frames(d):
         "median_ms": statistics.median(dts),
         "p99_ms": pct(dts, 0.99),
         "max_ms": max(dts),
-        "long_frames": sum(1 for x in dts if x > 2 * VBLANK_MS + 1.0),
+        "long_frames": sum(1 for x in dts if x > 2.5 * VBLANK_MS),   # held 3 vblanks or more (timestamps jitter)
         "over_100": sum(1 for x in dts if x > 100.0),
         "draw_median_ms": statistics.median(draws) if draws else None,
         "draw_p99_ms": pct(draws, 0.99),
@@ -180,6 +181,37 @@ def godot_errors(d):
     return errs, known
 
 
+def memory(d):
+    """Godot's memory at start-up (10 s), after the effects preload (godot.log) and at its peak; board RAM."""
+    out = {}
+    pm = [r for r in rows(os.path.join(d, "processes.csv")) if r["process"] == "godot"]
+    if pm:
+        rss = [(float(r["t_s"]), float(r["rss_mb"])) for r in pm]
+        out["rss_start"] = next((m for t, m in rss if t >= 10.0), rss[-1][1])
+        out["rss_peak"] = max(m for _, m in rss)
+        out["rss_end"] = rss[-1][1]
+        out["hwm"] = max(float(r["hwm_mb"]) for r in pm)
+    gm = rows(os.path.join(d, "memory.csv"))
+    if gm:
+        out["static_peak"] = max(float(r["static_mb"]) for r in gm)
+        out["video_peak"] = max(float(r["video_mb"]) for r in gm)
+        out["texture_peak"] = max(float(r["texture_mb"]) for r in gm)
+    path = os.path.join(d, "godot.log")
+    if os.path.exists(path):
+        m = re.search(r"DMD: (\d+) .*preloaded(?: in ([\d.]+) s)?", open(path, errors="replace").read())
+        if m:
+            out["preloaded"] = int(m.group(1))
+            out["preload_s"] = float(m.group(2)) if m.group(2) else None
+    path = os.path.join(d, "tegrastats.log")
+    if os.path.exists(path):
+        ram = [int(x) for x in re.findall(r"RAM (\d+)/", open(path, errors="replace").read())]
+        swap = [int(x) for x in re.findall(r"SWAP (\d+)/", open(path, errors="replace").read())]
+        if ram:
+            out["ram_avg"], out["ram_max"] = statistics.mean(ram), max(ram)
+            out["swap_max"] = max(swap) if swap else 0
+    return out
+
+
 def summarize(d):
     f, v, t = frames(d), video(d), tegra(d)
     errs, known = godot_errors(d)
@@ -215,6 +247,23 @@ def summarize(d):
                  "CPU %.1f C max; video decoder clock on in %.0f%% of samples (clock, not load)." % (
                      t["cpu_avg"], t["cpu_peak_core"], t["gpu_avg"] or 0, t["w_avg"] or 0, t["w_peak"] or 0,
                      t["temp_max"] or 0, t["nvdec_clock_on"] or 0))
+    mem = memory(d)
+    if mem:
+        parts = []
+        if "rss_start" in mem:
+            parts.append("Godot resident %.0f MB at 10 s, %.0f MB at the end, %.0f MB peak" % (
+                mem["rss_start"], mem["rss_end"], max(mem["rss_peak"], mem["hwm"])))
+        if "video_peak" in mem:
+            parts.append("Godot video memory peak %.0f MB (textures %.0f MB), static %.0f MB" % (
+                mem["video_peak"], mem["texture_peak"], mem["static_peak"]))
+        if "preloaded" in mem:
+            parts.append("effects preload: %d resources%s" % (
+                mem["preloaded"], " in %.1f s" % mem["preload_s"] if mem.get("preload_s") else ""))
+        if "ram_avg" in mem:
+            parts.append("board RAM used %.0f MB avg, %.0f MB max, swap %d MB max" % (
+                mem["ram_avg"], mem["ram_max"], mem["swap_max"]))
+        L.append("")
+        L.append("**Memory**: " + "; ".join(parts) + ".")
     th = threads(d)
     if th:
         L.append("")

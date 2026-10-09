@@ -138,6 +138,9 @@ def godot_command(godot_args, virtual_display=None):
     if not os.path.exists(exe) and not shutil.which(exe):
         raise SystemExit("Godot not found at {} (run `python scripts/setup.py`, or set GODOT)".format(exe))
     cmd = [exe, "--path", tc.GAME] + list(godot_args)
+    if "opengl3" in godot_args and "--render-thread" not in godot_args:
+        # the captures' renderer: with Godot's separate render thread (game/project.godot) it wrote no frames
+        cmd[3:3] = ["--render-thread", "safe"]
     if virtual_display is None:
         virtual_display = tc.needs_virtual_display()
     if virtual_display:

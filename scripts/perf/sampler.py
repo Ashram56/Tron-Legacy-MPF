@@ -4,7 +4,8 @@ Godot and MPF processes (from /proc/<pid>/task/*/stat), until the file STOP appe
 
     python scripts/perf/sampler.py OUT_DIR
 
-Writes OUT_DIR/threads.csv: t_s,process,tid,thread,cpu_pct (100 = one core). Linux only.
+Writes OUT_DIR/threads.csv: t_s,process,tid,thread,cpu_pct (100 = one core), and OUT_DIR/processes.csv:
+t_s,process,rss_mb,hwm_mb (resident memory now and its peak, from /proc/<pid>/status). Linux only.
 """
 import os
 import sys
@@ -49,13 +50,27 @@ def thread_ticks(pid):
     return out
 
 
+def memory_mb(pid):
+    """VmRSS and VmHWM of a process, in MB (None when it is gone)."""
+    out = {}
+    try:
+        with open("/proc/%d/status" % pid) as f:
+            for line in f:
+                if line.startswith(("VmRSS:", "VmHWM:")):
+                    out[line.split(":")[0]] = int(line.split()[1]) / 1024.0
+    except OSError:
+        return None
+    return out.get("VmRSS"), out.get("VmHWM")
+
+
 def main(out_dir):
     hz = os.sysconf("SC_CLK_TCK")
     stop = os.path.join(out_dir, "STOP")
     t0 = time.time()
     prev = {}
-    with open(os.path.join(out_dir, "threads.csv"), "w") as f:
+    with open(os.path.join(out_dir, "threads.csv"), "w") as f, open(os.path.join(out_dir, "processes.csv"), "w") as fm:
         f.write("t_s,process,tid,thread,cpu_pct\n")
+        fm.write("t_s,process,rss_mb,hwm_mb\n")
         while not os.path.exists(stop):
             pids = find_pids()
             now = time.time()
@@ -70,7 +85,11 @@ def main(out_dir):
                         if pct > 0.0:
                             f.write("%.1f,%s,%d,%s,%.1f\n" % (now - t0, proc, tid, name.replace(",", " "), pct))
                     prev[key] = (now, ticks)
+                mem = memory_mb(pid)
+                if mem and mem[0] is not None:
+                    fm.write("%.1f,%s,%.1f,%.1f\n" % (now - t0, proc, mem[0], mem[1] or 0.0))
             f.flush()
+            fm.flush()
             time.sleep(1.0)
 
 

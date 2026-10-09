@@ -12,6 +12,8 @@ extends Node
 ##                                          the shown frame's time (+ = audio ahead)
 ##   events.csv  t_ms,kind,screen,detail   video opens ("open"), black screens over 0.2 s ("black": a PuP window
 ##                                          where some layer should show a picture and none does)
+##   memory.csv  t_ms,static_mb,video_mb,texture_mb   once a second: Godot's own memory monitors (static memory;
+##                                          video memory and the textures' share of it)
 
 const PLAYBACK_SCRIPT := "video_playback.gd"
 
@@ -20,6 +22,7 @@ var _frames: FileAccess
 var _video: FileAccess
 var _av: FileAccess
 var _events: FileAccess
+var _memory: FileAccess
 var _t0 := 0
 var _frame_start := 0
 var _line_open := false  # a frames.csv line waits for its draw time
@@ -40,6 +43,7 @@ func _ready() -> void:
 	_video = _open("video.csv", "t_ms,screen,file,frame,step,late_ms")
 	_av = _open("av.csv", "t_ms,screen,file,av_ms")
 	_events = _open("events.csv", "t_ms,kind,screen,detail")
+	_memory = _open("memory.csv", "t_ms,static_mb,video_mb,texture_mb")
 	_t0 = Time.get_ticks_usec()
 	get_tree().node_added.connect(_on_node_added)
 	RenderingServer.frame_post_draw.connect(_on_post_draw)
@@ -107,7 +111,10 @@ func _process(delta: float) -> void:
 					(apos - node.current_frame / node._frame_rate) * 1000.0])
 	_check_black(t)
 	if second:
-		for f in [_frames, _video, _av, _events]:
+		_memory.store_line("%.1f,%.1f,%.1f,%.1f" % [t, Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0,
+				Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
+				Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0])
+		for f in [_frames, _video, _av, _events, _memory]:
 			f.flush()
 	_frames.store_line("%.1f,%.3f," % [t, delta * 1000.0])   # draw_ms is filled in by _on_post_draw
 	_line_open = true
@@ -163,6 +170,6 @@ func _end_black(n: int, t: float) -> void:
 
 
 func _exit_tree() -> void:
-	for f in [_frames, _video, _av, _events]:
+	for f in [_frames, _video, _av, _events, _memory]:
 		if f != null:
 			f.flush()

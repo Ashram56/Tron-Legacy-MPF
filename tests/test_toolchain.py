@@ -234,6 +234,13 @@ class TestRun(unittest.TestCase):
             with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
 
+    def test_captures_render_on_the_main_thread(self):
+        """opengl3 (the captures) with Godot's separate render thread (game/project.godot) wrote no frames."""
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable}):
+            self.assertEqual(["--render-thread", "safe", "--rendering-driver", "opengl3"],
+                             run.godot_command(["--rendering-driver", "opengl3"], virtual_display=False)[3:])
+            self.assertNotIn("--render-thread", run.godot_command(["--x"], virtual_display=False))
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux only")
     def test_core_pinning(self):
         """Godot's main thread alone on the last core, its other threads and MPF on the rest; off with TRON_PIN=0,
