@@ -63,4 +63,6 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
 
 Found this way (Xavier NX, L4T R35.6.4): the 2.3 s stall at the Light Cycle multiball start is deff 85 and 86
 (319 HD frames of 1024x256) loading on the main thread, about 7 ms per frame for lossless decompression
-(about 1.5 ms per frame when imported VRAM-compressed).
+(about 1.5 ms per frame when imported VRAM-compressed). `scripts/gen_media.py` therefore imports the HD effect
+frames VRAM-compressed (ETC2 R11 on ARM; 40.8 dB PSNR against the lossless frame, no visible difference at
+1280x320): the stall went from 2.34 to 1.00 s, deff 86 from 2.24 to 0.91 s.
