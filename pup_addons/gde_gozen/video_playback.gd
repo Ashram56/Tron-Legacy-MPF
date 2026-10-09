@@ -39,6 +39,7 @@ var playback_speed: float = 1.0: set = set_playback_speed ## Adjust the video pl
 @export var loop: bool = false ## Enable/disable looping on video_ended.
 @export_group("Extra's")
 @export var color_profile: COLOR_PROFILE = COLOR_PROFILE.AUTO: set = _set_color_profile ## Force a specific color profile if needed.
+@export var decode_to_display_size: bool = false ## With a hardware decoder that can scale (GoZenVideo.set_target_size(), the Jetson's): decode at this node's size when the video opens, instead of the file's full size. Fewer pixels to copy and upload per frame; a later resize scales the picture as usual.
 @export var debug: bool = false ## Enable/disable the printing of debug info.
 
 var video: GoZenVideo = null ## Video class object of GDE GoZen which interacts with video files through FFmpeg.
@@ -81,6 +82,7 @@ var _decode_task: int = -1 ## Worker task decoding the next frame into _queue (s
 var _decoded: int = 0 ## The last frame number decoded (or being decoded) into _queue.
 var _queue: Array[Dictionary] = [] ## Decoded frames not shown yet, oldest first: {"frame": int, "planes": Array}.
 var _queue_mutex: Mutex = Mutex.new()
+var _nv12: bool = false ## The decoder gives NV12: u_data holds U and V (RG8), there is no v plane to upload.
 var _clock: float = 0.0 ## Seconds of video played; frame n is due at n / _frame_rate (playback_speed moves it).
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
@@ -155,6 +157,8 @@ func set_video_path(new_path: String) -> void:
 
 	path = new_path
 	video = GoZenVideo.new()
+	if decode_to_display_size and video.has_method("set_target_size") and size.x >= 1.0 and size.y >= 1.0:
+		video.set_target_size(Vector2i(ceili(size.x), ceili(size.y)))
 	if debug:
 		video.enable_debug()
 	else:
@@ -209,6 +213,7 @@ func _update_video(new_video: GoZenVideo) -> void:
 	_resolution = video.get_resolution()
 	_frame_count = video.get_frame_count()
 	_has_alpha = video.get_has_alpha()
+	_nv12 = video.has_method("is_nv12") and video.is_nv12()
 
 	video_streams = video.get_streams(STREAM_TYPE.VIDEO)
 	audio_streams = video.get_streams(STREAM_TYPE.AUDIO)
@@ -241,6 +246,7 @@ func _update_video(new_video: GoZenVideo) -> void:
 	_shader_material.set_shader_parameter("full_color", video.is_full_color_range())
 	_shader_material.set_shader_parameter("interlaced", video.get_interlaced())
 	_shader_material.set_shader_parameter("rotation", rotation_radians)
+	_shader_material.set_shader_parameter("nv12", _nv12)
 	_set_color_profile()
 
 	y_texture.set_image(video.get_y_data())
@@ -451,7 +457,9 @@ func _fill_queue() -> void:
 ## On a worker thread: decodes the next frame and queues copies of its planes (GoZen reuses its images for the next).
 func _decode_one(frame_nr: int) -> void:
 	video.next_frame(false)
-	var planes: Array = [video.get_y_data().duplicate(), video.get_u_data().duplicate(), video.get_v_data().duplicate()]
+	var planes: Array = [video.get_y_data().duplicate(), video.get_u_data().duplicate()]
+	if not _nv12:
+		planes.append(video.get_v_data().duplicate())
 	if _has_alpha:
 		planes.append(video.get_a_data().duplicate())
 	_queue_mutex.lock()
@@ -598,14 +606,17 @@ func _set_current_frame(new_current_frame: int) -> void:
 
 func _set_frame_image(planes: Array = []) -> void:
 	if planes.is_empty():
-		planes = [video.get_y_data(), video.get_u_data(), video.get_v_data()]
+		planes = [video.get_y_data(), video.get_u_data()]
+		if not _nv12:
+			planes.append(video.get_v_data())
 		if _has_alpha:
 			planes.append(video.get_a_data())
 	RenderingServer.texture_2d_update(y_texture.get_rid(), planes[0], 0)
 	RenderingServer.texture_2d_update(u_texture.get_rid(), planes[1], 0)
-	RenderingServer.texture_2d_update(v_texture.get_rid(), planes[2], 0)
+	if not _nv12:
+		RenderingServer.texture_2d_update(v_texture.get_rid(), planes[2], 0)
 	if _has_alpha:
-		RenderingServer.texture_2d_update(a_texture.get_rid(), planes[3], 0)
+		RenderingServer.texture_2d_update(a_texture.get_rid(), planes[-1], 0)
 
 
 func set_playback_speed(new_playback_value: float) -> void:

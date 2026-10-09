@@ -68,6 +68,9 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   by the delay. A video with its own sound takes its clock from the sound heard (playback position minus the output
   latency) and drops the frames it is late by. Video frames skipped 89 / 85 to 15 / 7 per clip (all on videos with
   sound; 0 on the silent screens), A/V drift 79-130 ms to 30-46 ms on average.
+- Frames decoded at the shown size, as NV12 (GoZen `set_target_size()`, `decode_to_display_size`; docs/jetson.md
+  fix 10): 4 to 8 times fewer pixels per video frame. Godot's main thread 44-46% of a core instead of 51-55%;
+  52.9 / 54.7 to 53.4 / 55.7 FPS, frames over 2 vblanks 19 / 33 to 18 / 26.
 
 ## Finding the cause of a hitch
 

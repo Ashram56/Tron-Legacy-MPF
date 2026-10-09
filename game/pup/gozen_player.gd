@@ -42,6 +42,7 @@ func _ready() -> void:
 	_playback.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_playback.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_playback.enable_auto_play = true
+	_playback.decode_to_display_size = true   # the Jetson's decoder scales to the PuP window (fewer pixels per frame)
 	add_child(_playback)
 	_playback.video_ended.connect(_on_ended)
 	_playback.video_loaded.connect(func(): _playback.video_texture.show())

@@ -25,7 +25,8 @@ default) or 8 (20W): see [Xavier NX power modes](#xavier-nx-power-modes).
 The wrapper and libnvmpi share one patch file. `build_gozen.sh` and `install_jetson_hwdec.sh` both apply the whole
 file to their jetson-ffmpeg checkout, so GoZen's FFmpeg and the board's libnvmpi always carry the same fixes.
 Changing only the `src/` part needs a new install on the board but no GoZen rebuild. Changing the `ffmpeg/`
-part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
+part (or `gozen.patch`) needs `bash scripts/build_gozen.sh arm64` and committing the new `.so` (fix 10: build from
+a clean work folder).
 
 ## Fixes
 
@@ -123,6 +124,23 @@ Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as inst
   connected, so Godot fell back to no sound. A `~/.asoundrc` sending the default to HDMI (`hw:HDA,7` through dmix)
   fixes it; `install_jetson_hwdec.sh` writes it when no PulseAudio or PipeWire is installed, and keeps an existing
   one.
+
+### 10. Frames decoded at the size they are shown at, as NV12 (GoZen, nvmpi decoder options)
+jetson-ffmpeg's nvmpi decoders can scale in hardware (the VIC, option `resize=WxH`) and output NV12
+(`output_format=nv12`). `gozen.patch` adds `GoZenVideo.set_target_size()`: with an nvmpi decoder, frames come as
+NV12 and, when the video is shown smaller than its file, scaled down to that size (aspect kept, never up). NV12 is
+used natively (Y as R8, UV as one RG8 plane; the two YUV shaders take a `nv12` switch), where any format but
+YUV420P used to go through a CPU conversion. `video_playback.gd` asks for it with `decode_to_display_size`, which
+`gozen_player.gd` turns on: on one 1920x1080 screen holding the three PuP windows, a 1080p video is decoded at
+868x488 (backglass) or 868x254 (topper), 4 to 8 times fewer pixels to copy and upload per frame. Godot's main thread
+44-46% of a core instead of 51-55%; clip suite 52.9 / 54.7 -> 53.4 / 55.7 FPS, frames over 2 vblanks 19 / 33 -> 18 /
+26 (docs/performance.md). With a `.so` without these methods the script keeps the three-plane path.
+
+Rebuilding GoZen: start from a clean work folder (`scripts/build_gozen.sh` with a fresh `GOZEN_WORK`, or delete its
+`godot_cpp/bin` and object files). The committed `.so` files are the cross build on x86_64 (reproducible from any
+x86 machine); a native arm64 build on a Jetson has the same code, data and symbols and differs only by Ubuntu's
+SystemTap probe sections (`.note.stapsdt`, `.stapsdt.base`: its native libstdc++ has them, the cross one does not).
+Record the `.so`'s sha256 in the commit message.
 
 ## Known leftovers
 - A recreated decoder can lose up to about 10 trailing frames when it drains at the end of a video.
