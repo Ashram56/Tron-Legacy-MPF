@@ -2,11 +2,15 @@
 
 This page lists every change we carry so that the PuP Pack's videos play with the Jetson's hardware decoder (NVDEC)
 without freezes or crashes: what was wrong, the fix, where it lives and how it was checked. Start here when
-bringing up another Jetson, such as the Xavier NX.
+bringing up another Jetson, such as the Xavier NX. Everything else learned on the Xavier NX (screens, power, Godot
+settings, costs): [jetson_xavier_nx.md](jetson_xavier_nx.md).
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
 4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
-**Not tested yet:** Xavier NX / AGX Xavier (t194, L4T R35 / JetPack 5). See [Xavier NX checklist](#xavier-nx-checklist).
+**Tested:** Jetson Xavier NX Developer Kit (t194), L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04.6, X11 + openbox
+(no display manager), Godot 4.6.3, one 1920x1080 HDMI screen with the three PuP windows on it, HDMI audio: decoder
+self-test and both game scenarios in five power modes (2026-10-09). Use nvpmodel mode 5 (10W desktop, the module's
+default) or 8 (20W): see [Xavier NX power modes](#xavier-nx-power-modes).
 
 ## The video stack
 
@@ -22,7 +26,8 @@ bringing up another Jetson, such as the Xavier NX.
 The wrapper and libnvmpi share one patch file. `build_gozen.sh` and `install_jetson_hwdec.sh` both apply the whole
 file to their jetson-ffmpeg checkout, so GoZen's FFmpeg and the board's libnvmpi always carry the same fixes.
 Changing only the `src/` part needs a new install on the board but no GoZen rebuild. Changing the `ffmpeg/`
-part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
+part (or `gozen.patch`) needs `bash scripts/build_gozen.sh arm64` and committing the new `.so` (fix 10: build from
+a clean work folder).
 
 ## Fixes
 
@@ -102,6 +107,42 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
   leaves them), and `run.py` runs `xset s off -dpms`. Without both, the screen went black after 5 minutes.
 - GDM automatic login and an X11 session (Godot places one window per monitor only on X11): [pup.md](pup.md).
 
+### 9. 5 FPS on the Xavier NX (libnvmpi, GoZen player script, PuP windows)
+Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as installed, 55.5 FPS (median frame
+16.67 ms, GPU 32%, 7.3 W) with all three fixes. Without the PuP it already ran at 56 FPS.
+- **libnvmpi:** each frame mapped and unmapped every plane of its buffer for the CPU, about 11 ms of kernel time per
+  1080p frame on R35. Now a buffer's planes are mapped once and unmapped when the buffer is destroyed
+  (`nvmpi_flush.patch`): decode 74 -> 203 fps, CPU 17 -> 4 ms per frame.
+- **`video_playback.gd`:** the next frame is decoded on a worker task, one frame ahead, so Godot's main thread only
+  uploads it; a frame not ready yet is shown late instead of waited for. Before, three videos decoding on the main
+  thread fell behind, and the catch-up decoding made it worse. Decode tasks never seek (at most 1 s of frames per
+  task) and are high priority: a catch-up `seek_frame()` near the end of a clip retried for minutes on the one thread
+  Godot gives low-priority tasks here, and the game froze (9 min at 10W, 2 cores).
+- **`pup_player.gd`:** vsync stays on the backglass window only. On the R35 X11 Vulkan driver each vsync'd window
+  waits for its own vertical blank, so four windows made every frame four refreshes long (67 ms). The DMD and
+  topper windows can tear in principle; they redraw every frame anyway.
+- **Audio (Xavier NX devkit):** the system ALSA default (`/etc/asound.conf`) is the APE I2S card, which has nothing
+  connected, so Godot fell back to no sound. A `~/.asoundrc` sending the default to HDMI (`hw:HDA,7` through dmix)
+  fixes it; `install_jetson_hwdec.sh` writes it when no PulseAudio or PipeWire is installed, and keeps an existing
+  one.
+
+### 10. Frames decoded at the size they are shown at, as NV12 (GoZen, nvmpi decoder options)
+jetson-ffmpeg's nvmpi decoders can scale in hardware (the VIC, option `resize=WxH`) and output NV12
+(`output_format=nv12`). `gozen.patch` adds `GoZenVideo.set_target_size()`: with an nvmpi decoder, frames come as
+NV12 and, when the video is shown smaller than its file, scaled down to that size (aspect kept, never up). NV12 is
+used natively (Y as R8, UV as one RG8 plane; the two YUV shaders take a `nv12` switch), where any format but
+YUV420P used to go through a CPU conversion. `video_playback.gd` asks for it with `decode_to_display_size`, which
+`gozen_player.gd` turns on: on one 1920x1080 screen holding the three PuP windows, a 1080p video is decoded at
+868x488 (backglass) or 868x254 (topper), 4 to 8 times fewer pixels to copy and upload per frame. Godot's main thread
+44-46% of a core instead of 51-55%; clip suite 52.9 / 54.7 -> 53.4 / 55.7 FPS, frames over 2 vblanks 19 / 33 -> 18 /
+26 (docs/performance.md). With a `.so` without these methods the script keeps the three-plane path.
+
+Rebuilding GoZen: start from a clean work folder (`scripts/build_gozen.sh` with a fresh `GOZEN_WORK`, or delete its
+`godot_cpp/bin` and object files). The committed `.so` files are the cross build on x86_64 (reproducible from any
+x86 machine); a native arm64 build on a Jetson has the same code, data and symbols and differs only by Ubuntu's
+SystemTap probe sections (`.note.stapsdt`, `.stapsdt.base`: its native libstdc++ has them, the cross one does not).
+Record the `.so`'s sha256 in the commit message.
+
 ## Known leftovers
 - A recreated decoder can lose up to about 10 trailing frames when it drains at the end of a video.
 - About every 10 to 20 s, around a video switch, the game hitches for about 0.1 s. The same happens with
@@ -114,6 +155,7 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
 - Repro programs, built against GoZen's patched FFmpeg (build line at the top of each):
   [nvmpi_seek_close.c](upstream_issues/repro/nvmpi_seek_close.c) (`flush`, `close`, `crash` modes) and
   [nvmpi_concurrent.c](upstream_issues/repro/nvmpi_concurrent.c) (`in.mp4 3 40 10`).
+  `scripts/install/jetson_selftest.sh` builds and runs them all on a board.
 - Decode speed: 1080p H.264 at about 350 fps on NVDEC, against about 70 fps on one CPU core.
 - Games on the board: `scripts/run.py --scenario clu_hurryup --seconds 120`, with Godot's log showing
   `GoZen: hardware decoder h264_nvmpi` per video. `scripts/run.py --scenario full_game_to_portal`
@@ -121,26 +163,70 @@ part needs `bash scripts/build_gozen.sh arm64` and committing the new `.so`.
 
 ## Xavier NX checklist
 JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
-- NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` (the install handles it) and libnvmpi may build on
-  the legacy `nvbuf_utils` path instead of NvUtils (`WITH_NVUTILS`). Fixes 2 to 4 change code shared by both paths;
-  check that libnvmpi builds and run all repro modes.
-- The in-place reset (fix 1) may work on R35. Recreating the decoder still works there, so keep it.
+- NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` instead of `.../nvidia/` (the install and the
+  self-test handle it). R35's Multimedia API already has `nvbufsurface.h`, so libnvmpi builds on the same NvUtils
+  path (`WITH_NVUTILS`) as on the Orin, not on the legacy `nvbuf_utils` one.
 - The Xavier NX has fewer NVDEC sessions and less memory than the AGX Orin: check three screens decoding at once.
 
+**On the board** (Xavier NX Developer Kit, L4T R35.6.4, minimal image, no nvpmodel mode set: 6 CPUs at 1.9 GHz),
+`jetson_selftest.sh --stock` with `pup_pack/trn_174h/AttractMode/AttractMode-Trailer1.mp4` (1080p30 H.264):
+
+| Check | Patched | Stock jetson-ffmpeg `8d70c17` |
+|---|---|---|
+| flush (fix 1) | pass | hang (killed after 60 s): the in-place reset fails on R35 too |
+| close (fix 2) | 59 ms / 48 ms | 1086 ms / 24 ms (no packet / after 30 frames) |
+| crash (fix 3), 100 runs | 0 crashed | 0 crashed (the Orin: 9) |
+| concurrent (fix 4), 20 runs | 0 failed | 5 segfaults (the Orin hung instead) |
+
+So fixes 1, 2 and 4 are needed on JetPack 5 too; fix 3 is kept (no cost).
+
+**Checked without the board** (an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with L4T R35.4.1 and
+NVIDIA's r35.4 apt packages): the full Linux install (`install_prereqs_linux.sh --yes`) passes, including Python
+3.11 from uv, MPF Monitor, Godot 4.6.3 arm64, the PuP Pack and the Godot import; `nvmpi_flush.patch` applies and
+libnvmpi builds with NvUtils against R35.4.1 and links NVIDIA's own `libv4l2.so.0`. The self-test's ffmpeg 7.1 with nvmpi and
+both repro programs build and link there too. The GoZen arm64 `.so` needs
+glibc 2.29 at most (Ubuntu 20.04 has 2.31). Decoding itself needs the board.
+
 To bring one up:
-1. `bash scripts/install/install_jetson_hwdec.sh --test` (or the full Linux install), and check that libnvmpi is in
+1. `bash scripts/install/install_jetson_hwdec.sh` (or the full Linux install), and check that libnvmpi is in
    `ldconfig -p`.
-2. Build the repro programs against `~/.cache/tron-legacy-mpf/ffmpeg-src/ffmpeg7.1` (the `--test` ffmpeg), with
-   `-L/usr/lib/aarch64-linux-gnu/tegra` in place of `.../nvidia`, and run `flush`, `close` and `crash` (a loop of
-   100) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs). Expect what is written above. To learn which bugs R35
-   has on its own, run them once more with libnvmpi built at `8d70c17` without the patch, and note the result
-   under "Not checked yet on JetPack 5" in the matching report.
+2. `bash scripts/install/jetson_selftest.sh --stock`: builds the `--test` ffmpeg and the repro programs, then runs
+   `flush`, `close`, `crash` (100 runs) and `nvmpi_concurrent in.mp4 3 40 10` (20 runs), each with a time limit,
+   against our patched build and then against jetson-ffmpeg without the patch. The patched build must pass every
+   check (exit status 0); the stock results show which bugs R35 has on its own: note them under "Not checked yet
+   on JetPack 5" in the matching report. Logs: `~/.cache/tron-legacy-mpf/selftest/`.
 3. Play `scripts/run.py --scenario clu_hurryup --seconds 120`, then `scripts/run.py --scenario full_game_to_portal`, on the
    screen. Watch for freezes and black screens, and check `game/logs/godot.log` for `h264_nvmpi` and errors.
 4. Record the result in the "Tested" line at the top of this page and in the headers of `nvmpi_flush.patch` and
    `gozen.patch`.
 5. If a hunk does not apply or behaves differently on R35, change `nvmpi_flush.patch` and re-run step 1; when its
    `ffmpeg/` part changes, also rebuild GoZen (`bash scripts/build_gozen.sh arm64`) and commit the `.so`.
+
+## Xavier NX power modes
+Xavier NX, L4T R35.6.4, with fixes 1 to 9. Each mode set with `sudo nvpmodel -m N` (no reboot needed), then
+`clu_hurryup` for 120 s and `full_game_to_portal` for 620 s. Every run: 0 black screens, 0 Godot errors,
+`h264_nvmpi` on every video, no freeze; CPU at most 47.5 °C. Modes 0, 1, 6 and 7 were not run (2- and 4-core
+modes, slower per core than 5).
+
+| Mode (CPUs / GPU max MHz) | Test | FPS avg | Worst 1 s | Median ms | Frames > 50 / > 100 ms | Video frames skipped | Video lag avg | A/V drift avg / max ms | CPU / GPU / NVDEC % | W avg |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3: 10W 2-core (2 × 1.50 GHz / 803) | hurryup | 19.8 | 9 | 38.9 | 437 / 67 | 1788 | 1084 ms | – | 87 / 17 / 81 | 5.2 |
+| | full game | 20.3 | 1 | 37.5 | 3049 / 456 | 11685 | 475 ms | 186 / 1122 | 86 / 19 / 95 | 5.3 |
+| 4: 10W 4-core (4 × 1.19 GHz / 803) | hurryup | 32.0 | 5 | 33.3 | 93 / 21 | 655 | 142 ms | 92 / 301 | 62 / 25 / 91 | 5.6 |
+| | full game | 36.9 | 3 | 22.2 | 334 / 121 | 2776 | 183 ms | 113 / 910 | 53 / 27 / 97 | 5.6 |
+| **5: 10W desktop (4 × 1.91 GHz / 510)** | hurryup | 54.4 | 29 | 16.7 | 26 / 9 | 146 | 47 ms | 138 / 163 | 46 / 35 / 94 | 6.6 |
+| | full game | 52.6 | 8 | 16.7 | 161 / 68 | 856 | 68 ms | 91 / 521 | 43 / 36 / 98 | 6.5 |
+| 2: 15W 6-core (6 × 1.42 GHz / 1109) | hurryup | 49.5 | 23 | 18.1 | 35 / 14 | 198 | 58 ms | 59 / 109 | 44 / 31 / 93 | 6.1 |
+| | full game | 49.4 | 4 | 16.9 | 214 / 100 | 1274 | 122 ms | 192 / 1811 | 35 / 34 / 98 | 5.9 |
+| 8: 20W 6-core (6 × 1.42 GHz / 1109) | hurryup | 52.9 | 26 | 17.1 | 25 / 12 | 173 | 69 ms | 48 / 261 | 39 / 34 / 93 | 6.5 |
+| | full game | 50.7 | 3 | 16.7 | 218 / 96 | 1181 | 116 ms | 189 / 1749 | 34 / 35 / 98 | 6.4 |
+
+- Per-core speed matters more than the number of cores: Godot's main thread (game logic and render submission) is
+  the critical path. MPF uses about 6% of a core.
+- Mode 5 is the smoothest and draws about 6.5 W. Mode 8 is level with it and has twice the GPU clock in reserve.
+  Modes 3 and 4 are not playable.
+- The A/V drift maxima are single samples right after a video switch; the averages are the better figure.
+- Every mode has a 2.4–3.8 s stall at the same moment of the full game (about 118 s in): game side.
 
 ## Updating a pin
 To move jetson-ffmpeg or GDE GoZen to a newer revision:

@@ -34,7 +34,8 @@ def sh(args, env=None):
 
 @unittest.skipUnless(BASH and POSIX, "needs bash on Linux or macOS")
 class TestShellScripts(unittest.TestCase):
-    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh"]
+    SCRIPTS = ["install_prereqs_linux.sh", "install_prereqs_macos.sh", "build_pinproc.sh", "install_jetson_hwdec.sh",
+               "jetson_selftest.sh"]
 
     def test_syntax(self):
         for name in self.SCRIPTS + [os.path.join("..", "..", "docker", "tron.sh")]:
@@ -71,6 +72,65 @@ class TestShellScripts(unittest.TestCase):
         self.assertIn("tegra-egl/libEGL_nvidia.so.0", r.stdout)
         self.assertIn("aarch64-linux-gnu_EGL.conf: /usr/lib/aarch64-linux-gnu/tegra-egl", r.stdout)
         self.assertIn("scripts/build.sh --no-stubs --install", r.stdout)
+
+    def test_jetson_selftest_plan(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        script = os.path.join(INSTALL, "jetson_selftest.sh")
+        r = sh([script, "--dry-run"], env={"TRON_NV_RELEASE": release})
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertIn("not an NVIDIA Jetson", r.stdout)
+        for rev, libs in (("R35 (release), REVISION: 4.1", "tegra"), ("R36 (release), REVISION: 4.3", "nvidia")):
+            with self.subTest(release=rev):
+                with open(release, "w") as f:
+                    f.write("# %s, GCID: 1, BOARD: generic, EABI: aarch64\n" % rev)
+                r = sh([script, "--dry-run", "--stock", "--runs", "10"],
+                       env={"TRON_NV_RELEASE": release, "XDG_CACHE_HOME": tmp})
+                self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+                self.assertIn("-L/usr/lib/aarch64-linux-gnu/%s " % libs, r.stdout)
+                self.assertIn("nvmpi_seek_close.c", r.stdout)
+                self.assertIn("10 runs of:", r.stdout)
+                self.assertIn("2 runs of:", r.stdout)
+                self.assertIn("nvmpi_concurrent", r.stdout)
+                self.assertIn("Checks, stock build", r.stdout)
+                self.assertIn("--prefix %s/tron-legacy-mpf/stock/prefix" % tmp, r.stdout)
+
+    def test_jetson_hwdec_sound_to_hdmi_on_a_xavier_devkit(self):
+        """The devkit's ALSA default is the APE card: ~/.asoundrc goes to the HDMI output with a monitor, unless
+        one exists already."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        release = os.path.join(tmp, "nv_tegra_release")
+        with open(release, "w") as f:
+            f.write("# R35 (release), REVISION: 6.4, GCID: 1, BOARD: t186ref, EABI: aarch64\n")
+        with open(os.path.join(tmp, "model"), "w") as f:
+            f.write("NVIDIA Jetson Xavier NX Developer Kit\0")
+        with open(os.path.join(tmp, "compatible"), "w") as f:
+            f.write("nvidia,p3509-0000+p3668-0001\0nvidia,tegra194\0")
+        conf = os.path.join(tmp, "asound.conf")
+        with open(conf, "w") as f:
+            f.write('pcm.!default {\n\ttype plug\n\tslave {\n\t\tpcm "hw:APE,0"\n\t}\n}\n')
+        hda = os.path.join(tmp, "asound", "HDA")
+        os.makedirs(hda)
+        for n in (3, 7, 8, 9):
+            os.mkdir(os.path.join(hda, "pcm%dp" % n))
+        for n in (3, 4, 5, 6):   # the monitor is on the second output, device 7
+            with open(os.path.join(hda, "eld#%d.0" % n), "w") as f:
+                f.write("monitor_present\t\t%d\neld_valid\t\t%d\n" % ((n == 4,) * 2))
+        rc = os.path.join(tmp, "asoundrc")
+        env = {"TRON_ARCH": "aarch64", "TRON_NV_RELEASE": release, "TRON_DEVICE_TREE": tmp, "XDG_CACHE_HOME": tmp,
+               "TRON_ASOUND_CONF": conf, "TRON_PROC_ASOUND": os.path.join(tmp, "asound"), "TRON_ASOUNDRC": rc,
+               "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"}   # no PulseAudio here
+        if shutil.which("pulseaudio", path=env["PATH"]) or shutil.which("pipewire", path=env["PATH"]):
+            self.skipTest("PulseAudio or PipeWire on this machine")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"], env=env)
+        self.assertEqual(0, r.returncode, r.stdout + r.stderr)
+        self.assertIn("write %s: default -> hw:HDA,7 (dmix)" % rc, r.stdout)
+        with open(rc, "w") as f:
+            f.write("# mine\n")
+        r = sh([os.path.join(INSTALL, "install_jetson_hwdec.sh"), "--dry-run"], env=env)
+        self.assertIn("%s exists: kept as it is" % rc, r.stdout)
 
     def test_jetson_hwdec_plan_on_an_orin(self):
         """JetPack 6 (AGX Orin, R36.4.3): t234 repo, nvidia/ library folder, installs pinned to 36.4.3."""
@@ -326,6 +386,7 @@ class TestEntrypoint(unittest.TestCase):
 
     def test_proc_dmd(self):
         self.assertEqual(["--", "--proc-dmd"], self.ep.godot_args({"TRON_HW": "proc"}))
+        self.assertEqual(["--render-thread", "safe"], self.ep.godot_args({"TRON_RENDER_THREAD": "0"}))
         self.assertEqual(["--", "--x=1", "--proc-dmd"], self.ep.godot_args({"TRON_HW": "proc", "GODOT_ARGS": "-- --x=1"}))
         with self.assertRaises(SystemExit):
             self.ep.godot_args({"TRON_HW": "fast"})

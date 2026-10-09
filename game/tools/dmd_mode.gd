@@ -57,6 +57,13 @@ var glow := DEFAULT_GLOW
 var font := DEFAULT_FONT
 var text_scale := DEFAULT_TEXT_SCALE
 var _frames_hd := {}
+const LetterPanel := preload("res://tron/letter_panel.gd")
+const PRELOAD_IN_FLIGHT := 8       # background loads running at once (more would queue ahead of the game's own)
+var _preload: Array[String] = []    # resources loading in the background (_start_preload)
+var _to_preload: Array[String] = []   # resources not requested yet, in effect order
+var _preload_start := 0
+var _letters: Array[String] = []
+var _preloaded: Array[Resource] = []   # the preloaded ones: holding them keeps them in Godot's resource cache
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -202,6 +209,11 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	set_process(false)
+	if hd and font != "rom":
+		preload("res://tron/rom_text_hd.gd").load_baked(font)
+	if hd:
+		_start_preload()
 	if hd and dots > 0:
 		var layer := CanvasLayer.new()
 		layer.layer = 128
@@ -214,6 +226,65 @@ func _ready() -> void:
 		rect.material = mat
 		layer.add_child(rect)
 		add_child(layer)
+
+
+## The large display effects (at least tron/dmd/preload_min_frames HD frames; 0 = none), their HD frames and their
+## slide scenes, loaded on worker threads from the start. A slide is created on Godot's main thread when MPF shows its
+## effect, and loading 300 frames there stalled the game a second or more (docs/performance.md); with the frames
+## already in Godot's resource cache, the slide's load() calls return at once.
+## The letter pictures (solid*, hollow*) are loaded the same way, whatever their effect's size, and their glows made
+## on worker threads (tron/letter_panel.gd start_glow()).
+func _start_preload() -> void:
+	var min_frames := int(ProjectSettings.get_setting("tron/dmd/preload_min_frames", 40))
+	var glows := float(text_style()["glow"]) > 0.0
+	for d in DirAccess.get_directories_at(MEDIA_HD):
+		var paths: Array[String] = []
+		for f in DirAccess.get_files_at(MEDIA_HD + d):
+			f = f.trim_suffix(".import")          # an exported game lists the .import files
+			var path := MEDIA_HD + d + "/" + f
+			if not f.ends_with(".png") or path in paths or path in _letters:
+				continue
+			if f.begins_with("f"):
+				paths.append(path)                # effect frames
+			elif glows and (f.begins_with("solid") or f.begins_with("hollow")):
+				_letters.append(path)
+		if min_frames <= 0 or paths.size() < min_frames:
+			continue
+		var scene := "res://slides/deffs/%s.tscn" % d
+		if ResourceLoader.exists(scene):
+			paths.append(scene)
+		_to_preload.append_array(paths)
+	_to_preload = _letters + _to_preload
+	_preload_start = Time.get_ticks_msec()
+	set_process(not _to_preload.is_empty())
+
+
+func _process(_delta: float) -> void:
+	# at most PRELOAD_IN_FLIGHT at a time, in effect order: a slide the game shows meanwhile loads its own resources
+	# without waiting behind thousands of queued ones (with every effect requested at once, the first effect of a
+	# game waited 2.5 s)
+	while _preload.size() < PRELOAD_IN_FLIGHT and not _to_preload.is_empty():
+		var p: String = _to_preload.pop_front()
+		if ResourceLoader.load_threaded_request(p) == OK:
+			_preload.append(p)
+	# a few finished loads per frame; taking a finished load is cheap
+	var i := 0
+	var taken := 0
+	while i < _preload.size() and taken < 32:
+		var status := ResourceLoader.load_threaded_get_status(_preload[i])
+		if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			i += 1
+			continue
+		if status == ResourceLoader.THREAD_LOAD_LOADED:
+			_preloaded.append(ResourceLoader.load_threaded_get(_preload[i]))
+			if _preload[i] in _letters:
+				LetterPanel.start_glow(_preloaded[-1])
+			taken += 1
+		_preload.remove_at(i)                    # loaded, or failed (the slide then loads it itself)
+	if _preload.is_empty() and _to_preload.is_empty():
+		set_process(false)
+		print("DMD: %d effect frames and scenes preloaded in %.1f s" % [_preloaded.size(),
+				(Time.get_ticks_msec() - _preload_start) / 1000.0])
 
 
 ## The HD twin of a classic DMD picture, or null.

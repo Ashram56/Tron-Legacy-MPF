@@ -1,7 +1,9 @@
 Patch to GDE GoZen (github.com/VoylinsGamedevJourney/gde_gozen) at f9448619, applied by scripts/build_gozen.sh
 (git apply ignores this text): asks FFmpeg for <codec>_nvmpi (the Jetson's hardware decoder) first and falls back
-to software; SConstruct lean=yes. Hardware decoding tested on Jetson AGX Orin, L4T R36.4.3 / JetPack 6.2;
-Xavier NX (L4T R35) not tested yet. Software decoding: any Linux x86_64 / arm64.
+to software; with the hardware decoder, frames come as NV12 and, after GoZenVideo.set_target_size(), scaled
+down by the hardware to the size they are shown at (fewer pixels to copy and upload); SConstruct lean=yes.
+Hardware decoding tested on Jetson AGX Orin, L4T R36.4.3 / JetPack 6.2, and Jetson Xavier NX, L4T R35.6.4 /
+JetPack 5.1.4. Software decoding: any Linux x86_64 / arm64.
 
 diff --git a/SConstruct b/SConstruct
 index 5e7fcdf..923d50c 100644
@@ -29,28 +31,45 @@ index 5e7fcdf..923d50c 100644
  elif "windows" in platform:
      env.Append(LINKFLAGS=["-static"], LIBS=LIBS_COMMON)
 diff --git a/src/gozen_video.cpp b/src/gozen_video.cpp
-index bf3796f..83db3f7 100644
+index bf3796f..0b64efb 100644
 --- a/src/gozen_video.cpp
 +++ b/src/gozen_video.cpp
-@@ -1,6 +1,17 @@
+@@ -1,5 +1,34 @@
  #include "gozen_video.hpp"
  
- 
-+bool GoZenVideo::_open_decoder(const AVCodec* codec) {
++#include <algorithm>
++#include <string>
++
++
++bool GoZenVideo::_open_decoder(const AVCodec* codec, bool hw) {
 +	av_codec_ctx = make_unique_ffmpeg<AVCodecContext, AVCodecCtxDeleter>(avcodec_alloc_context3(codec));
 +	if (av_codec_ctx == NULL)
 +		return false;
 +	if (avcodec_parameters_to_context(av_codec_ctx.get(), av_stream->codecpar))
 +		return false;
 +	FFmpeg::enable_multithreading(av_codec_ctx.get(), codec);
-+	return avcodec_open2(av_codec_ctx.get(), codec, NULL) == 0;
++	AVDictionary* codec_options = nullptr;
++	if (hw) {
++		// jetson-ffmpeg's nvmpi decoders: NV12 straight from the hardware (no conversion to YUV420P), and scaled down
++		// by the hardware (VIC) to the shown size, keeping the aspect (even sizes, never up)
++		av_dict_set(&codec_options, "output_format", "nv12", 0);
++		int w = av_stream->codecpar->width, h = av_stream->codecpar->height;
++		if (target_size.x > 0 && target_size.y > 0 && w > 0 && h > 0) {
++			double scale = std::min(1.0, std::min((double)target_size.x / w, (double)target_size.y / h));
++			int tw = std::max(2, (int)(w * scale + 1) & ~1), th = std::max(2, (int)(h * scale + 1) & ~1);
++			if (tw < w && th < h)
++				av_dict_set(&codec_options, "resize", (std::to_string(tw) + "x" + std::to_string(th)).c_str(), 0);
++		}
++	}
++	bool ok = avcodec_open2(av_codec_ctx.get(), codec, &codec_options) == 0;
++	av_dict_free(&codec_options);
++	return ok;
 +}
 +
-+
+ 
  int GoZenVideo::open(const String& video_path) {
  	if (loaded)
- 		return _log_err("Already open");
-@@ -142,33 +153,36 @@ int GoZenVideo::open(const String& video_path) {
+@@ -142,33 +171,36 @@ int GoZenVideo::open(const String& video_path) {
  			}
  		}
  	}
@@ -83,7 +102,7 @@ index bf3796f..83db3f7 100644
 +									   : nullptr;
 +		if (hw_codec) {
 +			hw_tried = true;
-+			if (_open_decoder(hw_codec)) {
++			if (_open_decoder(hw_codec, true)) {
 +				av_codec = hw_codec;
 +				UtilityFunctions::print("GoZen: hardware decoder ", hw_codec->name);
 +			} else {
@@ -113,16 +132,101 @@ index bf3796f..83db3f7 100644
  	}
  
  	// Adjust resolution according to the aspect ratio.
+@@ -278,6 +310,14 @@ int GoZenVideo::open(const String& video_path) {
+ 	average_frame_duration = 10000000.0 / framerate; // eg. 1 sec / 25 fps = 400.000 ticks (40ms).
+ 	stream_time_base_video = av_q2d(av_stream->time_base) * 1000.0 * 10000.0; // Converting timebase to ticks.
+ 
++	// The decoder may scale (set_target_size()): the frames' own size is the one to copy
++	if (av_frame->width > 0 && av_frame->height > 0 &&
++		(av_frame->width != actual_resolution.x || av_frame->height != actual_resolution.y)) {
++		resolution = Vector2i(resolution.x * av_frame->width / std::max(1, actual_resolution.x),
++							  resolution.y * av_frame->height / std::max(1, actual_resolution.y));
++		actual_resolution = Vector2i(av_frame->width, av_frame->height);
++	}
++
+ 	// Check for alpha layer.
+ 	const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get((AVPixelFormat)av_frame->format);
+ 	has_alpha = desc && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
+@@ -293,8 +333,14 @@ int GoZenVideo::open(const String& video_path) {
+ 	int uv_height = (actual_resolution.y + 1) / 2;
+ 	bool is_natively_supported = (av_frame->format == AV_PIX_FMT_YUV420P || av_frame->format == AV_PIX_FMT_YUVJ420P ||
+ 								  av_frame->format == AV_PIX_FMT_YUVA420P);
++	nv12 = av_frame->format == AV_PIX_FMT_NV12;
+ 
+-	if (is_natively_supported) {
++	if (nv12) {
++		padding = av_frame->linesize[0] - actual_resolution.x;
++		y_data = Image::create_empty(actual_resolution.x, actual_resolution.y, false, Image::FORMAT_R8);
++		u_data = Image::create_empty(uv_width, uv_height, false, Image::FORMAT_RG8);
++		v_data = Image::create_empty(1, 1, false, Image::FORMAT_R8);
++	} else if (is_natively_supported) {
+ 		padding = av_frame->linesize[0] - actual_resolution.x;
+ 		y_data = Image::create_empty(actual_resolution.x, actual_resolution.y, false, Image::FORMAT_R8);
+ 		u_data = Image::create_empty(uv_width, uv_height, false, Image::FORMAT_R8);
+@@ -590,6 +636,14 @@ void GoZenVideo::_copy_frame_data() {
+ 		}
+ 
+ 		av_frame_unref(av_sws_frame.get());
++	} else if (nv12) {
++		for (int i = 0; i < actual_resolution.y; i++) {
++			memcpy(y_data->ptrw() + i * actual_resolution.x, av_frame->data[0] + i * av_frame->linesize[0],
++				   actual_resolution.x);
++		}
++		for (int i = 0; i < uv_height; i++) {
++			memcpy(u_data->ptrw() + i * uv_width * 2, av_frame->data[1] + i * av_frame->linesize[1], uv_width * 2);
++		}
+ 	} else {
+ 		for (int i = 0; i < actual_resolution.y; i++) {
+ 			memcpy(y_data->ptrw() + i * actual_resolution.x, av_frame->data[0] + i * av_frame->linesize[0],
+@@ -675,6 +729,9 @@ void GoZenVideo::_bind_methods() {
+ 
+ 	BIND_METHOD(is_full_color_range);
+ 	BIND_METHOD(is_using_sws);
++	BIND_METHOD_ARGS(set_target_size, "size");
++	BIND_METHOD(get_target_size);
++	BIND_METHOD(is_nv12);
+ 
+ 	BIND_METHOD(enable_debug);
+ 	BIND_METHOD(disable_debug);
 diff --git a/src/gozen_video.hpp b/src/gozen_video.hpp
-index ad7a971..9f40983 100644
+index ad7a971..25167da 100644
 --- a/src/gozen_video.hpp
 +++ b/src/gozen_video.hpp
-@@ -99,6 +99,8 @@ class GoZenVideo : public Resource {
+@@ -62,6 +62,7 @@ class GoZenVideo : public Resource {
+ 	bool loaded = false; // Is true after open().
+ 	bool debug = false;
+ 	bool using_sws = false; // This is set for when the pixel format is foreign and not directly supported by the addon.
++	bool nv12 = false; // NV12 frames (the Jetson's hardware decoder): u_data holds U and V interleaved (RG8), no v_data.
+ 	bool full_color_range = true;
+ 
+ 	int sws_flag = SWS_BILINEAR;
+@@ -75,6 +76,7 @@ class GoZenVideo : public Resource {
+ 
+ 	Vector2i resolution = Vector2i(0, 0);
+ 	Vector2i actual_resolution = Vector2i(0, 0);
++	Vector2i target_size = Vector2i(0, 0); // set_target_size(): the size the video is shown at (0 = full size).
+ 
+ 	Ref<Image> y_data;
+ 	Ref<Image> u_data;
+@@ -99,6 +101,8 @@ class GoZenVideo : public Resource {
  		if (debug)
  			UtilityFunctions::print("GoZenVideo: ", message, ".");
  	}
-+	bool _open_decoder(const AVCodec* codec);
++	bool _open_decoder(const AVCodec* codec, bool hw = false);
 +
  	inline bool _log_err(String message) {
  		UtilityFunctions::printerr("GoZenVideo: ", message, "!");
  		return false;
+@@ -126,6 +130,12 @@ class GoZenVideo : public Resource {
+ 	void set_headers(const String& headers_str) { headers = headers_str; }
+ 	String get_headers() const { return headers; }
+ 
++	// Before open(): the size the video is shown at. The Jetson's hardware decoder then scales its frames down to fit
++	// it (keeping the aspect) and hands them over as NV12, so a smaller window copies and uploads fewer pixels.
++	inline void set_target_size(const Vector2i& size) { target_size = size; }
++	inline Vector2i get_target_size() const { return target_size; }
++	inline bool is_nv12() const { return nv12; }
++
+ 	inline void set_sws_flag_bilinear() { sws_flag = SWS_BILINEAR; }
+ 	inline void set_sws_flag_bicubic() { sws_flag = SWS_BICUBIC; }
+ 

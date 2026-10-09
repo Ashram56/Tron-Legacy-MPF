@@ -50,4 +50,5 @@ ran clean.
 Patch (against `8d70c17`, `src/` part):
 https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/scripts/gozen/nvmpi_flush.patch
 
-Not checked yet on JetPack 5 (Xavier, L4T R35).
+On JetPack 5 (Jetson Xavier NX, L4T R35.6.4), stock libnvmpi: close with no packet 1086 ms (59 ms with the patch);
+the `crash` mode did not crash in 100 runs (0 with the patch too).

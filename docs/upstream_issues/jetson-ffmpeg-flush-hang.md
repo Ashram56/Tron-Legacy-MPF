@@ -65,4 +65,5 @@ https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/scripts/gozen/nvmpi_fl
 Known leftover, not caused by this change: on a recreated decoder, draining at EOF can lose up to about 10
 trailing frames.
 
-Not checked yet on JetPack 5 (Xavier, L4T R35), where the in-place flush may still work.
+Also on JetPack 5: Jetson Xavier NX, L4T R35.6.4, the `flush` mode hangs the same way with stock libnvmpi (and passes
+with the patch).

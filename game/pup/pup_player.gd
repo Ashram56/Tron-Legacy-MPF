@@ -4,7 +4,7 @@ extends Node
 ## "pup_play" commands MPF sends (game/tron_pup/mode.py).
 ##
 ## Windows (each on the monitor game/pup.cfg gives it):
-## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer);
+## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer); [backglass] enabled=false leaves it out;
 ## - dmd: the game's 128x32 DMD (the main window's picture) in a neon frame over a live light cycle chase
 ##   (game/pup/lightcycles.gd), or ([dmd] background="frame") in the PuP Pack's DMD panel art;
 ## - topper (optional, [pup] third_screen): PuP screens 13 (underlay) and 14 (pop-up top layer).
@@ -127,7 +127,8 @@ func _build() -> void:
 	for row in _read_csv(pack_dir.path_join("screens.pup")):
 		defaults[int(row.get("ScreenNum", "-1"))] = row
 	var video_volume := float(setting("pup", "video_volume", 100))
-	_make_layered_window("backglass", defaults, video_volume)
+	if bool(setting("backglass", "enabled", true)):
+		_make_layered_window("backglass", defaults, video_volume)
 	_make_dmd_window()
 	if bool(setting("pup", "third_screen", true)):
 		_make_layered_window("topper", defaults, video_volume)
@@ -145,11 +146,25 @@ func _build() -> void:
 		screens[n].start_background()
 	if bool(setting("dmd", "hide_main_window", true)):
 		get_tree().root.mode = Window.MODE_MINIMIZED
+	_vsync_one_window()
 	var placed := []
 	for section in windows:
 		placed.append("%s %s at %s" % [section, windows[section].size, windows[section].position])
 	print("PuP: windows %s, screens %s" % [", ".join(placed), screens.keys()])
 	_start_capture()
+
+
+## Vsync on the backglass window only (else the first PuP window): with vsync on every window, each one's present
+## waits for its own vertical blank, so a frame took one screen refresh per window (main, backglass, DMD, topper:
+## 15 FPS on a Jetson Xavier NX, L4T R35). One vsync'd window still paces the frames of all of them.
+func _vsync_one_window() -> void:
+	if windows.is_empty() or DisplayServer.window_get_vsync_mode() == DisplayServer.VSYNC_DISABLED:
+		return
+	var keep: Window = windows.get("backglass", windows.values()[0])
+	var others: Array = [get_tree().root] + windows.values()
+	for w: Window in others:
+		if w != keep:
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED, w.get_window_id())
 
 
 ## run.py --dmd-size WxH (Godot's --resolution, which sizes the main window): the size of the DMD window the

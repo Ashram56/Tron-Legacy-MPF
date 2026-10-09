@@ -4,6 +4,7 @@ uniform sampler2D y_data;
 uniform sampler2D u_data;
 uniform sampler2D v_data;
 uniform sampler2D a_data;
+uniform bool nv12; // u_data holds U and V interleaved (RG); v_data unused
 
 uniform vec2 resolution;
 uniform vec4 color_profile;
@@ -52,7 +53,8 @@ void fragment() {
 			y_val = mix(texture(y_data, tex_uv).r, y_neighbor, 0.5);
 		} else y_val = texture(y_data, tex_uv).r;
 
-		vec3 yuv = vec3(y_val, texture(u_data, tex_uv).r, texture(v_data, tex_uv).r);
+		vec2 chroma = nv12 ? texture(u_data, tex_uv).rg : vec2(texture(u_data, tex_uv).r, texture(v_data, tex_uv).r);
+		vec3 yuv = vec3(y_val, chroma);
 
 		if (full_color) yuv.yz -= 0.5; // Full range just needs Chroma offset.
 		else yuv = (yuv - LIMITED_Y_OFFSET) * LIMITED_SCALE;
