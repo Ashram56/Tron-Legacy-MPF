@@ -210,6 +210,8 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	set_process(false)
+	if hd and font != "rom":
+		preload("res://tron/rom_text_hd.gd").load_baked(font)
 	if hd:
 		_start_preload()
 	if hd and dots > 0:

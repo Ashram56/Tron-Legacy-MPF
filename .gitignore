@@ -26,3 +26,4 @@ game/addons/native_video/
 game/addons/gde_gozen/
 .cache/
 game/fonts_ttf/*.import
+game/fonts_ttf/baked/
