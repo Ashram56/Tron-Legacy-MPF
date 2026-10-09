@@ -84,6 +84,13 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   the summary counts apart. MSDF fonts avoid them but stalled start-up 3 to 7 s, so they are not used. The captures
   (`scripts/render_diff.py`, the tests; renderer opengl3) wrote no frames with it: `scripts/run.py` runs them with
   `--render-thread safe`.
+- The Vulkan pipeline cache saved while the game runs (`rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1`
+  in `game/project.godot`; Godot's default 3 MB): Godot saved it only at exit or when it grew by 3 MB, and with the
+  separate render thread its save at exit fails ("finalize can only be called from the render thread"), as does
+  any exit by a kill or a power cut. Every start compiled every pipeline again: the PuP light cycle background
+  stalled 4.0-4.7 s at its first derez (particles and a flash light). Saved as it grows, the next start finds the
+  pipelines: that stall gone (start-up stall 0.6 s, as without the light cycles); a test scene alone, 1.4 s and
+  2.3 s hitches every start to none from the second start.
 - Letter glows off Godot's main thread (`game/tron/letter_panel.gd`): the letters of deffs 91, 92, 94 and 107 had their
   glow made on the main thread when the slide was created (reading the pictures back from the GPU and blurring them
   in script), even with the glow off (`tron/dmd/text_glow=0`, the default): deff 94's slide took 380 ms to create
