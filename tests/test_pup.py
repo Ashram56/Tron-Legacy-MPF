@@ -64,6 +64,17 @@ class TestSetup(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.GOZEN_SRC, name)), name)
 
 
+class TestDmdBackground(unittest.TestCase):
+    def test_lightcycles_by_default(self):
+        import configparser
+        cfg = configparser.ConfigParser(inline_comment_prefixes=(";",))
+        cfg.read(os.path.join(GAME, "pup.cfg"))
+        self.assertEqual('"lightcycles"', cfg["dmd"]["background"])
+        self.assertIn("frame_image", cfg["dmd"])   # background="frame" keeps the pack's art
+        for name in ("lightcycles.gd", "lightcycles_grid.gdshader", "neon_frame.gdshader"):
+            self.assertTrue(os.path.exists(os.path.join(GAME, "pup", name)), name)
+
+
 @unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
 class TestEngine(unittest.TestCase):
 

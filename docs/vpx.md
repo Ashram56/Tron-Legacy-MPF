@@ -45,7 +45,8 @@ console and waits for it (VPX looks frozen during that time; the first start aft
 media). Closing the table quits a game the bridge started.
 
 Keys are VPX's own (the table script and `sam.vbs` turn them into switches): coin `5`, START `1`, flippers, plunger,
-tilt (nudge) keys, slam tilt `Home`, service buttons `7` `8` `9` `0`. Free play is on by default, as with
+tilt (nudge) keys, slam tilt `Home`, service buttons `7` `8` `9` `0`, and `End` opens and closes the coin door
+(as in PinMAME: "50V / 20V DISABLED" on the DMD and no coils until it is closed again, or `7` takes the warning away). Free play is on by default, as with
 `--hw virtual`; `--no-free-play` brings back the factory pricing. The DMD window is Godot's: place it where
 the table's DMD goes (`--dmd-size 1280x320` sets its size). The table's own DMD stays
 empty. Other run.py options work as usual (`--dmd classic`, `--monitor` for MPF Monitor next to the table).
@@ -67,6 +68,7 @@ own numbering, the numbers `game/config` already uses. So every device keeps its
 | switch -6 (`swSlamTilt`) | `s_slam_tilt` | |
 | switch 65 (`swCoin1`) | `s_coin` | Coins 2 and 3 (66, 67) are ignored, like any switch MPF does not have. |
 | switches -3, -2, -1, 0 | `s_service_back`, `_minus`, `_plus`, `_select` | |
+| switch -4 | `s_coin_door_open` | The table script's `End` key toggles it (`scripts/vpx_table.py` adds that line to the table's KeyDown; sam.vbs has no coin door switch). While it is on, every solenoid but 24 reads 0 and solenoid 33 is off, as the ROM masks its outputs with the door's power cut. |
 | switch 41 | `s_disc_opto` | Not inverted here: the table closes it while the ball is on the disc. |
 | solenoids 1-32 | the coils and flashers of the same number | Reported 0 or 255 (the table sets `UseVPMModSol`), pulses always reported at least once. |
 | solenoid 33 | flippers enabled | On while MPF has the flipper rules on. `sam.vbs`'s fast flips then move the flippers straight from the keys; when MPF turns the flippers off (tilt, ball end, game over, service menu) solenoid 33 goes off and the flippers drop. The ticket outputs (MPF 33-35) are renumbered out of the way. |

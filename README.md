@@ -6,7 +6,8 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
 This fork adds Terry Red's "End of Line" PuP Pack on three screens: the backglass (4:3 videos), a large LCD
-DMD (the pack's DMD panel art, with the game's DMD in the middle) and an optional topper. The pack's
+DMD (the game's DMD in a neon frame over a live 3D light cycle chase, or the pack's DMD panel art) and an
+optional topper. The pack's
 soundtrack replaces the ROM music. [docs/pup.md](docs/pup.md) has the details.
 
 ## Install
@@ -102,12 +103,17 @@ any layout.
 - `--no-free-play`: coins as on the factory settings.
 - `--scenario NAME`: plays a rule trace from `assets/rules/traces/` in real time.
 - `--hw proc`: the real machine on a Multimorphic P-ROC ([docs/hardware.md](docs/hardware.md)).
+- `--machine le`: a Tron Legacy LE's IO assignments; the default is the Pro (`--fiber-optics` drives the ramp
+  light tubes on a Pro). See [docs/hardware.md](docs/hardware.md), "Pro or LE".
 - `--hw vpx`: the Visual Pinball X table, with MPF instead of PinMAME (Windows; `setup.py --vpx` first, [docs/vpx.md](docs/vpx.md)).
 - `--dmd classic`: the original 128x32 dots instead of the HD DMD (the default on the desktop); `TRON_DMD=classic`
   in the environment does the same for every run.
 - `--dmd-size 1920x480`: the DMD window's size (HD scales to any size). `--dmd-dots 2`: an HD dot-matrix look.
 - `--dmd-tint orange`: the HD DMD in the original orange instead of Tron blue.
-- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (none by default).
+- `--dmd-font NAME`: the HD text font: `orbitron` (default, Tron style), `rajdhani` (clean, narrower), `godot` (Godot's
+  default font), a `.ttf`/`.otf` file, or `rom` (the ROM's own dot fonts, smoothed). `--dmd-text-scale X`: its
+  size, 1 = the ROM's capital height (default 0.85).
+- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (0.8 by default; `--dmd-text-glow 0` turns it off).
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.
 

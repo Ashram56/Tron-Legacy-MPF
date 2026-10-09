@@ -13,10 +13,14 @@ the answers where MPF 0.80's platform differs from VPinMAME:
   while MPF has the rule on. Solenoid 33 is on while any flipper rule is on: that is the input of the table's
   fast flips (sam.vbs cvpmFFlipsSAM: SolCallback(33) switches the flippers from ROM to button control), so
   the flippers react without a round trip to MPF, and stop when MPF disables them (tilt, ball end, game over).
+- Coin door open (End key, switch -4): the ROM drives no coil but the optional coil 24 while the door interlock
+  has cut the 50 V / 20 V (IO interrupt 0x12070 writes shadow & mask 0x3b984 while RAM 0x3727c & 3 != 3), so
+  every other solenoid reads 0 and solenoid 33 (the fast flips) is off until the door closes.
 - Stop: the table closed; MPF quits too when the bridge started it.
 - Lamps are numbered as in PinMAME (1-80, 0/1), and the ramp tubes' colour bits are lamps 101-106 as PinMAME's
   SAM driver numbers them (src/wpc/sam.c, SAM_GAME_TRON: strobe 0x10 -> 101-103, strobe 0x20 -> 104-106, each
-  blue, green, red). Those six are 0-255: the table only uses them as RGB() colour values.
+  blue, green, red). Those six are 0-255: the table only uses them as RGB() colour values. They stay 0 while the
+  machine var fiber_optics is 0 (a Pro, hw_vpx_pro.yaml, unless enabled).
 
 MPF's platform classes have __slots__, so the methods are replaced on the classes; they fall back to MPF's own
 code for any platform this module did not attach to.
@@ -29,6 +33,7 @@ from mpf.platforms.virtual_pinball import virtual_pinball as vp
 FLIPPER_COILS = ("15", "16", "12")     # c_left_flipper, c_right_flipper, c_upper_left_flipper
 FLIPPERS_ON_SOLENOID = 33              # sam.vbs: SolCallback(33) = "vpmFFlipsSAM.RomControl = not"
 MAX_SOLENOID = 32
+POWERED_WITH_DOOR_OPEN = (24,)         # coil descriptor flag 0x2 (assets/rom_data/io/coils.csv): OPTIONAL COIL
 TUBE_LAMPS = range(101, 107)           # hw_vpx.yaml: the ramp tubes' channels, reported 0-255
 
 _ADAPTERS = {}          # id(platform) -> VpxAdapter
@@ -110,6 +115,10 @@ class VpxAdapter:
                 driver._state = False
 
     # ------------------------------------------------------------------ outputs
+    def door_open(self):
+        door = self.machine.switches.get("s_coin_door_open")
+        return bool(door) and self.machine.switch_controller.is_active(door)
+
     def flippers_on(self):
         return any(driver.number in FLIPPER_COILS for (_, driver) in self.platform.rules)
 
@@ -121,6 +130,8 @@ class VpxAdapter:
             states[int(number)] = driver.state or number in self.pulsed
         self.pulsed.clear()
         states[FLIPPERS_ON_SOLENOID] = self.flippers_on()
+        if self.door_open():
+            states = {n: v and n in POWERED_WITH_DOOR_OPEN for n, v in states.items()}
         changed = []
         for number in sorted(states):
             value = 255 if states[number] else 0
@@ -131,12 +142,13 @@ class VpxAdapter:
 
     def lamp_levels(self):
         levels = {}
+        fiber_optics = self.machine.variables.get_machine_var("fiber_optics") != 0    # machine_pro.yaml: off on a Pro
         for light in self.platform._lights.values():
             if light.subtype != "matrix" or not light.hw_number.isdigit():
                 continue
             number, level = int(light.hw_number), light.current_brightness
             if number in TUBE_LAMPS:
-                levels[number] = max(0, min(255, int(round(level * 255))))
+                levels[number] = max(0, min(255, int(round(level * 255)))) if fiber_optics else 0
             else:
                 levels[number] = 1 if level > 0.5 else 0
         return levels

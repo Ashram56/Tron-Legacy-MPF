@@ -140,8 +140,12 @@ for merges.
   `80 + 16*(7-((n-1)%8)) + (n-1)/8`. Generate the address file, never hand-write it.
 - Flippers: 40 ms pulse, hold 1 ms every 12 ms (`default_hold_power: 0.083`). Slings and pops are fired
   by CPU software on SAM; on a P-ROC make them hardware rules.
-- Coil pulse widths live in the ROM's coil table; until it is decoded every coil time is a guess
-  (trace timings are 16 ms samples, not widths).
+- Coil pulse widths live in the ROM's coil table and hardware rules (decoded for Tron: generate the MPF
+  times from the asset repo's `rom_data/io/coils.csv`, as `scripts/gen_config.py` does); trace timings are
+  16 ms samples, not widths.
+- Pro and LE models of one title can share rules but not IO numbers. Keep the config in one model's ROM
+  numbers, generate the other model's numbers as an overlay (unmatched devices on the virtual platform), and
+  have the rules look devices up by name, never by the configured number (`tron/hw_numbers.py`).
 - Aux-bus outputs (latched coils 33+, RGB tubes, GI relay bit) are not P-ROC drivers. A wrong aux address
   can fire a coil bank: keep such code off until checked with a logic analyzer.
 - Coin door open comes from the IO board interlock status, which a P-ROC cannot read; wire a spare input.

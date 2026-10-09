@@ -14,8 +14,13 @@
 # solenoid values and lamp numbers as VPinMAME reports them, PinMAME's ramp RGB lamps 101-106, the
 # flipper "game on" output 33 the table's fast flips listen to, and tolerance for switches MPF does not know.
 
+# The VPW table is the LE (cGameName trn_174h: drop targets, Recognizer motor, ramp light tubes), so this overlay is
+# the LE; hw_vpx_pro.yaml puts the Pro's numbers on it (for a Pro table).
+config:
+  - machine_le.yaml
+
 hardware:
-  platform: virtual_pinball
+  platform: virtual_pinball, virtual    # virtual: the LE devices a Pro does not have (machine_pro.yaml)
 
 custom_code: tron.os_layer.TronOS, tron.vpx_hardware.VpxHardware
 
@@ -38,8 +43,8 @@ switches:
     number: -1
   s_service_select:     # swEnter (keyEnter, key 0)
     number: 0
-  s_coin_door_open:     # SAM has no coin door switch PinMAME or the table could set; stays closed
-    number: door
+  s_coin_door_open:     # PinMAME toggles the door with its End key; sam.vbs has no switch for it, so the table
+    number: -4          # script that scripts/vpx_table.py writes toggles -4 (DED #20, as on the P-ROC) with End
   s_disc_opto:          # the table closes 41 while the ball is on the disc (sw41_Hit = 1), like every other
     type: NO            # switch, so here it is not inverted (rom/switches.yaml: NC, unverified on hardware)
 

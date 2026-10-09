@@ -50,13 +50,13 @@ def main(argv=None):
     env = dict(os.environ, GIT_LFS_SKIP_SMUDGE="1")
     print("$ git submodule update --init --depth 1", flush=True)
     subprocess.run(["git", "submodule", "update", "--init", "--depth", "1"], cwd=tc.ROOT, env=env, check=True)
-    py = tc.python()
     failed = []
     for name, cmd in (("setup (new requirements, generated config and media, PuP media, Godot import)",
-                       [sys.executable, "scripts/setup.py"]),
-                      ("PuP capture match", [py, "scripts/pup_captures.py"]),
-                      ("unit tests", [py, "-m", "pytest", "-q", "tests"])):
-        if step(cmd):
+                       lambda: [sys.executable, "scripts/setup.py"]),
+                      ("PuP capture match", lambda: [tc.python(), "scripts/pup_captures.py"]),
+                      ("unit tests", lambda: [tc.python(), "-m", "pytest", "-q", "tests"])):
+        # tc.python() is resolved per step: on a fresh clone the venv only exists once setup has run.
+        if step(cmd()):
             failed.append(name)
     if failed:
         print("\nTo look at: " + ", ".join(failed) + (" (docs/pup_captures.md lists the captures to check)"
