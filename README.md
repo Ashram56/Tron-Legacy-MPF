@@ -6,7 +6,8 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
 This fork adds Terry Red's "End of Line" PuP Pack on three screens: the backglass (4:3 videos), a large LCD
-DMD (the pack's DMD panel art, with the game's DMD in the middle) and an optional topper. The pack's
+DMD (the game's DMD in a neon frame over a live 3D light cycle chase, or the pack's DMD panel art) and an
+optional topper. The pack's
 soundtrack replaces the ROM music. [docs/pup.md](docs/pup.md) has the details.
 
 ## Install
