@@ -204,6 +204,8 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	if hd and font != "rom":
+		preload("res://tron/rom_text_hd.gd").load_baked(font)
 	if hd and dots > 0:
 		var layer := CanvasLayer.new()
 		layer.layer = 128
