@@ -49,13 +49,20 @@ Notes on reading it:
 Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V drift under 40 ms on average,
 0 black screens, 0 Godot `ERROR` lines. `summary.md` ends with PASS/FAIL per target.
 
-## Board settings measured (Xavier NX, mode 5, the clip suite)
+## Settings measured (Xavier NX, mode 5, the clip suite)
 
 - Core pinning (`scripts/run.py`, Linux with 4+ cores, `TRON_PIN=0` turns it off): Godot's main thread alone on the
   last core, Godot's other threads and MPF on the others. About +1.5 FPS and a third fewer frames over 2 vblanks
   (two runs each way). Putting MPF alone on one core instead made it worse (42.5 / 49.7 FPS against 49.8 / 53.0).
 - `jetson_clocks` (every clock at the mode's maximum): no measurable gain (47.8 / 52.9 FPS with it, 48.3 / 53.4
   without) at the same power, so it is not used.
+- Godot's worker pool (`threading/worker_pool/low_priority_thread_ratio=0.5` in `game/project.godot`, Godot's
+  default 0.3): low-priority tasks (video opens, closes, restarts, background loads) get 2 threads instead of 1 on 4
+  cores. Shorter stalls at video switches (1.27 / 1.29 s to 0.95 / 0.61 s), the rest unchanged.
+- Large display effects preloaded (`tron/dmd/preload_min_frames=40`, `game/tools/dmd_mode.gd`; 0 = off): the HD
+  frames and slide scenes of every effect with 40 frames or more (17 effects, 1558 frames) load on worker threads
+  from the start, so their slides no longer load on the main thread when shown. Deff 86 created 0.89 s to under
+  0.1 s, deff 143 0.38 s to under 0.13 s; about 200 MB more memory (2.6 to 2.8 GB used of 6.8 GB).
 
 ## Finding the cause of a hitch
 

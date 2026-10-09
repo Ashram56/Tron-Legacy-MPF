@@ -32,6 +32,7 @@ dmd/mode="hd"
 dmd/dots=0
 dmd/tint="blue"
 dmd/text_glow=0.0
+dmd/preload_min_frames=40
 
 [editor_plugins]
 
@@ -41,3 +42,7 @@ enabled=PackedStringArray("res://addons/mpf-gmc/plugin.cfg")
 
 renderer/rendering_method="mobile"
 textures/canvas_textures/default_texture_filter=0
+
+[threading]
+
+worker_pool/low_priority_thread_ratio=0.5

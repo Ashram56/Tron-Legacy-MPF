@@ -46,6 +46,8 @@ var text_color := Color(DEFAULT_TEXT_COLOR)
 var glow_color := Color(DEFAULT_GLOW_COLOR)
 var glow := DEFAULT_GLOW
 var _frames_hd := {}
+var _preload: Array[String] = []    # resources still loading in the background (_start_preload)
+var _preloaded: Array[Resource] = []   # the preloaded ones: holding them keeps them in Godot's resource cache
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -158,6 +160,9 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	set_process(false)
+	if hd:
+		_start_preload()
 	if hd and dots > 0:
 		var layer := CanvasLayer.new()
 		layer.layer = 128
@@ -170,6 +175,49 @@ func _ready() -> void:
 		rect.material = mat
 		layer.add_child(rect)
 		add_child(layer)
+
+
+## The large display effects (at least tron/dmd/preload_min_frames HD frames; 0 = none), their HD frames and their
+## slide scenes, loaded on worker threads from the start. A slide is created on Godot's main thread when MPF shows its
+## effect, and loading 300 frames there stalled the game a second or more (docs/performance.md); with the frames
+## already in Godot's resource cache, the slide's load() calls return at once.
+func _start_preload() -> void:
+	var min_frames := int(ProjectSettings.get_setting("tron/dmd/preload_min_frames", 40))
+	if min_frames <= 0:
+		return
+	for d in DirAccess.get_directories_at(MEDIA_HD):
+		var paths: Array[String] = []
+		for f in DirAccess.get_files_at(MEDIA_HD + d):
+			f = f.trim_suffix(".import")          # an exported game lists the .import files
+			if f.begins_with("f") and f.ends_with(".png") and not (MEDIA_HD + d + "/" + f) in paths:
+				paths.append(MEDIA_HD + d + "/" + f)  # effect frames (letter sprites are solid*/hollow*)
+		if paths.size() < min_frames:
+			continue
+		var scene := "res://slides/deffs/%s.tscn" % d
+		if ResourceLoader.exists(scene):
+			paths.append(scene)
+		for p in paths:
+			if ResourceLoader.load_threaded_request(p) == OK:
+				_preload.append(p)
+	set_process(not _preload.is_empty())
+
+
+func _process(_delta: float) -> void:
+	# a few finished loads per frame; taking a finished load is cheap
+	var i := 0
+	var taken := 0
+	while i < _preload.size() and taken < 32:
+		var status := ResourceLoader.load_threaded_get_status(_preload[i])
+		if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			i += 1
+			continue
+		if status == ResourceLoader.THREAD_LOAD_LOADED:
+			_preloaded.append(ResourceLoader.load_threaded_get(_preload[i]))
+			taken += 1
+		_preload.remove_at(i)                    # loaded, or failed (the slide then loads it itself)
+	if _preload.is_empty():
+		set_process(false)
+		print("DMD: %d large-effect frames and scenes preloaded" % _preloaded.size())
 
 
 ## The HD twin of a classic DMD picture, or null.
