@@ -6,9 +6,10 @@ bringing up another Jetson, such as the Xavier NX.
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
 4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
-**Decoder self-test passed:** Jetson Xavier NX Developer Kit (t194), L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04.6,
-on the PuP Pack's 1080p trailer (2026-10-08). The game itself is not played on it yet. See
-[Xavier NX checklist](#xavier-nx-checklist).
+**Tested:** Jetson Xavier NX Developer Kit (t194), L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04.6, X11 + openbox
+(no display manager), Godot 4.6.3, one 1920x1080 HDMI screen with the three PuP windows on it, HDMI audio: decoder
+self-test and both game scenarios in five power modes (2026-10-09). Use nvpmodel mode 5 (10W desktop, the module's
+default) or 8 (20W): see [Xavier NX power modes](#xavier-nx-power-modes).
 
 ## The video stack
 
@@ -120,7 +121,8 @@ Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as inst
   topper windows can tear in principle; they redraw every frame anyway.
 - **Audio (Xavier NX devkit):** the system ALSA default (`/etc/asound.conf`) is the APE I2S card, which has nothing
   connected, so Godot fell back to no sound. A `~/.asoundrc` sending the default to HDMI (`hw:HDA,7` through dmix)
-  fixes it; the install does not write it yet.
+  fixes it; `install_jetson_hwdec.sh` writes it when no PulseAudio or PipeWire is installed, and keeps an existing
+  one.
 
 ## Known leftovers
 - A recreated decoder can lose up to about 10 trailing frames when it drains at the end of a video.
@@ -180,6 +182,32 @@ To bring one up:
    `gozen.patch`.
 5. If a hunk does not apply or behaves differently on R35, change `nvmpi_flush.patch` and re-run step 1; when its
    `ffmpeg/` part changes, also rebuild GoZen (`bash scripts/build_gozen.sh arm64`) and commit the `.so`.
+
+## Xavier NX power modes
+Xavier NX, L4T R35.6.4, with fixes 1 to 9. Each mode set with `sudo nvpmodel -m N` (no reboot needed), then
+`clu_hurryup` for 120 s and `full_game_to_portal` for 620 s. Every run: 0 black screens, 0 Godot errors,
+`h264_nvmpi` on every video, no freeze; CPU at most 47.5 °C. Modes 0, 1, 6 and 7 were not run (2- and 4-core
+modes, slower per core than 5).
+
+| Mode (CPUs / GPU max MHz) | Test | FPS avg | Worst 1 s | Median ms | Frames > 50 / > 100 ms | Video frames skipped | Video lag avg | A/V drift avg / max ms | CPU / GPU / NVDEC % | W avg |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3: 10W 2-core (2 × 1.50 GHz / 803) | hurryup | 19.8 | 9 | 38.9 | 437 / 67 | 1788 | 1084 ms | – | 87 / 17 / 81 | 5.2 |
+| | full game | 20.3 | 1 | 37.5 | 3049 / 456 | 11685 | 475 ms | 186 / 1122 | 86 / 19 / 95 | 5.3 |
+| 4: 10W 4-core (4 × 1.19 GHz / 803) | hurryup | 32.0 | 5 | 33.3 | 93 / 21 | 655 | 142 ms | 92 / 301 | 62 / 25 / 91 | 5.6 |
+| | full game | 36.9 | 3 | 22.2 | 334 / 121 | 2776 | 183 ms | 113 / 910 | 53 / 27 / 97 | 5.6 |
+| **5: 10W desktop (4 × 1.91 GHz / 510)** | hurryup | 54.4 | 29 | 16.7 | 26 / 9 | 146 | 47 ms | 138 / 163 | 46 / 35 / 94 | 6.6 |
+| | full game | 52.6 | 8 | 16.7 | 161 / 68 | 856 | 68 ms | 91 / 521 | 43 / 36 / 98 | 6.5 |
+| 2: 15W 6-core (6 × 1.42 GHz / 1109) | hurryup | 49.5 | 23 | 18.1 | 35 / 14 | 198 | 58 ms | 59 / 109 | 44 / 31 / 93 | 6.1 |
+| | full game | 49.4 | 4 | 16.9 | 214 / 100 | 1274 | 122 ms | 192 / 1811 | 35 / 34 / 98 | 5.9 |
+| 8: 20W 6-core (6 × 1.42 GHz / 1109) | hurryup | 52.9 | 26 | 17.1 | 25 / 12 | 173 | 69 ms | 48 / 261 | 39 / 34 / 93 | 6.5 |
+| | full game | 50.7 | 3 | 16.7 | 218 / 96 | 1181 | 116 ms | 189 / 1749 | 34 / 35 / 98 | 6.4 |
+
+- Per-core speed matters more than the number of cores: Godot's main thread (game logic and render submission) is
+  the critical path. MPF uses about 6% of a core.
+- Mode 5 is the smoothest and draws about 6.5 W. Mode 8 is level with it and has twice the GPU clock in reserve.
+  Modes 3 and 4 are not playable.
+- The A/V drift maxima are single samples right after a video switch; the averages are the better figure.
+- Every mode has a 2.4–3.8 s stall at the same moment of the full game (about 118 s in): game side.
 
 ## Updating a pin
 To move jetson-ffmpeg or GDE GoZen to a newer revision:
