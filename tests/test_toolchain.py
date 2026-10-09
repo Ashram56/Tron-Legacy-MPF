@@ -6,6 +6,7 @@ import os
 import socket
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from unittest import mock
@@ -235,6 +236,52 @@ class TestRun(unittest.TestCase):
             self.assertEqual(sys.executable, run.godot_command([], virtual_display=False)[0])
             with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
+
+    def test_captures_render_on_the_main_thread(self):
+        """opengl3 (the captures) with Godot's separate render thread (game/project.godot) wrote no frames."""
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable}):
+            self.assertEqual(["--render-thread", "safe", "--rendering-driver", "opengl3"],
+                             run.godot_command(["--rendering-driver", "opengl3"], virtual_display=False)[3:])
+            self.assertNotIn("--render-thread", run.godot_command(["--x"], virtual_display=False))
+
+    def test_render_thread_switch(self):
+        """Godot's separate render thread is on by default; --no-render-thread or TRON_RENDER_THREAD=0 turns it off."""
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable, "TRON_RENDER_THREAD": "0"}):
+            self.assertEqual(["--render-thread", "safe", "--x"], run.godot_command(["--x"], virtual_display=False)[3:])
+        with mock.patch.object(run, "run", return_value=0) as r:
+            run.main(["--no-render-thread", "--no-text-ui"])
+            self.assertEqual(["--render-thread", "safe"], r.call_args.kwargs["godot_args"][:2])
+            run.main(["--no-text-ui"])
+            self.assertNotIn("--render-thread", r.call_args.kwargs["godot_args"])
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux only")
+    def test_core_pinning(self):
+        """Godot's main thread alone on the last core, its other threads and MPF on the rest; off with TRON_PIN=0,
+        under Xvfb and below 4 cores."""
+        import subprocess
+        import threading
+        cpus = sorted(os.sched_getaffinity(0))
+        with mock.patch.dict(os.environ, {"TRON_PIN": "0"}):
+            self.assertIsNone(run.start_core_pinning(None, None, False))
+        self.assertIsNone(run.start_core_pinning(None, None, True))
+        if len(cpus) < 4:
+            self.assertIsNone(run.start_core_pinning(None, None, False))
+            return
+        script = "import threading, time; threading.Thread(target=time.sleep, args=(5,)).start(); time.sleep(5)"
+        godot = subprocess.Popen([sys.executable, "-c", script])
+        mpf = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
+        self.addCleanup(godot.kill)
+        self.addCleanup(mpf.kill)
+        stop = threading.Event()
+        worker = threading.Thread(target=run.core_pinning, args=(godot, mpf, stop, 0.1))
+        worker.start()
+        time.sleep(1.0)
+        stop.set()
+        worker.join()
+        tids = [int(t) for t in os.listdir("/proc/%d/task" % godot.pid)]
+        self.assertEqual({cpus[-1]}, os.sched_getaffinity(godot.pid))
+        self.assertEqual(set(cpus[:-1]), os.sched_getaffinity([t for t in tids if t != godot.pid][0]))
+        self.assertEqual(set(cpus[:-1]), os.sched_getaffinity(mpf.pid))
 
 
 class TestMediaStale(unittest.TestCase):

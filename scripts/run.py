@@ -140,6 +140,11 @@ def godot_command(godot_args, virtual_display=None):
     if not os.path.exists(exe) and not shutil.which(exe):
         raise SystemExit("Godot not found at {} (run `python scripts/setup.py`, or set GODOT)".format(exe))
     cmd = [exe, "--path", tc.GAME] + list(godot_args)
+    if ("opengl3" in godot_args or os.environ.get("TRON_RENDER_THREAD") == "0") \
+            and "--render-thread" not in godot_args:
+        # Godot's separate render thread (game/project.godot) off: --no-render-thread or TRON_RENDER_THREAD=0, and
+        # always for the captures' renderer (opengl3), which wrote no frames with it
+        cmd[3:3] = ["--render-thread", "safe"]
     if virtual_display is None:
         virtual_display = tc.needs_virtual_display()
     if virtual_display:
@@ -147,6 +152,42 @@ def godot_command(godot_args, virtual_display=None):
             raise SystemExit("no display and no xvfb-run: install xvfb (apt install xvfb) or set DISPLAY")
         cmd = ["xvfb-run", "-a", "-s", "-screen 0 1280x720x24"] + cmd
     return cmd
+
+
+def core_pinning(godot, mpf, stop_event, interval=2.0):
+    """Linux, 4+ usable cores: Godot's main thread gets the last core to itself; Godot's other threads (renderer,
+    video decoding, audio) and MPF share the others. Godot's main thread runs the game's scripts and draws every
+    frame, so it is the one that must not wait for a core (docs/performance.md: on a Jetson Xavier NX in mode 5,
+    +1.5 FPS and a third fewer frames over 2 vblanks). Applied again every `interval` s, as new threads start with
+    their creator's cores. TRON_PIN=0 turns it off."""
+    cpus = sorted(os.sched_getaffinity(0))
+    main_core, others = {cpus[-1]}, set(cpus[:-1])
+    while not stop_event.wait(interval):
+        for proc, is_godot in ((godot, True), (mpf, False)):
+            if proc is None or proc.poll() is not None:
+                continue
+            try:
+                tids = [int(t) for t in os.listdir("/proc/%d/task" % proc.pid)]
+            except OSError:
+                continue
+            for tid in tids:
+                want = main_core if is_godot and tid == proc.pid else others
+                try:
+                    if os.sched_getaffinity(tid) != want:
+                        os.sched_setaffinity(tid, want)
+                except OSError:
+                    pass                # the thread ended meanwhile
+
+
+def start_core_pinning(godot, mpf, virtual_display):
+    """core_pinning() on a thread when it applies (Linux, a real display, 4+ cores); returns its stop event."""
+    if not sys.platform.startswith("linux") or virtual_display or os.environ.get("TRON_PIN") == "0" \
+            or len(os.sched_getaffinity(0)) < 4:
+        return None
+    import threading
+    stop_event = threading.Event()
+    threading.Thread(target=core_pinning, args=(godot, mpf, stop_event), daemon=True).start()
+    return stop_event
 
 
 def user_arg(gargs, arg):
@@ -264,7 +305,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         env["TRON_LIVE_SCENARIO"] = scenario
     if trace:
         env["TRON_TRACE"] = trace
-    godot = mpf = mon = None
+    godot = mpf = mon = pinning = None
     try:
         godot = spawn(godot_command(gargs, virtual_display), log=godot_log, group=True)
         print("Godot started (log: {}), waiting for GMC on port {}".format(godot_log, tc.BCP_PORT), flush=True)
@@ -277,6 +318,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics)
         print("Starting MPF: mpf " + " ".join(margs), flush=True)
         mpf = spawn(tc.mpf_command() + margs, log=mpf_log, cwd=tc.GAME, env=env)
+        pinning = start_core_pinning(godot, mpf, virtual_display if virtual_display is not None
+                                     else tc.needs_virtual_display())
         if hw == "vpx":
             print("MPF waits for the Visual Pinball X table (TronMPF.Controller) on port {}: start the table "
                   "now (docs/vpx.md)".format(tc.MONITOR_PORT), flush=True)
@@ -306,6 +349,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("interrupted, stopping", flush=True)
         return 130
     finally:
+        if pinning:
+            pinning.set()
         for p in (mon, mpf, godot):
             stop(p)
 
@@ -353,8 +398,13 @@ def main(argv=None):
     p.add_argument("--dmd-text-scale", type=float, metavar="X",
                    help="hd only, clean fonts: text size, 1 = capitals as tall as the ROM's (default 0.85; 0.5-1.5). "
                         "Also TRON_DMD_TEXT_SCALE")
+    p.add_argument("--no-render-thread", dest="render_thread", action="store_false",
+                   help="draw on Godot's main thread instead of its separate render thread (the default, "
+                        "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
+    if not args.render_thread and "--render-thread" not in args.godot_args:
+        args.godot_args = engine_arg(args.godot_args, "--render-thread", "safe")
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None

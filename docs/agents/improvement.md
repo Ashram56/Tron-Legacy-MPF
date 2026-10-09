@@ -36,6 +36,31 @@ Current defaults (Tron, `dmd_mode.gd` constants and `project.godot`): HD on, Tro
 `#22b8ff` at 0.8, font Rajdhani Bold, text scale 0.85. Back to the ROM: `--dmd classic`, `--dmd-font rom`,
 `--dmd-tint orange`, `--dmd-text-glow 0`.
 
+## 2a. Assets and loading: what keeps the HD display smooth
+
+Measured on a Jetson Xavier NX (the slowest target; figures in [performance.md](../performance.md)), true on
+every platform. The rule behind all of them: **a slide is created on Godot's main thread when MPF shows its
+effect, so anything it loads or computes then stalls the whole game**. Move the work to build time, to setup, or
+to worker threads at start-up.
+
+| Finding | What to do (Tron) | Measured |
+|---|---|---|
+| Lossless HD frames decompress on the main thread when their slide loads (~7 ms per 1024x256 frame) | `scripts/gen_media.py` writes a VRAM-compressed `.import` for every HD effect frame (`HD_FRAME_IMPORT`: ETC2 on ARM, S3TC/BPTC on PCs; grey, so one channel) | ~1.5 ms per frame, half the GPU memory; 40.8 dB PSNR, no visible difference at 1280x320. Light Cycle multiball start 2.34 to 1.00 s |
+| Letter sprites (`solid*`, `hollow*`) are read back to make their glow | Keep them lossless (no VRAM compression): the glow is made from their pixels | - |
+| Large effects (300 frames) still took about 1 s to load when shown | Preload every effect with 40+ frames, plus its slide scene, on worker threads from start-up (`tron/dmd/preload_min_frames=40`, `game/tools/dmd_mode.gd`); 0 turns it off | Deff 86 0.89 s to under 0.1 s, about +200 MB memory |
+| Preloading every effect (`preload_min_frames=1`) | Not kept | +130 MB video memory, start-up preload 11 to 16 s, and effects shown during the longer preload waited for it |
+| Requesting every preload at once queued ahead of the game's own loads (first effect waited 2.5 s) | At most 8 background loads in flight, in effect order (`PRELOAD_IN_FLIGHT`) | - |
+| Letter glows were made on the main thread at slide creation (texture read back, blurred in script), even with the glow off | None made with the glow off; with it on, made on worker threads from the files at start-up (`game/tron/letter_panel.gd` `start_glow()`); a worker never reads a texture back (that broke the separate render thread) | Deff 94 380 ms to 25-36 ms; slowest effect 0.56 to 0.19 s |
+| MSDF clean fonts generate each glyph on the main thread when first drawn | Bake them at setup (`game/tools/bake_fonts.gd`, `game/fonts_ttf/baked/`), load them on worker threads at start-up (`rom_text_hd.gd` `load_baked()`) | Orbitron: 20-30 s freezes gone; renders pixel-identical |
+| The clean fonts' wide copy (outline and glow, `WIDE_RANGE=192`) is the expensive one | Keep the range as small as the glow allows | Orbitron vs the ROM font: about +1 W, +450 MB memory, +150 MB video memory on a Xavier NX |
+| Godot's pipeline cache was never saved (the save at exit fails with the separate render thread; a kill never saves) | `rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1` in `game/project.godot`: saved as it grows | First-use stalls of new effects (1.4-4.7 s) gone from the second start |
+| Rendering on the main thread | Separate render thread (`thread_model=2`), `run.py --no-render-thread` / `TRON_RENDER_THREAD=0` to turn it off; the captures (opengl3) always run without it | Main thread 54% to 29% of a core, +2 to 3 FPS |
+| Background loads got one worker thread on 4 cores | `threading/worker_pool/low_priority_thread_ratio=0.5` | Shorter stalls when several loads overlap |
+
+When adding media: a new kind of picture loaded by a slide gets a VRAM-compressed import unless a script reads its
+pixels; a new effect with 40+ frames is preloaded automatically; a new font goes through `bake_fonts.gd`. After
+changing any of these, run setup (media regeneration and font bake) before measuring.
+
 ## 3. Owner decisions (Tron, keep adding)
 
 | Date | Decision |

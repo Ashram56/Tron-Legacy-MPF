@@ -413,12 +413,30 @@ def build_deffs(only_data):
     return out
 
 
+# Godot import settings for the HD effect frames: VRAM-compressed (ETC2 on ARM, S3TC/BPTC on PCs; one channel, as
+# the frames are grey). An effect's frames load when its slide is created, on Godot's main thread: lossless frames
+# took ~7 ms each to decompress (the 319 frames of the Light Cycle multiball intro stalled the game 2.4 s on a Jetson
+# Xavier NX), VRAM-compressed ones ~1.5 ms, at half the GPU memory (docs/performance.md). Godot completes the file
+# (uid, paths) on import and keeps these parameters. Letter sprites stay lossless: tron/letter_panel.gd reads them.
+HD_FRAME_IMPORT = """[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[params]
+
+compress/mode=2
+mipmaps/generate=false
+"""
+
+
 def build_hd_frames(scale=None, deffs=None):
     """game/media/dmd_hd: every picture of game/media/dmd upscaled (dmd_hd.upscale_file), same names.
     Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black. The
     recorded effects' frames (deffs: build_deffs, source "reference") lose their ROM-font letters, which
     the HD mode draws live (scripts/frame_text.py, media/dmd_hd/text.json); effects whose pictures are only
-    rectangles (frames, blocks) lose those too, drawn as rectangles (media/dmd_hd/shapes.json)."""
+    rectangles (frames, blocks) lose those too, drawn as rectangles (media/dmd_hd/shapes.json).
+    Effect frames get a VRAM-compressed import (HD_FRAME_IMPORT)."""
     import dmd_hd
     import frame_text
     scale = scale or dmd_hd.FRAME_SCALE
@@ -443,6 +461,9 @@ def build_hd_frames(scale=None, deffs=None):
             if boxes:
                 rects[key] = boxes
             jobs.append((cleared or src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
+            if kind == "frame":
+                with open(os.path.join(out, name + ".import"), "w", encoding="utf-8", newline="\n") as f:
+                    f.write(HD_FRAME_IMPORT)
     with open(os.path.join(dst_root, "scale.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"scale": scale}, f)
     with open(os.path.join(dst_root, "text.json"), "w", encoding="utf-8", newline="\n") as f:
