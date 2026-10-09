@@ -112,7 +112,9 @@ Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as inst
   (`nvmpi_flush.patch`): decode 74 -> 203 fps, CPU 17 -> 4 ms per frame.
 - **`video_playback.gd`:** the next frame is decoded on a worker task, one frame ahead, so Godot's main thread only
   uploads it; a frame not ready yet is shown late instead of waited for. Before, three videos decoding on the main
-  thread fell behind, and the catch-up decoding made it worse.
+  thread fell behind, and the catch-up decoding made it worse. Decode tasks never seek (at most 1 s of frames per
+  task) and are high priority: a catch-up `seek_frame()` near the end of a clip retried for minutes on the one thread
+  Godot gives low-priority tasks here, and the game froze (9 min at 10W, 2 cores).
 - **`pup_player.gd`:** vsync stays on the backglass window only. On the R35 X11 Vulkan driver each vsync'd window
   waits for its own vertical blank, so four windows made every frame four refreshes long (67 ms). The DMD and
   topper windows can tear in principle; they redraw every frame anyway.

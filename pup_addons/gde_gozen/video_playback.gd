@@ -419,14 +419,14 @@ func _seek_start() -> void:
 		printerr("Couldn't seek frame!")
 
 
-## Starts decoding up to [param target] on a worker thread (_process() shows it when it is due).
+## Starts decoding up to [param target] on a worker thread (_process() shows it when it is due). At most a second
+## of frames per task and never a seek: GoZenVideo.seek_frame() near the end of a file can retry for minutes, and a
+## close() waits for this task. A high-priority task: Godot runs low-priority ones (the opens, closes and restarts)
+## on about a third of its threads, one on a Xavier NX, so a frame would wait behind them.
 func _start_decode(target: int) -> void:
-	var count: int = target - current_frame
-	_ahead_frame = target
-	if count > _frame_rate:
-		_decode_task = WorkerThreadPool.add_task(_decode_seek.bind(target))
-	else:
-		_decode_task = WorkerThreadPool.add_task(_decode_ahead.bind(count))
+	var count: int = mini(target - current_frame, maxi(1, ceili(_frame_rate)))
+	_ahead_frame = current_frame + count
+	_decode_task = WorkerThreadPool.add_task(_decode_ahead.bind(count), true)
 
 
 ## On a worker thread: decodes [param count] frames, keeping the image of the last one.
@@ -434,12 +434,6 @@ func _decode_ahead(count: int) -> void:
 	for i: int in range(count - 1):
 		video.next_frame(true)
 	video.next_frame(false)
-
-
-## On a worker thread: far behind, seeks instead.
-func _decode_seek(target: int) -> void:
-	if video.seek_frame(target):
-		printerr("Couldn't seek frame!")
 
 
 func _wait_decode() -> void:
