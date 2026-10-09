@@ -71,6 +71,11 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
 - Frames decoded at the shown size, as NV12 (GoZen `set_target_size()`, `decode_to_display_size`; docs/jetson.md
   fix 10): 4 to 8 times fewer pixels per video frame. Godot's main thread 44-46% of a core instead of 51-55%;
   52.9 / 54.7 to 53.4 / 55.7 FPS, frames over 2 vblanks 19 / 33 to 18 / 26.
+- Godot's separate render thread (`rendering/driver/threads/thread_model=2` in `game/project.godot`): rendering moves
+  off the main thread (27-28% of a core instead of 44-46%). 53.4 / 55.7 to 55.7 / 58.1 FPS, p99 33.9 / 31.6 to
+  29.1 / 25.0 ms, frames over 2 vblanks 18 / 26 to 16 / 21. Godot calls the mode experimental; it logs harmless
+  `_texture_2d_update` glyph-cache errors (docs/upstream_issues/godot-separate-render-thread-glyph-cache.md), which
+  the summary counts apart. MSDF fonts avoid them but stalled start-up 3 to 7 s, so they are not used.
 
 ## Finding the cause of a hitch
 

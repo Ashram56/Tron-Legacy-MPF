@@ -83,6 +83,10 @@ var _decoded: int = 0 ## The last frame number decoded (or being decoded) into _
 var _queue: Array[Dictionary] = [] ## Decoded frames not shown yet, oldest first: {"frame": int, "planes": Array}.
 var _queue_mutex: Mutex = Mutex.new()
 var _nv12: bool = false ## The decoder gives NV12: u_data holds U and V (RG8), there is no v plane to upload.
+## With a separate render thread, RenderingServer.texture_2d_update() runs later, on that thread, while the next decode
+## may already write into GoZen's images: a frame shown straight from GoZen (after a seek or restart) is then copied.
+## (Queued frames always are.)
+static var _copy_planes: bool = int(ProjectSettings.get_setting("rendering/driver/threads/thread_model", 1)) == 2
 var _clock: float = 0.0 ## Seconds of video played; frame n is due at n / _frame_rate (playback_speed moves it).
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
@@ -611,6 +615,8 @@ func _set_frame_image(planes: Array = []) -> void:
 			planes.append(video.get_v_data())
 		if _has_alpha:
 			planes.append(video.get_a_data())
+		if _copy_planes:
+			planes = planes.map(func(image: Image) -> Image: return image.duplicate())
 	RenderingServer.texture_2d_update(y_texture.get_rid(), planes[0], 0)
 	RenderingServer.texture_2d_update(u_texture.get_rid(), planes[1], 0)
 	if not _nv12:

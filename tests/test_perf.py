@@ -28,7 +28,9 @@ class TestPerfSummary(unittest.TestCase):
         open(os.path.join(d, "mpf.log"), "w").write(
             "2026-10-09 13:01:16,341 : INFO : EventManager : Event: ======'tron_deff_85'====== Args={}\n"
             "2026-10-09 13:01:17,319 : INFO : EventManager : Event: ======'slide_deff_085_created'====== Args={}\n")
-        open(os.path.join(d, "godot.log"), "w").write("ERROR: something\nfine\n")
+        open(os.path.join(d, "godot.log"), "w").write(
+            "ERROR: something\nfine\n"
+            'ERROR: Condition "p_image.is_null() || p_image->is_empty()" is true.\n')
         return d
 
     def test_summary(self):
@@ -41,7 +43,8 @@ class TestPerfSummary(unittest.TestCase):
         self.assertEqual(40.0, v["av_avg_ms"])
         self.assertEqual(["0.0 s: screens 12+13+2"], v["bursts"])
         self.assertEqual(1, v["black"])
-        self.assertEqual(1, vals["errors"])
+        self.assertEqual(1, vals["errors"])          # the known glyph-cache error is counted apart
+        self.assertIn("glyph cache, separate render thread 1", text)
         self.assertIn("deff 85 0.98 s", text)
         self.assertIn("FAIL video frames skipped", text)
         self.assertTrue(os.path.exists(os.path.join(d, "summary.md")))

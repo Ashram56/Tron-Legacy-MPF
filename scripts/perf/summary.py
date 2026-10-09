@@ -16,6 +16,8 @@ import sys
 STARTUP_S = 8.0
 VBLANK_MS = 1000.0 / 60.0
 STALL_MS = 300.0
+# Godot errors known to be harmless, counted apart (docs/upstream_issues/godot-separate-render-thread-glyph-cache.md)
+KNOWN_ERRORS = (('Condition "p_image.is_null() || p_image->is_empty()" is true', "glyph cache, separate render thread"),)
 TARGETS = (   # acceptance (docs/performance.md): key, limit, what
     ("long_frames", 0, "frames over 2 vblanks after start-up"),
     ("video_skipped", 0, "video frames skipped"),
@@ -162,10 +164,25 @@ def threads(d):
     return top[:8]
 
 
+def godot_errors(d):
+    """ERROR lines of godot.log: (unexpected count, {known error: count})."""
+    errs, known = 0, {}
+    path = os.path.join(d, "godot.log")
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            if not line.startswith("ERROR"):
+                continue
+            k = next((name for text, name in KNOWN_ERRORS if text in line), None)
+            if k:
+                known[k] = known.get(k, 0) + 1
+            else:
+                errs += 1
+    return errs, known
+
+
 def summarize(d):
     f, v, t = frames(d), video(d), tegra(d)
-    errs = sum(1 for line in open(os.path.join(d, "godot.log"), errors="replace") if line.startswith("ERROR")) \
-        if os.path.exists(os.path.join(d, "godot.log")) else 0
+    errs, known = godot_errors(d)
     vals = {"long_frames": f.get("long_frames", 0), "video_skipped": v["video_skipped"], "av_avg_ms": v["av_avg_ms"],
             "black": v["black"], "errors": errs}
     name = os.path.basename(os.path.normpath(d))
@@ -203,6 +220,10 @@ def summarize(d):
         L.append("")
         L.append("**Threads** (CPU % of one core, average / peak): " + ", ".join(
             "%s %s %.0f/%.0f" % (k[0], k[2], a, m) for a, m, k in th))
+    if known:
+        L.append("")
+        L.append("**Known harmless Godot errors** (not counted below): " + ", ".join(
+            "%s %d" % (k, n) for k, n in sorted(known.items())))
     L.append("")
     L.append("**Targets**: " + "; ".join("%s %s (%s %s)" % (
         "PASS" if vals[k] <= lim else "FAIL", what, "%.0f" % vals[k] if isinstance(vals[k], float) else vals[k],

@@ -41,6 +41,7 @@ enabled=PackedStringArray("res://addons/mpf-gmc/plugin.cfg")
 [rendering]
 
 renderer/rendering_method="mobile"
+driver/threads/thread_model=2
 textures/canvas_textures/default_texture_filter=0
 
 [threading]
