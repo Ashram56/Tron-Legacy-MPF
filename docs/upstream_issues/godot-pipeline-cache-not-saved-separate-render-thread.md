@@ -22,6 +22,17 @@ Every start compiles every pipeline again: the pipeline cache file is never writ
 On a slow GPU each first use of a material stalls the game: a particle effect with a light took 4.0-4.7 s on its
 first appearance, on every start; a test scene had 1.4 s and 2.3 s hitches on every start.
 
+## Minimal reproduction project
+
+[`repro/godot_pipeline_cache/`](repro/godot_pipeline_cache/) (zip: `repro/godot_pipeline_cache.zip`): a 3D scene with
+a dozen materials, particles and a shadowed light, `thread_model=2`. It prints the files in `user://vulkan` at
+start and the time of the first 5 frames, and quits after 120 frames. Run it twice.
+
+- Every run ends with `ERROR: This function (finalize) can only be called from the render thread.`
+  (`servers/rendering/rendering_device.cpp:7470`). Reproduced on Linux x86_64 too (lavapipe, Godot 4.6.3).
+- On the Xavier NX (NVIDIA driver) the save at exit is lost, so the second run compiles every pipeline again.
+  lavapipe writes no pipeline cache data at all, so there only the error shows.
+
 ## Workaround
 
 `rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1`: the cache is saved while the game runs, as it

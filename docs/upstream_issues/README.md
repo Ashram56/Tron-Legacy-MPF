@@ -9,11 +9,11 @@ Xavier NX results behind them are in [../jetson_xavier_nx.md](../jetson_xavier_n
 
 | Report | Kind | Summary |
 |---|---|---|
-| [godot-separate-render-thread-glyph-cache.md](godot-separate-render-thread-glyph-cache.md) | bug | With the separate render thread, a growing glyph cache logs `_texture_2d_update` errors (harmless, picture identical) |
-| [godot-pipeline-cache-not-saved-separate-render-thread.md](godot-pipeline-cache-not-saved-separate-render-thread.md) | bug | With the separate render thread the pipeline cache save at exit fails, so every start recompiles every pipeline (4-5 s stalls) |
-| [godot-msdf-glyphs-main-thread.md](godot-msdf-glyphs-main-thread.md) | bug / feature | MSDF glyphs are generated on the main thread when first drawn: 6.8 s and 45 s for one font on a Xavier NX |
+| [godot-separate-render-thread-glyph-cache.md](godot-separate-render-thread-glyph-cache.md) (test project `repro/godot_glyph_cache.zip`) | bug | With the separate render thread, a growing glyph cache logs `_texture_2d_update` errors (harmless, picture identical) |
+| [godot-pipeline-cache-not-saved-separate-render-thread.md](godot-pipeline-cache-not-saved-separate-render-thread.md) (test project `repro/godot_pipeline_cache.zip`) | bug | With the separate render thread the pipeline cache save at exit fails, so every start recompiles every pipeline (4-5 s stalls) |
+| [godot-msdf-glyphs-main-thread.md](godot-msdf-glyphs-main-thread.md) (test project `repro/godot_msdf_main_thread.zip`) | bug / feature | MSDF glyphs are generated on the main thread when first drawn: 6.8 s and 45 s for one font on a Xavier NX |
 
-## GDE GoZen ([VoylinsGamedevJourney/gde_gozen](https://github.com/VoylinsGamedevJourney/gde_gozen/issues))
+## GDE GoZen ([gozen/gde_gozen on Codeberg](https://codeberg.org/gozen/gde_gozen/issues); issues are off on GitHub)
 
 | Report | Kind | Summary |
 |---|---|---|
@@ -37,8 +37,9 @@ All fixes are in `scripts/gozen/nvmpi_flush.patch`.
 
 ## Tron-Legacy-MPF ([Ashram56/Tron-Legacy-MPF](https://github.com/Ashram56/Tron-Legacy-MPF), the game this repo syncs from)
 
-These change files the two repositories share, so they help every platform and should go upstream, or they will
-conflict at the next sync. Measurements: [../performance.md](../performance.md).
+All ported to Tron-Legacy-MPF `main` (2026-10-09: font bake in PR #35, the rest in commit 4b8da5e), so they are
+listed here for the record; the next upstream sync brings them back without conflicts. Measurements:
+[../performance.md](../performance.md).
 
 | Change | Files | Gain |
 |---|---|---|
