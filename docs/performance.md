@@ -49,6 +49,14 @@ Notes on reading it:
 Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V drift under 40 ms on average,
 0 black screens, 0 Godot `ERROR` lines. `summary.md` ends with PASS/FAIL per target.
 
+## Board settings measured (Xavier NX, mode 5, the clip suite)
+
+- Core pinning (`scripts/run.py`, Linux with 4+ cores, `TRON_PIN=0` turns it off): Godot's main thread alone on the
+  last core, Godot's other threads and MPF on the others. About +1.5 FPS and a third fewer frames over 2 vblanks
+  (two runs each way). Putting MPF alone on one core instead made it worse (42.5 / 49.7 FPS against 49.8 / 53.0).
+- `jetson_clocks` (every clock at the mode's maximum): no measurable gain (47.8 / 52.9 FPS with it, 48.3 / 53.4
+  without) at the same power, so it is not used.
+
 ## Finding the cause of a hitch
 
 1. Take the stall's start time from `summary.md` (seconds since the probe started).

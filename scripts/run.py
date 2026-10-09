@@ -147,6 +147,42 @@ def godot_command(godot_args, virtual_display=None):
     return cmd
 
 
+def core_pinning(godot, mpf, stop_event, interval=2.0):
+    """Linux, 4+ usable cores: Godot's main thread gets the last core to itself; Godot's other threads (renderer,
+    video decoding, audio) and MPF share the others. Godot's main thread runs the game's scripts and draws every
+    frame, so it is the one that must not wait for a core (docs/performance.md: on a Jetson Xavier NX in mode 5,
+    +1.5 FPS and a third fewer frames over 2 vblanks). Applied again every `interval` s, as new threads start with
+    their creator's cores. TRON_PIN=0 turns it off."""
+    cpus = sorted(os.sched_getaffinity(0))
+    main_core, others = {cpus[-1]}, set(cpus[:-1])
+    while not stop_event.wait(interval):
+        for proc, is_godot in ((godot, True), (mpf, False)):
+            if proc is None or proc.poll() is not None:
+                continue
+            try:
+                tids = [int(t) for t in os.listdir("/proc/%d/task" % proc.pid)]
+            except OSError:
+                continue
+            for tid in tids:
+                want = main_core if is_godot and tid == proc.pid else others
+                try:
+                    if os.sched_getaffinity(tid) != want:
+                        os.sched_setaffinity(tid, want)
+                except OSError:
+                    pass                # the thread ended meanwhile
+
+
+def start_core_pinning(godot, mpf, virtual_display):
+    """core_pinning() on a thread when it applies (Linux, a real display, 4+ cores); returns its stop event."""
+    if not sys.platform.startswith("linux") or virtual_display or os.environ.get("TRON_PIN") == "0" \
+            or len(os.sched_getaffinity(0)) < 4:
+        return None
+    import threading
+    stop_event = threading.Event()
+    threading.Thread(target=core_pinning, args=(godot, mpf, stop_event), daemon=True).start()
+    return stop_event
+
+
 def keep_screen_on():
     """Linux on a real X display: the X server's own screen saver and DPMS power-off off for this X session (GNOME's
     idle blanking and lock are turned off by install_jetson_hwdec.sh); a cabinet's players use no keyboard or mouse."""
@@ -256,7 +292,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         env["TRON_LIVE_SCENARIO"] = scenario_path(scenario)
     if trace:
         env["TRON_TRACE"] = trace
-    godot = mpf = mon = None
+    godot = mpf = mon = pinning = None
     print(pup_setup.status()[1], flush=True)  # PuP Pack: docs/pup.md
     if not virtual_display:
         keep_screen_on()
@@ -271,6 +307,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("GMC is listening", flush=True)
         print("Starting MPF: mpf " + " ".join(mpf_args(hw, scenario, text_ui, free_play)), flush=True)
         mpf = spawn(tc.mpf_command() + mpf_args(hw, scenario, text_ui, free_play), log=mpf_log, cwd=tc.GAME, env=env)
+        pinning = start_core_pinning(godot, mpf, virtual_display if virtual_display is not None
+                                     else tc.needs_virtual_display())
         if hw == "vpx":
             print("MPF waits for the Visual Pinball X table (TronMPF.Controller) on port {}: start the table "
                   "now (docs/vpx.md)".format(tc.MONITOR_PORT), flush=True)
@@ -300,6 +338,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         print("interrupted, stopping", flush=True)
         return 130
     finally:
+        if pinning:
+            pinning.set()
         for p in (mon, mpf, godot):
             stop(p)
 
