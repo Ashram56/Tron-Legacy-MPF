@@ -72,7 +72,8 @@ for merges.
 4. **Lamps**: lamp model, leff layers from captured shows, code-drawn leffs, lamp/coil trace comparison.
 5. **Service**: adjustments, audits, service menu, credits and pricing, high scores, attract pages.
 6. **Hardware overlays**: smart_virtual + MPF Monitor, P-ROC (`driverboards: sternSAM`), VPX bridge.
-7. **Portability**: one setup script for Windows/macOS/Linux, CI on all three, installers, Docker.
+7. **Portability**: one setup script for Windows/macOS/Linux, CI on all three, installers, Docker: the
+   packaging agent (`docs/agents/packaging.md`), started as soon as step 1 works.
 8. **Optional HD display**: see `dmd_hd_upscaling.md`.
 
 ## 5. Verification loop (the part that makes it faithful)

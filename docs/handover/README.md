@@ -1,7 +1,9 @@
 # Handover: rebuilding a Stern SAM game in MPF
 
-Start here. These files are written for an AI agent taking over, so each one is short, dense and
-self-contained: read only the one your task needs.
+The master plan is [../agents/README.md](../agents/README.md): what the owner provides, and the agents (ROM
+extraction, VPX extraction, strict recreation, VPX bridge, improvements) with their instructions. The files
+below are the reference docs those agents read. Each is short, dense and self-contained: read only the one
+your task needs.
 
 | File | Read it when | Size |
 |---|---|---|

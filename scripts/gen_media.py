@@ -417,7 +417,8 @@ def build_hd_frames(scale=None, deffs=None):
     """game/media/dmd_hd: every picture of game/media/dmd upscaled (dmd_hd.upscale_file), same names.
     Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black. The
     recorded effects' frames (deffs: build_deffs, source "reference") lose their ROM-font letters, which
-    the HD mode draws live (scripts/frame_text.py, media/dmd_hd/text.json)."""
+    the HD mode draws live (scripts/frame_text.py, media/dmd_hd/text.json); effects whose pictures are only
+    rectangles (frames, blocks) lose those too, drawn as rectangles (media/dmd_hd/shapes.json)."""
     import dmd_hd
     import frame_text
     scale = scale or dmd_hd.FRAME_SCALE
@@ -426,23 +427,28 @@ def build_hd_frames(scale=None, deffs=None):
     fsutil.remove_dir(dst_root)
     fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd_color"))    # the colour frames of earlier versions
     recorded = {info["slide"] for info in (deffs or {}).values() if info["source"] == "reference"}
-    texts = frame_text.process_files(sorted(p for d in recorded for p in glob.glob(os.path.join(src_root, d, "*.png"))),
-                                     os.path.join(ROOT, ".cache", "frame_text"))
-    jobs, lines = [], {}
+    frames = sorted(p for p in glob.glob(os.path.join(src_root, "deff_*", "f*.png")))
+    texts = frame_text.process_files(frames, os.path.join(ROOT, ".cache", "frame_text"), recorded)
+    jobs, lines, rects = [], {}, {}
     for folder in sorted(glob.glob(os.path.join(src_root, "deff_*"))):
         out = os.path.join(dst_root, os.path.basename(folder))
         os.makedirs(out, exist_ok=True)
         for src in sorted(glob.glob(os.path.join(folder, "*.png"))):
             name = os.path.basename(src)
             kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
-            found, cleared = texts.get(src, ([], None))
+            found, boxes, cleared = texts.get(src, ([], [], None))
+            key = os.path.basename(folder) + "/" + name
             if found:
-                lines[os.path.basename(folder) + "/" + name] = found
+                lines[key] = found
+            if boxes:
+                rects[key] = boxes
             jobs.append((cleared or src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
     with open(os.path.join(dst_root, "scale.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"scale": scale}, f)
     with open(os.path.join(dst_root, "text.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(lines, f, indent=0, sort_keys=True)
+    with open(os.path.join(dst_root, "shapes.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(rects, f, indent=0, sort_keys=True)
     return len(dmd_hd.upscale_files(jobs))
 
 

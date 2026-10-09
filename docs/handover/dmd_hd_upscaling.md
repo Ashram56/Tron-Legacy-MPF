@@ -80,6 +80,11 @@ frame, at the recorded level. Results are cached by frame content in `.cache/fra
 4 cores the first time). `ZOOMS` handles text that zooms rather than being drawn in a ROM font (deff 100,
 ZEN): HD draws the final line scaled about its middle. Classic frames keep the recorded text.
 
+Effects whose pictures, once their text is cleared, are only rectangles (one-dot frames such as BALL SAVED's
+border, solid blocks such as the volume bars; `frame_text.shapes`, every frame of the effect must qualify)
+lose those too: `media/dmd_hd/shapes.json` lists them per frame and `FrameText` draws them as rectangles in
+the text colour at their level, sharp at any size.
+
 ![recorded text, classic / HD](../images/hd_recorded_text.png)
 
 The ZUSE/TRON target letters (deffs 91, 92, 94, 107) stay the ROM's stylised pictures, upscaled: drawn in

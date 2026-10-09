@@ -58,6 +58,7 @@ var font := DEFAULT_FONT
 var text_scale := DEFAULT_TEXT_SCALE
 var _frames_hd := {}
 var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' text lines (FrameText)
+var _frame_shapes = null         # media/dmd_hd/shapes.json: the frames drawn as rectangles (FrameText)
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -271,12 +272,24 @@ func _on_node_added(node: Node) -> void:
 ## FrameText draws them.
 func frame_text() -> Dictionary:
 	if _frame_text == null:
-		_frame_text = {}
-		if FileAccess.file_exists(MEDIA_HD + "text.json"):
-			var data = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "text.json"))
-			if data is Dictionary:
-				_frame_text = data
+		_frame_text = _load_json(MEDIA_HD + "text.json")
 	return _frame_text
+
+
+## The effects whose pictures are only rectangles (scripts/frame_text.py shapes): {"deff_NNN/fNNN.png":
+## [[x0, y0, x1, y1, level, filled], ...]}, cleared from their HD frames and drawn by FrameText.
+func frame_shapes() -> Dictionary:
+	if _frame_shapes == null:
+		_frame_shapes = _load_json(MEDIA_HD + "shapes.json")
+	return _frame_shapes
+
+
+static func _load_json(path: String) -> Dictionary:
+	if FileAccess.file_exists(path):
+		var data = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if data is Dictionary:
+			return data
+	return {}
 
 
 static func frame_key(tex: Texture2D) -> String:
@@ -285,9 +298,11 @@ static func frame_key(tex: Texture2D) -> String:
 
 func _has_frame_text(frames: SpriteFrames) -> bool:
 	var lines := frame_text()
+	var rects := frame_shapes()
 	for anim in frames.get_animation_names():
 		for i in frames.get_frame_count(anim):
-			if lines.has(frame_key(frames.get_frame_texture(anim, i))):
+			var key := frame_key(frames.get_frame_texture(anim, i))
+			if lines.has(key) or rects.has(key):
 				return true
 	return false
 
@@ -296,7 +311,7 @@ func _add_frame_text(sprite: AnimatedSprite2D) -> void:
 	if not is_instance_valid(sprite) or sprite.get_parent() == null or sprite.has_meta("dmd_frame_text"):
 		return
 	sprite.set_meta("dmd_frame_text", true)
-	var overlay := FrameText.new(sprite, frame_text(), frame_scale)
+	var overlay := FrameText.new(sprite, frame_text(), frame_shapes(), frame_scale)
 	sprite.add_sibling(overlay)
 
 
@@ -305,16 +320,20 @@ func _add_frame_text(sprite: AnimatedSprite2D) -> void:
 ## centred on the recorded line (so the clean fonts' scale shrinks it in place; a line against the DMD's edge
 ## stays against it); a line the frame shows only
 ## part of (letters covered by the art, or not yet drawn) shows those letters where they sit in the line.
+## Effects whose pictures are only rectangles (frames, blocks, bars) get them drawn as rectangles, sharp at
+## any size, in the text colour at their level.
 class FrameText extends Node2D:
 	const RomText = preload("res://tron/rom_text.gd")
 	const RomTextHd = preload("res://tron/rom_text_hd.gd")
 	var sprite: AnimatedSprite2D
 	var lines: Dictionary
+	var rects: Dictionary
 	var _key := "-"
 
-	func _init(of: AnimatedSprite2D, text_lines: Dictionary, frame_scale: int) -> void:
+	func _init(of: AnimatedSprite2D, text_lines: Dictionary, shapes: Dictionary, frame_scale: int) -> void:
 		sprite = of
 		lines = text_lines
+		rects = shapes
 		name = sprite.name + "Text"
 		position = sprite.position
 		scale = sprite.scale * frame_scale
@@ -325,6 +344,20 @@ class FrameText extends Node2D:
 	func _ready() -> void:
 		_sync()
 
+	func _draw() -> void:
+		var color: Color = RomTextHd.style()["color"]
+		for r in rects.get(_key, []):
+			var lv := float(r[4]) / 15.0
+			var c := Color(color.r * lv, color.g * lv, color.b * lv, 1)
+			var box := Rect2(float(r[0]), float(r[1]), float(r[2]) - float(r[0]) + 1, float(r[3]) - float(r[1]) + 1)
+			if int(r[5]):
+				draw_rect(box, c)
+			else:                       # a one-dot frame
+				draw_rect(Rect2(box.position, Vector2(box.size.x, 1)), c)
+				draw_rect(Rect2(box.position + Vector2(0, box.size.y - 1), Vector2(box.size.x, 1)), c)
+				draw_rect(Rect2(box.position + Vector2(0, 1), Vector2(1, box.size.y - 2)), c)
+				draw_rect(Rect2(box.position + Vector2(box.size.x - 1, 1), Vector2(1, box.size.y - 2)), c)
+
 	func _sync() -> void:
 		visible = sprite.visible
 		var tex := sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame) if sprite.sprite_frames else null
@@ -332,6 +365,7 @@ class FrameText extends Node2D:
 		if key == _key:
 			return
 		_key = key
+		queue_redraw()
 		for c in get_children():
 			c.queue_free()
 		var clean := not RomTextHd.clean().is_empty()

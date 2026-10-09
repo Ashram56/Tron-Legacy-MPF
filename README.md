@@ -5,6 +5,9 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 [Ashram56/Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption). It runs on
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
+**Working with Claude, or rebuilding another Stern SAM game this way?** Start at the
+[master plan](docs/agents/README.md): what to provide (ROM, VPX table) and the agents that do the work.
+
 ## Install
 
 Run the line for your OS in a terminal. It installs what is missing (Git, Python 3.11, the libraries), clones
@@ -123,3 +126,5 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.
+- [docs/agents/README.md](docs/agents/README.md): the master plan for AI agents: what to provide (ROM, VPX table)
+  and the agents that turn it into this game.

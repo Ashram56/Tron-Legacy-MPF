@@ -245,6 +245,14 @@ class TestFrameText(unittest.TestCase):
         f = hd.width // 128
         self.assertGreater(classic.crop((x, base - cap + 1, x + w, base + 1)).getextrema()[1], 200)
         self.assertLess(hd.crop((x * f + f, (base - cap + 2) * f, (x + w - 1) * f, base * f)).getextrema()[1], 30)
+        # pictures that are only rectangles (BALL SAVED's frame, the volume bars) are drawn as rectangles
+        shapes = json.load(open(os.path.join(GAME, "media", "dmd_hd", "shapes.json"), encoding="utf-8"))
+        self.assertEqual([[0, 0, 127, 31, 3, 0]], shapes["deff_020/f001.png"])
+        self.assertLess(hd.getextrema()[1], 30)                      # nothing left of the picture
+        self.assertTrue(all(r[5] == 1 for k, v in shapes.items() if k.startswith("deff_002/") for r in v))
+        self.assertTrue(self.ft.shapes([[0] * 8, [0, 3, 3, 3, 0, 0, 0, 0], [0, 3, 0, 3, 0, 5, 0, 0], [0, 3, 3, 3, 0, 0, 0, 0]])
+                        == [[1, 1, 3, 3, 3, 0], [5, 2, 5, 2, 5, 1]])
+        self.assertIsNone(self.ft.shapes([[0, 7, 0], [7, 7, 7], [0, 7, 0]]))     # a cross is art
         # the ZEN zoom: the final line drawn larger on the frames before
         self.assertEqual([2.25], [l[8] for l in self.text["deff_100/f004.png"]])
 

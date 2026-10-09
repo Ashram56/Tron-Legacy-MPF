@@ -421,20 +421,60 @@ def clear_text(img, dots):
     return out
 
 
-def process_files(srcs, cache):
-    """The text of recorded frames srcs (game/media/dmd/deff_NNN/fNNN.png), scanned in parallel and
-    completed per effect: {src: (lines, path of the frame with its letters cleared, or None)}."""
+def _components(a):
+    """The 4-connected runs of dots at one level of a frame: [(level, [(y, x)])]."""
+    seen, out = set(), []
+    for y in range(len(a)):
+        for x in range(len(a[0])):
+            if a[y][x] and (y, x) not in seen:
+                lv, todo, comp = a[y][x], [(y, x)], []
+                seen.add((y, x))
+                while todo:
+                    p = todo.pop()
+                    comp.append(p)
+                    for q in ((p[0] + 1, p[1]), (p[0] - 1, p[1]), (p[0], p[1] + 1), (p[0], p[1] - 1)):
+                        if 0 <= q[0] < len(a) and 0 <= q[1] < len(a[0]) and q not in seen and a[q[0]][q[1]] == lv:
+                            seen.add(q)
+                            todo.append(q)
+                out.append((lv, comp))
+    return out
+
+
+def shapes(a):
+    """A frame's dots as rectangles [[x0, y0, x1, y1, level, filled]] (filled 1: a solid block, 0: a one-dot
+    frame), or None when any part of it is not one (art)."""
+    out = []
+    for lv, comp in _components(a):
+        ys, xs = [p[0] for p in comp], [p[1] for p in comp]
+        y0, y1, x0, x1 = min(ys), max(ys), min(xs), max(xs)
+        if len(comp) == (y1 - y0 + 1) * (x1 - x0 + 1):
+            out.append([x0, y0, x1, y1, lv, 1])
+        elif min(y1 - y0, x1 - x0) >= 2 and len(comp) == 2 * (x1 - x0 + y1 - y0) and \
+                all(y in (y0, y1) or x in (x0, x1) for y, x in comp):
+            out.append([x0, y0, x1, y1, lv, 0])
+        else:
+            return None
+    return out
+
+
+def process_files(srcs, cache, recorded=None):
+    """The text of recorded frames (game/media/dmd/deff_NNN/fNNN.png of the effects in `recorded`, folder
+    names; all of srcs when None), scanned in parallel and completed per effect, and the effects whose
+    pictures (once their text is cleared) are only rectangles, boxes and blocks, drawn as such in HD:
+    {src: (lines, rectangles, path of the frame with its letters and rectangles cleared, or None)}."""
     from PIL import Image
-    jobs = [(s, cache) for s in srcs]
+    scanned = [s for s in srcs if recorded is None or os.path.basename(os.path.dirname(s)) in recorded]
+    jobs = [(s, cache) for s in scanned]
     if len(jobs) < 8:
         scans = [scan(j) for j in jobs]
     else:
         import multiprocessing
         with multiprocessing.Pool(os.cpu_count() or 2) as pool:
             scans = pool.map(scan, jobs, chunksize=2)
+    found = dict(zip(scanned, scans))
     by_deff = {}
-    for src, lines in zip(srcs, scans):
-        by_deff.setdefault(os.path.dirname(src), {})[src] = lines
+    for src in srcs:
+        by_deff.setdefault(os.path.dirname(src), {})[src] = found.get(src, [])
     fonts = _cached_fonts()
     out = {}
     for folder, frames in by_deff.items():
@@ -449,16 +489,28 @@ def process_files(srcs, cache):
                 if z is not None and source:
                     done[src] = ([line + [z, zoom["keep_left"]] for line in source] if z else [],
                                  [(y, x, None) for y in range(32) for x in range(zoom["keep_left"], 128)])
+        pictures = {}
         for src, (lines, dots) in done.items():
-            if not lines and not dots:
-                out[src] = ([], None)
-                continue
             img = Image.open(src)
             a = levels(img)
             lit = [(y, x) for y, x, lv in dots if a[y][x] == lv or lv is None]
+            for y, x in lit:
+                a[y][x] = 0
+            pictures[src] = (img, lit, a)
+        rects = {src: shapes(a) for src, (_, _, a) in pictures.items()}
+        if any(r is None for r in rects.values()) or not any(rects.values()):
+            rects = {src: [] for src in rects}        # art: the picture stays
+        for src, (img, lit, a) in pictures.items():
+            lines = done[src][0]
+            boxes = rects[src]
+            for x0, y0, x1, y1, _, _ in boxes:
+                lit += [(y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)]
+            if not lit:
+                out[src] = (lines, boxes, None)
+                continue
             dst = os.path.join(clear_dir, os.path.basename(src))
             clear_text(img, lit).save(dst)
-            out[src] = (lines, dst)
+            out[src] = (lines, boxes, dst)
     return out
 
 
@@ -472,8 +524,8 @@ def main():
                 lines = frame_text(Image.open(os.path.join(folder, f)), fonts)
                 print(name, f, [(t, fid, x, b, lv, w) for t, fid, x, b, lv, w, _ in lines])
         folder_srcs = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.endswith(".png")]
-        for src, (lines, _) in process_files(folder_srcs, os.path.join(ROOT, ".cache", "frame_text")).items():
-            print("  completed", os.path.basename(src), lines)
+        for src, (lines, boxes, _) in process_files(folder_srcs, os.path.join(ROOT, ".cache", "frame_text")).items():
+            print("  completed", os.path.basename(src), lines, boxes)
 
 
 if __name__ == "__main__":
