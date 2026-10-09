@@ -76,8 +76,12 @@ var _video_thread: int = -1
 var _opened_audio: AudioStreamFFmpeg = null ## Opened by _open_video() on the worker thread, set on the main one.
 var _release_tasks: Array[int] = [] ## Worker tasks freeing closed videos (see close()).
 var _restart_thread: int = -1 ## Worker task seeking back to the first frame (see restart()).
-var _decode_task: int = -1 ## Worker task decoding the next frame to show (see _process()).
-var _ahead_frame: int = 0 ## The frame the decoded-ahead data is (or, while _decode_task runs, will be).
+const QUEUE_FRAMES: int = 3 ## Frames decoded ahead per video (see _process()).
+var _decode_task: int = -1 ## Worker task decoding the next frame into _queue (see _fill_queue()).
+var _decoded: int = 0 ## The last frame number decoded (or being decoded) into _queue.
+var _queue: Array[Dictionary] = [] ## Decoded frames not shown yet, oldest first: {"frame": int, "planes": Array}.
+var _queue_mutex: Mutex = Mutex.new()
+var _clock: float = 0.0 ## Seconds of video played; frame n is due at n / _frame_rate (playback_speed moves it).
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
 var _ignore_path_setter: bool = false
@@ -195,7 +199,8 @@ func _update_video(new_video: GoZenVideo) -> void:
 
 	is_playing = false
 	current_frame = 0
-	_ahead_frame = 0
+	_decoded = 0
+	_clock = 0.0
 
 	# Getting video data
 	_padding = video.get_padding()
@@ -275,7 +280,8 @@ func seek_frame(new_frame_nr: int) -> void:
 
 	_wait_decode()
 	current_frame = clamp(new_frame_nr, 0, _frame_count)
-	_ahead_frame = current_frame
+	_decoded = current_frame
+	_clock = current_frame / _frame_rate
 	if video.seek_frame(current_frame):
 		printerr("Couldn't seek frame!")
 	else:
@@ -291,7 +297,7 @@ func seek_frame(new_frame_nr: int) -> void:
 func next_frame(skip: bool = false) -> bool:
 	_wait_decode()
 	var success: bool = video.next_frame(skip)
-	_ahead_frame = current_frame
+	_decoded = current_frame
 	if success and !skip:
 		_set_frame_image()
 		next_frame_called.emit(current_frame)
@@ -334,48 +340,53 @@ func _process(delta: float) -> void:
 		WorkerThreadPool.wait_for_task_completion(_restart_thread)
 		_restart_thread = -1
 		current_frame = 0
-		_ahead_frame = 0
+		_decoded = 0
+		_clock = 0.0
 		_time_elapsed = 0.0
 		_set_frame_image()
 		play()
 		return
 
 	if is_playing:
-		# Frames are decoded one ahead on a worker thread (_decode_ahead()), so the main thread only uploads them:
-		# decoding three 1080p videos on it took most of every frame on a Jetson Xavier NX, and once behind, the
-		# catch-up decoding made it worse (5 FPS). A frame that is not ready yet is shown late instead of waited for.
-		_time_elapsed += delta
-		if _time_elapsed < _frame_time:
-			return
-		if _decode_task != -1:
-			if not WorkerThreadPool.is_task_completed(_decode_task):
-				return
-			WorkerThreadPool.wait_for_task_completion(_decode_task)
-			_decode_task = -1
-		var eof_reached: bool = false
-		if _ahead_frame <= current_frame:
-			# nothing decoded ahead yet (playback just started, or the end is reached)
-			if _frame_count > 0 and current_frame + 1 >= _frame_count:
-				eof_reached = true
-			else:
-				_start_decode(current_frame + maxi(1, floori(_time_elapsed / _frame_time)))
-				return
+		# Frames are decoded ahead on worker threads into _queue (_fill_queue()), so the main thread only uploads
+		# them: decoding three 1080p videos on it took most of every frame on a Jetson Xavier NX (5 FPS). A frame is
+		# shown when the clock reaches it. When frames come late (the game's frame took long, or a decode did):
+		# a video with its own sound playing keeps to its sound (its clock is the sound's position) and drops the
+		# frames it is late by; any other video (the PuP's are mostly silent) shows every frame, and its clock slips
+		# by the delay instead.
+		var audio_master: bool = enable_audio and audio_player.playing and audio_player.stream != null
+		if audio_master:            # the sound heard now: its position, minus what is still on its way out
+			_clock = maxf(audio_player.get_playback_position() + AudioServer.get_time_since_last_mix()
+					- AudioServer.get_output_latency(), _clock)
 		else:
-			_skips = _ahead_frame - current_frame
-			_time_elapsed = maxf(_time_elapsed - _skips * _frame_time, 0.0)
-			current_frame = _ahead_frame
-			_set_frame_image()
+			_clock += delta * playback_speed
+		_fill_queue()
+		var due: int = floori(_clock * _frame_rate + 0.000001)
+		var shown: Dictionary = {}
+		_skips = 0
+		_queue_mutex.lock()
+		while not _queue.is_empty() and int(_queue[0].frame) <= due:
+			if audio_master and _queue.size() > 1 and int(_queue[1].frame) <= due:
+				_queue.pop_front()          # late, keeping to the sound
+				_skips += 1
+				continue
+			shown = _queue.pop_front()
+			break
+		var waiting: bool = not _queue.is_empty() or _decode_task != -1
+		_queue_mutex.unlock()
+		var eof_reached: bool = false
+		if not shown.is_empty():
+			current_frame = int(shown.frame)
+			if not audio_master and current_frame < due:
+				_clock = current_frame / _frame_rate   # late: the clock slips, no frame is lost
+			_set_frame_image(shown.planes)
 			next_frame_called.emit(current_frame)
-			if enable_audio:
-				_sync_audio_video()
-			# the next frame due, further on when this one came late
-			var target: int = current_frame + 1 + floori(_time_elapsed / _frame_time)
-			if _frame_count > 0 and target >= _frame_count:
-				target = _frame_count - 1
-			if target > current_frame:
-				_start_decode(target)
-			elif _frame_count > 0 and current_frame + 1 >= _frame_count:
-				eof_reached = current_frame + 1 >= _frame_count and _time_elapsed >= _frame_time
+			_fill_queue()
+		elif not waiting and _frame_count > 0 and _decoded + 1 >= _frame_count:
+			eof_reached = due > current_frame
+		elif not audio_master and due > current_frame:
+			_clock = (current_frame + 1) / _frame_rate   # the next frame is still decoding
+		_time_elapsed = (_clock - current_frame / _frame_rate) / playback_speed
 		if eof_reached:
 			is_playing = !is_playing
 			if enable_audio and audio_player.stream != null:
@@ -419,29 +430,44 @@ func _seek_start() -> void:
 		printerr("Couldn't seek frame!")
 
 
-## Starts decoding up to [param target] on a worker thread (_process() shows it when it is due). At most a second
-## of frames per task and never a seek: GoZenVideo.seek_frame() near the end of a file can retry for minutes, and a
-## close() waits for this task. A high-priority task: Godot runs low-priority ones (the opens, closes and restarts)
-## on about a third of its threads, one on a Xavier NX, so a frame would wait behind them.
-func _start_decode(target: int) -> void:
-	var count: int = mini(target - current_frame, maxi(1, ceili(_frame_rate)))
-	_ahead_frame = current_frame + count
-	_decode_task = WorkerThreadPool.add_task(_decode_ahead.bind(count), true)
+## Keeps up to QUEUE_FRAMES frames decoded ahead: one worker task at a time decodes the next frame (frames decode in
+## order). Never a seek: GoZenVideo.seek_frame() near the end of a file can retry for minutes, and close() waits for
+## this task. A high-priority task: Godot runs low-priority ones (the opens, closes and restarts) on a share of its
+## threads only, so a frame would wait behind them.
+func _fill_queue() -> void:
+	if _decode_task != -1:
+		if not WorkerThreadPool.is_task_completed(_decode_task):
+			return
+		WorkerThreadPool.wait_for_task_completion(_decode_task)
+		_decode_task = -1
+	_queue_mutex.lock()
+	var room: bool = _queue.size() < QUEUE_FRAMES
+	_queue_mutex.unlock()
+	if room and (_frame_count <= 0 or _decoded + 1 < _frame_count):
+		_decoded += 1
+		_decode_task = WorkerThreadPool.add_task(_decode_one.bind(_decoded), true)
 
 
-## On a worker thread: decodes [param count] frames, keeping the image of the last one.
-func _decode_ahead(count: int) -> void:
-	for i: int in range(count - 1):
-		video.next_frame(true)
+## On a worker thread: decodes the next frame and queues copies of its planes (GoZen reuses its images for the next).
+func _decode_one(frame_nr: int) -> void:
 	video.next_frame(false)
+	var planes: Array = [video.get_y_data().duplicate(), video.get_u_data().duplicate(), video.get_v_data().duplicate()]
+	if _has_alpha:
+		planes.append(video.get_a_data().duplicate())
+	_queue_mutex.lock()
+	_queue.append({"frame": frame_nr, "planes": planes})
+	_queue_mutex.unlock()
 
 
+## Stops decoding ahead and forgets the decoded frames (before a seek, a restart or a close).
 func _wait_decode() -> void:
 	if _decode_task != -1:
 		WorkerThreadPool.wait_for_task_completion(_decode_task)
 		_decode_task = -1
-	if _ahead_frame > current_frame:
-		_ahead_frame = current_frame
+	_queue_mutex.lock()
+	_queue.clear()
+	_queue_mutex.unlock()
+	_decoded = current_frame
 
 
 ## Start the video playback. This will play until reaching the end of the video and then pause and go back to the start.
@@ -451,6 +477,7 @@ func play() -> void:
 		return
 	if is_playing: return
 	is_playing = true
+	_clock = current_frame / _frame_rate
 
 	if enable_audio and audio_player.stream and audio_player.stream.get_length() != 0:
 		audio_player.set_stream_paused(false)
@@ -569,12 +596,16 @@ func _set_current_frame(new_current_frame: int) -> void:
 	frame_changed.emit(current_frame)
 
 
-func _set_frame_image() -> void:
-	RenderingServer.texture_2d_update(y_texture.get_rid(), video.get_y_data(), 0)
-	RenderingServer.texture_2d_update(u_texture.get_rid(), video.get_u_data(), 0)
-	RenderingServer.texture_2d_update(v_texture.get_rid(), video.get_v_data(), 0)
+func _set_frame_image(planes: Array = []) -> void:
+	if planes.is_empty():
+		planes = [video.get_y_data(), video.get_u_data(), video.get_v_data()]
+		if _has_alpha:
+			planes.append(video.get_a_data())
+	RenderingServer.texture_2d_update(y_texture.get_rid(), planes[0], 0)
+	RenderingServer.texture_2d_update(u_texture.get_rid(), planes[1], 0)
+	RenderingServer.texture_2d_update(v_texture.get_rid(), planes[2], 0)
 	if _has_alpha:
-		RenderingServer.texture_2d_update(a_texture.get_rid(), video.get_a_data(), 0)
+		RenderingServer.texture_2d_update(a_texture.get_rid(), planes[3], 0)
 
 
 func set_playback_speed(new_playback_value: float) -> void:

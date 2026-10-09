@@ -63,6 +63,11 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   frames and slide scenes of every effect with 40 frames or more (17 effects, 1558 frames) load on worker threads
   from the start, so their slides no longer load on the main thread when shown. Deff 86 created 0.89 s to under
   0.1 s, deff 143 0.38 s to under 0.13 s; about 200 MB more memory (2.6 to 2.8 GB used of 6.8 GB).
+- Video frames decoded ahead (`pup_addons/gde_gozen/video_playback.gd`): up to 3 frames per video are decoded on
+  worker threads and shown when their time comes. A silent video never drops a frame: after a stall its clock slips
+  by the delay. A video with its own sound takes its clock from the sound heard (playback position minus the output
+  latency) and drops the frames it is late by. Video frames skipped 89 / 85 to 15 / 7 per clip (all on videos with
+  sound; 0 on the silent screens), A/V drift 79-130 ms to 30-46 ms on average.
 
 ## Finding the cause of a hitch
 

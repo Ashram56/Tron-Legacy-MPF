@@ -101,7 +101,8 @@ func _process(delta: float) -> void:
 		var st: Dictionary = _players[node]
 		if second and node.is_playing and node._frame_rate > 0.0 and node.enable_audio \
 				and node.audio_player.playing and node.audio_player.stream != null:
-			var apos: float = node.audio_player.get_playback_position() + AudioServer.get_time_since_last_mix()
+			var apos: float = node.audio_player.get_playback_position() + AudioServer.get_time_since_last_mix() \
+					- AudioServer.get_output_latency()   # the sound heard now
 			_av.store_line("%.1f,%d,%s,%.1f" % [t, st.screen, str(node.path).get_file().replace(",", " "),
 					(apos - node.current_frame / node._frame_rate) * 1000.0])
 	_check_black(t)
