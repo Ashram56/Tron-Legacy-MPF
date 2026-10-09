@@ -4,7 +4,7 @@ extends Node
 ## "pup_play" commands MPF sends (game/tron_pup/mode.py).
 ##
 ## Windows (each on the monitor game/pup.cfg gives it):
-## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer);
+## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer); [backglass] enabled=false leaves it out;
 ## - dmd: the PuP Pack's DMD panel frame with the game's 128x32 DMD (the main window's picture) in its middle;
 ## - topper (optional, [pup] third_screen): PuP screens 13 (underlay) and 14 (pop-up top layer).
 ## PuP screen 15 (OST music) has no window. Commands for a screen that is off are dropped.
@@ -124,7 +124,8 @@ func _build() -> void:
 	for row in _read_csv(pack_dir.path_join("screens.pup")):
 		defaults[int(row.get("ScreenNum", "-1"))] = row
 	var video_volume := float(setting("pup", "video_volume", 100))
-	_make_layered_window("backglass", defaults, video_volume)
+	if bool(setting("backglass", "enabled", true)):
+		_make_layered_window("backglass", defaults, video_volume)
 	_make_dmd_window()
 	if bool(setting("pup", "third_screen", true)):
 		_make_layered_window("topper", defaults, video_volume)
