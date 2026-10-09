@@ -2,7 +2,8 @@
 
 This page lists every change we carry so that the PuP Pack's videos play with the Jetson's hardware decoder (NVDEC)
 without freezes or crashes: what was wrong, the fix, where it lives and how it was checked. Start here when
-bringing up another Jetson, such as the Xavier NX.
+bringing up another Jetson, such as the Xavier NX. Everything else learned on the Xavier NX (screens, power, Godot
+settings, costs): [jetson_xavier_nx.md](jetson_xavier_nx.md).
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
 4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
