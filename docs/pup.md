@@ -46,7 +46,7 @@ decodes in software.
 | Window | Shows | PuP screens |
 |---|---|---|
 | `backglass` (4:3) | background and mode loops, event videos popping over them | 2 (underlay), 12 (top layer) |
-| `dmd` (large LCD) | the pack's DMD panel art, the game's 128x32 DMD in its black middle | the game's DMD |
+| `dmd` (large LCD) | the game's 128x32 DMD in a neon frame over a live light cycle chase (or the pack's DMD panel art, `background="frame"`) | the game's DMD |
 | `topper` (optional) | mode info, TRON / ZUSE letters, light cycles | 13 (underlay), 14 (top layer) |
 | (no window) | OST music | 15 |
 
@@ -80,7 +80,14 @@ borderless=true
   the upstream game.
 - `[backglass] fit`: the videos are 16:9 and the backglass 4:3: `fit` (black bars, `align` places the video),
   `fill` (crops the sides) or `stretch`.
-- `[dmd] frame_crop` / `dmd_rect` place the art and the DMD (pixels of the art image), `dots` draws round dots.
+- `[dmd] background`: `lightcycles` (the default) draws the DMD in a neon frame over a live 3D chase
+  (`game/pup/lightcycles.gd`): two 1982-style light cycles on a grid, their trails fading after about 3 s, a
+  cycle that hits a trail, a wall or the other cycle derezzes and comes back. The middle of the DMD is a wall
+  and the cells behind the rest of it an avoid zone the cycles steer out of, so the chase stays around the
+  DMD; `lightcycles_dmd` is the DMD's width as a share of the window's (0.6: 768x192 on a 1280x390 bar). It is
+  a few hundred triangles; `background="frame"` is the PuP Pack's DMD panel art instead.
+- `[dmd] frame_crop` / `dmd_rect` (`background="frame"`) place the art and the DMD (pixels of the art image),
+  `dots` draws round dots.
   The game's own 128x32 window is minimised (`hide_main_window`); it stays the source of the DMD picture, so
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as
   in the DMD window.
