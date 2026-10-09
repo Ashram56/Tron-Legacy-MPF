@@ -159,6 +159,13 @@ class Setup:
             self.say("   $ " + " ".join(cmd))
             if not self.dry:
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
+        # the HD clean fonts' signed distance fields, made once here instead of on the game's main thread
+        # (tron/rom_text_hd.gd; about 2 minutes on a Jetson Xavier NX)
+        self.say("== HD clean fonts (game/tools/bake_fonts.gd)")
+        cmd = [exe, "--headless", "--path", tc.GAME, "-s", "res://tools/bake_fonts.gd"]
+        self.say("   $ " + " ".join(cmd))
+        if not self.dry:
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1800)
 
 
 def refresh_media():

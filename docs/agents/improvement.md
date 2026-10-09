@@ -27,7 +27,8 @@ display, cleaner fonts, colour, new modes, desktop conveniences. Runs only after
 
 How it works, game agnostic: [dmd_hd_upscaling.md](../handover/dmd_hd_upscaling.md). In short: frames
 upscaled shade by shade (level sets) at build time; ROM fonts traced to vector outlines; by default text in
-a clean TrueType font at the ROM's positions (MSDF, sharp at any size); text baked into recorded animations
+a clean TrueType font at the ROM's positions (MSDF, sharp at any size; its fields are baked once at setup by
+`game/tools/bake_fonts.gd`, since Godot makes them on its main thread and froze a Jetson 20 s and more); text baked into recorded animations
 found, cleared and redrawn live (`scripts/frame_text.py`); pictures that are only frames and blocks drawn as
 rectangles. Mode precedence and options are in `game/tools/dmd_mode.gd`.
 
@@ -60,4 +61,4 @@ Current defaults (Tron, `dmd_mode.gd` constants and `project.godot`): HD on, Tro
 and pictures at 1920x480 and 3840x960 for the owner (render through Xvfb with `--rendering-driver opengl3`;
 `--headless` draws nothing). Bump `frame_text.VERSION` when the text matching changes (it keys the cache).
 
-Last updated 2026-10-08.
+Last updated 2026-10-09.

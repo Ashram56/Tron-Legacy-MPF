@@ -23,6 +23,14 @@ const CLEAN_DIR := "res://fonts_ttf/"
 ## clean fonts: file in fonts_ttf/ ("" = Godot's own default font), OpenType weight (0 = as is)
 const CLEAN := {"rajdhani": ["Rajdhani-Bold.ttf", 0], "orbitron": ["Orbitron.ttf", 700], "godot": ["", 0]}
 const CLEAN_SIZE := 64           # the clean font's drawing size, scaled to the line's height in dots
+## the clean fonts' two signed distance field copies (_sdf()): the letters, and the black and glow outlines
+const MSDF_SIZE := 256
+const TEXT_RANGE := 16
+const WIDE_RANGE := 192
+## the clean fonts' fields, made once at setup (tools/bake_fonts.gd, scripts/setup.py): made here, on Godot's
+## main thread when a character is first drawn, they held the game 6 s (text) and 45 s (wide) for the 94
+## printable characters of Orbitron on a Jetson Xavier NX
+const BAKED_DIR := "res://fonts_ttf/baked/"
 ## the black under clean text, in dots on each side: outlined ROM fonts, the others (instead of the ROM's cell)
 const OUTLINE_DOTS := 1.0
 const CELL_DOTS := 0.5
@@ -107,10 +115,11 @@ static func clean() -> Dictionary:
 		return _clean
 	var spec: Array = CLEAN.get(want, [want, 0])
 	var base: Font = null
+	var path := ""
 	if spec[0] == "":
 		base = ThemeDB.fallback_font
 	else:
-		var path: String = spec[0] if want not in CLEAN else CLEAN_DIR + spec[0]
+		path = spec[0] if want not in CLEAN else CLEAN_DIR + spec[0]
 		var f := FontFile.new()
 		if FileAccess.file_exists(path) and f.load_dynamic_font(path) == OK:
 			base = f
@@ -118,27 +127,63 @@ static func clean() -> Dictionary:
 			push_warning("DMD font %s: cannot load %s, using the ROM fonts" % [want, path])
 			return _clean
 	var cap := cap_height(base)
-	_clean = {"font": _sdf(base, 16, spec[1]), "wide": _sdf(base, 192, spec[1]), "cap": cap}
+	_clean = {"font": _sdf(base, TEXT_RANGE, spec[1], path), "wide": _sdf(base, WIDE_RANGE, spec[1], path),
+		"cap": cap}
 	return _clean
 
 
 ## The font as a multichannel signed distance field (sharp at any scale), at an OpenType weight (0 = as is).
 ## px_range: the field's reach in texels of a 256 texel glyph: small keeps the edges smooth, large lets outlines
 ## (the black under the text, the glow) grow wide.
-static func _sdf(base: Font, px_range: int, weight: int) -> Font:
-	if base is FontFile:
-		var f := (base as FontFile).duplicate() as FontFile
-		f.multichannel_signed_distance_field = true
-		f.msdf_pixel_range = px_range
-		f.msdf_size = 256
-		f.allow_system_fallback = false
-		base = f
+## path: the font file, whose baked field (baked_path()) is used when there is one.
+static func _sdf(base: Font, px_range: int, weight: int, path := "") -> Font:
+	var baked := baked_path(path, px_range, weight) if path != "" else ""
+	if baked != "" and ResourceLoader.exists(baked):
+		base = load(baked)
+	elif base is FontFile:
+		base = msdf_copy(base as FontFile, px_range)
+	return weighted(base, weight)
+
+
+## A copy of a dynamic font drawn as a multichannel signed distance field (no glyph made yet).
+static func msdf_copy(base: FontFile, px_range: int) -> FontFile:
+	var f := base.duplicate() as FontFile
+	f.multichannel_signed_distance_field = true
+	f.msdf_pixel_range = px_range
+	f.msdf_size = MSDF_SIZE
+	f.allow_system_fallback = false
+	return f
+
+
+## The font at an OpenType weight (0 = as is).
+static func weighted(base: Font, weight: int) -> Font:
 	if weight > 0:
 		var v := FontVariation.new()
 		v.base_font = base
 		v.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
 		base = v
 	return base
+
+
+## Starts loading the baked fields of clean font want on worker threads (tools/dmd_mode.gd, at start-up), so the
+## first line drawn finds them loaded (loaded then, on the main thread, they held the game 1.3 s).
+static func load_baked(want: String) -> void:
+	var spec: Array = CLEAN.get(want, [want, 0])
+	var path: String = spec[0] if want not in CLEAN else CLEAN_DIR + spec[0]
+	if spec[0] == "" or not FileAccess.file_exists(path):
+		return
+	for px_range in [TEXT_RANGE, WIDE_RANGE]:
+		var baked := baked_path(path, px_range, spec[1])
+		if ResourceLoader.exists(baked):
+			ResourceLoader.load_threaded_request(baked)
+
+
+## Where tools/bake_fonts.gd saves the field of font file path: named after the file, its contents, the weight,
+## the field's settings and the Godot version, so a change of any of them is never served a stale field.
+static func baked_path(path: String, px_range: int, weight: int) -> String:
+	var key := "%s %d %d %d %s" % [FileAccess.get_md5(path), weight, MSDF_SIZE, px_range,
+		Engine.get_version_info()["string"]]
+	return "%s%s_%s.res" % [BAKED_DIR, path.get_file().get_basename(), key.md5_text().left(12)]
 
 
 ## A font's capital height per em (the top of its "H"), 0.7 when it has none.
