@@ -24,14 +24,18 @@ first appearance, on every start; a test scene had 1.4 s and 2.3 s hitches on ev
 
 ## Minimal reproduction project
 
-[`repro/godot_pipeline_cache/`](repro/godot_pipeline_cache/) (zip: `repro/godot_pipeline_cache.zip`): a 3D scene with
-a dozen materials, particles and a shadowed light, `thread_model=2`. It prints the files in `user://vulkan` at
-start and the time of the first 5 frames, and quits after 120 frames. Run it twice.
+[`repro/godot_pipeline_cache/`](repro/godot_pipeline_cache/) (zip: `repro/godot_pipeline_cache.zip`; three files, no
+assets): a 3D scene, `thread_model=2`, where a burst of emissive particles and an omni light appear at 2 s. Each run
+prints the files in `user://vulkan` at start and the longest frame. Run it twice:
 
-- Every run ends with `ERROR: This function (finalize) can only be called from the render thread.`
-  (`servers/rendering/rendering_device.cpp:7470`). Reproduced on Linux x86_64 too (lavapipe, Godot 4.6.3).
-- On the Xavier NX (NVIDIA driver) the save at exit is lost, so the second run compiles every pipeline again.
-  lavapipe writes no pipeline cache data at all, so there only the error shows.
+    godot --path godot_pipeline_cache                         # separate render thread
+    godot --path godot_pipeline_cache --render-thread safe    # for comparison
+
+Xavier NX, idle: with the separate render thread both runs show no cache file and a long frame at the burst
+(Godot 4.6.3: 2.1 s and 1.7 s; 4.5.2: 1.6 s and 1.5 s), and the exit logs `finalize can only be called from the
+render thread` (rendering_device.cpp:7470 in 4.6.3, :7248 in 4.5.2). With `--render-thread safe` the second run
+finds `pipelines.mobile.*.cache` and its longest frame is 0.2 s. On Linux x86_64 with lavapipe only the error shows
+(lavapipe writes no pipeline cache data at all).
 
 ## Workaround
 

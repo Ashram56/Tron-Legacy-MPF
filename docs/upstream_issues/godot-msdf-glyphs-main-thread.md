@@ -41,5 +41,6 @@ comparison). Script: `game/tools/bake_fonts.gd`.
 
 ## Expected
 
-Glyph generation for MSDF fonts on a worker thread (show the glyph a frame later), or an editor/import option to
+The font importer's pre-render option helps only fonts imported into the project, not fonts loaded at run time
+with `load_dynamic_font()` (as a game that lets the user pick a font does). Glyph generation for MSDF fonts on a worker thread (show the glyph a frame later), or an editor/import option to
 pre-render a character set, and a note in the `msdf_pixel_range` docs about its cost.
