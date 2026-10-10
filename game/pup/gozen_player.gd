@@ -1,7 +1,7 @@
 extends Control
 
 ## A PuP screen's video player on Linux: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which plays the
-## pack's mp4s as they are and uses the Jetson's hardware decoder when libnvmpi is installed (docs/pup.md). Offers
+## pack's mp4s as they are and uses the Jetson's hardware decoder when libnvmpi is installed (docs/pup/README.md). Offers
 ## the parts of VideoStreamPlayer that pup_screen.gd uses: open(), play() (from the start), stop(), finished.
 
 signal finished
@@ -42,6 +42,7 @@ func _ready() -> void:
 	_playback.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_playback.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_playback.enable_auto_play = true
+	_playback.decode_to_display_size = true   # the Jetson's decoder scales to the PuP window (fewer pixels per frame)
 	add_child(_playback)
 	_playback.video_ended.connect(_on_ended)
 	_playback.video_loaded.connect(func(): _playback.video_texture.show())

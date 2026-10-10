@@ -28,7 +28,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fsutil  # noqa: E402  (Windows/OneDrive-safe folder wipes)
 import gmc_patch  # noqa: E402
-import pup_setup  # noqa: E402  (PuP Pack: docs/pup.md)
+from pup import pup_setup  # noqa: E402  (PuP Pack: docs/pup/README.md)
 import toolchain as tc  # noqa: E402
 
 
@@ -162,6 +162,13 @@ class Setup:
             self.say("   $ " + " ".join(cmd))
             if not self.dry:
                 subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=900)
+        # the HD clean fonts' signed distance fields, made once here instead of on the game's main thread
+        # (tron/rom_text_hd.gd; about 2 minutes on a Jetson Xavier NX)
+        self.say("== HD clean fonts (game/tools/bake_fonts.gd)")
+        cmd = [exe, "--headless", "--path", tc.GAME, "-s", "res://tools/bake_fonts.gd"]
+        self.say("   $ " + " ".join(cmd))
+        if not self.dry:
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1800)
 
 
 def refresh_media():
@@ -270,7 +277,7 @@ def main(argv=None):
         s.run([tc.venv_python(s.os), os.path.join(tc.ROOT, "scripts", "gen_config.py")], cwd=tc.ROOT)
     else:
         s.generate()
-        pup_setup.setup(tc.venv_python(s.os), s.dry)  # PuP Pack: docs/pup.md
+        pup_setup.setup(tc.venv_python(s.os), s.dry)  # PuP Pack: docs/pup/README.md
     if not args.skip_godot:
         s.godot_import()
         if not args.skip_media and not s.dry:

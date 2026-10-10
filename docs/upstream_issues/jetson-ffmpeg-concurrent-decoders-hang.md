@@ -45,4 +45,6 @@ https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/scripts/gozen/nvmpi_fl
 The root cause, why the CAPTURE plane's DQBUF fails with `EINVAL` while another decoder starts or stops, is
 probably in NVIDIA's libtegrav4l2 / NvMMLite and may be worth a report on the NVIDIA developer forum.
 
-Not checked yet on JetPack 5 (Xavier, L4T R35).
+On JetPack 5 (Jetson Xavier NX, L4T R35.6.4), stock libnvmpi: 5 of 20 runs of `in.mp4 3 40 10` segfaulted instead of
+hanging, one after `NVMMLITE_NVVIDEODEC cbDisplayPicture ErrorInfo = VideoErrorInfo_NullFrameBuffer`; 0 of 20 with
+the patch.

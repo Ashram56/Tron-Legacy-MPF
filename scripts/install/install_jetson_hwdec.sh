@@ -226,7 +226,7 @@ need "/usr/lib/aarch64-linux-gnu/libGLX.so.0" libglx0
 need "/usr/lib/aarch64-linux-gnu/libEGL.so.1" libegl1
 need "/usr/lib/aarch64-linux-gnu/libvulkan.so.1" libvulkan1
 if [ "$X" = 1 ]; then
-    # Godot places one window per monitor only on X11 (docs/pup.md)
+    # Godot places one window per monitor only on X11 (docs/pup/README.md)
     need "/usr/lib/xorg/modules/drivers/nvidia_drv.so" nvidia-l4t-x11
     need Xorg xserver-xorg-core
     need "/usr/lib/xorg/modules/input/libinput_drv.so" xserver-xorg-input-libinput
@@ -259,7 +259,63 @@ if [ "$X" = 1 ] && [ "$BLANK" = 0 ]; then
             read -r schema key value <<< "$kv"
             run "${GS[@]}" set "$schema" "$key" "$value" || note "warning: could not set $schema $key"
         done
-        note "--keep-blanking leaves these alone; for a cabinet also turn on automatic login (docs/pup.md)"
+        note "--keep-blanking leaves these alone; for a cabinet also turn on automatic login (docs/pup/README.md)"
+    fi
+fi
+
+# ------------------------------------------------------------------ sound output (ALSA default -> HDMI)
+
+# The Xavier NX devkit image makes the APE card (I2S on the 40-pin header, nothing attached) ALSA's default in
+# /etc/asound.conf: Godot found no sound device and the game was silent. Without PulseAudio or PipeWire (a minimal
+# image), the cabinet user's ~/.asoundrc sends the default to the HDMI monitor instead; an existing one is kept.
+ASOUND_CONF="${TRON_ASOUND_CONF:-/etc/asound.conf}"
+PROC_ASOUND="${TRON_PROC_ASOUND:-/proc/asound}"
+if [ "$X" = 1 ] && grep -qs 'hw:APE' "$ASOUND_CONF" && [ -d "$PROC_ASOUND/HDA" ]; then
+    say "Sound output (the ALSA default is the APE card; user $USER_NAME)"
+    ASOUNDRC="${TRON_ASOUNDRC:-$(getent passwd "$USER_NAME" | cut -d: -f6)/.asoundrc}"
+    if command -v pulseaudio >/dev/null 2>&1 || command -v pipewire >/dev/null 2>&1; then
+        note "PulseAudio or PipeWire is installed: sound goes through it, nothing to change"
+    elif [ -e "$ASOUNDRC" ]; then
+        note "$ASOUNDRC exists: kept as it is"
+    else
+        # the HDMI card's playback devices and their ELD files (one per output) come in the same order: take the
+        # device of the output with a monitor connected, else the first
+        devs=($(ls "$PROC_ASOUND/HDA/" | sed -n 's/^pcm\([0-9]*\)p$/\1/p' | sort -n))
+        elds=($(ls "$PROC_ASOUND/HDA/" | sed -n 's/^eld#\([0-9]*\)\.0$/\1/p' | sort -n))
+        dev="${devs[0]:-3}"
+        for i in "${!elds[@]}"; do
+            if grep -qs 'monitor_present[[:space:]]*1' "$PROC_ASOUND/HDA/eld#${elds[$i]}.0"; then
+                dev="${devs[$i]:-$dev}"
+                break
+            fi
+        done
+        printf '   $ write %s: default -> hw:HDA,%s (dmix)\n' "$ASOUNDRC" "$dev"
+        if [ "$DRY" = 0 ]; then
+            asoundrc="# Written by install_jetson_hwdec.sh: ALSA's default to the HDMI monitor (hw:HDA,$dev), mixed with dmix.
+# /etc/asound.conf points it at the APE card, which has nothing attached on the devkit.
+pcm.!default {
+	type plug
+	slave.pcm \"hdmi_dmix\"
+}
+pcm.hdmi_dmix {
+	type dmix
+	ipc_key 4242
+	slave {
+		pcm \"hw:HDA,$dev\"
+		rate 48000
+		channels 2
+	}
+}
+ctl.!default {
+	type hw
+	card HDA
+}"
+            if [ "$USER_NAME" = "$(id -un)" ]; then
+                printf '%s\n' "$asoundrc" > "$ASOUNDRC"
+            else
+                printf '%s\n' "$asoundrc" | sudo -u "$USER_NAME" tee "$ASOUNDRC" >/dev/null
+            fi
+        fi
     fi
 fi
 

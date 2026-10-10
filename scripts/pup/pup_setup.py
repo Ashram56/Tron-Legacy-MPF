@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """The PuP Pack part of the workspace: setup.py and run.py call it, or run it on its own.
 
-    python scripts/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
+    python scripts/pup/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
                                            # (Windows: the native_video add-on, Linux: GDE GoZen, which
                                            # play the mp4s as they are)
-    python scripts/pup_setup.py --status   # one line: is the PuP on, and if not why
+    python scripts/pup/pup_setup.py --status   # one line: is the PuP on, and if not why
+    python scripts/pup/pup_setup.py --pup-zip PACK.zip   # the pack from a zip (a file or an https URL) instead of
+                                                     # the pup_pack submodule; TRON_PUP_ZIP=PACK.zip does the
+                                                     # same for setup.py and the installers
 
 Kept out of setup.py and run.py (upstream files, one-line hooks only) so upstream merges stay clean.
 """
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import urllib.request
+import zipfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import fsutil  # noqa: E402
 import toolchain as tc  # noqa: E402
 
@@ -32,7 +39,7 @@ def status():
                        "`git submodule update --init pup_pack`)".format(os.path.relpath(pack, tc.ROOT)))
     if not os.path.exists(os.path.join(media, "manifest.json")):
         return False, ("PuP off: the pack's videos are not converted yet (run `python scripts/setup.py`, or "
-                       "`python scripts/pup_setup.py`)")
+                       "`python scripts/pup/pup_setup.py`)")
     screens = "backglass, DMD" + (", topper" if cfg["pup"].get("third_screen", True) else "")
     music = "PuP OST music" if cfg["pup"].get("ost_music", True) else "ROM music"
     return True, "PuP on: {} windows, {}".format(screens, music)
@@ -93,12 +100,116 @@ def ensure_ffmpeg(py):
         subprocess.run([py, "-m", "pip", "install", "--quiet", "imageio-ffmpeg"], check=True)
 
 
+ZIP_STAMP = ".pup_zip"               # in the pack folder: which zip it was extracted from
+ZIP_CACHE = os.path.join(tc.ROOT, ".cache", "pup_pack.zip")
+
+
+def pack_zip():
+    """The zip given with --pup-zip or TRON_PUP_ZIP (a path or an http(s) URL), or None for the submodule."""
+    return os.environ.get("TRON_PUP_ZIP", "").strip() or None
+
+
+def _fetch_zip(src, dry):
+    if not src.lower().startswith(("http://", "https://")):
+        path = os.path.abspath(os.path.expanduser(src))
+        if not os.path.isfile(path):
+            raise SystemExit("PuP Pack zip not found: {}".format(path))
+        return path
+    say("   downloading the PuP Pack zip: " + src)
+    if dry:
+        return None
+    os.makedirs(os.path.dirname(ZIP_CACHE), exist_ok=True)
+    tmp = ZIP_CACHE + ".part"
+    with urllib.request.urlopen(src) as resp, open(tmp, "wb") as out:
+        shutil.copyfileobj(resp, out)
+    os.replace(tmp, ZIP_CACHE)
+    return ZIP_CACHE
+
+
+def _digest(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def extract_pack(zip_path, pack):
+    """Extracts the folder of the zip that holds triggers.pup (the pack itself, at any depth, e.g.
+    trn_174h/ or PUPVideos/trn_174h/) into `pack`. Returns the number of files written."""
+    with zipfile.ZipFile(zip_path) as z:
+        names = [n for n in z.namelist() if not n.endswith("/")]
+        tops = sorted((n for n in names if n.replace("\\", "/").rsplit("/", 1)[-1].lower() == "triggers.pup"),
+                      key=lambda n: n.count("/"))
+        if not tops:
+            raise SystemExit("{} holds no triggers.pup: not a PuP Pack zip".format(zip_path))
+        prefix = tops[0].replace("\\", "/")[:-len("triggers.pup")]
+        tmp = tempfile.mkdtemp(prefix="pup_pack_", dir=os.path.dirname(os.path.abspath(pack)))
+        try:
+            count = _extract(z, names, prefix, tmp)
+        except BaseException:
+            fsutil.remove_dir(tmp)
+            raise
+    if os.path.isdir(pack):
+        fsutil.remove_dir(pack)
+    os.replace(tmp, pack)
+    return count
+
+
+def _extract(z, names, prefix, tmp):
+    count = 0
+    for name in names:
+        rel = name.replace("\\", "/")
+        if not rel.startswith(prefix):
+            continue
+        rel = rel[len(prefix):]
+        parts = rel.split("/")
+        if not rel or rel.startswith("/") or ".." in parts or ":" in parts[0]:
+            continue                        # nothing may land outside the pack folder
+        dst = os.path.join(tmp, *parts)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with z.open(name) as src, open(dst, "wb") as out:
+            shutil.copyfileobj(src, out)
+        count += 1
+    return count
+
+
+def pack_from_zip(src, pack, dry=False):
+    """The pack from a zip instead of the submodule (so a user installs the pack they downloaded from its
+    author). Re-extracts only when the zip changed. Returns 0, or 1 when the pack cannot be used."""
+    say("   PuP Pack from a zip (TRON_PUP_ZIP / --pup-zip): " + src)
+    stamp = os.path.join(pack, ZIP_STAMP)
+    if os.path.exists(os.path.join(pack, "triggers.pup")) and not os.path.exists(stamp):
+        say("   {} is already there (pup_pack submodule): the zip is not used; delete that folder to use "
+            "it".format(os.path.relpath(pack, tc.ROOT)))
+        return 0
+    path = _fetch_zip(src, dry)
+    if dry:
+        say("   (dry run) would extract it into " + os.path.relpath(pack, tc.ROOT))
+        return 0
+    digest = _digest(path)
+    if os.path.exists(stamp):
+        with open(stamp, encoding="utf-8") as f:
+            if f.read().split()[:1] == [digest]:
+                say("   in place (same zip)")
+                return 0
+    os.makedirs(os.path.dirname(pack), exist_ok=True)
+    count = extract_pack(path, pack)
+    with open(os.path.join(pack, ZIP_STAMP), "w", encoding="utf-8") as f:
+        f.write("{} {}\n".format(digest, src))
+    say("   {} files -> {}".format(count, os.path.relpath(pack, tc.ROOT)))
+    return 0
+
+
 def setup(py=None, dry=False):
     py = py or tc.python()
     say("== PuP Pack (pup_pack submodule, videos converted for Godot into pup_media/)")
     cfg = settings.load()
     pack = settings.pack_dir(cfg)
-    if not os.path.exists(os.path.join(pack, "triggers.pup")):
+    if pack_zip():
+        if pack_from_zip(pack_zip(), pack, dry):
+            return 1
+    elif not os.path.exists(os.path.join(pack, "triggers.pup")):
         cmd = ["git", "submodule", "update", "--init", "--depth", "1", "pup_pack"]
         say("   $ " + " ".join(cmd))
         if not dry and subprocess.run(cmd, cwd=tc.ROOT).returncode:
@@ -118,7 +229,7 @@ def setup(py=None, dry=False):
             if os.path.isdir(addon):
                 fsutil.remove_dir(addon)
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
-    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
+    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
     say("   " + status()[1])
     return code
@@ -129,4 +240,8 @@ if __name__ == "__main__":
         on, text = status()
         say(text)
         sys.exit(0 if on else 1)
+    if sys.argv[1:2] == ["--pup-zip"] and len(sys.argv) == 3:
+        os.environ["TRON_PUP_ZIP"] = sys.argv[2]
+    elif sys.argv[1:]:
+        sys.exit(__doc__)
     sys.exit(setup())

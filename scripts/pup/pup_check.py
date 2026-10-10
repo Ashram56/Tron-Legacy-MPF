@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Boot Godot + MPF with the PuP Pack, play a rules scenario and save the PuP windows every 1.5 s.
 
-    python scripts/pup_check.py [seconds] [scenario]     (default 40 s, gem_hurryup)
+    python scripts/pup/pup_check.py [seconds] [scenario]     (default 40 s, gem_hurryup)
 
 Output in captures/pup/: <window>_NNNN.png for backglass, dmd and topper (when [pup] third_screen is on),
 godot.log and mpf.log. Fails when a window was never drawn or Godot's PuP player did not answer MPF.
-Needs the converted media (scripts/gen_pup.py). Like render_check.py, runs under Xvfb without a display.
+Needs the converted media (scripts/pup/gen_pup.py). Like render_check.py, runs under Xvfb without a display.
 """
 import glob
 import os
 import shutil
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import run  # noqa: E402
 import toolchain as tc  # noqa: E402
 

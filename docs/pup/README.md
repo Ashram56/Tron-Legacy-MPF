@@ -7,7 +7,7 @@ and its OST replaces the ROM music.
 
 ## Setting it up
 
-The [README](../README.md#install) has the one-line install. By hand, from a clone:
+The [README](../../README.md#install) has the one-line install. By hand, from a clone:
 
 ```sh
 python scripts/setup.py               # venv, MPF, Godot, GMC, the game's media + the PuP media
@@ -15,12 +15,23 @@ python scripts/run.py                 # the game, with the PuP windows
 ```
 
 `run.py` prints `PuP on: ...` before it starts Godot, or what is missing. `setup.py` calls
-`scripts/pup_setup.py`, which fetches the `pup_pack` submodule and runs `scripts/gen_pup.py`: it turns
+`scripts/pup/pup_setup.py`, which fetches the `pup_pack` submodule and runs `scripts/pup/gen_pup.py`: it turns
 every video into Theora (`.ogv`, the only video format Godot plays) and copies the mp3s and
 pictures. It needs an ffmpeg with libtheora (ffmpeg on the PATH, or `FFMPEG=<path>`); without one it
 installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
+
+**The pack from its author's zip.** The default source is the `pup_pack` submodule (this project's private
+copy of the pack). `TRON_PUP_ZIP=<zip or https URL>` in the environment of `setup.py` (or the installers'
+`--pup-zip` / `-PupZip`, or `python scripts/pup/pup_setup.py --pup-zip <zip>`) takes the pack from the zip its author
+publishes instead, so a player downloads it from the author, who gets the credit:
+`pup_setup.py` finds the folder holding `triggers.pup` in the zip (at any depth, e.g. `PUPVideos/trn_174h/`),
+extracts it into `pup_pack/trn_174h/` and notes the zip's SHA-256 in `pup_pack/trn_174h/.pup_zip`, so the same zip
+is not extracted twice; the installers then don't ask for access to the pack's repository. A pack already
+checked out by the submodule is left alone (delete the folder to switch). A different release of the pack can
+change the captures or the trigger rows: run `python scripts/pup/pup_captures.py` after switching and fix the
+lines it flags in `game/tron_pup/trigger_map.yaml`.
 
 **Windows and macOS: native mp4 playback.** On Windows and macOS, `setup.py` installs the `native_video` add-on
 (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
@@ -36,7 +47,7 @@ removes the add-on; without it loaded the PuP plays the converted Theora videos.
 copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
 nothing is converted. On a Jetson (JetPack 5 or 6) it uses the hardware decoder once libnvmpi is installed
 (the Linux install line does it, or `scripts/install/install_jetson_hwdec.sh`, see
-`pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md) for the fixes it needs); everywhere else FFmpeg
+`pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md) for the fixes it needs); everywhere else FFmpeg
 decodes in software.
 `TRON_GOZEN=0 python scripts/setup.py` goes back to Theora. The binaries are rebuilt from pinned sources with
 `scripts/build_gozen.sh` (Docker).
@@ -46,7 +57,7 @@ decodes in software.
 | Window | Shows | PuP screens |
 |---|---|---|
 | `backglass` (4:3) | background and mode loops, event videos popping over them | 2 (underlay), 12 (top layer) |
-| `dmd` (large LCD) | the pack's DMD panel art, the game's 128x32 DMD in its black middle | the game's DMD |
+| `dmd` (large LCD) | the game's 128x32 DMD in a neon frame over a live light cycle chase (or the pack's DMD panel art, `background="frame"`) | the game's DMD |
 | `topper` (optional) | mode info, TRON / ZUSE letters, light cycles | 13 (underlay), 14 (top layer) |
 | (no window) | OST music | 15 |
 
@@ -80,7 +91,14 @@ borderless=true
   the upstream game.
 - `[backglass] fit`: the videos are 16:9 and the backglass 4:3: `fit` (black bars, `align` places the video),
   `fill` (crops the sides) or `stretch`.
-- `[dmd] frame_crop` / `dmd_rect` place the art and the DMD (pixels of the art image), `dots` draws round dots.
+- `[dmd] background`: `lightcycles` (the default) draws the DMD in a neon frame over a live 3D chase
+  (`game/pup/lightcycles.gd`): two 1982-style light cycles on a grid, their trails fading after about 3 s, a
+  cycle that hits a trail, a wall or the other cycle derezzes and comes back. The middle of the DMD is a wall
+  and the cells behind the rest of it an avoid zone the cycles steer out of, so the chase stays around the
+  DMD; `lightcycles_dmd` is the DMD's width as a share of the window's (0.6: 768x192 on a 1280x390 bar). It is
+  a few hundred triangles; `background="frame"` is the PuP Pack's DMD panel art instead.
+- `[dmd] frame_crop` / `dmd_rect` (`background="frame"`) place the art and the DMD (pixels of the art image),
+  `dots` draws round dots.
   The game's own 128x32 window is minimised (`hide_main_window`); it stays the source of the DMD picture, so
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as
   in the DMD window.
@@ -108,8 +126,8 @@ WaylandEnable=false
    pack version needs no code change. In Visual Pinball, `D<n>` fires when the DMD shows the inside of the
    purple rectangle of `PupCapture/<n>.bmp`. Here the game says what it shows: it posts `tron_deff_<id>` when
    display effect `<id>` takes the DMD. `game/tron_pup/trigger_map.yaml` maps each `D<n>` to the effects whose
-   frames contain that capture, found by `scripts/pup_captures.py` (all 98 captures against every recorded frame,
-   variant and ROM library animation; report in [pup_captures.md](pup_captures.md)). `W<n>` are switches
+   frames contain that capture, found by `scripts/pup/pup_captures.py` (all 98 captures against every recorded frame,
+   variant and ROM library animation; report in [captures.md](captures.md)). `W<n>` are switches
    (by name, so the P-ROC numbering does not matter). The one `W11=1,L35=1` row (Arcade Mystery) is mapped to the
    Flynn's Arcade award effect.
 2. **MPF side** (`game/tron_pup/`, loaded as the never-started mode `pup`): the engine fires the rows of an
@@ -121,7 +139,7 @@ WaylandEnable=false
    ROM's music calls (the sound pools on the `music` track) and stops the running ROM music; speech and effects
    still play. Without a ready PuP player the ROM music plays as before.
 
-`python scripts/pup_check.py` plays a rules scenario with the PuP windows and saves them to `captures/pup/`.
+`python scripts/pup/pup_check.py` plays a rules scenario with the PuP windows and saves them to `captures/pup/`.
 `tests/test_pup.py` covers the map, the engine and the music hand-over.
 
 ## Keeping up with the upstream game
@@ -144,7 +162,7 @@ One upstream change is not a hook and would be best made upstream too: Godot 4.6
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 
-- a DMD animation or effect number changed: `scripts/pup_captures.py` marks the captures whose mapped effect no
-  longer draws them (**check** in `docs/pup_captures.md`); fix those lines of `trigger_map.yaml`;
+- a DMD animation or effect number changed: `scripts/pup/pup_captures.py` marks the captures whose mapped effect no
+  longer draws them (**check** in `docs/pup/captures.md`); fix those lines of `trigger_map.yaml`;
 - the media bridge (`game/tron/media_bridge.py`) renamed `sound`, `music_key` or its sound pools:
   `tests/test_pup.py` fails on the music hand-over (`game/tron_pup/mode.py`, `set_music_mute`).

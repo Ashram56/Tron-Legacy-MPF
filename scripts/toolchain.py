@@ -156,7 +156,8 @@ def godot_command(*args):
 MEDIA_INPUTS = [os.path.join("scripts", n) for n in ("gen_config.py", "gen_media.py", "gen_fonts.py", "rom_layout.py",
                                                        "dmd_hd.py", "font_outline.py")] \
     + [os.path.join("assets", "mpf_package", n) for n in ("event_map.csv", "lamp_effects.csv")] \
-    + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")]
+    + [os.path.join("assets", "code", "tron_game_decompiled_v2.c")] \
+    + [os.path.join("game", "tools", "bake_fonts.gd")]
 MEDIA_STAMP = os.path.join(GAME, "media", ".generated")
 
 

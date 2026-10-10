@@ -3,9 +3,9 @@
 # In Visual Pinball, PinUP Player watches PinMAME's DMD: D<n> fires when the pixels inside the purple
 # rectangle of PupCapture/<n>.bmp appear on the DMD. Here the rules tell us instead: the game posts
 # tron_deff_<id> when display effect <id> takes the DMD (game/tron/display.py), so each D<n> is mapped to the
-# display effect(s) whose frames contain that capture. scripts/pup_captures.py did the matching (every frame
+# display effect(s) whose frames contain that capture. scripts/pup/pup_captures.py did the matching (every frame
 # of every effect, its variants and the ROM's library animations, against the 98 captures) and writes the
-# report to docs/pup_captures.md; re-run it when the upstream DMD animations change.
+# report to docs/pup/captures.md; re-run it when the upstream DMD animations change.
 #
 # An event may carry a condition on its arguments: tron_deff_112{award==1}.
 # Synthetic events posted by game/tron_pup/mode.py:

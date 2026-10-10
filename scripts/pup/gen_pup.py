@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Convert the PuP Pack's media for Godot: pup_pack/trn_174h -> pup_media/trn_174h (git-ignored).
 
-    python scripts/gen_pup.py                  # everything, in parallel; re-runs only redo changed files
-    python scripts/gen_pup.py --max-height 720 # smaller videos for a slower PC
-    python scripts/gen_pup.py --only "Drain/*" # some files (testing)
+    python scripts/pup/gen_pup.py                  # everything, in parallel; re-runs only redo changed files
+    python scripts/pup/gen_pup.py --max-height 720 # smaller videos for a slower PC
+    python scripts/pup/gen_pup.py --only "Drain/*" # some files (testing)
 
 Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis); with --native (Windows and
 macOS, the native_video add-on: pup_addons/native_video) the videos are only probed and Godot plays the pack's mp4s. The OST mp3s and the pictures
@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import fsutil  # noqa: E402
 import toolchain as tc  # noqa: E402
 
@@ -33,7 +33,7 @@ from tron_pup import settings  # noqa: E402
 VIDEO = (".mp4", ".m4v", ".mov", ".avi", ".wmv", ".webm", ".mkv", ".f4v")
 COPY = (".mp3", ".ogg", ".png", ".jpg", ".jpeg", ".bmp", ".webp")
 AUDIO_TO_OGG = (".wav",)
-SKIP_DIRS = {"pupcapture", "pup-pack_options"}       # DMD captures (scripts/pup_captures.py) and the VPX options
+SKIP_DIRS = {"pupcapture", "pup-pack_options"}       # DMD captures (scripts/pup/pup_captures.py) and the VPX options
 SIZE = re.compile(r"Stream #.*Video:.*?(\d{2,5})x(\d{2,5})")
 DURATION = re.compile(r"Duration: (\d+):(\d+):(\d+\.\d+)")
 

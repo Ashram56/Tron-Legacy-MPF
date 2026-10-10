@@ -37,7 +37,7 @@ class TestPupFiles(unittest.TestCase):
 class TestSetup(unittest.TestCase):
     def test_native_video_on_windows_and_macos(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        import pup_setup
+        from pup import pup_setup
         with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": ""}):
             self.assertTrue(pup_setup.native_video("windows"))
             self.assertTrue(pup_setup.native_video("macos"))
@@ -51,7 +51,7 @@ class TestSetup(unittest.TestCase):
 
     def test_gozen_on_linux_only(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        import pup_setup
+        from pup import pup_setup
         self.assertTrue(pup_setup.gozen("linux", "arm64"))
         self.assertTrue(pup_setup.gozen("linux", "x86_64"))
         self.assertFalse(pup_setup.gozen("windows", "x86_64"))
@@ -62,6 +62,52 @@ class TestSetup(unittest.TestCase):
                      "bin/libgozen.linux.template_release.arm64.so",
                      "bin/libgozen.linux.template_release.x86_64.so"):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.GOZEN_SRC, name)), name)
+
+    def test_pack_from_zip(self):
+        """--pup-zip / TRON_PUP_ZIP: the folder holding triggers.pup is extracted, at any depth, nothing
+        outside it, and the same zip is not extracted twice."""
+        import tempfile
+        import zipfile
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        from pup import pup_setup
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "pack.zip")
+            with zipfile.ZipFile(src, "w") as z:
+                z.writestr("PUPVideos/trn_174h/triggers.pup", "ID,Trigger\n")
+                z.writestr("PUPVideos/trn_174h/StartGame/StartGame 1.mp4", b"mp4")
+                z.writestr("PUPVideos/readme.txt", "outside the pack")
+                z.writestr("PUPVideos/trn_174h/../../evil.txt", "zip slip")
+            pack = os.path.join(tmp, "pup_pack", "trn_174h")
+            with mock.patch.object(pup_setup.tc, "ROOT", tmp):
+                self.assertEqual(0, pup_setup.pack_from_zip(src, pack))
+                self.assertTrue(os.path.exists(os.path.join(pack, "triggers.pup")))
+                self.assertTrue(os.path.exists(os.path.join(pack, "StartGame", "StartGame 1.mp4")))
+                self.assertFalse(os.path.exists(os.path.join(tmp, "evil.txt")))
+                self.assertFalse(os.path.exists(os.path.join(pack, "readme.txt")))
+                os.remove(os.path.join(pack, "StartGame", "StartGame 1.mp4"))
+                self.assertEqual(0, pup_setup.pack_from_zip(src, pack))           # same zip: left as is
+                self.assertFalse(os.path.exists(os.path.join(pack, "StartGame", "StartGame 1.mp4")))
+                os.remove(os.path.join(pack, pup_setup.ZIP_STAMP))               # a submodule checkout: kept
+                with zipfile.ZipFile(src, "a") as z:
+                    z.writestr("PUPVideos/trn_174h/new.txt", "x")
+                self.assertEqual(0, pup_setup.pack_from_zip(src, pack))
+                self.assertFalse(os.path.exists(os.path.join(pack, "new.txt")))
+            bad = os.path.join(tmp, "bad.zip")
+            with zipfile.ZipFile(bad, "w") as z:
+                z.writestr("readme.txt", "no pack")
+            with self.assertRaises(SystemExit):
+                pup_setup.extract_pack(bad, os.path.join(tmp, "other"))
+
+
+class TestDmdBackground(unittest.TestCase):
+    def test_lightcycles_by_default(self):
+        import configparser
+        cfg = configparser.ConfigParser(inline_comment_prefixes=(";",))
+        cfg.read(os.path.join(GAME, "pup.cfg"))
+        self.assertEqual('"lightcycles"', cfg["dmd"]["background"])
+        self.assertIn("frame_image", cfg["dmd"])   # background="frame" keeps the pack's art
+        for name in ("lightcycles.gd", "lightcycles_grid.gdshader", "neon_frame.gdshader"):
+            self.assertTrue(os.path.exists(os.path.join(GAME, "pup", name)), name)
 
 
 @unittest.skipUnless(HAVE_PACK, "PuP Pack not checked out (git submodule update --init pup_pack)")
