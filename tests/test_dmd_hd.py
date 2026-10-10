@@ -324,11 +324,11 @@ CAN_RENDER = (sys.platform.startswith("linux") and GENERATED and os.path.exists(
 class TestGodotModes(unittest.TestCase):
     """Renders slides with game/tools/slide_capture.tscn, as scripts/render_diff.py does."""
 
-    def render(self, user_args=(), engine_args=(), env=None):
+    def render(self, user_args=(), engine_args=(), env=None, machine_vars=None, slides=CLASSIC):
         out = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, out, True)
-        jobs = [{"slide": s, "kwargs": KWARGS[s], "times_ms": [0, 400, 1600], "out": os.path.join(out, s)}
-                for s in CLASSIC]
+        jobs = [{"slide": s, "kwargs": KWARGS[s], "times_ms": [0, 400, 1600], "out": os.path.join(out, s),
+                 "machine_vars": machine_vars or {}} for s in slides]
         job = os.path.join(out, "job.json")
         with open(job, "w") as f:
             json.dump(jobs, f)
@@ -397,6 +397,33 @@ class TestGodotModes(unittest.TestCase):
                                                        env={"TRON_DMD_FONT": "rom"}))[0])
         self.assertEqual(boxes["rom"], box(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-font=/nowhere/x.ttf"],
                                                        ["--resolution", "1280x320"]))[0])
+
+    def test_service_menu_glow_and_size(self):
+        """The service menu's DISPLAY ADJUSTMENTS (MPF machine vars dmd_text_glow, dmd_text_size, in percent)
+        restyle the text already shown: size 100 = --dmd-text-scale=1, glow 0 = --dmd-text-glow=0; -1 keeps
+        the start value; classic ignores them."""
+        from PIL import Image, ImageStat
+
+        def frame(out):
+            return Image.open(os.path.join(out, "deff_025", "frame_00000.png")).convert("RGB")
+
+        def box(img):
+            return img.convert("L").point(lambda p: 255 if p > 90 else 0).getbbox()
+        hd = ["--resolution", "1280x320"]
+        full = frame(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-text-scale=1"], hd, slides=["deff_025"]))
+        plain = frame(self.render(["--dmd=hd"], hd, slides=["deff_025"]))
+        got = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": 0, "dmd_text_size": 100},
+                                slides=["deff_025"]))
+        self.assertEqual(box(full), box(got))
+        self.assertEqual(full.tobytes(), got.tobytes())
+        same = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": -1, "dmd_text_size": -1},
+                                 slides=["deff_025"]))
+        self.assertEqual(plain.tobytes(), same.tobytes())
+        big_glow = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": 200}, slides=["deff_025"]))
+        light = [sum(ImageStat.Stat(img.convert("L")).sum) for img in (got, plain, big_glow)]   # no glow, 80%, 200%
+        self.assertTrue(light[0] < light[1] < light[2], light)
+        self.assertEqual(CLASSIC, self.hashes(self.render(["--dmd=classic"], machine_vars={"dmd_text_glow": 300,
+                                                                                         "dmd_text_size": 50})))
 
     def test_recorded_text_drawn_live(self):
         """HD: the text of a recorded effect (deff 20, BALL SAVED) is drawn live in the clean font at its place:

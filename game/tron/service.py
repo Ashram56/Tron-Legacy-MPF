@@ -38,6 +38,10 @@ CHARSET = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,'-&"
 CUSTOM_MESSAGE_LEN = 16
 CUSTOM_PRICING_MAX = 10
 LOCK_KEY = "service"
+# items of this game that the ROM does not have, by menu (docs/rom_differences.md): DISPLAY ADJUSTMENTS,
+# the HD display's text glow and size (tron/settings.py DisplaySettings)
+GAME_ITEMS = {"ADJUSTMENTS": [{"text": "DISPLAY ADJUSTMENTS", "kind": "screen", "submenu": None,
+                               "shown_only_if": None}]}
 LIGHT_PRIORITY = 1000000
 
 # ROM draw constants
@@ -77,6 +81,7 @@ ICONS = {
     "START TOURNAMENT": 146, "STOP TOURNAMENT": 148, "VIEW TOURNAMENT DATA": 150, "SIGN MESSAGES A-B": 152,
     "INSTALL REDEMPTION SYSTEM": 154, "CHANGE REDEMPTION SETTINGS": 156, "UNINSTALL REDEMPTION SYSTEM": 158,
     "VIEW REDEMPTION DATA": 160,
+    "DISPLAY ADJUSTMENTS": 88,
     "GAME-SPECIFIC TESTS": 1429, "3-BANK MOTOR TEST": 1431, "DISC MOTOR TEST": 1433,
     "RECOGNIZER MOTOR TEST": 1435, "FIBER OPTIC LIGHT TUBE TEST": 1437,
 }
@@ -239,6 +244,7 @@ class MenuScreen(Screen):
 
     def items(self):
         items = [i for i in service_data()["menus"][self.title] if self.svc.visible(i)]
+        items += GAME_ITEMS.get(self.title, [])
         # the game adds its items (GAME-SPECIFIC TESTS) at run time: the tail items stay last
         tail = [i for i in items if i["kind"] in ("back", "exit", "help")]
         return [i for i in items if i not in tail] + tail
@@ -937,11 +943,14 @@ def dump_audits(os_, path):
 
 class AdjustmentScreen(ListScreen):
     """STANDARD / FEATURE ADJUSTMENTS: MINUS / PLUS scroll; SELECT edits, MINUS / PLUS change the value by
-    the ROM step, SELECT stores it (MPF setting, persisted), BACK drops the change."""
+    the ROM step, SELECT stores it (MPF setting, persisted), BACK drops the change. DISPLAY ADJUSTMENTS
+    (added by this game) edits the HD display's settings (tron/settings.py DisplaySettings) the same way,
+    showing the value being edited on the display as it changes."""
 
-    def __init__(self, svc, title, group):
+    def __init__(self, svc, title, group, adj=None):
         super().__init__(svc, title)
-        self.numbers = self.os.adj.menu(group)
+        self.adj = self.os.adj if adj is None else adj
+        self.numbers = self.adj.menu(group)
         self.editing = None
         self.blink_on = True
         self.handle = None
@@ -950,7 +959,7 @@ class AdjustmentScreen(ListScreen):
         return self.numbers
 
     def entry_lines(self, num):
-        adj = self.os.adj
+        adj = self.adj
         value = adj[num] if self.editing is None else self.editing
         mark = " (FACTORY)" if value == adj.default(num) else ""
         edit = "> " if self.editing is not None else ""      # the value being edited
@@ -961,7 +970,7 @@ class AdjustmentScreen(ListScreen):
         on row 14, the value in font 8 on row 22 (blinking while it is edited) and on row 29, fitted,
         (INSTALLED, FACTORY DEFAULT) / (INSTALLED) for the stored value, (FACTORY DEFAULT) for the default."""
         num = self.current()
-        adj = self.os.adj
+        adj = self.adj
         value = adj[num] if self.editing is None else self.editing
         out = [rd.fit("{} #{}".format(self.title, num), 64, 5, SMALL_FONTS),
                rd.fit(adj.info[num]["name"], 64, 14, (6, 2, 0))]
@@ -985,28 +994,37 @@ class AdjustmentScreen(ListScreen):
         self.blink_on = True
 
     def leave(self):
+        if self.editing is not None:
+            self._preview(self.current(), None)
         self._stop_blink()
 
     def button(self, name):
         num = self.current()
         if self.editing is None:
             if name == "select":
-                self.editing = self.os.adj[num]
+                self.editing = self.adj[num]
                 self.handle = self.machine.clock.schedule_once(self._blink, BLINK_SECONDS / 2)
                 self.refresh()
             else:
                 super().button(name)
             return
         if name in ("minus", "plus"):
-            self.editing = self.os.adj.step(num, self.editing, 1 if name == "plus" else -1)
+            self.editing = self.adj.step(num, self.editing, 1 if name == "plus" else -1)
+            self._preview(num, self.editing)
         elif name == "select":
-            self.os.adj[num] = self.editing
+            self.adj[num] = self.editing
             self.editing = None
             self._stop_blink()
         elif name == "back":
             self.editing = None
+            self._preview(num, None)
             self._stop_blink()
         self.refresh()
+
+    def _preview(self, num, value):
+        """DISPLAY ADJUSTMENTS: the value being edited shows on the display at once (None: the stored one)."""
+        if hasattr(self.adj, "preview"):
+            self.adj.preview(num, value)
 
 
 # ---------------------------------------------------------------------------------------------- utilities
@@ -1347,6 +1365,7 @@ class ServiceMode(Mode):
                 lambda: big_two("AUDIT DUMP", "COMPLETE") + [rd.fit(CONTINUE, 64, 27, SMALL_FONTS)]),
             "STANDARD ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "standard"),
             "FEATURE ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "feature"),
+            "DISPLAY ADJUSTMENTS": lambda: AdjustmentScreen(self, text, None, os_.display_settings),
             "ENTER CUSTOM MESSAGE": lambda: CustomMessageScreen(self),
             "SET DATE/TIME": lambda: DateTimeScreen(self),
             "SET CUSTOM PRICING": lambda: CustomPricingScreen(self),
@@ -1379,8 +1398,10 @@ class ServiceMode(Mode):
             hs.reset_all() if mask == 3 else hs.reset(mask)
 
     def factory_reset(self):
-        """RESET FACTORY SETTINGS: adjustments to their defaults, audits cleared, high scores and credits."""
+        """RESET FACTORY SETTINGS: adjustments to their defaults (the display's too), audits cleared, high
+        scores and credits."""
         self.os.adj.factory_reset()
+        self.os.display_settings.factory_reset()
         self.os.audits.reset_all()
         self.reset_high_scores(3)
         self.reset_credits()

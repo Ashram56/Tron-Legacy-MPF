@@ -91,7 +91,8 @@ Open:
 
 Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue text `#2a6cff`, glow
 `#22b8ff` at 0.8, font Rajdhani Bold, text scale 0.85. Back to the ROM: `--dmd classic`, `--dmd-font rom`,
-`--dmd-tint orange`, `--dmd-text-glow 0`.
+`--dmd-tint orange`, `--dmd-text-glow 0`. The operator can also set the text glow and size in the service
+menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the options).
 
 ### Owner decisions (keep adding)
 
@@ -131,4 +132,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-10 (DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
