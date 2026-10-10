@@ -44,6 +44,11 @@ You can change where the files go, and what is installed:
 - **Private repositories:** if the assets (or the game) repository is private, the installer asks first for a
   GitHub token that can read it (github.com > Settings > Developer settings > Personal access tokens; a
   fine-grained token with Contents: read-only), instead of a password. Or set `TRON_GITHUB_TOKEN` before the line.
+- **PuP Pack from its zip:** by default the pack comes from this project's private `pup_pack` repository. To
+  use the pack as its author publishes it instead (Terry Red's "End of Line" zip, from where the author shares it), set
+  `TRON_PUP_ZIP` to the zip file or its https URL before the line (Windows: `$env:TRON_PUP_ZIP =
+  "C:\Users\me\Downloads\Tron.zip"`), or give `--pup-zip FILE` (Windows `-PupZip FILE`). No access to the
+  private repository is needed then. Already installed: `python scripts/pup/pup_setup.py --pup-zip FILE`.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
   `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.

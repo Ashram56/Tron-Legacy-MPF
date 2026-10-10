@@ -22,6 +22,17 @@ installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
+**The pack from its author's zip.** The default source is the `pup_pack` submodule (this project's private
+copy of the pack). `TRON_PUP_ZIP=<zip or https URL>` in the environment of `setup.py` (or the installers'
+`--pup-zip` / `-PupZip`, or `python scripts/pup/pup_setup.py --pup-zip <zip>`) takes the pack from the zip its author
+publishes instead, so a player downloads it from the author, who gets the credit:
+`pup_setup.py` finds the folder holding `triggers.pup` in the zip (at any depth, e.g. `PUPVideos/trn_174h/`),
+extracts it into `pup_pack/trn_174h/` and notes the zip's SHA-256 in `pup_pack/trn_174h/.pup_zip`, so the same zip
+is not extracted twice; the installers then don't ask for access to the pack's repository. A pack already
+checked out by the submodule is left alone (delete the folder to switch). A different release of the pack can
+change the captures or the trigger rows: run `python scripts/pup/pup_captures.py` after switching and fix the
+lines it flags in `game/tron_pup/trigger_map.yaml`.
+
 **Windows and macOS: native mp4 playback.** On Windows and macOS, `setup.py` installs the `native_video` add-on
 (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
 they are, with hardware decoding (Media Foundation, AVFoundation): nothing is converted, `gen_pup.py --native`
