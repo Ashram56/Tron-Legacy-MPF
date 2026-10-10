@@ -47,7 +47,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# Run from a clone, it sets up that clone. Run on its own (irm ... | iex, README "Install"), it first clones the
+# Run from a clone, it sets up that clone. Run on its own (& ([scriptblock]::Create((irm ...) -join [char]10)), README "Install"), it first clones the
 # repository into $env:TRON_DIR (default ~\Tron-Legacy-MPF, outside OneDrive), branch $env:TRON_BRANCH (default
 # main), from $env:TRON_REPO; an existing clone gets a git pull.
 $Clone = -not ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot '..\setup.py')))

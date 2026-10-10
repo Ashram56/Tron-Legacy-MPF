@@ -10,7 +10,7 @@ Last updated 2026-10-08.
 
 | OS | Line |
 |---|---|
-| Windows | `powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1 \| iex"` |
+| Windows | `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1) -join [char]10))"` (was `irm ... \| iex`, which failed on Windows PowerShell with "the terminator #> is missing": observed on Transformers, 2026-10-10) |
 | macOS | `bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_macos.sh)` |
 | Linux | `bash <(curl -fsSL https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_linux.sh)` |
 
