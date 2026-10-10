@@ -6,7 +6,8 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
 **Working with Claude, or rebuilding another Stern SAM game this way?** Start at the
-[master plan](docs/agents/README.md): what to provide (ROM, VPX table) and the agents that do the work.
+[master plan](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/README.md) in Stern-SAM-Decryption: what to provide (ROM, VPX table) and the
+agents that do the work. Tron's own status and decisions: [docs/agents/README.md](docs/agents/README.md).
 
 ## Install
 
@@ -126,5 +127,5 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.
-- [docs/agents/README.md](docs/agents/README.md): the master plan for AI agents: what to provide (ROM, VPX table)
-  and the agents that turn it into this game.
+- [docs/agents/README.md](docs/agents/README.md): Tron's page for the AI agents (status, open work, decisions); the
+  agents themselves and the master plan are in [Stern-SAM-Decryption](https://github.com/Ashram56/Stern-SAM-Decryption).
