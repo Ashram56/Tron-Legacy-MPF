@@ -155,6 +155,11 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 | `--dmd-text-color "#RRGGBB"` (or `TRON_DMD_TEXT_COLOR`, `tron/dmd/text_color`) | HD text colour (default the tint's, `#2a6cff`): ROM text, score display, service menu, ZUSE/TRON letters, attract pages |
 | `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0.8, a soft glow; 0 = none); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
 
+The text glow and size can also be set from the service menu while the game runs: ADJUSTMENTS > DISPLAY
+ADJUSTMENTS, TEXT GLOW (OFF to 300%) and TEXT SIZE (50% to 110%). The text changes on the display as the value
+is edited; SELECT keeps it across power cycles, and then it replaces `--dmd-text-glow` / `--dmd-text-scale`.
+Setting it back to FACTORY (80%, 85%) or RESET FACTORY SETTINGS returns to the options above.
+
 `--hw proc` is always classic: the P-ROC drives the machine's own 128x32 DMD. Godot reads the same choice
 from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
 `scripts/gen_media.py --no-hd` skips building the HD media (HD then falls back to classic).

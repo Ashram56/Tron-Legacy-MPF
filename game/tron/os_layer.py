@@ -189,8 +189,9 @@ class TronOS(CustomCode):
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
                                 "settings.yaml")
         self.adj_table = adjustment_defaults(settings)
-        from tron.settings import Adjustments, Audits   # noqa: E402
+        from tron.settings import Adjustments, Audits, DisplaySettings   # noqa: E402
         self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
+        self.display_settings = DisplaySettings(self.machine)  # HD text glow and size, persisted
         self.audits = Audits(self.machine)                     # ROM audit counters, persisted
         from tron.credits import Credits             # noqa: E402
         self.credit_model = Credits(self)                      # credits and pricing, persisted

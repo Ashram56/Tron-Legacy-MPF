@@ -92,7 +92,8 @@ Open:
 
 Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue text `#2a6cff`, glow
 `#22b8ff` at 0.8, font Rajdhani Bold, text scale 0.85. Back to the ROM: `--dmd classic`, `--dmd-font rom`,
-`--dmd-tint orange`, `--dmd-text-glow 0`.
+`--dmd-tint orange`, `--dmd-text-glow 0`. The operator can also set the text glow and size in the service
+menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the options).
 
 ### Owner decisions (keep adding)
 
@@ -105,6 +106,7 @@ Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue
 | 2026-10-06 | Outlined ROM fonts sized and placed by their lit dots. |
 | 2026-10-07 | ZUSE/TRON target letters stay the ROM's pictures, upscaled: the clean-font versions looked worse. |
 | 2026-10-07 | Effects that are only frames and blocks drawn as sharp rectangles. |
+| 2026-10-10 | Service menu DISPLAY ADJUSTMENTS: TEXT SIZE capped at 110% (above it stacked lines touch); TEXT GLOW OFF to 300%. |
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
 | 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
 
@@ -141,4 +143,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (PuP Pack merged in from the fork; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-10 (PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).

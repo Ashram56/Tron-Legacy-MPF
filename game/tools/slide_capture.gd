@@ -3,6 +3,8 @@ extends Node
 ##   godot --path game res://tools/slide_capture.tscn -- --job=/abs/job.json
 ## job.json: [{"slide": "deff_025", "kwargs": {"line1": "50,000"}, "times_ms": [0, 49, ...],
 ##             optional "scene": "res://slides/service.tscn" (a slide other than slides/deffs/<slide>.tscn),
+##             optional "machine_vars": {"dmd_text_size": 100, ...} (MPF machine variables, as GMC receives
+##             them, set once the slide is up: the service menu's DISPLAY ADJUSTMENTS),
 ##             "out": "/abs/dir"}, ...]. For each time the slide's animation is put on the frame
 ## showing at that time, timed nodes (group "rom_timed": tron/rom_text.gd, tron/score_display.gd) are
 ## put at that time, and the 128x32 viewport is saved as out/frame_NNNNN.png. Quits when done.
@@ -24,6 +26,9 @@ func _run(jobs: Array) -> void:
 		var slide = load(scene).instantiate()
 		slide.initialize(job["slide"], {"key": job["slide"]}, "capture", 0, job.get("kwargs", {}))
 		add_child(slide)
+		var mvars: Dictionary = job.get("machine_vars", {})
+		for k in mvars:
+			MPF.game.update_machine({"name": k, "value": mvars[k]})
 		var anim: AnimatedSprite2D = slide.get_node_or_null("Anim")
 		if anim:
 			anim.pause()
