@@ -18,7 +18,8 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | D, VPX bridge | [agents/vpx_bridge.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/vpx_bridge.md) | [D](#d-vpx-bridge) |
 | E, improvements | [agents/improvement.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/improvement.md) | [E](#e-improvements) |
 | F, packaging | [agents/packaging.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/packaging.md) | [F](#f-packaging) |
-| Knowledge base | [knowledge/](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/knowledge/README.md): SAM to MPF playbook, HD DMD method, decomp feedback | |
+| G, PuP Pack | [agents/pup_pack.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/pup_pack.md) | [G](#g-pup-pack) |
+| Knowledge base | [knowledge/](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/knowledge/README.md): SAM to MPF playbook, HD DMD method, decomp feedback, PuP Pack format | |
 
 ## Tron's inputs (the kickoff values)
 
@@ -39,6 +40,7 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | ROM | the game runs the LE rules on Pro (default) or LE hardware: [hardware.md](../hardware.md), "Pro or LE" |
 | Coil times | the ROM's, generated into `game/config/rom/coil_times.yaml` from `assets/rom_data/io/coils.csv` |
 | User docs | [README](../../README.md), [requirements.md](../requirements.md), [hardware.md](../hardware.md) (P-ROC), [vpx.md](../vpx.md) (Visual Pinball X), [development.md](../development.md), [performance.md](../performance.md) |
+| PuP Pack (agent G) | the fork [Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) (this game plus the pack, synced from this repository); the decoded pack in the private `Ashram56/Tron-LE-PuP-Pack` |
 | Departures from the ROM | [rom_differences.md](../rom_differences.md): read before changing a rule; add every new departure there |
 
 ## A, ROM extraction
@@ -123,6 +125,28 @@ Docker, CI on three OSes. Open:
    the installed options: not built; the owner runs the command line today.
 3. Transformers has only the Windows installer; macOS and Linux installers, Docker and CI are not ported.
 
+## G, PuP Pack
+
+Built in the fork [Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP), not here: the
+author's "End of Line" pack (`trn_174h`) on three windows (backglass 4:3, a large LCD DMD around the game's DMD,
+an optional topper), the pack's soundtrack in place of the ROM's music, on Windows, macOS, Linux and the Jetson
+cabinet (AGX Orin, Xavier NX). The pack installs from its author's zip (`TRON_PUP_ZIP`, fork PR #17) or, the
+default, from the private `pup_pack` submodule. The fork touches this game's files with one-line hooks only and
+takes this repository with `python scripts/sync_upstream.py`. Open:
+
+1. **The fork is behind this repository** (PRs #34-#36: packaging agent, Xavier NX display fixes, agents moved
+   to Stern-SAM-Decryption). A trial merge on 2026-10-10 conflicts in 10 files, because the Xavier NX fixes were
+   made in both repositories; the render thread default also differs (off here, on in the fork). The sync is its
+   own task.
+2. Game fixes go here first and reach the fork by sync (agent G, section 7); only what exists for the pack stays
+   in the fork.
+3. The tag `jetson-agx-orin-l4t-r36.4.3` (fork commit `a3374de`) is not pushed: cloud sessions cannot push tags,
+   the owner creates it.
+
+Owner decisions: the pack's mp4s played as they are (a native video add-on on Windows and macOS, GDE GoZen on
+Linux), Godot 4.6 in the fork (2026-10-03); the topper is optional (`third_screen=false` in
+`game/pup.local.cfg`); the pack's author is credited and players can install from the author's zip (2026-10-10).
+
 ## Owner preferences
 
 Go ahead without asking for approval; pick a default, say which, and list what needs the owner's judgement as
@@ -130,4 +154,5 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-10 (agent G, the PuP Pack, added; before: agents and knowledge base moved to
+Stern-SAM-Decryption, this page keeps Tron's part).
