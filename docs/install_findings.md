@@ -1,9 +1,8 @@
 # One-line installer: findings
 
 What running the one-line install commands (README, "Install") taught us, for the core game only. The fixes
-were made and tested in the PuP fork's copy of `scripts/install/` (the fork adds a PuP repository and Jetson
-video decoding, which are left out here). All of them are now
-in this repository's scripts too.
+were made and tested in the PuP fork's copy of `scripts/install/`, which was merged back into this repository
+on 2026-10-10 with the PuP Pack and the Jetson video decoding.
 
 Last updated 2026-10-08.
 
@@ -85,5 +84,5 @@ and checked it against the assets repository only. Testing found these problems 
 ## Jetson boards
 
 The core game runs on a Jetson (Ubuntu for arm64) with the Linux line above, given the arm64 items in the section
-before (MPF Monitor needs the PyQt6 pin). What the fork's Jetson work adds beyond that (NVIDIA hardware video decoding, L4T package pinning,
-several video windows) is for PuP videos and is documented in the fork, not here.
+before (MPF Monitor needs the PyQt6 pin). What the Jetson work adds beyond that (NVIDIA hardware video decoding, L4T package pinning,
+several video windows) is for PuP videos: [jetson/README.md](jetson/README.md).

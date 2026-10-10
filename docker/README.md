@@ -2,7 +2,7 @@
 
 This is an optional alternative to the native install (`scripts/setup.py`, or the installers in
 `scripts/install/`). One image holds the whole toolchain: Python 3.11 with MPF 0.80.1 and MPF Monitor 1.0.0,
-Godot 4.5.2, and the libraries for X11, OpenGL/Vulkan, sound and the P-ROC's USB chip. Nothing is installed
+Godot 4.6.3, and the libraries for X11, OpenGL/Vulkan, sound and the P-ROC's USB chip. Nothing is installed
 on your computer except Docker.
 
 The game runs as three containers. Each one opens its own window on your desktop, so you can put each window
