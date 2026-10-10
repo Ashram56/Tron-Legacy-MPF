@@ -16,6 +16,7 @@ extends Node2D
 ## Drawn as a multichannel signed distance field: sharp at any window size.
 
 const HD_DIR := "res://fonts/hd/"
+const GROUP := "dmd_hd_text"     # every line, redrawn when the service menu changes the glow or size (restyle())
 const CELL_PLANE := 0xE000
 const LEVEL_PLANE := 0xE000
 
@@ -207,6 +208,7 @@ static func plane(s: String, base: int) -> String:
 
 func _init() -> void:
 	name = "HdText"
+	add_to_group(GROUP)
 	_glow = Node2D.new()
 	_glow.name = "Glow"
 	var add := CanvasItemMaterial.new()
@@ -218,6 +220,13 @@ func _init() -> void:
 	_ink.name = "Ink"
 	_ink.draw.connect(_draw_ink)
 	add_child(_ink)
+
+
+## Redraws the line in the current text style and size (tools/dmd_mode.gd service_setting()).
+func restyle() -> void:
+	queue_redraw()
+	_glow.queue_redraw()
+	_ink.queue_redraw()
 
 
 ## Shows text s in ROM font id; line_ascent and line_height in dots (fonts.json ascent, ascent + descent);

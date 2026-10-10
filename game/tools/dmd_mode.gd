@@ -33,6 +33,9 @@ extends Node
 ## Text size (HD only, clean fonts): --dmd-text-scale=X (or TRON_DMD_TEXT_SCALE, or tron/dmd/text_scale), 0.5-1.5:
 ## 1 = capitals as tall as the ROM's and lines never wider than the ROM's text; default 0.85, a bit smaller,
 ## so stacked lines and the glow keep apart. Lines shrink about the middle of their capitals.
+## Service menu (HD only): ADJUSTMENTS > DISPLAY ADJUSTMENTS sets TEXT GLOW and TEXT SIZE while the game runs
+## (tron/settings.py DisplaySettings). MPF sends them as the machine variables dmd_text_glow and dmd_text_size
+## (percent; -1 = the value chosen above at start), and every HD text line is redrawn at once.
 ## Dot-matrix look (HD only): --dmd-dots=N (or TRON_DMD_DOTS=N, or tron/dmd/dots): round dots, N per DMD
 ## dot along each axis (1 = the 128x32 grid of the real display, 2 = 256x64, ...); 0 = off (default).
 
@@ -56,6 +59,8 @@ var glow_color := Color(DEFAULT_GLOW_COLOR)
 var glow := DEFAULT_GLOW
 var font := DEFAULT_FONT
 var text_scale := DEFAULT_TEXT_SCALE
+var _start_glow := DEFAULT_GLOW            # the glow and text scale chosen at start (args, environment, project),
+var _start_text_scale := DEFAULT_TEXT_SCALE   # which the service menu's settings replace while they are set
 var _frames_hd := {}
 var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' text lines (FrameText)
 var _frame_shapes = null         # media/dmd_hd/shapes.json: the frames drawn as rectangles (FrameText)
@@ -194,6 +199,8 @@ func _enter_tree() -> void:
 	glow = st["glow"]
 	text_scale = choose_text_scale(args, OS.get_environment("TRON_DMD_TEXT_SCALE"),
 		str(ProjectSettings.get_setting("tron/dmd/text_scale", "")))
+	_start_glow = glow
+	_start_text_scale = text_scale
 	font = choose_font(args, OS.get_environment("TRON_DMD_FONT"), str(ProjectSettings.get_setting("tron/dmd/font", "")))
 	if FileAccess.file_exists(MEDIA_HD + "scale.json"):
 		var info = JSON.parse_string(FileAccess.get_file_as_string(MEDIA_HD + "scale.json"))
@@ -216,6 +223,7 @@ func _ready() -> void:
 		preload("res://tron/rom_text_hd.gd").load_baked(font)
 	if hd:
 		_start_preload()
+		_follow_service_settings.call_deferred()
 	if hd and dots > 0:
 		var layer := CanvasLayer.new()
 		layer.layer = 128
@@ -228,6 +236,37 @@ func _ready() -> void:
 		rect.material = mat
 		layer.add_child(rect)
 		add_child(layer)
+
+
+## The service menu's DISPLAY ADJUSTMENTS (MPF machine variables, sent by GMC's machine variable monitor).
+func _follow_service_settings() -> void:
+	var mpf = get_tree().root.get_node_or_null("MPF")
+	if mpf == null or mpf.game == null:
+		return
+	mpf.game.machine_update.connect(service_setting)
+	for k in ["dmd_text_glow", "dmd_text_size"]:
+		if mpf.game.machine_vars.has(k):
+			service_setting(k, mpf.game.machine_vars[k])
+
+
+## A DISPLAY ADJUSTMENTS value: dmd_text_glow / dmd_text_size in percent, < 0 = the start value. Redraws the
+## HD text lines (tron/rom_text_hd.gd) when it changes; the ZUSE/TRON letters take the glow when next shown.
+func service_setting(var_name: String, value) -> void:
+	if not (var_name in ["dmd_text_glow", "dmd_text_size"]) or not str(value).is_valid_float():
+		return
+	var v := str(value).to_float()
+	if var_name == "dmd_text_glow":
+		var g := _start_glow if v < 0.0 else clampf(v / 100.0, 0.0, 4.0)
+		if g == glow:
+			return
+		glow = g
+	else:
+		var s := _start_text_scale if v < 0.0 else clampf(v / 100.0, 0.5, 1.5)
+		if s == text_scale:
+			return
+		text_scale = s
+	print("DMD: service menu %s %s: glow x%.2f, text x%.2f" % [var_name, value, glow, text_scale])
+	get_tree().call_group("dmd_hd_text", "restyle")   # tron/rom_text_hd.gd GROUP
 
 
 ## The large display effects (at least tron/dmd/preload_min_frames HD frames; 0 = none), their HD frames and their
