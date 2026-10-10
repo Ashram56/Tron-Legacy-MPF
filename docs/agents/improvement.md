@@ -54,7 +54,7 @@ to worker threads at start-up.
 | MSDF clean fonts generate each glyph on the main thread when first drawn | Bake them at setup (`game/tools/bake_fonts.gd`, `game/fonts_ttf/baked/`), load them on worker threads at start-up (`rom_text_hd.gd` `load_baked()`) | Orbitron: 20-30 s freezes gone; renders pixel-identical |
 | The clean fonts' wide copy (outline and glow, `WIDE_RANGE=192`) is the expensive one | Keep the range as small as the glow allows | Orbitron vs the ROM font: about +1 W, +450 MB memory, +150 MB video memory on a Xavier NX |
 | Godot's pipeline cache was never saved (the save at exit fails with the separate render thread; a kill never saves) | `rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1` in `game/project.godot`: saved as it grows | First-use stalls of new effects (1.4-4.7 s) gone from the second start |
-| Rendering on the main thread | Separate render thread (`thread_model=2`), `run.py --no-render-thread` / `TRON_RENDER_THREAD=0` to turn it off; the captures (opengl3) always run without it | Main thread 54% to 29% of a core, +2 to 3 FPS |
+| Rendering on the main thread | Godot's separate render thread is opt-in here (`run.py --render-thread` / `TRON_RENDER_THREAD=1`; never for the captures, opengl3): with Godot 4.5.2 and the DMD alone it was slower (54.3 vs 56.2 FPS, twice the late frames, glyph texture update errors). The PuP repo (Godot 4.6.3, three videos) turns it on (`thread_model=2`): main thread 54% to 29% of a core, +2 to 3 FPS. Measure again on each Godot upgrade | Here: +1.9 FPS off; PuP: +2 to 3 FPS on |
 | Background loads got one worker thread on 4 cores | `threading/worker_pool/low_priority_thread_ratio=0.5` | Shorter stalls when several loads overlap |
 
 When adding media: a new kind of picture loaded by a slide gets a VRAM-compressed import unless a script reads its
@@ -86,4 +86,4 @@ changing any of these, run setup (media regeneration and font bake) before measu
 and pictures at 1920x480 and 3840x960 for the owner (render through Xvfb with `--rendering-driver opengl3`;
 `--headless` draws nothing). Bump `frame_text.VERSION` when the text matching changes (it keys the cache).
 
-Last updated 2026-10-09.
+Last updated 2026-10-10.

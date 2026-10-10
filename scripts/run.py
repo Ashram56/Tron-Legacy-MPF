@@ -140,11 +140,11 @@ def godot_command(godot_args, virtual_display=None):
     if not os.path.exists(exe) and not shutil.which(exe):
         raise SystemExit("Godot not found at {} (run `python scripts/setup.py`, or set GODOT)".format(exe))
     cmd = [exe, "--path", tc.GAME] + list(godot_args)
-    if ("opengl3" in godot_args or os.environ.get("TRON_RENDER_THREAD") == "0") \
+    if os.environ.get("TRON_RENDER_THREAD") == "1" and "opengl3" not in godot_args \
             and "--render-thread" not in godot_args:
-        # Godot's separate render thread (game/project.godot) off: --no-render-thread or TRON_RENDER_THREAD=0, and
-        # always for the captures' renderer (opengl3), which wrote no frames with it
-        cmd[3:3] = ["--render-thread", "safe"]
+        # Godot's separate render thread on (--render-thread or TRON_RENDER_THREAD=1; off by default, docs/performance.md),
+        # never for the captures' renderer (opengl3), which wrote no frames with it
+        cmd[3:3] = ["--render-thread", "separate"]
     if virtual_display is None:
         virtual_display = tc.needs_virtual_display()
     if virtual_display:
@@ -398,13 +398,13 @@ def main(argv=None):
     p.add_argument("--dmd-text-scale", type=float, metavar="X",
                    help="hd only, clean fonts: text size, 1 = capitals as tall as the ROM's (default 0.85; 0.5-1.5). "
                         "Also TRON_DMD_TEXT_SCALE")
-    p.add_argument("--no-render-thread", dest="render_thread", action="store_false",
-                   help="draw on Godot's main thread instead of its separate render thread (the default, "
-                        "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
+    p.add_argument("--render-thread", action="store_true",
+                   help="draw on Godot's separate render thread instead of its main thread (the default: with "
+                        "Godot 4.5.2 the thread was slower on a Jetson, docs/performance.md). Also TRON_RENDER_THREAD=1")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
-    if not args.render_thread and "--render-thread" not in args.godot_args:
-        args.godot_args = engine_arg(args.godot_args, "--render-thread", "safe")
+    if args.render_thread and "--render-thread" not in args.godot_args:
+        args.godot_args = engine_arg(args.godot_args, "--render-thread", "separate")
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None

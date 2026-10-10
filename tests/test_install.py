@@ -269,7 +269,8 @@ class TestEntrypoint(unittest.TestCase):
 
     def test_proc_dmd(self):
         self.assertEqual(["--", "--proc-dmd"], self.ep.godot_args({"TRON_HW": "proc"}))
-        self.assertEqual(["--render-thread", "safe"], self.ep.godot_args({"TRON_RENDER_THREAD": "0"}))
+        self.assertEqual(["--render-thread", "separate"], self.ep.godot_args({"TRON_RENDER_THREAD": "1"}))
+        self.assertEqual([], self.ep.godot_args({"TRON_RENDER_THREAD": "0"}))
         self.assertEqual(["--", "--x=1", "--proc-dmd"], self.ep.godot_args({"TRON_HW": "proc", "GODOT_ARGS": "-- --x=1"}))
         with self.assertRaises(SystemExit):
             self.ep.godot_args({"TRON_HW": "fast"})

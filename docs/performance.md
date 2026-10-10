@@ -9,7 +9,7 @@ section 2a.
 
 | Setting | Where | Gain (Xavier NX) | Turn off |
 |---|---|---|---|
-| Godot's separate render thread | `rendering/driver/threads/thread_model=2`, `game/project.godot` | Main thread 29% of a core instead of 54%; 55.3 / 57.1 FPS instead of 53.3 / 54.2 on the two test clips. Logs harmless `_texture_2d_update` glyph-cache errors (a Godot bug). The captures (`scripts/render_diff.py`, opengl3) wrote no frames with it, so `run.py` always runs them with `--render-thread safe` | `run.py --no-render-thread`, `TRON_RENDER_THREAD=0` (Docker too) |
+| Godot's separate render thread: **off** by default | `run.py --render-thread`, `TRON_RENDER_THREAD=1` (Docker too); never for the captures (`scripts/render_diff.py`, opengl3), which wrote no frames with it | With this game's Godot 4.5.2 and the DMD alone (light cycle clip) it lost: 54.3 FPS on vs 56.2 off, 24 frames held 3+ vblanks vs 12, and 3 `texture update size does not match` errors (one claiming 818 MB). In the PuP repo (Godot 4.6.3, three videos) it wins: main thread 29% of a core instead of 54%, +2 to 3 FPS, so it is on there. Retest on a Godot upgrade | - |
 | Pipeline cache saved while running | `rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1` | With the render thread, Godot's save at exit fails, so every start recompiled every pipeline: 1.4-4.7 s at the first use of an effect. Gone from the second start | - |
 | Worker pool | `threading/worker_pool/low_priority_thread_ratio=0.5` | Background loads get 2 threads on 4 cores instead of 1: stalls 1.3 to 0.6-0.95 s where loads overlap | - |
 | Large effects preloaded | `tron/dmd/preload_min_frames=40`, `game/tools/dmd_mode.gd` | Deff 86 0.89 s to under 0.1 s; about +200 MB | `0` |

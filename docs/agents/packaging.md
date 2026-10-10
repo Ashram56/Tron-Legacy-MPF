@@ -140,8 +140,8 @@ AGX Orin, L4T R36.4.3 / JetPack 6.2):
 - **Setup steps that matter on ARM:** `setup.py` bakes the clean HD fonts' signed distance fields
   (`game/tools/bake_fonts.gd`, about 2 minutes on a Xavier NX; without it the first text froze the game 20 s and
   more) and `gen_media.py` imports the HD effect frames VRAM-compressed. Both rerun when their inputs change.
-- **Run options** (the PuP repo's `run.py`; its `docs/upstream_issues/README.md` lists what to port here): `run.py --no-render-thread` / `TRON_RENDER_THREAD=0` (Godot's separate render thread is on by
-  default), `TRON_PIN=0` (core pinning, Linux with 4+ cores), `TRON_PERF_DIR` (the performance probe; use
+- **Run options** (the PuP repo's `run.py`; its `docs/upstream_issues/README.md` lists what to port here): `run.py --render-thread` / `TRON_RENDER_THREAD=1` (Godot's separate render thread, off by default here
+  on Godot 4.5.2; the PuP repo on Godot 4.6.3 has it on and `--no-render-thread` / `TRON_RENDER_THREAD=0` there), `TRON_PIN=0` (core pinning, Linux with 4+ cores), `TRON_PERF_DIR` (the performance probe; use
   `scripts/perf/run.sh`). Each new run option reaches `docker/entrypoint.py` and `docker/tron.env.example` too.
 - **Testing without the board:** an arm64 Ubuntu 20.04 root under qemu, posing as a Xavier NX with NVIDIA's r35.4
   apt packages, runs the whole Linux install and builds libnvmpi. When Docker Hub rate-limits, build the base
