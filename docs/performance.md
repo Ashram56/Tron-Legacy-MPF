@@ -4,7 +4,7 @@ The game's settings that keep every frame on time, and the measurements behind t
 NX (nvpmodel mode 5, 4 cores at 1.9 GHz, the slowest target), where every hitch shows; the same settings apply on
 every platform. The measuring tools (frame, video, memory and power probes, a clip suite) and the Jetson findings
 live in the PuP repository: [Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP)
-`docs/performance.md` and `docs/jetson_xavier_nx.md`. Asset rules for new media: [agents/improvement.md](agents/improvement.md)
+`docs/performance.md` and `docs/jetson_xavier_nx.md`. Asset rules for new media: [agents/improvement.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/improvement.md)
 section 2a.
 
 | Setting | Where | Gain (Xavier NX) | Turn off |
