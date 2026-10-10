@@ -11,6 +11,7 @@ or PowerShell 7. Run it from the repository:
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -NoMonitor
     powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -DryRun
+    powershell -ExecutionPolicy Bypass -File scripts\install\install_prereqs_windows.ps1 -PupZip PACK.zip
 
 Arguments that are not options of this script go to setup.py (for example --skip-media).
 
@@ -28,8 +29,11 @@ Prerequisites only, no setup.py.
 Use the downloaded installers even when winget is there.
 .PARAMETER Yes
 No questions.
+.PARAMETER PupZip
+The PuP Pack from a zip (a file or an https URL), as its author publishes it, instead of the pup_pack
+submodule: no access to that repository needed. Same as $env:TRON_PUP_ZIP; setup.py extracts it.
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$DryRun,
     [switch]$Monitor,
@@ -38,6 +42,7 @@ param(
     [switch]$NoSetup,
     [switch]$NoWinget,
     [switch]$Yes,
+    [string]$PupZip,
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$SetupArgs
 )
 
@@ -50,6 +55,16 @@ $Root = if (-not $Clone) { Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         elseif ($env:TRON_DIR) { $env:TRON_DIR } else { Join-Path $HOME 'Tron-Legacy-MPF-PuP' }
 $RepoUrl = if ($env:TRON_REPO) { $env:TRON_REPO } else { 'https://github.com/Ashram56/Tron-Legacy-MPF-PuP.git' }
 $RepoBranch = if ($env:TRON_BRANCH) { $env:TRON_BRANCH } else { 'main' }
+# The PuP Pack from a zip (-PupZip or $env:TRON_PUP_ZIP) instead of the pup_pack submodule: setup.py reads
+# $env:TRON_PUP_ZIP; a file is given to it as a full path
+if (-not $PupZip) { $PupZip = $env:TRON_PUP_ZIP }
+if ($PupZip) {
+    if ($PupZip -notmatch '^https?://') {
+        if (-not (Test-Path -LiteralPath $PupZip -PathType Leaf)) { throw "PuP Pack zip not found: $PupZip" }
+        $PupZip = (Resolve-Path -LiteralPath $PupZip).ProviderPath
+    }
+    $env:TRON_PUP_ZIP = $PupZip
+}
 
 # The last Python 3.11 release with Windows installers (later 3.11 releases are source-only security fixes)
 $PyOrgVersion = '3.11.9'
@@ -160,7 +175,9 @@ function Invoke-GitHubAuth([string]$GitExe) {
     }
     # only the repositories nobody can read without a login need the token: a token that cannot read a public
     # repository (a fine-grained one for other repositories, an expired one) would make git fail on it
-    $private = @(@($RepoUrl, $AssetsUrl, $PupUrl) | Where-Object { -not (Test-RepoAccess $GitExe $_ -Anonymous) })
+    # a PuP Pack zip replaces the pup_pack submodule: its repository is not needed then
+    $urls = if ($PupZip) { @($RepoUrl, $AssetsUrl) } else { @($RepoUrl, $AssetsUrl, $PupUrl) }
+    $private = @($urls | Where-Object { -not (Test-RepoAccess $GitExe $_ -Anonymous) })
     if ($private.Count -eq 0) {
         Write-Note 'the repositories are public: no token needed'
         return

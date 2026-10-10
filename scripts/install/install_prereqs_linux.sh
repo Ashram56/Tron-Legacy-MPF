@@ -6,6 +6,7 @@
 #   scripts/install/install_prereqs_linux.sh --no-monitor    # ... without MPF Monitor (installed by default, with the Qt libraries it needs)
 #   scripts/install/install_prereqs_linux.sh --proc          # ... plus libpinproc/pypinproc and the P-ROC udev rule
 #   scripts/install/install_prereqs_linux.sh --dry-run       # print the plan, change nothing
+#   scripts/install/install_prereqs_linux.sh --pup-zip PACK.zip # the PuP Pack from its author's zip (file or URL)
 #   scripts/install/install_prereqs_linux.sh -- --skip-media # arguments after -- go to setup.py
 #
 # Options: --yes (no questions), --xvfb (Xvfb for running without a screen; automatic when there is no
@@ -33,7 +34,7 @@ UDEV_RULE=/etc/udev/rules.d/99-pinproc.rules
 DRY=0 YES=0 MONITOR=1 PROC=0 XVFB=0 SETUP=1 PY_ANY=0
 SETUP_ARGS=()
 
-usage() { sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -45,12 +46,26 @@ while [ $# -gt 0 ]; do
         --xvfb) XVFB=1 ;;
         --no-setup) SETUP=0 ;;
         --python-any) PY_ANY=1 ;;
+        --pup-zip) [ $# -ge 2 ] || { echo "--pup-zip needs a zip file or URL" >&2; exit 2; }
+                   TRON_PUP_ZIP="$2"; shift ;;
         -h|--help) usage; exit 0 ;;
         --) shift; SETUP_ARGS=("$@"); break ;;
         *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
     esac
     shift
 done
+
+# The PuP Pack from a zip (--pup-zip, or TRON_PUP_ZIP in the environment): the pack as its author publishes
+# it, instead of the pup_pack submodule (no access to that repository needed). setup.py extracts it.
+TRON_PUP_ZIP="${TRON_PUP_ZIP:-}"
+if [ -n "$TRON_PUP_ZIP" ]; then
+    case "$TRON_PUP_ZIP" in
+        http://*|https://*) ;;
+        *) [ -f "$TRON_PUP_ZIP" ] || { echo "PuP Pack zip not found: $TRON_PUP_ZIP" >&2; exit 2; }
+           TRON_PUP_ZIP="$(cd "$(dirname "$TRON_PUP_ZIP")" && pwd)/$(basename "$TRON_PUP_ZIP")" ;;
+    esac
+    export TRON_PUP_ZIP
+fi
 
 say() { printf '\n==> %s\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
@@ -81,7 +96,9 @@ github_auth() {
     # only the repositories nobody can read without a login need the token: a token that cannot read a public
     # repository (a fine-grained one for other repositories, an expired one) would make git fail on it
     local url private=()
-    for url in "$REPO_URL" "$ASSETS_URL" "$PUP_URL"; do public_repo "$url" || private+=("$url"); done
+    local urls=("$REPO_URL" "$ASSETS_URL")
+    [ -n "$TRON_PUP_ZIP" ] || urls+=("$PUP_URL")      # a PuP Pack zip replaces the pup_pack submodule
+    for url in "${urls[@]}"; do public_repo "$url" || private+=("$url"); done
     if [ ${#private[@]} = 0 ]; then
         note "the repositories are public: no token needed"
         return
