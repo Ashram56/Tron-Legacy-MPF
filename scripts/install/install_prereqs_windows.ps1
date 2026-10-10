@@ -191,6 +191,7 @@ function Invoke-GitHubAuth([string]$GitExe) {
         Write-Note "Private: $($private -join ' ')"
         Write-Note 'Paste a GitHub token that can read it (github.com > Settings > Developer settings > Personal access'
         Write-Note 'tokens; a fine-grained token with Contents: read-only on these repositories).'
+        Write-Note 'Paste it with a right-click: Ctrl+V does not paste into this hidden prompt.'
         $secure = Read-Host '    token (not shown)' -AsSecureString
         $token = [System.Net.NetworkCredential]::new('', $secure).Password
     }
