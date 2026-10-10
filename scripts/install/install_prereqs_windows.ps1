@@ -135,12 +135,18 @@ function Find-Git {
 $AssetsUrl = if ($env:TRON_ASSETS_REPO) { $env:TRON_ASSETS_REPO } else { 'https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption.git' }
 
 function Test-RepoAccess([string]$GitExe, [string]$Url, [switch]$Anonymous) {
+    # no prompt of any kind: GIT_TERMINAL_PROMPT for git's own, GCM_INTERACTIVE for Git Credential Manager's
+    # login window (it asks for a user and password, which GitHub then refuses for git)
+    # Windows PowerShell 5.1 turns a redirected native command's stderr ("fatal: could not read Username") into
+    # an error record, which 'Stop' makes fatal: only the exit code counts here
+    $ErrorActionPreference = 'Continue'
     $env:GIT_TERMINAL_PROMPT = '0'
+    $env:GCM_INTERACTIVE = 'never'
     try {
         if ($Anonymous) { & $GitExe -c credential.helper= ls-remote $Url HEAD *> $null }
         else { & $GitExe ls-remote $Url HEAD *> $null }
         return ($LASTEXITCODE -eq 0)
-    } finally { Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue }
+    } finally { Remove-Item Env:GIT_TERMINAL_PROMPT, Env:GCM_INTERACTIVE -ErrorAction SilentlyContinue }
 }
 
 function Invoke-GitHubAuth([string]$GitExe) {
@@ -150,27 +156,41 @@ function Invoke-GitHubAuth([string]$GitExe) {
         Write-Note '(dry run) a private repository asks for a GitHub token here'
         return
     }
+    # only the repositories nobody can read without a login need the token: a token that cannot read a public
+    # repository (a fine-grained one for other repositories, an expired one) would make git fail on it
+    $private = @(@($RepoUrl, $AssetsUrl) | Where-Object { -not (Test-RepoAccess $GitExe $_ -Anonymous) })
+    if ($private.Count -eq 0) {
+        Write-Note 'the repositories are public: no token needed'
+        return
+    }
     if (-not $token) {
-        if ((Test-RepoAccess $GitExe $RepoUrl -Anonymous) -and (Test-RepoAccess $GitExe $AssetsUrl -Anonymous)) {
-            Write-Note 'the repositories are public: no token needed'
-            return
-        }
-        if ((Test-RepoAccess $GitExe $RepoUrl) -and (Test-RepoAccess $GitExe $AssetsUrl)) {
+        if (-not ($private | Where-Object { -not (Test-RepoAccess $GitExe $_) })) {
             Write-Note 'a private repository, readable with the GitHub credentials git already has'
             return
         }
         if ($Yes) { throw 'a repository is private: set $env:TRON_GITHUB_TOKEN to a GitHub token that can read it' }
-        Write-Note 'A repository is private. Paste a GitHub token that can read it (github.com > Settings > Developer'
-        Write-Note 'settings > Personal access tokens; a fine-grained token with Contents: read-only on both repositories).'
+        Write-Note "Private: $($private -join ' ')"
+        Write-Note 'Paste a GitHub token that can read it (github.com > Settings > Developer settings > Personal access'
+        Write-Note 'tokens; a fine-grained token with Contents: read-only on these repositories).'
+        Write-Note 'Paste it with a right-click: Ctrl+V does not paste into this hidden prompt.'
         $secure = Read-Host '    token (not shown)' -AsSecureString
         $token = [System.Net.NetworkCredential]::new('', $secure).Password
-        if (-not $token) { throw 'no token given' }
     }
-    $env:GIT_CONFIG_COUNT = '1'
-    $env:GIT_CONFIG_KEY_0 = "url.https://x-access-token:$token@github.com/.insteadOf"
-    $env:GIT_CONFIG_VALUE_0 = 'https://github.com/'
-    if (-not (Test-RepoAccess $GitExe $AssetsUrl)) {
-        throw "the GitHub token cannot read $AssetsUrl (check its repository access and expiry)"
+    # a token copied from a text editor can carry spaces or a line break; GitHub tokens have none
+    $token = ($token -replace '\s', '')
+    if (-not $token) { throw 'no token given' }
+    $prefix = if ($token -match '^(github_pat_|gh[pousr]_)') { $Matches[1] } else { 'unknown' }
+    Write-Note "token: $($token.Length) characters, type $prefix (a fine-grained token is about 93, a classic one 40)"
+    # the token goes into the private repositories' URLs only (git's url.insteadOf, inherited by setup.py)
+    for ($i = 0; $i -lt $private.Count; $i++) {
+        Set-Item "Env:GIT_CONFIG_KEY_$i" ("url.https://x-access-token:$token@" + $private[$i].Substring(8) + '.insteadOf')
+        Set-Item "Env:GIT_CONFIG_VALUE_$i" $private[$i]
+    }
+    $env:GIT_CONFIG_COUNT = "$($private.Count)"
+    foreach ($url in $private) {
+        if (-not (Test-RepoAccess $GitExe $url)) {
+            throw "the GitHub token cannot read $url (check its repository access and expiry)"
+        }
     }
     "protocol=https`nhost=github.com`nusername=x-access-token`npassword=$token`n" | & $GitExe credential approve 2>$null
     Write-Note 'token accepted'
@@ -213,6 +233,12 @@ try {
         if (-not $DryRun -and -not (Find-Git)) { throw 'Git is still missing after the install' }
     }
     $authGit = Find-Git
+    # setup.py runs `git` from the PATH (to fetch the submodules): a Git found only at its install folder is
+    # put on this session's PATH
+    if ($authGit -and -not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $env:Path = (Split-Path -Parent $authGit) + ';' + $env:Path
+        Write-Note "Git added to this session's PATH: $(Split-Path -Parent $authGit)"
+    }
     Invoke-GitHubAuth $(if ($authGit) { $authGit } else { 'git' })
 
     # ---------------------------------------------------------------- Python 3.11
@@ -326,8 +352,10 @@ try {
             $cur = (& $gitExe -C $Root symbolic-ref --short -q HEAD 2>$null)
             $onRemote = $false
             if ($cur) {
+                $ErrorActionPreference = 'Continue'     # stderr is not an error here (see Test-RepoAccess)
                 & $gitExe -C $Root ls-remote --exit-code --heads origin $cur *> $null
                 $onRemote = ($LASTEXITCODE -eq 0)
+                $ErrorActionPreference = 'Stop'
             }
             if ($onRemote) { Invoke-Step $gitExe @('-C', $Root, 'pull', '--ff-only') }
             else {

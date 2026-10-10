@@ -42,7 +42,10 @@ You can change where the files go, and what is installed:
   updated with `git pull --ff-only` instead.
 - **Private repositories:** if the assets (or the game) repository is private, the installer asks first for a
   GitHub token that can read it (github.com > Settings > Developer settings > Personal access tokens; a
-  fine-grained token with Contents: read-only), instead of a password. Or set `TRON_GITHUB_TOKEN` before the line.
+  fine-grained token with Contents: read-only), instead of a password, and uses it only for the private ones. On
+  Windows, paste it with a right-click: Ctrl+V does not paste into the hidden prompt. Or give it before the line,
+  so nothing is asked: Windows `$env:TRON_GITHUB_TOKEN = "github_pat_..."` first, macOS / Linux
+  `TRON_GITHUB_TOKEN=github_pat_... bash <(curl ...)`.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
   `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.
@@ -123,6 +126,7 @@ You can also run the install line again. Both are safe to repeat; setup only red
 - [docs/development.md](docs/development.md): the workspace in detail (layout, setup options, running by hand,
   tests and checks, the asset sync).
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
+- [docs/install_findings.md](docs/install_findings.md): what testing the one-line installers found (tokens, Windows, Linux arm64).
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
