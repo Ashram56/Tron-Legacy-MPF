@@ -9,7 +9,7 @@ extends Node
 ##   (game/pup/lightcycles.gd), or ([dmd] background="frame") in the PuP Pack's DMD panel art;
 ## - topper (optional, [pup] third_screen): PuP screens 13 (underlay) and 14 (pop-up top layer).
 ## PuP screen 15 (OST music) has no window. Commands for a screen that is off are dropped.
-## Media come from the converted copy of the pack (scripts/gen_pup.py, manifest.json): Theora videos, the
+## Media come from the converted copy of the pack (scripts/pup/gen_pup.py, manifest.json): Theora videos, the
 ## pack's own mp3 and pictures, all loaded at run time (nothing is imported into the Godot project).
 
 const CONFIG_FILES := ["res://pup.cfg", "res://pup.local.cfg"]
@@ -78,7 +78,7 @@ func setting(section: String, key: String, default = null):
 func _load_media() -> bool:
 	var path := media_dir.path_join("manifest.json")
 	if not FileAccess.file_exists(path):
-		push_warning("PuP: no converted media at %s (run scripts/gen_pup.py): PuP off" % media_dir)
+		push_warning("PuP: no converted media at %s (run scripts/pup/gen_pup.py): PuP off" % media_dir)
 		return false
 	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if typeof(data) != TYPE_DICTIONARY:
@@ -453,7 +453,7 @@ func load_image(path: String) -> Texture2D:
 # ------------------------------------------------------------------ checks without a screen
 
 ## godot --path game -- --pup-capture-dir=/abs/path [--pup-capture-every-ms=2000]: saves every PuP window
-## as <window>_NNNN.png (scripts/pup_check.py).
+## as <window>_NNNN.png (scripts/pup/pup_check.py).
 func _start_capture() -> void:
 	var dir := ""
 	var every := 2000

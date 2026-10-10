@@ -1,6 +1,6 @@
 # PuP DMD captures against the game's display effects
 
-Written by `scripts/pup_captures.py` (21062 recorded frames). D<n> fires in Visual Pinball when the pixels in the purple rectangle of `PupCapture/<n>.bmp` are on the DMD; *score* is the share of lit dots the best frame has in common with it (intersection over union). *Effects* are all the display effects with a frame within 0.5 % of the best; *map* is what `game/tron_pup/trigger_map.yaml` uses.
+Written by `scripts/pup/pup_captures.py` (21062 recorded frames). D<n> fires in Visual Pinball when the pixels in the purple rectangle of `PupCapture/<n>.bmp` are on the DMD; *score* is the share of lit dots the best frame has in common with it (intersection over union). *Effects* are all the display effects with a frame within 0.5 % of the best; *map* is what `game/tron_pup/trigger_map.yaml` uses.
 
 | D | rows | rectangle | score | effects | map | |
 |---|---|---|---|---|---|---|

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NVIDIA Jetson: checks the hardware video decoder fixes (docs/jetson.md) on this board, with the repro programs in
+# NVIDIA Jetson: checks the hardware video decoder fixes (docs/jetson/README.md) on this board, with the repro programs in
 # docs/upstream_issues/repro/. Run it after install_jetson_hwdec.sh, on a new board or a new L4T release:
 #
 #   bash scripts/install/jetson_selftest.sh                # build what is missing, run every check
@@ -194,7 +194,7 @@ if [ "$DRY" = 1 ]; then
 elif [ "$FAILED" = 0 ]; then
     note "every check of the patched build passed on L4T R${L4T:-?}"
 else
-    note "a check of the patched build FAILED on L4T R${L4T:-?}: see the logs above and docs/jetson.md"
+    note "a check of the patched build FAILED on L4T R${L4T:-?}: see the logs above and docs/jetson/README.md"
 fi
 [ "$STOCK" = 0 ] || [ "$DRY" = 1 ] || note "stock results show which bugs this L4T release has without our patch (expected to fail)"
 exit "$FAILED"

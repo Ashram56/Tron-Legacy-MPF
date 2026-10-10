@@ -7,7 +7,7 @@ and its OST replaces the ROM music.
 
 ## Setting it up
 
-The [README](../README.md#install) has the one-line install. By hand, from a clone:
+The [README](../../README.md#install) has the one-line install. By hand, from a clone:
 
 ```sh
 python scripts/setup.py               # venv, MPF, Godot, GMC, the game's media + the PuP media
@@ -15,7 +15,7 @@ python scripts/run.py                 # the game, with the PuP windows
 ```
 
 `run.py` prints `PuP on: ...` before it starts Godot, or what is missing. `setup.py` calls
-`scripts/pup_setup.py`, which fetches the `pup_pack` submodule and runs `scripts/gen_pup.py`: it turns
+`scripts/pup/pup_setup.py`, which fetches the `pup_pack` submodule and runs `scripts/pup/gen_pup.py`: it turns
 every video into Theora (`.ogv`, the only video format Godot plays) and copies the mp3s and
 pictures. It needs an ffmpeg with libtheora (ffmpeg on the PATH, or `FFMPEG=<path>`); without one it
 installs `imageio-ffmpeg` in the venv. The whole pack
@@ -36,7 +36,7 @@ removes the add-on; without it loaded the PuP plays the converted Theora videos.
 copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's mp4s play as they are and
 nothing is converted. On a Jetson (JetPack 5 or 6) it uses the hardware decoder once libnvmpi is installed
 (the Linux install line does it, or `scripts/install/install_jetson_hwdec.sh`, see
-`pup_addons/gde_gozen/README.md`, and [jetson.md](jetson.md) for the fixes it needs); everywhere else FFmpeg
+`pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md) for the fixes it needs); everywhere else FFmpeg
 decodes in software.
 `TRON_GOZEN=0 python scripts/setup.py` goes back to Theora. The binaries are rebuilt from pinned sources with
 `scripts/build_gozen.sh` (Docker).
@@ -115,8 +115,8 @@ WaylandEnable=false
    pack version needs no code change. In Visual Pinball, `D<n>` fires when the DMD shows the inside of the
    purple rectangle of `PupCapture/<n>.bmp`. Here the game says what it shows: it posts `tron_deff_<id>` when
    display effect `<id>` takes the DMD. `game/tron_pup/trigger_map.yaml` maps each `D<n>` to the effects whose
-   frames contain that capture, found by `scripts/pup_captures.py` (all 98 captures against every recorded frame,
-   variant and ROM library animation; report in [pup_captures.md](pup_captures.md)). `W<n>` are switches
+   frames contain that capture, found by `scripts/pup/pup_captures.py` (all 98 captures against every recorded frame,
+   variant and ROM library animation; report in [captures.md](captures.md)). `W<n>` are switches
    (by name, so the P-ROC numbering does not matter). The one `W11=1,L35=1` row (Arcade Mystery) is mapped to the
    Flynn's Arcade award effect.
 2. **MPF side** (`game/tron_pup/`, loaded as the never-started mode `pup`): the engine fires the rows of an
@@ -128,7 +128,7 @@ WaylandEnable=false
    ROM's music calls (the sound pools on the `music` track) and stops the running ROM music; speech and effects
    still play. Without a ready PuP player the ROM music plays as before.
 
-`python scripts/pup_check.py` plays a rules scenario with the PuP windows and saves them to `captures/pup/`.
+`python scripts/pup/pup_check.py` plays a rules scenario with the PuP windows and saves them to `captures/pup/`.
 `tests/test_pup.py` covers the map, the engine and the music hand-over.
 
 ## Keeping up with the upstream game
@@ -151,7 +151,7 @@ One upstream change is not a hook and would be best made upstream too: Godot 4.6
 After the merge the script updates the submodules, regenerates the config and media, re-runs the capture
 match and the tests. What can need a hand after an upstream change:
 
-- a DMD animation or effect number changed: `scripts/pup_captures.py` marks the captures whose mapped effect no
-  longer draws them (**check** in `docs/pup_captures.md`); fix those lines of `trigger_map.yaml`;
+- a DMD animation or effect number changed: `scripts/pup/pup_captures.py` marks the captures whose mapped effect no
+  longer draws them (**check** in `docs/pup/captures.md`); fix those lines of `trigger_map.yaml`;
 - the media bridge (`game/tron/media_bridge.py`) renamed `sound`, `music_key` or its sound pools:
   `tests/test_pup.py` fails on the music hand-over (`game/tron_pup/mode.py`, `set_music_mute`).

@@ -226,7 +226,7 @@ need "/usr/lib/aarch64-linux-gnu/libGLX.so.0" libglx0
 need "/usr/lib/aarch64-linux-gnu/libEGL.so.1" libegl1
 need "/usr/lib/aarch64-linux-gnu/libvulkan.so.1" libvulkan1
 if [ "$X" = 1 ]; then
-    # Godot places one window per monitor only on X11 (docs/pup.md)
+    # Godot places one window per monitor only on X11 (docs/pup/README.md)
     need "/usr/lib/xorg/modules/drivers/nvidia_drv.so" nvidia-l4t-x11
     need Xorg xserver-xorg-core
     need "/usr/lib/xorg/modules/input/libinput_drv.so" xserver-xorg-input-libinput
@@ -259,7 +259,7 @@ if [ "$X" = 1 ] && [ "$BLANK" = 0 ]; then
             read -r schema key value <<< "$kv"
             run "${GS[@]}" set "$schema" "$key" "$value" || note "warning: could not set $schema $key"
         done
-        note "--keep-blanking leaves these alone; for a cabinet also turn on automatic login (docs/pup.md)"
+        note "--keep-blanking leaves these alone; for a cabinet also turn on automatic login (docs/pup/README.md)"
     fi
 fi
 

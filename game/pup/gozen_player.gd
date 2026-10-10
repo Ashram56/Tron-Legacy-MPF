@@ -1,7 +1,7 @@
 extends Control
 
 ## A PuP screen's video player on Linux: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which plays the
-## pack's mp4s as they are and uses the Jetson's hardware decoder when libnvmpi is installed (docs/pup.md). Offers
+## pack's mp4s as they are and uses the Jetson's hardware decoder when libnvmpi is installed (docs/pup/README.md). Offers
 ## the parts of VideoStreamPlayer that pup_screen.gd uses: open(), play() (from the start), stop(), finished.
 
 signal finished

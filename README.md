@@ -8,7 +8,7 @@ Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 This fork adds Terry Red's "End of Line" PuP Pack on three screens: the backglass (4:3 videos), a large LCD
 DMD (the game's DMD in a neon frame over a live 3D light cycle chase, or the pack's DMD panel art) and an
 optional topper. The pack's
-soundtrack replaces the ROM music. [docs/pup.md](docs/pup.md) has the details.
+soundtrack replaces the ROM music. [docs/pup/README.md](docs/pup/README.md) has the details.
 
 ## Install
 
@@ -145,13 +145,65 @@ borderless=true
 From the install folder: `git pull`, then `python3 scripts/setup.py` (Windows: `py -3.11 scripts\setup.py`).
 You can also run the install line again. Both are safe to repeat; setup only redoes what changed.
 
+Git leaves a folder behind when a pull moves or deletes all its files. `python3 scripts/clean_tree.py` lists those
+empty folders and `--delete` removes them; it never touches a folder holding a file, a Git-ignored folder or a
+submodule.
+
+## Folders
+
+What is in the repository; *(PuP)* marks this fork's own folders, everything else follows the upstream game.
+
+```
+Tron-Legacy-MPF-PuP/
+├── assets/                  submodule: the ROM extraction (rules, traces, sounds, DMD frames); setup.py fetches it
+├── pup_pack/                submodule (PuP): Terry Red's "End of Line" PuP Pack, read as is
+├── game/                    the MPF + Godot game (MPF machine folder and Godot project in one)
+│   ├── config/              MPF config: config.yaml, hardware overlays (hw_*), machine_pro/le, pup.yaml (PuP hook)
+│   ├── modes/               MPF modes: attract, tron_service, pup (PuP)
+│   ├── tron/                the game's rules, display and hardware code (Python and GDScript)
+│   │   └── features/        one file per rule feature (modes, multiballs, hurry-ups, ...)
+│   ├── slides/              Godot scenes for the DMD slides
+│   ├── tools/               Godot helpers: DMD capture, font bake, HD DMD shaders, performance probe
+│   ├── fonts_ttf/           the HD DMD fonts (Orbitron, Rajdhani)
+│   ├── monitor/             MPF Monitor layout and playfield picture
+│   ├── pup/                 (PuP) the PuP windows in Godot: video player, screens, DMD frame, light cycles
+│   ├── tron_pup/            (PuP) the trigger engine in MPF; trigger_map.yaml maps pack triggers to game effects
+│   ├── pup.cfg              (PuP) screen settings, every key documented; yours go in pup.local.cfg
+│   └── gmc.cfg              keyboard and window settings of the Godot media controller
+├── pup_addons/              (PuP) video add-ons setup.py copies into game/addons/
+│   ├── native_video/        Windows and macOS: plays the pack's mp4s
+│   ├── native_video_build/  the heap fix the macOS build applies
+│   └── gde_gozen/           Linux and Jetson: GDE GoZen with the hardware decoder
+├── scripts/                 setup.py (install), run.py (play), the generators and checks
+│   ├── pup/                 (PuP) pup_setup (called by setup.py and run.py), gen_pup (media conversion),
+│   │                        pup_captures (trigger map check), pup_check (screens check)
+│   ├── install/             one-line installers per OS, P-ROC build, Jetson hardware decoder and self-test
+│   ├── gozen/               (PuP) the GoZen and jetson-ffmpeg patches build_gozen.sh applies
+│   ├── perf/                (PuP) performance runs (docs/performance.md)
+│   ├── sync_upstream.py     (PuP) merges the upstream game and re-checks the PuP
+│   └── clean_tree.py        (PuP) removes empty leftover folders
+├── scenarios/               (PuP) game scripts for run.py --scenario (a whole game to Portal Multiball)
+├── tests/                   unit tests (pytest -q tests) and the machine configs they load
+├── docs/                    upstream docs (development, hardware, requirements, vpx, rom_differences, handover/)
+│   ├── pup/                 (PuP) how the PuP is wired in; captures.md, the trigger map report
+│   ├── jetson/              (PuP) NVIDIA Jetson set-up and video fixes, Xavier NX results
+│   └── upstream_issues/     (PuP) reports for Godot, GoZen and jetson-ffmpeg, with their test programs
+├── docker/                  optional Docker setup for Linux hosts
+└── .github/workflows/       CI tests on Windows, macOS and Linux; the macOS native_video build
+```
+
+Setup and play create these, all ignored by Git: `.venv/` (Python), `tools/` (Godot), `pup_media/` (the converted
+PuP media), `game/addons/` (GMC and the video add-ons), `game/logs/`, `game/data/`, `game/audits/`, the generated
+`game/config/rom/`, `game/sounds/`, `game/media/` and `game/fonts/`, and `captures/`.
+
 ## More
 
-- [docs/pup.md](docs/pup.md): how the PuP Pack is wired in, and keeping up with the upstream game.
+- [docs/pup/README.md](docs/pup/README.md): how the PuP Pack is wired in, and keeping up with the upstream game.
 - [docs/development.md](docs/development.md): the workspace in detail (layout, setup options, running by hand,
   tests and checks, the asset sync).
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
+- [docs/jetson/README.md](docs/jetson/README.md): the game on an NVIDIA Jetson (Orin, Xavier NX).
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.
