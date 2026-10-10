@@ -13,7 +13,8 @@ const SPEED := 6.0           # cells per second
 const FADE := 3.2            # seconds a trail lives
 const WALL_H := 0.5
 const RESPAWN := 2.2         # seconds a derezzed cycle stays away
-const INSET := Vector2(0.155, 0.18)  # the wall is the DMD shrunk by this share of its size on each side
+const INSET := Vector2(0.137, 0.16)  # the wall is the DMD shrunk by this share of its size on each side
+const BEHIND := 0.03          # the avoid zone reaches past the DMD by this share of its height
 const AVOID := 3.0           # how hard the cycles steer out of the avoid zone
 const COLORS := [Color(0.2, 0.75, 1.0), Color(1.0, 0.42, 0.04)]
 const DIRS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.UP, Vector2i.DOWN]
@@ -98,7 +99,7 @@ func _restart() -> void:
 	var area := Rect2(Vector2.ZERO, size).grow(-12)
 	var wall := _dmd.grow_individual(-_dmd.size.x * INSET.x, -_dmd.size.y * INSET.y,
 		-_dmd.size.x * INSET.x, -_dmd.size.y * INSET.y)
-	var behind := _dmd.grow(_dmd.size.y * 0.05)
+	var behind := _dmd.grow(_dmd.size.y * BEHIND)
 	_blocked.clear()
 	_avoid.clear()
 	_cells.clear()

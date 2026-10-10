@@ -325,8 +325,9 @@ func _layout_dmd() -> void:
 	var area := Vector2(windows["dmd"].size)
 	var dmd_rect := Rect2(Vector2.ZERO, area)
 	if _cycles:
-		# a 4:1 DMD in the middle, lightcycles_dmd of the window's width, at most half its height
-		var w := minf(area.x * float(setting("dmd", "lightcycles_dmd", 0.6)), area.y * 0.5 * 4.0)
+		# a 4:1 DMD in the middle, lightcycles_dmd of the window's width, at most lightcycles_dmd_height of its height
+		var w := minf(area.x * float(setting("dmd", "lightcycles_dmd", 0.68)),
+			area.y * float(setting("dmd", "lightcycles_dmd_height", 0.62)) * 4.0)
 		dmd_rect = Rect2((area - Vector2(w, w / 4.0)) * 0.5, Vector2(w, w / 4.0))
 		_cycles.position = Vector2.ZERO
 		_cycles.size = area
