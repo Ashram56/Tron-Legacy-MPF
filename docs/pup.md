@@ -22,6 +22,17 @@ installs `imageio-ffmpeg` in the venv. The whole pack
 takes a while (Theora encodes on one core per file; all cores are used); `--max-height 720` makes smaller
 videos for a slower PC. Without the converted media the PuP stays off and the game runs as upstream.
 
+**The pack from its author's zip.** The default source is the `pup_pack` submodule (this project's private
+copy of the pack). `TRON_PUP_ZIP=<zip or https URL>` in the environment of `setup.py` (or the installers'
+`--pup-zip` / `-PupZip`, or `python scripts/pup_setup.py --pup-zip <zip>`) takes the pack from the zip its author
+publishes instead, so a player downloads it from the author, who gets the credit:
+`pup_setup.py` finds the folder holding `triggers.pup` in the zip (at any depth, e.g. `PUPVideos/trn_174h/`),
+extracts it into `pup_pack/trn_174h/` and notes the zip's SHA-256 in `pup_pack/trn_174h/.pup_zip`, so the same zip
+is not extracted twice; the installers then don't ask for access to the pack's repository. A pack already
+checked out by the submodule is left alone (delete the folder to switch). A different release of the pack can
+change the captures or the trigger rows: run `python scripts/pup_captures.py` after switching and fix the
+lines it flags in `game/tron_pup/trigger_map.yaml`.
+
 **Windows and macOS: native mp4 playback.** On Windows and macOS, `setup.py` installs the `native_video` add-on
 (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`) and the pack's mp4s play as
 they are, with hardware decoding (Media Foundation, AVFoundation): nothing is converted, `gen_pup.py --native`
@@ -46,7 +57,7 @@ decodes in software.
 | Window | Shows | PuP screens |
 |---|---|---|
 | `backglass` (4:3) | background and mode loops, event videos popping over them | 2 (underlay), 12 (top layer) |
-| `dmd` (large LCD) | the pack's DMD panel art, the game's 128x32 DMD in its black middle | the game's DMD |
+| `dmd` (large LCD) | the game's 128x32 DMD in a neon frame over a live light cycle chase (or the pack's DMD panel art, `background="frame"`) | the game's DMD |
 | `topper` (optional) | mode info, TRON / ZUSE letters, light cycles | 13 (underlay), 14 (top layer) |
 | (no window) | OST music | 15 |
 
@@ -80,7 +91,14 @@ borderless=true
   the upstream game.
 - `[backglass] fit`: the videos are 16:9 and the backglass 4:3: `fit` (black bars, `align` places the video),
   `fill` (crops the sides) or `stretch`.
-- `[dmd] frame_crop` / `dmd_rect` place the art and the DMD (pixels of the art image), `dots` draws round dots.
+- `[dmd] background`: `lightcycles` (the default) draws the DMD in a neon frame over a live 3D chase
+  (`game/pup/lightcycles.gd`): two 1982-style light cycles on a grid, their trails fading after about 3 s, a
+  cycle that hits a trail, a wall or the other cycle derezzes and comes back. The middle of the DMD is a wall
+  and the cells behind the rest of it an avoid zone the cycles steer out of, so the chase stays around the
+  DMD; `lightcycles_dmd` is the DMD's width as a share of the window's (0.6: 768x192 on a 1280x390 bar). It is
+  a few hundred triangles; `background="frame"` is the PuP Pack's DMD panel art instead.
+- `[dmd] frame_crop` / `dmd_rect` (`background="frame"`) place the art and the DMD (pixels of the art image),
+  `dots` draws round dots.
   The game's own 128x32 window is minimised (`hide_main_window`); it stays the source of the DMD picture, so
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as
   in the DMD window.

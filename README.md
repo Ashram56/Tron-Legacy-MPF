@@ -6,7 +6,8 @@ a Godot DMD, from the reverse-engineered rules, media and effects in
 Windows, macOS and Linux, on a desktop or on the real machine through a P-ROC.
 
 This fork adds Terry Red's "End of Line" PuP Pack on three screens: the backglass (4:3 videos), a large LCD
-DMD (the pack's DMD panel art, with the game's DMD in the middle) and an optional topper. The pack's
+DMD (the game's DMD in a neon frame over a live 3D light cycle chase, or the pack's DMD panel art) and an
+optional topper. The pack's
 soundtrack replaces the ROM music. [docs/pup.md](docs/pup.md) has the details.
 
 ## Install
@@ -46,6 +47,11 @@ You can change where the files go, and what is installed:
   Contents: read-only). On Windows, paste it with a right-click: Ctrl+V does not paste into the hidden prompt. Or
   give it before the line, so nothing is asked: Windows `$env:TRON_GITHUB_TOKEN = "github_pat_..."` first,
   macOS / Linux `TRON_GITHUB_TOKEN=github_pat_... bash <(curl ...)`.
+- **PuP Pack from its zip:** by default the pack comes from this project's private `pup_pack` repository. To
+  use the pack as its author publishes it instead (Terry Red's "End of Line" zip, from where the author shares it), set
+  `TRON_PUP_ZIP` to the zip file or its https URL before the line (Windows: `$env:TRON_PUP_ZIP =
+  "C:\Users\me\Downloads\Tron.zip"`), or give `--pup-zip FILE` (Windows `-PupZip FILE`). No access to the
+  private repository is needed then. Already installed: `python scripts/pup_setup.py --pup-zip FILE`.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
   `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.

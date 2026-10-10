@@ -411,9 +411,27 @@ def build_deffs(only_data):
     return out
 
 
+# Godot import settings for the HD effect frames: VRAM-compressed (ETC2 on ARM, S3TC/BPTC on PCs; one channel, as
+# the frames are grey). An effect's frames load when its slide is created, on Godot's main thread: lossless frames
+# took ~7 ms each to decompress (the 319 frames of the Light Cycle multiball intro stalled the game 2.4 s on a Jetson
+# Xavier NX), VRAM-compressed ones ~1.5 ms, at half the GPU memory (docs/performance.md). Godot completes the file
+# (uid, paths) on import and keeps these parameters. Letter sprites stay lossless: tron/letter_panel.gd reads them.
+HD_FRAME_IMPORT = """[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[params]
+
+compress/mode=2
+mipmaps/generate=false
+"""
+
+
 def build_hd_frames(scale=None):
     """game/media/dmd_hd: every picture of game/media/dmd upscaled (dmd_hd.upscale_file), same names.
-    Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black."""
+    Letter sprites (solid*/hollow*) keep their transparency; effect frames are drawn over black and get a
+    VRAM-compressed import (HD_FRAME_IMPORT)."""
     import dmd_hd
     scale = scale or dmd_hd.FRAME_SCALE
     src_root = os.path.join(GAME, "media", "dmd")
@@ -428,6 +446,9 @@ def build_hd_frames(scale=None):
             name = os.path.basename(src)
             kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
             jobs.append((src, os.path.join(out, name), scale, kind, os.path.join(ROOT, ".cache", "dmd_hd")))
+            if kind == "frame":
+                with open(os.path.join(out, name + ".import"), "w", encoding="utf-8", newline="\n") as f:
+                    f.write(HD_FRAME_IMPORT)
     with open(os.path.join(dst_root, "scale.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"scale": scale}, f)
     return len(dmd_hd.upscale_files(jobs))

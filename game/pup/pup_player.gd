@@ -4,8 +4,9 @@ extends Node
 ## "pup_play" commands MPF sends (game/tron_pup/mode.py).
 ##
 ## Windows (each on the monitor game/pup.cfg gives it):
-## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer);
-## - dmd: the PuP Pack's DMD panel frame with the game's 128x32 DMD (the main window's picture) in its middle;
+## - backglass: PuP screens 2 (underlay) and 12 (pop-up top layer); [backglass] enabled=false leaves it out;
+## - dmd: the game's 128x32 DMD (the main window's picture) in a neon frame over a live light cycle chase
+##   (game/pup/lightcycles.gd), or ([dmd] background="frame") in the PuP Pack's DMD panel art;
 ## - topper (optional, [pup] third_screen): PuP screens 13 (underlay) and 14 (pop-up top layer).
 ## PuP screen 15 (OST music) has no window. Commands for a screen that is off are dropped.
 ## Media come from the converted copy of the pack (scripts/gen_pup.py, manifest.json): Theora videos, the
@@ -16,6 +17,8 @@ const LAYERS := {"backglass": [2, 12], "topper": [13, 14]}
 const MUSIC_SCREEN := 15
 const DOTS_SHADER := preload("res://pup/dmd_dots.gdshader")
 const PupScreen := preload("res://pup/pup_screen.gd")
+const LightCycles := preload("res://pup/lightcycles.gd")
+const NEON_SHADER := preload("res://pup/neon_frame.gdshader")
 
 var cfg := ConfigFile.new()
 var enabled := false
@@ -124,7 +127,8 @@ func _build() -> void:
 	for row in _read_csv(pack_dir.path_join("screens.pup")):
 		defaults[int(row.get("ScreenNum", "-1"))] = row
 	var video_volume := float(setting("pup", "video_volume", 100))
-	_make_layered_window("backglass", defaults, video_volume)
+	if bool(setting("backglass", "enabled", true)):
+		_make_layered_window("backglass", defaults, video_volume)
 	_make_dmd_window()
 	if bool(setting("pup", "third_screen", true)):
 		_make_layered_window("topper", defaults, video_volume)
@@ -142,11 +146,25 @@ func _build() -> void:
 		screens[n].start_background()
 	if bool(setting("dmd", "hide_main_window", true)):
 		get_tree().root.mode = Window.MODE_MINIMIZED
+	_vsync_one_window()
 	var placed := []
 	for section in windows:
 		placed.append("%s %s at %s" % [section, windows[section].size, windows[section].position])
 	print("PuP: windows %s, screens %s" % [", ".join(placed), screens.keys()])
 	_start_capture()
+
+
+## Vsync on the backglass window only (else the first PuP window): with vsync on every window, each one's present
+## waits for its own vertical blank, so a frame took one screen refresh per window (main, backglass, DMD, topper:
+## 15 FPS on a Jetson Xavier NX, L4T R35). One vsync'd window still paces the frames of all of them.
+func _vsync_one_window() -> void:
+	if windows.is_empty() or DisplayServer.window_get_vsync_mode() == DisplayServer.VSYNC_DISABLED:
+		return
+	var keep: Window = windows.get("backglass", windows.values()[0])
+	var others: Array = [get_tree().root] + windows.values()
+	for w: Window in others:
+		if w != keep:
+			DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED, w.get_window_id())
 
 
 ## run.py --dmd-size WxH (Godot's --resolution, which sizes the main window): the size of the DMD window the
@@ -239,15 +257,26 @@ func _make_layered_window(section: String, defaults: Dictionary, volume: float) 
 		screens[n] = layer
 
 
-var _dmd_frame: TextureRect             # the pack's DMD panel art (null without frame_image)
+var _dmd_frame: TextureRect             # the pack's DMD panel art (background="frame" with a frame_image)
 var _dmd_crop := Rect2i()
+var _cycles: LightCycles                # the light cycle chase (background="lightcycles")
+var _neon: ColorRect                    # its neon frame round the DMD
 var _dmd_view: TextureRect              # the game's DMD (the main window's picture)
 
 
 func _make_dmd_window() -> void:
 	var w := _make_window("dmd")
+	var background := str(setting("dmd", "background", "lightcycles"))
 	var frame_path := str(setting("dmd", "frame_image", ""))
-	if frame_path != "":
+	if background == "lightcycles":
+		_cycles = LightCycles.new()
+		w.add_child(_cycles)
+		_neon = ColorRect.new()
+		_neon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_neon.material = ShaderMaterial.new()
+		_neon.material.shader = NEON_SHADER
+		w.add_child(_neon)
+	elif background == "frame" and frame_path != "":
 		var image := Image.load_from_file(pack_dir.path_join(frame_path))
 		if image:
 			var c = setting("dmd", "frame_crop", [0, 0, image.get_width(), image.get_height()])
@@ -281,7 +310,21 @@ func _make_dmd_window() -> void:
 func _layout_dmd() -> void:
 	var area := Vector2(windows["dmd"].size)
 	var dmd_rect := Rect2(Vector2.ZERO, area)
-	if _dmd_frame:
+	if _cycles:
+		# a 4:1 DMD in the middle, lightcycles_dmd of the window's width, at most half its height
+		var w := minf(area.x * float(setting("dmd", "lightcycles_dmd", 0.6)), area.y * 0.5 * 4.0)
+		dmd_rect = Rect2((area - Vector2(w, w / 4.0)) * 0.5, Vector2(w, w / 4.0))
+		_cycles.position = Vector2.ZERO
+		_cycles.size = area
+		_cycles.set_dmd_rect(dmd_rect)
+		var k := w / 772.0   # the frame was drawn for a 772 px wide DMD (a 1280x390 bar panel)
+		_neon.position = Vector2.ZERO
+		_neon.size = area
+		var neon := {"size": area, "box": Vector4(dmd_rect.position.x, dmd_rect.position.y, w, w / 4.0),
+			"margin": 12.0 * k, "radius": 18.0 * k, "scale": k}
+		for key in neon:
+			_neon.material.set_shader_parameter(key, neon[key])
+	elif _dmd_frame:
 		var scale := minf(area.x / _dmd_crop.size.x, area.y / _dmd_crop.size.y)
 		var origin := (area - Vector2(_dmd_crop.size) * scale) * 0.5
 		_dmd_frame.position = origin
