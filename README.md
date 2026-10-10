@@ -226,4 +226,6 @@ PuP media), `game/addons/` (GMC and the video add-ons), `game/logs/`, `game/data
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
 - [docs/jetson/README.md](docs/jetson/README.md): the game on an NVIDIA Jetson (Orin, Xavier NX).
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
+- [docs/jetson.md](docs/jetson.md): Jetson hardware video decoding fixes; [docs/jetson_image.md](docs/jetson_image.md):
+  building and flashing the minimal Xavier NX image (SD or NVMe, from WSL or Linux).
 - [docker/README.md](docker/README.md): the optional Docker setup for Linux hosts.

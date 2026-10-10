@@ -162,6 +162,9 @@ Record the `.so`'s sha256 in the commit message.
   (`scenarios/full_game_to_portal.txt`) plays a whole game to Portal Multiball in about 10 minutes.
 
 ## Xavier NX checklist
+For the board's OS, the minimal L4T 35.6.4 image and how to flash it (SD or NVMe) are in
+[jetson_image.md](jetson_image.md).
+
 JetPack 5 (L4T R35, t194) differs from the Orin in ways that touch these fixes:
 - NVIDIA's libraries are in `/usr/lib/aarch64-linux-gnu/tegra/` instead of `.../nvidia/` (the install and the
   self-test handle it). R35's Multimedia API already has `nvbufsurface.h`, so libnvmpi builds on the same NvUtils
