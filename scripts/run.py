@@ -33,7 +33,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gmc_patch  # noqa: E402
-import pup_setup  # noqa: E402  (PuP Pack: docs/pup.md)
+from pup import pup_setup  # noqa: E402  (PuP Pack: docs/pup/README.md)
 import toolchain as tc  # noqa: E402
 
 IS_WINDOWS = os.name == "nt"
@@ -325,7 +325,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if trace:
         env["TRON_TRACE"] = trace
     godot = mpf = mon = pinning = None
-    print(pup_setup.status()[1], flush=True)  # PuP Pack: docs/pup.md
+    print(pup_setup.status()[1], flush=True)  # PuP Pack: docs/pup/README.md
     if not virtual_display:
         keep_screen_on()
     try:

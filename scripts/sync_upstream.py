@@ -6,11 +6,12 @@
     python scripts/sync_upstream.py --no-merge           # only the checks (after a manual merge)
 
 The PuP lives in its own files (game/pup/, game/tron_pup/, game/pup.cfg, game/config/pup.yaml,
-game/modes/pup/, scripts/*pup*), so a merge only meets four one-line hooks in upstream files:
+game/modes/pup/, scripts/pup/), so a merge only meets four one-line hooks in upstream files:
 game/config/config.yaml (include pup.yaml), game/project.godot (the Pup autoload), .gitmodules (pup_pack) and
 .gitignore. After the merge: the submodules, the generated config and media, the capture match
-(scripts/pup_captures.py: does trigger_map.yaml still point at the effects that draw each PuP capture?) and
-the unit tests. The merge is left uncommitted when it conflicts; nothing is pushed.
+(scripts/pup/pup_captures.py: does trigger_map.yaml still point at the effects that draw each PuP capture?) and
+the unit tests. Folders the merge left empty are removed (scripts/clean_tree.py). The merge is left uncommitted
+when it conflicts; nothing is pushed.
 """
 import argparse
 import os
@@ -18,6 +19,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import clean_tree  # noqa: E402
 import toolchain as tc  # noqa: E402
 
 UPSTREAM = "https://github.com/Ashram56/Tron-Legacy-MPF.git"
@@ -47,19 +49,22 @@ def main(argv=None):
             print("\nThe merge conflicts: resolve it (keep the PuP hook lines), commit, then run "
                   "`python scripts/sync_upstream.py --no-merge`.")
             return 1
+    for rel in clean_tree.leftovers():  # folders the merge emptied
+        print("removed empty folder " + rel, flush=True)
+        clean_tree.shutil.rmtree(os.path.join(tc.ROOT, rel), ignore_errors=True)
     env = dict(os.environ, GIT_LFS_SKIP_SMUDGE="1")
     print("$ git submodule update --init --depth 1", flush=True)
     subprocess.run(["git", "submodule", "update", "--init", "--depth", "1"], cwd=tc.ROOT, env=env, check=True)
     failed = []
     for name, cmd in (("setup (new requirements, generated config and media, PuP media, Godot import)",
                        lambda: [sys.executable, "scripts/setup.py"]),
-                      ("PuP capture match", lambda: [tc.python(), "scripts/pup_captures.py"]),
+                      ("PuP capture match", lambda: [tc.python(), "scripts/pup/pup_captures.py"]),
                       ("unit tests", lambda: [tc.python(), "-m", "pytest", "-q", "tests"])):
         # tc.python() is resolved per step: on a fresh clone the venv only exists once setup has run.
         if step(cmd()):
             failed.append(name)
     if failed:
-        print("\nTo look at: " + ", ".join(failed) + (" (docs/pup_captures.md lists the captures to check)"
+        print("\nTo look at: " + ", ".join(failed) + (" (docs/pup/captures.md lists the captures to check)"
                                                       if "PuP capture match" in failed else ""))
         return 1
     print("\nUp to date with upstream/{}; the PuP map still matches.".format(args.branch))

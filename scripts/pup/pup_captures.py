@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Match the PuP Pack's DMD captures (PupCapture/<n>.bmp, trigger D<n>) against the game's display effects.
 
-    python scripts/pup_captures.py            # writes docs/pup_captures.md, exits 1 if the map disagrees
+    python scripts/pup/pup_captures.py            # writes docs/pup/captures.md, exits 1 if the map disagrees
 
 In Visual Pinball, PinUP Player fires D<n> when the pixels inside the purple rectangle of capture <n> show on
 PinMAME's DMD. This compares that rectangle (lit / unlit dots) with every frame the asset package recorded:
@@ -18,14 +18,14 @@ import sys
 
 from PIL import Image, ImageSequence
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import toolchain as tc  # noqa: E402
 
 sys.path.insert(0, tc.GAME)
 from tron_pup import engine, pupfiles, settings  # noqa: E402
 
 PACKAGE = os.path.join(tc.ROOT, "assets", "mpf_package")
-REPORT = os.path.join(tc.ROOT, "docs", "pup_captures.md")
+REPORT = os.path.join(tc.ROOT, "docs", "pup", "captures.md")
 PURPLE = (253, 0, 253)
 W, H = 128, 32
 
@@ -95,7 +95,7 @@ def main():
             if kind == "D":
                 used.setdefault(num, []).append(row.id)
     lines = ["# PuP DMD captures against the game's display effects", "",
-             "Written by `scripts/pup_captures.py` ({} recorded frames). D<n> fires in Visual Pinball when the "
+             "Written by `scripts/pup/pup_captures.py` ({} recorded frames). D<n> fires in Visual Pinball when the "
              "pixels in the purple rectangle of `PupCapture/<n>.bmp` are on the DMD; *score* is the share of "
              "lit dots the best frame has in common with it (intersection over union). *Effects* are all the "
              "display effects with a frame within 0.5 % of the best; *map* is what "

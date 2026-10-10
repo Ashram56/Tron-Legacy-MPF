@@ -1,9 +1,9 @@
 extends SceneTree
 
-## Checks GDE GoZen's video decoding on this PC (docs/pup.md), without the game: opens a few PuP Pack videos one
+## Checks GDE GoZen's video decoding on this PC (docs/pup/README.md), without the game: opens a few PuP Pack videos one
 ## after another, decodes up to FRAMES frames of each as fast as it can, and says per video whether the GPU decoded
 ## it (NV12 frames: Direct3D 11 Video / DXVA2 on Windows, the Jetson's decoder) and how fast, against the video's
-## own frame rate. scripts/video_check.py runs it on the GPU and then in software (GOZEN_HWDEC=0).
+## own frame rate. scripts/pup/video_check.py runs it on the GPU and then in software (GOZEN_HWDEC=0).
 ##   godot --headless --path game -s res://tools/gozen_check.gd -- [--out FILE] [VIDEO...]
 
 const FRAMES := 300

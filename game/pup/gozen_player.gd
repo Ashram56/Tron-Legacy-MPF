@@ -2,7 +2,7 @@ extends Control
 
 ## A PuP screen's video player on Linux and Windows: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which
 ## plays the pack's mp4s as they are and decodes on the GPU: the Jetson's decoder when libnvmpi is installed,
-## Direct3D 11 Video (else DXVA2) on Windows (docs/pup.md). Offers
+## Direct3D 11 Video (else DXVA2) on Windows (docs/pup/README.md). Offers
 ## the parts of VideoStreamPlayer that pup_screen.gd uses: open(), play() (from the start), stop(), finished.
 
 signal finished

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Checks GDE GoZen's PuP video decoding on this PC, without the game (docs/pup.md): a few pack videos decoded on
+"""Checks GDE GoZen's PuP video decoding on this PC, without the game (docs/pup/README.md): a few pack videos decoded on
 the GPU (Direct3D 11 Video / DXVA2 on Windows, the Jetson's decoder), then in software (GOZEN_HWDEC=0), with the
 speed of each against the video's own frame rate.
 
-    python scripts/video_check.py            # both runs
-    python scripts/video_check.py --gpu      # the GPU run only
+    python scripts/pup/video_check.py            # both runs
+    python scripts/pup/video_check.py --gpu      # the GPU run only
 """
 import os
 import subprocess
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import toolchain as tc  # noqa: E402
 
 

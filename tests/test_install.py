@@ -193,6 +193,14 @@ class TestShellScripts(unittest.TestCase):
         r = sh([os.path.join(INSTALL, "install_prereqs_linux.sh"), "--bogus"])
         self.assertEqual(2, r.returncode)
 
+    def test_pup_zip_missing_file(self):
+        for name in ("install_prereqs_linux.sh", "install_prereqs_macos.sh"):
+            r = sh([os.path.join(INSTALL, name), "--dry-run", "--pup-zip", "/no/such/pack.zip"])
+            self.assertEqual(2, r.returncode, name)
+            self.assertIn("PuP Pack zip not found", r.stderr)
+            r = sh([os.path.join(INSTALL, name), "--pup-zip"])
+            self.assertEqual(2, r.returncode, name)
+
     def test_linux_setup_args(self):
         r = sh([os.path.join(INSTALL, "install_prereqs_linux.sh"), "--dry-run", "--", "--skip-media"],
                env={"TRON_OS_RELEASE": self.os_release("ID=debian\n"), "DISPLAY": ":0"})

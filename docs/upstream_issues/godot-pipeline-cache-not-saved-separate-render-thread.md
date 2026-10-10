@@ -4,7 +4,7 @@
 
 ## Environment
 
-- Godot 4.6.3 stable, Linux arm64, Vulkan, Mobile renderer
+- Godot 4.6.3 stable (also 4.5.2 stable), Linux arm64, Vulkan, Mobile renderer
 - Jetson Xavier NX, L4T R35.6.4 (JetPack 5.1.4), NVIDIA Tegra Vulkan driver, X11
 - `rendering/driver/threads/thread_model=2` (separate render thread)
 
@@ -21,6 +21,21 @@ Every start compiles every pipeline again: the pipeline cache file is never writ
 
 On a slow GPU each first use of a material stalls the game: a particle effect with a light took 4.0-4.7 s on its
 first appearance, on every start; a test scene had 1.4 s and 2.3 s hitches on every start.
+
+## Minimal reproduction project
+
+[`repro/godot_pipeline_cache/`](repro/godot_pipeline_cache/) (zip: `repro/godot_pipeline_cache.zip`; three files, no
+assets): a 3D scene, `thread_model=2`, where a burst of emissive particles and an omni light appear at 2 s. Each run
+prints the files in `user://vulkan` at start and the longest frame. Run it twice:
+
+    godot --path godot_pipeline_cache                         # separate render thread
+    godot --path godot_pipeline_cache --render-thread safe    # for comparison
+
+Xavier NX, idle: with the separate render thread both runs show no cache file and a long frame at the burst
+(Godot 4.6.3: 2.1 s and 1.7 s; 4.5.2: 1.6 s and 1.5 s), and the exit logs `finalize can only be called from the
+render thread` (rendering_device.cpp:7470 in 4.6.3, :7248 in 4.5.2). With `--render-thread safe` the second run
+finds `pipelines.mobile.*.cache` and its longest frame is 0.2 s. On Linux x86_64 with lavapipe only the error shows
+(lavapipe writes no pipeline cache data at all).
 
 ## Workaround
 

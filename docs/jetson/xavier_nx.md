@@ -2,8 +2,8 @@
 
 Everything learned running Tron Legacy MPF with the PuP Pack on a Jetson Xavier NX: the set-up that works, what
 was wrong and how it was fixed, the settings measured, and what is left. Details: video decoding fixes in
-[jetson.md](jetson.md), measuring and every setting's figures in [performance.md](performance.md), reports for
-other projects in [upstream_issues/](upstream_issues/README.md).
+[README.md](README.md), measuring and every setting's figures in [performance.md](../performance.md), reports for
+other projects in [upstream_issues/](../upstream_issues/README.md).
 
 **Board:** Jetson Xavier NX Developer Kit (t194), L4T R35.6.4 / JetPack 5.1.4, Ubuntu 20.04.6, Godot 4.6.3,
 Vulkan with the Mobile renderer. Tested 2026-10-08 to 2026-10-09.
@@ -25,7 +25,7 @@ memory. Board RAM peaks at 3.4 GB of 6.8 GB with Orbitron, no swap.
 
 1. **Install:** the Linux one line, then `bash scripts/install/install_jetson_hwdec.sh` (libnvmpi with our patch,
    NVIDIA packages pinned to the board's own L4T release, no idle blanking), then
-   `bash scripts/install/jetson_selftest.sh --stock` (must pass every check). [jetson.md](jetson.md) "To bring one
+   `bash scripts/install/jetson_selftest.sh --stock` (must pass every check). [README.md](README.md) "To bring one
    up".
 2. **Session:** X11 with openbox, autologin on tty1, no display manager. Godot places one window per monitor only
    on X11.
@@ -72,11 +72,11 @@ memory. Board RAM peaks at 3.4 GB of 6.8 GB with Orbitron, no swap.
 
 ## Video decoding (NVDEC)
 
-Hardware decoding through jetson-ffmpeg's `h264_nvmpi` in GDE GoZen. Ten fixes, all in [jetson.md](jetson.md):
+Hardware decoding through jetson-ffmpeg's `h264_nvmpi` in GDE GoZen. Ten fixes, all in [README.md](README.md):
 
 - jetson-ffmpeg bugs that are on JetPack 5 too: a loop or seek hung the next decode (fix 1), closing a decoder took
   about 1 s (fix 2), several decoders starting at once segfaulted (fix 4). Self-test results against stock
-  jetson-ffmpeg in [jetson.md](jetson.md) "Xavier NX checklist".
+  jetson-ffmpeg in [README.md](README.md) "Xavier NX checklist".
 - 5 FPS as installed (fix 9): libnvmpi mapped every plane of every frame for the CPU (11 ms of kernel time per
   1080p frame on R35); decoding on the main thread fell behind; four vsync'd windows. 55.5 FPS after.
 - Frames decoded at the size they are shown at, as NV12 (fix 10): 4 to 8 times fewer pixels per frame.
@@ -86,7 +86,7 @@ Hardware decoding through jetson-ffmpeg's `h264_nvmpi` in GDE GoZen. Ten fixes, 
 
 ## Godot settings (all platforms)
 
-Measured with the clip suite in mode 5; figures in [performance.md](performance.md) "Settings measured".
+Measured with the clip suite in mode 5; figures in [performance.md](../performance.md) "Settings measured".
 
 | Setting | Where | Effect on the Xavier NX |
 |---|---|---|
@@ -112,12 +112,12 @@ Measured with the clip suite in mode 5; figures in [performance.md](performance.
 
 - A start-up stall of about 0.6 s, and short stalls at some scene switches while a video opens.
 - About 170-190 frames per 10-minute game held 3 vblanks or more.
-- Decoder leftovers in [jetson.md](jetson.md) "Known leftovers" (lost trailing frames on a recreated decoder, a
+- Decoder leftovers in [README.md](README.md) "Known leftovers" (lost trailing frames on a recreated decoder, a
   0.1 s hold at some loop points).
 
 ## Tools
 
 - `bash scripts/perf/run.sh --suite 5`: the trouble-spot clips with frame, video, A/V, memory and power figures
-  ([performance.md](performance.md)).
+  ([performance.md](../performance.md)).
 - `scripts/install/jetson_selftest.sh --stock`: the decoder checks, patched against stock.
 - A stuck Godot: `sudo gdb -batch -p $(pgrep -f Godot_v | head -1) -ex 'thread apply all bt 25'`.

@@ -66,7 +66,7 @@ default, so the NVIDIA packages it installs are pinned to the board's own releas
 (R36.4.3 installs 36.4.3, not 36.4.7). Upgrading the board's BSP stays a separate `sudo apt upgrade`.
 
 Every Jetson fix (this add-on, the FFmpeg wrapper, libnvmpi), why and how it was checked, and the checklist for
-another board: [`docs/jetson.md`](../../docs/jetson.md).
+another board: [`docs/jetson/README.md`](../../docs/jetson/README.md).
 
 When the game starts, Godot's log (`game/logs/` or the terminal) says for each video either
 `GoZen: hardware decoder h264_nvmpi` or `GoZen: hardware decoder h264_nvmpi unavailable, using software`.
