@@ -49,19 +49,37 @@ class TestSetup(unittest.TestCase):
                      "libnative_video.macos.release.dylib"):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
 
-    def test_gozen_on_linux_only(self):
+    def test_gozen_on_linux_and_windows(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
         from pup import pup_setup
-        self.assertTrue(pup_setup.gozen("linux", "arm64"))
-        self.assertTrue(pup_setup.gozen("linux", "x86_64"))
-        self.assertFalse(pup_setup.gozen("windows", "x86_64"))
-        self.assertFalse(pup_setup.gozen("macos", "arm64"))
+        with mock.patch.dict(os.environ, {"TRON_GOZEN": ""}):
+            self.assertTrue(pup_setup.gozen("linux", "arm64"))
+            self.assertTrue(pup_setup.gozen("linux", "x86_64"))
+            self.assertTrue(pup_setup.gozen("windows", "x86_64"))
+            self.assertFalse(pup_setup.gozen("windows", "arm64"))
+            self.assertFalse(pup_setup.gozen("macos", "arm64"))
         with mock.patch.dict(os.environ, {"TRON_GOZEN": "0"}):
             self.assertFalse(pup_setup.gozen("linux", "arm64"))
+            self.assertFalse(pup_setup.gozen("windows", "x86_64"))
         for name in ("gozen.gdextension", "video_playback.gd", "yuv_to_rgb_compatibility.gdshader",
                      "bin/libgozen.linux.template_release.arm64.so",
-                     "bin/libgozen.linux.template_release.x86_64.so"):
+                     "bin/libgozen.linux.template_release.x86_64.so",
+                     "bin/libgozen.windows.template_release.x86_64.dll"):
             self.assertTrue(os.path.exists(os.path.join(pup_setup.GOZEN_SRC, name)), name)
+        with open(os.path.join(pup_setup.GOZEN_SRC, "gozen.gdextension")) as f:
+            ext = f.read()
+        for key in ("windows.debug.x86_64", "windows.release.x86_64", "linux.release.arm64"):
+            self.assertIn(key, ext)
+
+    def test_video_player_setting(self):
+        import configparser
+        cfg = configparser.ConfigParser(inline_comment_prefixes=(";",))
+        cfg.read(os.path.join(GAME, "pup.cfg"))
+        self.assertEqual('"gozen"', cfg["pup"]["video_player"])   # Windows: GoZen first, native_video fallback
+        with open(os.path.join(GAME, "pup", "pup_player.gd")) as f:
+            self.assertIn("TRON_VIDEO_PLAYER", f.read())
+        with open(os.path.join(GAME, "pup", "gozen_player.gd")) as f:   # the Jetson check is Linux only
+            self.assertIn('OS.get_name() != "Linux"', f.read())
 
     def test_pack_from_zip(self):
         """--pup-zip / TRON_PUP_ZIP: the folder holding triggers.pup is extracted, at any depth, nothing

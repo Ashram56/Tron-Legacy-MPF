@@ -1,8 +1,9 @@
 #!/bin/bash
 # Rebuilds pup_addons/gde_gozen/bin/ (GDE GoZen for Linux x86_64 and arm64, FFmpeg 7.1 with the Jetson's nvmpi
-# decoders) from pinned sources, in Docker. Not part of setup: the binaries are committed. Needs docker and git.
+# decoders; Windows x86_64, FFmpeg 7.1 with Direct3D 11 Video / DXVA2 decoding) from pinned sources, in Docker.
+# Not part of setup: the binaries are committed. Needs docker and git.
 #
-#     bash scripts/build_gozen.sh [arm64] [x86_64]     # default both
+#     bash scripts/build_gozen.sh [arm64] [x86_64] [windows]     # default all three
 #
 # - GDE GoZen (github.com/VoylinsGamedevJourney/gde_gozen) at GOZEN_REV, with scripts/gozen/gozen.patch: asks
 #   FFmpeg for <codec>_nvmpi first and falls back to the software decoder (GOZEN_HWDEC=0 forces software);
@@ -18,7 +19,7 @@ JETSON_FFMPEG_REV=8d70c17efeee57f4d956df500fec78a73f8c27d4
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="${GOZEN_WORK:-$ROOT/.cache/gozen}"
 ARCHS=("$@")
-[ ${#ARCHS[@]} -eq 0 ] && ARCHS=(arm64 x86_64)
+[ ${#ARCHS[@]} -eq 0 ] && ARCHS=(arm64 x86_64 windows)
 
 mkdir -p "$WORK"
 if [ ! -d "$WORK/gde_gozen/.git" ]; then
@@ -37,6 +38,13 @@ git -C "$WORK/jetson-ffmpeg" apply "$ROOT/scripts/gozen/nvmpi_flush.patch"
 "$WORK/jetson-ffmpeg/scripts/ffpatch.sh" "$WORK/gde_gozen/ffmpeg"
 
 for arch in "${ARCHS[@]}"; do
+  if [ "$arch" = windows ]; then
+    # MinGW-w64 cross build (scripts/gozen/build_windows_in_docker.sh); ubuntu:24.04 for its newer MinGW
+    docker run --rm -e PIP_CERT -v "$WORK/gde_gozen:/src" -v "$ROOT/scripts/gozen:/b:ro" ubuntu:24.04 \
+      bash /b/build_windows_in_docker.sh
+    cp "test_room/addons/gde_gozen/bin/libgozen.windows.template_release.x86_64.dll" "$ROOT/pup_addons/gde_gozen/bin/"
+    continue
+  fi
   docker run --rm -e PIP_CERT -v "$WORK/gde_gozen:/src" -v "$ROOT/scripts/gozen:/b:ro" ubuntu:20.04 \
     bash /b/build_in_docker.sh "$arch"
   cp "test_room/addons/gde_gozen/bin/libgozen.linux.template_release.$arch.so" "$ROOT/pup_addons/gde_gozen/bin/"
