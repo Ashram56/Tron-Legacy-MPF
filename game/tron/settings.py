@@ -249,7 +249,7 @@ class Audits:
 # tools/dmd_mode.gd's defaults (glow 0.8, text scale 0.85).
 DISPLAY_ITEMS = {
     1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 80, 0, 300, 10),
-    2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 150, 5),
+    2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 110, 5),
 }
 
 

@@ -105,6 +105,7 @@ menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the optio
 | 2026-10-06 | Outlined ROM fonts sized and placed by their lit dots. |
 | 2026-10-07 | ZUSE/TRON target letters stay the ROM's pictures, upscaled: the clean-font versions looked worse. |
 | 2026-10-07 | Effects that are only frames and blocks drawn as sharp rectangles. |
+| 2026-10-10 | Service menu DISPLAY ADJUSTMENTS: TEXT SIZE capped at 110% (above it stacked lines touch); TEXT GLOW OFF to 300%. |
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. All in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15): this game has no video player of its own. |
 
 ### Ideas not built (ask before starting)

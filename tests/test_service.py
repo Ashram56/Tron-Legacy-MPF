@@ -415,6 +415,10 @@ class TestAuditsAndAdjustments(ServiceCase):
             self.press("plus")
         self.press("select")
         self.assertEqual((110, 110), (os_.display_settings[2], var("dmd_text_size")))
+        self.press("select")                                      # 110% is the top (owner's choice)
+        self.press("plus")
+        self.assertEqual("> 110%", self.shown[-1][2])
+        self.press("back")
         self.press("select")                                      # back to the factory value: the start value
         for _ in range(5):
             self.press("minus")

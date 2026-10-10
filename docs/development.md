@@ -155,7 +155,7 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 | `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0.8, a soft glow; 0 = none); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
 
 The text glow and size can also be set from the service menu while the game runs: ADJUSTMENTS > DISPLAY
-ADJUSTMENTS, TEXT GLOW (OFF to 300%) and TEXT SIZE (50% to 150%). The text changes on the display as the value
+ADJUSTMENTS, TEXT GLOW (OFF to 300%) and TEXT SIZE (50% to 110%). The text changes on the display as the value
 is edited; SELECT keeps it across power cycles, and then it replaces `--dmd-text-glow` / `--dmd-text-scale`.
 Setting it back to FACTORY (80%, 85%) or RESET FACTORY SETTINGS returns to the options above.
 
