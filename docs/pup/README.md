@@ -108,7 +108,10 @@ borderless=true
   (`game/pup/lightcycles.gd`): two 1982-style light cycles on a grid, their trails fading after about 3 s, a
   cycle that hits a trail, a wall or the other cycle derezzes and comes back. The middle of the DMD is a wall
   and the cells behind the rest of it an avoid zone the cycles steer out of, so the chase stays around the
-  DMD; `lightcycles_dmd` is the DMD's width as a share of the window's (0.6: 768x192 on a 1280x390 bar). It is
+  DMD; `lightcycles_dmd` is the DMD's width as a share of the window's and `lightcycles_dmd_height` the most of
+  its height it may take (0.68 and 0.62, the DMD's share of the pack's own panel art: 870x218 on a 1280x390
+  bar, 1190x298 on 1920x480; until 2026-10-10 0.6 and 0.5, which left a 1920x480 bar's DMD at half its
+  height). It is
   a few hundred triangles; `background="frame"` is the PuP Pack's DMD panel art instead.
 - `[dmd] frame_crop` / `dmd_rect` (`background="frame"`) place the art and the DMD (pixels of the art image),
   `dots` draws round dots.
