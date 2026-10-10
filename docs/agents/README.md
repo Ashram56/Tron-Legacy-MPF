@@ -104,6 +104,7 @@ Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue
 | 2026-10-06 | Outlined ROM fonts sized and placed by their lit dots. |
 | 2026-10-07 | ZUSE/TRON target letters stay the ROM's pictures, upscaled: the clean-font versions looked worse. |
 | 2026-10-07 | Effects that are only frames and blocks drawn as sharp rectangles. |
+| 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. All in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15): this game has no video player of its own. |
 
 ### Ideas not built (ask before starting)
 
@@ -130,4 +131,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-10 (PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
