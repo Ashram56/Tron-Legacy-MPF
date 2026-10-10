@@ -18,7 +18,7 @@ import run  # noqa: E402
 import setup  # noqa: E402
 import toolchain as tc  # noqa: E402
 
-RELEASES = "https://github.com/godotengine/godot/releases/download/4.5.2-stable/"
+RELEASES = "https://github.com/godotengine/godot/releases/download/4.6.3-stable/"
 
 
 class TestHost(unittest.TestCase):
@@ -60,12 +60,12 @@ class TestVenv(unittest.TestCase):
 
 class TestGodot(unittest.TestCase):
     CASES = [  # os, arch, zip, executable in tools/godot/
-        ("windows", "x86_64", "Godot_v4.5.2-stable_win64.exe.zip", ["Godot_v4.5.2-stable_win64.exe"]),
-        ("windows", "arm64", "Godot_v4.5.2-stable_windows_arm64.exe.zip", ["Godot_v4.5.2-stable_windows_arm64.exe"]),
-        ("macos", "x86_64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("macos", "arm64", "Godot_v4.5.2-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
-        ("linux", "x86_64", "Godot_v4.5.2-stable_linux.x86_64.zip", ["Godot_v4.5.2-stable_linux.x86_64"]),
-        ("linux", "arm64", "Godot_v4.5.2-stable_linux.arm64.zip", ["Godot_v4.5.2-stable_linux.arm64"]),
+        ("windows", "x86_64", "Godot_v4.6.3-stable_win64.exe.zip", ["Godot_v4.6.3-stable_win64.exe"]),
+        ("windows", "arm64", "Godot_v4.6.3-stable_windows_arm64.exe.zip", ["Godot_v4.6.3-stable_windows_arm64.exe"]),
+        ("macos", "x86_64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("macos", "arm64", "Godot_v4.6.3-stable_macos.universal.zip", ["Godot.app", "Contents", "MacOS", "Godot"]),
+        ("linux", "x86_64", "Godot_v4.6.3-stable_linux.x86_64.zip", ["Godot_v4.6.3-stable_linux.x86_64"]),
+        ("linux", "arm64", "Godot_v4.6.3-stable_linux.arm64.zip", ["Godot_v4.6.3-stable_linux.arm64"]),
     ]
 
     def test_urls_and_paths(self):
@@ -142,12 +142,12 @@ class TestUnpack(unittest.TestCase):
     def test_godot_zip_keeps_exec_bit(self):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as z:
-            info = zipfile.ZipInfo("Godot_v4.5.2-stable_linux.x86_64")
+            info = zipfile.ZipInfo("Godot_v4.6.3-stable_linux.x86_64")
             info.external_attr = 0o755 << 16
             z.writestr(info, "ELF")
         with tempfile.TemporaryDirectory() as tmp:
             setup.unzip(buf.getvalue(), tmp, "linux")
-            exe = os.path.join(tmp, "Godot_v4.5.2-stable_linux.x86_64")
+            exe = os.path.join(tmp, "Godot_v4.6.3-stable_linux.x86_64")
             self.assertTrue(os.path.isfile(exe))
             if os.name != "nt":
                 self.assertTrue(os.access(exe, os.X_OK))
@@ -176,6 +176,13 @@ class TestRun(unittest.TestCase):
             port = s.getsockname()[1]
             s.listen()
             self.assertTrue(run.port_in_use(port))
+
+    def test_scenario_path(self):
+        # this repo's scenarios/ first, then the asset repo's traces (by name, as live_scenario.py finds them)
+        self.assertEqual(run.scenario_path("full_game_to_portal"),
+                         os.path.join(ROOT, "scenarios", "full_game_to_portal.txt"))
+        self.assertEqual(run.scenario_path("game_flow"), "game_flow")
+        self.assertTrue(os.path.isabs(run.scenario_path("my_game.txt")))   # MPF runs in game/
 
     def test_wait_for_port_log_marker(self):
         with tempfile.TemporaryDirectory() as d:
@@ -237,20 +244,20 @@ class TestRun(unittest.TestCase):
             with mock.patch.object(run.shutil, "which", return_value="/usr/bin/xvfb-run"):
                 self.assertEqual("xvfb-run", run.godot_command([], virtual_display=True)[0])
 
-    def test_render_thread_switch(self):
-        """Godot's separate render thread is off by default (game/project.godot); --render-thread or
-        TRON_RENDER_THREAD=1 turns it on, never for opengl3 (the captures), which wrote no frames with it."""
-        with mock.patch.dict(os.environ, {"GODOT": sys.executable, "TRON_RENDER_THREAD": "1"}):
-            self.assertEqual(["--render-thread", "separate", "--x"],
-                             run.godot_command(["--x"], virtual_display=False)[3:])
-            self.assertNotIn("--render-thread", run.godot_command(["--rendering-driver", "opengl3"],
-                                                                  virtual_display=False))
+    def test_captures_render_on_the_main_thread(self):
+        """opengl3 (the captures) with Godot's separate render thread (game/project.godot) wrote no frames."""
         with mock.patch.dict(os.environ, {"GODOT": sys.executable}):
-            os.environ.pop("TRON_RENDER_THREAD", None)
+            self.assertEqual(["--render-thread", "safe", "--rendering-driver", "opengl3"],
+                             run.godot_command(["--rendering-driver", "opengl3"], virtual_display=False)[3:])
             self.assertNotIn("--render-thread", run.godot_command(["--x"], virtual_display=False))
+
+    def test_render_thread_switch(self):
+        """Godot's separate render thread is on by default; --no-render-thread or TRON_RENDER_THREAD=0 turns it off."""
+        with mock.patch.dict(os.environ, {"GODOT": sys.executable, "TRON_RENDER_THREAD": "0"}):
+            self.assertEqual(["--render-thread", "safe", "--x"], run.godot_command(["--x"], virtual_display=False)[3:])
         with mock.patch.object(run, "run", return_value=0) as r:
-            run.main(["--render-thread", "--no-text-ui"])
-            self.assertEqual(["--render-thread", "separate"], r.call_args.kwargs["godot_args"][:2])
+            run.main(["--no-render-thread", "--no-text-ui"])
+            self.assertEqual(["--render-thread", "safe"], r.call_args.kwargs["godot_args"][:2])
             run.main(["--no-text-ui"])
             self.assertNotIn("--render-thread", r.call_args.kwargs["godot_args"])
 

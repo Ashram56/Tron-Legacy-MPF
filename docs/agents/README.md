@@ -18,6 +18,7 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | D, VPX bridge | [agents/vpx_bridge.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/vpx_bridge.md) | [D](#d-vpx-bridge) |
 | E, improvements | [agents/improvement.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/improvement.md) | [E](#e-improvements) |
 | F, packaging | [agents/packaging.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/packaging.md) | [F](#f-packaging) |
+| G, PuP Pack | [agents/pup_pack.md](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/agents/pup_pack.md) | [G](#g-pup-pack) |
 | Knowledge base | [knowledge/](https://github.com/Ashram56/Stern-SAM-Decryption/blob/main/knowledge/README.md): SAM to MPF playbook, HD DMD method, decomp feedback | |
 
 ## Tron's inputs (the kickoff values)
@@ -28,7 +29,7 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | ROM | PinMAME sets `trn_174h` (LE 1.74), `trn_17402` (Pro 1.74); never committed |
 | VPX table | VPW Mod v1.1, in the project's files as `Tron Legacy (Stern 2011) VPW Mod v1.1.vpx` |
 | Repositories | asset repo [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption) (git submodule at `assets/`); game repo this one; colour work in the private repo `Ashram56/Tron-Legacy-MPF-Private` |
-| Hardware | P-ROC on the SAM boards, Pro by default, LE selectable; VPX on Windows; Jetson cabinet with the PuP Pack ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP)) |
+| Hardware | P-ROC on the SAM boards, Pro by default, LE selectable; VPX on Windows; Jetson cabinet with the PuP Pack (in this repository since 2026-10-10: [docs/pup/README.md](../pup/README.md); the pack itself from its author's zip or the private `pup_pack` submodule) |
 
 ## Where the Tron instance lives
 
@@ -106,7 +107,8 @@ menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the optio
 | 2026-10-07 | ZUSE/TRON target letters stay the ROM's pictures, upscaled: the clean-font versions looked worse. |
 | 2026-10-07 | Effects that are only frames and blocks drawn as sharp rectangles. |
 | 2026-10-10 | Service menu DISPLAY ADJUSTMENTS: TEXT SIZE capped at 110% (above it stacked lines touch); TEXT GLOW OFF to 300%. |
-| 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. All in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15): this game has no video player of its own. |
+| 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
+| 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
 
 ### Ideas not built (ask before starting)
 
@@ -126,6 +128,14 @@ Docker, CI on three OSes. Open:
    the installed options: not built; the owner runs the command line today.
 3. Transformers has only the Windows installer; macOS and Linux installers, Docker and CI are not ported.
 
+## G, PuP Pack
+
+Built (in the fork Tron-Legacy-MPF-PuP, merged here 2026-10-10): Terry Red's "End of Line" pack on backglass,
+DMD and topper windows, OST in place of the ROM music, GoZen (Linux, Windows) and native_video (macOS) players,
+Jetson hardware decoding: [docs/pup/README.md](../pup/README.md), [docs/jetson/README.md](../jetson/README.md),
+[docs/performance.md](../performance.md). Open: after a display change, re-run `scripts/pup/pup_captures.py`
+and fix the flagged rows of `game/tron_pup/trigger_map.yaml`.
+
 ## Owner preferences
 
 Go ahead without asking for approval; pick a default, say which, and list what needs the owner's judgement as
@@ -133,4 +143,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-10 (PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).

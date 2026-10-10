@@ -28,6 +28,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fsutil  # noqa: E402  (Windows/OneDrive-safe folder wipes)
 import gmc_patch  # noqa: E402
+from pup import pup_setup  # noqa: E402  (PuP Pack: docs/pup/README.md)
 import toolchain as tc  # noqa: E402
 
 
@@ -276,6 +277,7 @@ def main(argv=None):
         s.run([tc.venv_python(s.os), os.path.join(tc.ROOT, "scripts", "gen_config.py")], cwd=tc.ROOT)
     else:
         s.generate()
+        pup_setup.setup(tc.venv_python(s.os), s.dry)  # PuP Pack: docs/pup/README.md
     if not args.skip_godot:
         s.godot_import()
         if not args.skip_media and not s.dry:
