@@ -24,7 +24,7 @@ while.
 **Windows 10/11** (PowerShell or cmd):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1) -join [char]10))"
 ```
 
 **macOS 12+:**
@@ -59,7 +59,8 @@ You can change where the files go, and what is installed:
   private repository is needed then. Already installed: `python scripts/pup/pup_setup.py --pup-zip FILE`.
 - **Options:** on macOS and Linux they go after the line, for example `bash <(curl ...) --no-monitor` to leave
   MPF Monitor out, `--proc` for the real machine, `--dry-run` to see the plan first. On Windows:
-  `powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <the URL above>))) -NoMonitor"`.
+  add them at the end of the line: `... -join [char]10)) -NoMonitor"`. (Never `irm ... | iex`: Windows
+  PowerShell can run the script line by line and stop on line 1 with "the terminator #> is missing".)
 
 On Windows, keep the folder out of OneDrive (the default, your home folder, is): OneDrive locks and
 read-protects files while it syncs them. Setup copes with that, but it is slower and may leave stray files.
@@ -68,7 +69,7 @@ read-protects files while it syncs them. Setup copes with that, but it is slower
 to them (in PowerShell on Windows; the same token is then used for git):
 
 ```powershell
-$env:TRON_GITHUB_TOKEN = "github_pat_..."; irm -Headers @{Authorization = "token $env:TRON_GITHUB_TOKEN"} https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1 | iex
+$env:TRON_GITHUB_TOKEN = "github_pat_..."; & ([scriptblock]::Create((irm -Headers @{Authorization = "token $env:TRON_GITHUB_TOKEN"} https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/main/scripts/install/install_prereqs_windows.ps1) -join [char]10))
 ```
 
 ```sh
