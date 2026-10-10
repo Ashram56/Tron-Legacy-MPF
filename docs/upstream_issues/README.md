@@ -3,7 +3,7 @@
 Everything this repository changed or found that belongs to another project, grouped by the project to report it
 to. Bugs have a ready-to-file report (copy its title and body into a new GitHub issue); improvements list what to
 send and where it lives here. The fixes we carry until upstream has its own are in `scripts/gozen/`, and the
-Xavier NX results behind them are in [../jetson_xavier_nx.md](../jetson_xavier_nx.md).
+Xavier NX results behind them are in [../jetson/xavier_nx.md](../jetson/xavier_nx.md).
 
 ## Godot ([godotengine/godot](https://github.com/godotengine/godot/issues))
 
@@ -18,7 +18,7 @@ Xavier NX results behind them are in [../jetson_xavier_nx.md](../jetson_xavier_n
 | Report | Kind | Summary |
 |---|---|---|
 | [gde-gozen-main-thread-stalls.md](gde-gozen-main-thread-stalls.md) | bug | `VideoPlayback` opens, loops and frees videos on the main thread (1-2.5 s stalls with a hardware decoder) |
-| `seek_frame()` retry loop | bug | Near the end of a clip a catch-up `seek_frame()` retried at EOF for minutes on a busy low-priority worker; the game froze (9 min at 10 W, 2 cores). We never seek from decode tasks ([../jetson.md](../jetson.md) fix 9) |
+| `seek_frame()` retry loop | bug | Near the end of a clip a catch-up `seek_frame()` retried at EOF for minutes on a busy low-priority worker; the game froze (9 min at 10 W, 2 cores). We never seek from decode tasks ([../jetson/README.md](../jetson/README.md) fix 9) |
 | Hardware decoder first (`<codec>_nvmpi`, fallback to software, `GOZEN_HWDEC=0`) | feature | `scripts/gozen/gozen.patch` |
 | `GoZenVideo.set_target_size()` and native NV12 | feature | Frames decoded at the size they are shown at, as NV12 (Y as R8, UV as RG8; `nv12` switch in both YUV shaders): 4-8x fewer pixels per frame. `gozen.patch`, `pup_addons/gde_gozen/*.gdshader`, `video_playback.gd` `decode_to_display_size` |
 | Frames decoded ahead | feature | `video_playback.gd`: up to 3 frames per video decoded on worker tasks; silent videos never drop a frame, videos with sound follow the audio clock. Video frames skipped 89 to 15 per clip, A/V drift 79-130 to 30-46 ms |
@@ -33,7 +33,7 @@ All fixes are in `scripts/gozen/nvmpi_flush.patch`.
 | [jetson-ffmpeg-flush-hang.md](jetson-ffmpeg-flush-hang.md) | bug | `avcodec_flush_buffers()` on `*_nvmpi` hangs the next decode (JetPack 6 and 5) |
 | [jetson-ffmpeg-slow-close-crash.md](jetson-ffmpeg-slow-close-crash.md) | bug | `nvmpi_decoder_close()` takes about 1 s, and closing mid-stream sometimes crashes |
 | [jetson-ffmpeg-concurrent-decoders-hang.md](jetson-ffmpeg-concurrent-decoders-hang.md) | bug | With several decoders starting and stopping at once, one can hang forever (JetPack 5: segfaults) |
-| Planes mapped once per buffer | performance | Each frame mapped and unmapped every plane for the CPU, about 11 ms of kernel time per 1080p frame on L4T R35: decode 74 to 203 fps, CPU 17 to 4 ms per frame ([../jetson.md](../jetson.md) fix 9) |
+| Planes mapped once per buffer | performance | Each frame mapped and unmapped every plane for the CPU, about 11 ms of kernel time per 1080p frame on L4T R35: decode 74 to 203 fps, CPU 17 to 4 ms per frame ([../jetson/README.md](../jetson/README.md) fix 9) |
 
 ## Tron-Legacy-MPF ([Ashram56/Tron-Legacy-MPF](https://github.com/Ashram56/Tron-Legacy-MPF), the game this repo syncs from)
 

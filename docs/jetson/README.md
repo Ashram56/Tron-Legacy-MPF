@@ -3,7 +3,7 @@
 This page lists every change we carry so that the PuP Pack's videos play with the Jetson's hardware decoder (NVDEC)
 without freezes or crashes: what was wrong, the fix, where it lives and how it was checked. Start here when
 bringing up another Jetson, such as the Xavier NX. Everything else learned on the Xavier NX (screens, power, Godot
-settings, costs): [jetson_xavier_nx.md](jetson_xavier_nx.md).
+settings, costs): [xavier_nx.md](xavier_nx.md).
 
 **Tested:** Jetson AGX Orin Developer Kit (t234), L4T R36.4.3 / JetPack 6.2, Ubuntu 22.04, `oot` kernel, Godot
 4.6.3, one 1920x1080 DisplayPort screen with the three PuP windows on it (git tag `jetson-agx-orin-l4t-r36.4.3`).
@@ -41,7 +41,7 @@ a clean work folder).
   `nvDecParam` with the next packet (lazily, primed with the extradata again). A flush with nothing decoded since
   the decoder was created does nothing (GoZen flushes right after opening and right before freeing).
 - **Checked:** 3 loops and 3 mid-stream seeks pass for mp4/mkv/ts; `ffmpeg -stream_loop 9 -c:v h264_nvmpi`
-  completes. Report: [upstream_issues/jetson-ffmpeg-flush-hang.md](upstream_issues/jetson-ffmpeg-flush-hang.md).
+  completes. Report: [upstream_issues/jetson-ffmpeg-flush-hang.md](../upstream_issues/jetson-ffmpeg-flush-hang.md).
 
 ### 2. Closing a decoder took about 1 s (libnvmpi)
 - **Symptom:** every video switch froze the whole game for 1 to 2.5 s (software decoding: about 0.1 s).
@@ -50,7 +50,7 @@ a clean work folder).
 - **Fix:** a `closing` flag set first in `nvmpi_decoder_close()`; the capture thread's event wait runs in 50 ms
   slices and skips its extra 500 ms "race guard" wait when closing.
 - **Checked:** close 1061 ms → 55 ms. Report:
-  [upstream_issues/jetson-ffmpeg-slow-close-crash.md](upstream_issues/jetson-ffmpeg-slow-close-crash.md).
+  [upstream_issues/jetson-ffmpeg-slow-close-crash.md](../upstream_issues/jetson-ffmpeg-slow-close-crash.md).
 
 ### 3. Closing a decoder mid-video sometimes crashed (libnvmpi)
 - **Symptom:** SIGSEGV in NVIDIA's decoder thread (`libnvmmlite_video.so`), inside `v4l2_close` or after the
@@ -72,7 +72,7 @@ a clean work folder).
   OUTPUT plane, which wakes a blocked `put_packet()` with an error, and `put_packet()` fails at once while the
   decoder is in error. GoZen then ends or restarts that video with a new decoder (fix 1).
 - **Checked:** 0 hangs in 20 runs (3 decoders recovered from the error). Report:
-  [upstream_issues/jetson-ffmpeg-concurrent-decoders-hang.md](upstream_issues/jetson-ffmpeg-concurrent-decoders-hang.md).
+  [upstream_issues/jetson-ffmpeg-concurrent-decoders-hang.md](../upstream_issues/jetson-ffmpeg-concurrent-decoders-hang.md).
 
 ### 5. Video work stalled Godot's main thread (GoZen player script)
 - **Symptom:** every stall above hit all three PuP windows and the DMD, because they are drawn by the same
@@ -86,7 +86,7 @@ a clean work folder).
   - new `restart()`: back to the first frame on a worker task, showing the current frame meanwhile. Looping uses
     it, and so does `gozen_player.gd`'s `play()`.
 - **Checked:** with timing logs over a 2-minute game, the longest video step on the main thread went from
-  2.4 s to 10 ms. Report: [upstream_issues/gde-gozen-main-thread-stalls.md](upstream_issues/gde-gozen-main-thread-stalls.md).
+  2.4 s to 10 ms. Report: [upstream_issues/gde-gozen-main-thread-stalls.md](../upstream_issues/gde-gozen-main-thread-stalls.md).
 
 ### 6. The topper went black between videos (PuP screens)
 - **Cause:** `pup_screen.gd` stopped the player, which hides the picture, before opening the next video.
@@ -105,7 +105,7 @@ a clean work folder).
   looks for libnvmpi, and applies `nvmpi_flush.patch` before building libnvmpi.
 - No blanking mid-game: the install turns off GNOME's idle blanking, dimming, lock and suspend (`--keep-blanking`
   leaves them), and `run.py` runs `xset s off -dpms`. Without both, the screen went black after 5 minutes.
-- GDM automatic login and an X11 session (Godot places one window per monitor only on X11): [pup.md](pup.md).
+- GDM automatic login and an X11 session (Godot places one window per monitor only on X11): [pup/README.md](../pup/README.md).
 
 ### 9. 5 FPS on the Xavier NX (libnvmpi, GoZen player script, PuP windows)
 Measured on the Xavier NX (L4T R35.6.4), `clu_hurryup` for 30 s: 5.4 FPS as installed, 55.5 FPS (median frame
@@ -153,8 +153,8 @@ Record the `.so`'s sha256 in the commit message.
 
 ## How the fixes were checked
 - Repro programs, built against GoZen's patched FFmpeg (build line at the top of each):
-  [nvmpi_seek_close.c](upstream_issues/repro/nvmpi_seek_close.c) (`flush`, `close`, `crash` modes) and
-  [nvmpi_concurrent.c](upstream_issues/repro/nvmpi_concurrent.c) (`in.mp4 3 40 10`).
+  [nvmpi_seek_close.c](../upstream_issues/repro/nvmpi_seek_close.c) (`flush`, `close`, `crash` modes) and
+  [nvmpi_concurrent.c](../upstream_issues/repro/nvmpi_concurrent.c) (`in.mp4 3 40 10`).
   `scripts/install/jetson_selftest.sh` builds and runs them all on a board.
 - Decode speed: 1080p H.264 at about 350 fps on NVDEC, against about 70 fps on one CPU core.
 - Games on the board: `scripts/run.py --scenario clu_hurryup --seconds 120`, with Godot's log showing
@@ -234,5 +234,5 @@ To move jetson-ffmpeg or GDE GoZen to a newer revision:
    `scripts/install/install_jetson_hwdec.sh`. Both must name the same jetson-ffmpeg revision: the wrapper in GoZen
    and the library on the board have to match.
 2. Check that both patches still apply (`git apply --check`) and drop the hunks upstream has fixed (see the reports
-   in `upstream_issues/`).
+   in `docs/upstream_issues/`).
 3. Rebuild GoZen, re-run the Jetson install, then repeat steps 2 and 3 of the checklist.

@@ -37,7 +37,7 @@ class TestPupFiles(unittest.TestCase):
 class TestSetup(unittest.TestCase):
     def test_native_video_on_windows_and_macos(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        import pup_setup
+        from pup import pup_setup
         with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": ""}):
             self.assertTrue(pup_setup.native_video("windows"))
             self.assertTrue(pup_setup.native_video("macos"))
@@ -51,7 +51,7 @@ class TestSetup(unittest.TestCase):
 
     def test_gozen_on_linux_only(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        import pup_setup
+        from pup import pup_setup
         self.assertTrue(pup_setup.gozen("linux", "arm64"))
         self.assertTrue(pup_setup.gozen("linux", "x86_64"))
         self.assertFalse(pup_setup.gozen("windows", "x86_64"))
@@ -69,7 +69,7 @@ class TestSetup(unittest.TestCase):
         import tempfile
         import zipfile
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        import pup_setup
+        from pup import pup_setup
         with tempfile.TemporaryDirectory() as tmp:
             src = os.path.join(tmp, "pack.zip")
             with zipfile.ZipFile(src, "w") as z:

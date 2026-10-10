@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The PuP Pack part of the workspace: setup.py and run.py call it, or run it on its own.
 
-    python scripts/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
+    python scripts/pup/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
                                            # (Windows: the native_video add-on, Linux: GDE GoZen, which
                                            # play the mp4s as they are)
-    python scripts/pup_setup.py --status   # one line: is the PuP on, and if not why
-    python scripts/pup_setup.py --pup-zip PACK.zip   # the pack from a zip (a file or an https URL) instead of
+    python scripts/pup/pup_setup.py --status   # one line: is the PuP on, and if not why
+    python scripts/pup/pup_setup.py --pup-zip PACK.zip   # the pack from a zip (a file or an https URL) instead of
                                                      # the pup_pack submodule; TRON_PUP_ZIP=PACK.zip does the
                                                      # same for setup.py and the installers
 
@@ -20,7 +20,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
 import fsutil  # noqa: E402
 import toolchain as tc  # noqa: E402
 
@@ -39,7 +39,7 @@ def status():
                        "`git submodule update --init pup_pack`)".format(os.path.relpath(pack, tc.ROOT)))
     if not os.path.exists(os.path.join(media, "manifest.json")):
         return False, ("PuP off: the pack's videos are not converted yet (run `python scripts/setup.py`, or "
-                       "`python scripts/pup_setup.py`)")
+                       "`python scripts/pup/pup_setup.py`)")
     screens = "backglass, DMD" + (", topper" if cfg["pup"].get("third_screen", True) else "")
     music = "PuP OST music" if cfg["pup"].get("ost_music", True) else "ROM music"
     return True, "PuP on: {} windows, {}".format(screens, music)
@@ -229,7 +229,7 @@ def setup(py=None, dry=False):
             if os.path.isdir(addon):
                 fsutil.remove_dir(addon)
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
-    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "gen_pup.py")] + (["--native"] if native else []),
+    code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
     say("   " + status()[1])
     return code
