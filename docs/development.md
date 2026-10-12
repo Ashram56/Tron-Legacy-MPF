@@ -162,7 +162,10 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 The text glow and size can also be set from the service menu while the game runs: ADJUSTMENTS > DISPLAY
 ADJUSTMENTS, TEXT GLOW (OFF to 300%) and TEXT SIZE (50% to 110%). The text changes on the display as the value
 is edited; SELECT keeps it across power cycles, and then it replaces `--dmd-text-glow` / `--dmd-text-scale`.
-Setting it back to FACTORY (80%, 85%) or RESET FACTORY SETTINGS returns to the options above.
+Setting it back to FACTORY (80%, 85%) or RESET FACTORY SETTINGS returns to the options above. The third item,
+PUP DMD SIZE, sizes the DMD in the PuP's DMD window: WITH LIGHT CYCLES (a smaller DMD, the light cycles round
+it) or FULL SIZE (a real DMD's 320x80 mm over the grid, no light cycles); its factory value is `game/pup.cfg`'s
+`[dmd] dmd_size` ([docs/pup/README.md](pup/README.md), "DMD size").
 
 `--hw proc` is always classic: the P-ROC drives the machine's own 128x32 DMD. Godot reads the same choice
 from its user args (`godot --path game -- --dmd=classic --dmd-dots=2`); `game/tools/dmd_mode.gd` applies it.
