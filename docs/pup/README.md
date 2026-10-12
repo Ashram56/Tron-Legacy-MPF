@@ -112,8 +112,9 @@ borderless=true
   its height it may take (0.68 and 0.62, the DMD's share of the pack's own panel art: 870x218 on a 1280x390
   bar, 1190x298 on 1920x480; until 2026-10-10 0.6 and 0.5, which left a 1920x480 bar's DMD at half its
   height). It is
-  a few hundred triangles; a few grid lines, picked at random along both axes, glow up and fade out again
-  (`game/pup/lightcycles_grid.gdshader`: `pulse_chance`, `pulse_seconds`, `pulse_energy`; all in the shader,
+  a few hundred triangles; now and then a glowing segment with a fading tail runs along a grid line
+  picked at random, along x or z, like the pulses round the DMD's frame (`game/pup/lightcycles_grid.gdshader`:
+  `pulse_chance`, `pulse_speed`, `pulse_length`, `pulse_energy`; all in the shader,
   no work on the CPU), with the light cycles or without. `background="frame"` is the PuP Pack's DMD panel art
   instead.
 - `[dmd] dmd_size` (`background="lightcycles"`): `cycles` (the default) is the DMD above with the light cycles
