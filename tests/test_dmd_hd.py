@@ -315,6 +315,13 @@ KWARGS = {"deff_019": {"line0": "BALL 1", "line1": "1,234,560", "credits": "FREE
                        "blink_age": 0, "bar_ds": 6, "bar_zfs": 7},
           "deff_025": {"line1": "50,000"}, "deff_046": {}, "deff_091": {"lit": 3, "new": 4},
           "deff_143": {"line2": "25,000,000"}}
+# the args of an earlier show of each slide, for a slide reused from the pool (tron/dmd_slide.gd)
+REUSE_KWARGS = {"deff_019": {"line0": "BALL 3", "line1": "98,765,430", "credits": "CREDITS 2", "replay": "",
+                             "p1": "1", "p2": "2", "p3": "3", "p4": "98,765,430", "players": 4, "player": 4,
+                             "valid": False, "award": "1,000,000", "award_age": 0, "blink_age": 70,
+                             "bar_ds": 10, "bar_clu": 9, "bar_gem": 4},
+                "deff_025": {"line1": "7,777,777"}, "deff_046": {}, "deff_091": {"lit": 15, "new": 1},
+                "deff_143": {"line2": "1"}}
 CAN_RENDER = (sys.platform.startswith("linux") and GENERATED and os.path.exists(tc.godot_path())
               and (shutil.which("xvfb-run") or os.environ.get("DISPLAY"))
               and not tc.media_stale())
@@ -324,11 +331,13 @@ CAN_RENDER = (sys.platform.startswith("linux") and GENERATED and os.path.exists(
 class TestGodotModes(unittest.TestCase):
     """Renders slides with game/tools/slide_capture.tscn, as scripts/render_diff.py does."""
 
-    def render(self, user_args=(), engine_args=(), env=None, machine_vars=None, slides=CLASSIC):
+    def render(self, user_args=(), engine_args=(), env=None, machine_vars=None, slides=CLASSIC, reuse=False):
         out = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, out, True)
         jobs = [{"slide": s, "kwargs": KWARGS[s], "times_ms": [0, 400, 1600], "out": os.path.join(out, s),
                  "machine_vars": machine_vars or {}} for s in slides]
+        for j in jobs if reuse else []:
+            j["reuse_kwargs"] = REUSE_KWARGS[j["slide"]]
         job = os.path.join(out, "job.json")
         with open(job, "w") as f:
             json.dump(jobs, f)
@@ -352,6 +361,55 @@ class TestGodotModes(unittest.TestCase):
         self.assertEqual(CLASSIC, self.hashes(self.render(env={"TRON_DMD": "hd"})))
         # the HD text font never touches classic
         self.assertEqual(CLASSIC, self.hashes(self.render(["--dmd=classic", "--dmd-font=orbitron"])))
+
+    def test_reused_slide_renders_as_new(self):
+        """A display effect's slide kept from an earlier show (tron/dmd_slide.gd, GMC's slide pool) renders exactly as
+        one just built: the ROM's frames in classic, the same pixels in HD (text, panel, letters, animation)."""
+        self.assertEqual(CLASSIC, self.hashes(self.render(["--dmd=classic"], reuse=True)))
+        hd = (["--dmd=hd"], ["--resolution", "512x128"])
+        self.assertEqual(self.hashes(self.render(*hd)), self.hashes(self.render(*hd, reuse=True)))
+
+    def test_effect_data_and_node_scenes_agree(self):
+        """Every display effect is drawn from its data (media/dmd/<name>/effect.json, tron/dmd_screen.gd); its node
+        scene (tron/dmd/renderer="nodes") draws the same ROM frames, and a custom scene res://dmd_custom/<name>.tscn
+        is shown instead of either, with the effect's event args."""
+        self.assertEqual(CLASSIC, self.hashes(self.render(["--dmd=classic"], env={"TRON_DMD_RENDERER": "nodes"})))
+        custom = os.path.join(GAME, "dmd_custom", "deff_025.tscn")
+        self.assertFalse(os.path.exists(custom))
+        os.makedirs(os.path.dirname(custom), exist_ok=True)
+        self.addCleanup(os.remove, custom)
+        with open(custom, "w") as f:      # one text line where deff 25 has two, a white box over the left half
+            f.write('''[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]
+
+[node name="custom" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 128.0
+offset_bottom = 32.0
+
+[node name="Box" type="ColorRect" parent="."]
+offset_right = 64.0
+offset_bottom = 32.0
+color = Color(1, 1, 1, 1)
+
+[node name="Line1" type="Label" parent="."]
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line1"
+rom_font = 15
+rom_x = 96
+rom_y = 26
+rom_flags = 2
+''')
+        from PIL import Image
+        out = self.render(["--dmd=classic"], slides=["deff_025"])
+        img = Image.open(os.path.join(out, "deff_025", "frame_00000.png")).convert("RGB")
+        self.assertEqual((255, 255, 255), img.getpixel((10, 10)))
+        right = img.crop((64, 0, 128, 32)).convert("L").point(lambda p: 255 if p > 40 else 0).getbbox()
+        self.assertTrue(right and abs((64 + right[0] + 64 + right[2]) / 2 - 96.5) < 3, right)   # "50,000" about x 96
 
     def test_hd_draws_text_at_window_resolution(self):
         from PIL import Image

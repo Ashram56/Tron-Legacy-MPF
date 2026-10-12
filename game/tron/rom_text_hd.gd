@@ -1,4 +1,5 @@
 extends Node2D
+const RomTextHd = preload("res://tron/rom_text_hd.gd")
 ## One line of ROM text in the HD display mode (tools/dmd_mode.gd): drawn from the ROM font's vector
 ## outlines (fonts/hd/rom_font_NN.ttf, scripts/font_outline.py) at the window's resolution, in the DMD text
 ## style (dmd_mode.gd: text colour, glow colour and strength). Child of the node placing the line (a
@@ -41,14 +42,7 @@ static var _fonts: Dictionary = {}
 static var _clean_name := "?"
 static var _clean: Dictionary = {}
 
-var text := ""
-var font_id := 0
-var ascent := 0
-var font_size := 1
-var box_width := -1              # the ROM's text width in dots (-1: unknown, no fitting)
-var flags := 0                   # 2 = centred, 4 = right aligned, else left (tron/rom_text.gd rom_flags)
-var first := 0                   # clean fonts: only the characters first.. (count) of the line are drawn,
-var count := -1                  # where they sit in the whole line (-1: to the end)
+var line := Line.new()           # the line drawn (set_line()); a RomTextHd node draws one Line
 var _glow: Node2D
 var _ink: Node2D
 
@@ -214,11 +208,11 @@ func _init() -> void:
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	_glow.material = add
-	_glow.draw.connect(_draw_glow)
+	_glow.draw.connect(func(): line.draw_glow(_glow))
 	add_child(_glow)
 	_ink = Node2D.new()
 	_ink.name = "Ink"
-	_ink.draw.connect(_draw_ink)
+	_ink.draw.connect(func(): line.draw_ink(_ink))
 	add_child(_ink)
 
 
@@ -233,108 +227,136 @@ func restyle() -> void:
 ## width: the ROM's text width in dots, align_flags: the ROM's alignment (both for the clean fonts).
 func set_line(s: String, id: int, line_ascent: int, line_height: int, width := -1, align_flags := 0,
 		from := 0, n := -1) -> void:
-	if s == text and id == font_id and line_ascent == ascent and line_height == font_size and width == box_width \
-			and align_flags == flags and from == first and n == count:
-		return
-	first = from
-	count = n
-	text = s
-	font_id = id
-	ascent = line_ascent
-	font_size = maxi(line_height, 1)
-	box_width = width
-	flags = align_flags
-	queue_redraw()
-	_glow.queue_redraw()
-	_ink.queue_redraw()
-
-
-## The clean font's placement: [font, origin (the baseline's left end), scale x, scale y] in dots, or [].
-func clean_layout() -> Array:
-	var c := clean()
-	if c.is_empty() or text == "":
-		return []
-	var s := text_scale()
-	var cap := float(info(font_id).get("cap", font_size))
-	var base := float(ascent)
-	var air := 1.0                     # a dot of air: clean letters reach their box's edges, ROM letters do not
-	if info(font_id).get("outline", false):
-		cap -= 2.0                     # the ROM's cap counts the black border above and below the lit dots,
-		base -= 1.0                    # whose bottom row is the baseline row
-		air = 2.0
-	var k := s * cap / (float(c["cap"]) * CLEAN_SIZE)
-	var font: Font = c["font"]
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * k
-	var sx := k
-	var room := s * (box_width - air)
-	var x := 0.0
-	if box_width > 0 and w > room:
-		sx = k * room / w
-		w = room
-		x = (box_width - w) / 2.0
-	elif box_width > 0:
-		if flags & 2:
-			x = (box_width - w) / 2.0
-		elif flags & 4:
-			x = box_width - w
-	if first > 0:
-		x += font.get_string_size(text.left(first), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * sx
-	return [font, Vector2(x, base - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
-
-
-## The characters drawn in the clean font: the whole line, or its part first.. (count).
-func shown_text() -> String:
-	return text.substr(first, count) if first > 0 or count >= 0 else text
-
-
-func _draw_clean(item: CanvasItem, color: Color, outline_dots: float) -> void:
-	var l := clean_layout()
-	if l.is_empty():
-		return
-	item.draw_set_transform(l[1], 0.0, Vector2(l[2], l[3]))
-	if outline_dots > 0.0:
-		item.draw_string_outline(clean()["wide"], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE,
-			maxi(1, roundi(2.0 * outline_dots / l[3])), color)
-	else:
-		item.draw_string(l[0], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE, color)
-	item.draw_set_transform(Vector2.ZERO)
+	if line.set_line(s, id, line_ascent, line_height, width, align_flags, from, n):
+		restyle()
 
 
 func _draw() -> void:
-	if text == "":
-		return
-	if not clean().is_empty():
-		_draw_clean(self, Color(0, 0, 0, 1), OUTLINE_DOTS if info(font_id).get("outline", false) else CELL_DOTS)
-		return
-	draw_string(vector_font(font_id), Vector2(0, ascent), plane(text, CELL_PLANE), HORIZONTAL_ALIGNMENT_LEFT,
-		-1, font_size, Color(0, 0, 0, 1))
+	line.draw_cell(self)
 
 
-func _draw_glow() -> void:
-	var st := style()
-	if text == "" or float(st["glow"]) <= 0.0:
-		return
-	var g: Color = st["glow_color"] * float(st["glow"])
-	g.a = 1.0
-	if not clean().is_empty():
-		for r in [2.0, 1.5, 1.1, 0.75, 0.4]:   # widening outlines, added: soft light around the strokes
-			_draw_clean(_glow, Color(g.r * 0.3, g.g * 0.3, g.b * 0.3, 1), r)
-		return
-	_glow.draw_string(glow_font(font_id), Vector2(0, ascent), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, g)
+## One line of ROM text and how it is drawn, in three layers: draw_cell() (the black under the glyphs), draw_glow()
+## (added: on a canvas item with an additive material) and draw_ink() (the lit dots). A RomTextHd node draws one on its
+## own canvas items; tron/dmd_screen.gd draws every line of a display effect on three shared ones. xf places the
+## line (its top left, its scale) on the item; mod multiplies its colours (the ROM's per-line level and blinking).
+class Line extends RefCounted:
+	var text := ""
+	var font_id := 0
+	var ascent := 0
+	var font_size := 1
+	var box_width := -1              # the ROM's text width in dots (-1: unknown, no fitting)
+	var flags := 0                   # 2 = centred, 4 = right aligned, else left (tron/rom_text.gd rom_flags)
+	var first := 0                   # clean fonts: only the characters first.. (count) of the line are drawn,
+	var count := -1                  # where they sit in the whole line (-1: to the end)
 
+	## As RomTextHd.set_line(); false when nothing changed.
+	func set_line(s: String, id: int, line_ascent: int, line_height: int, width := -1, align_flags := 0,
+			from := 0, n := -1) -> bool:
+		if s == text and id == font_id and line_ascent == ascent and maxi(line_height, 1) == font_size \
+				and width == box_width and align_flags == flags and from == first and n == count:
+			return false
+		first = from
+		count = n
+		text = s
+		font_id = id
+		ascent = line_ascent
+		font_size = maxi(line_height, 1)
+		box_width = width
+		flags = align_flags
+		return true
 
-func _draw_ink() -> void:
-	if text == "":
-		return
-	var color: Color = style()["color"]
-	var levels: Array = info(font_id).get("levels", [15])
-	if not clean().is_empty():
-		var top := float(levels.max()) / 15.0
-		_draw_clean(_ink, Color(color.r * top, color.g * top, color.b * top, 1), 0.0)
-		return
-	var font := vector_font(font_id)
-	for k in levels.size():
-		var lv := float(levels[k]) / 15.0
-		var s := text if k == 0 else plane(text, LEVEL_PLANE + 0x100 * k)
-		_ink.draw_string(font, Vector2(0, ascent), s, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
-			Color(color.r * lv, color.g * lv, color.b * lv, 1))
+	## The clean font's placement: [font, origin (the baseline's left end), scale x, scale y] in dots, or [].
+	func clean_layout() -> Array:
+		var c := RomTextHd.clean()
+		if c.is_empty() or text == "":
+			return []
+		var s := RomTextHd.text_scale()
+		var cap := float(RomTextHd.info(font_id).get("cap", font_size))
+		var base := float(ascent)
+		var air := 1.0                     # a dot of air: clean letters reach their box's edges, ROM letters do not
+		if RomTextHd.info(font_id).get("outline", false):
+			cap -= 2.0                     # the ROM's cap counts the black border above and below the lit dots,
+			base -= 1.0                    # whose bottom row is the baseline row
+			air = 2.0
+		var k := s * cap / (float(c["cap"]) * CLEAN_SIZE)
+		var font: Font = c["font"]
+		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * k
+		var sx := k
+		var room := s * (box_width - air)
+		var x := 0.0
+		if box_width > 0 and w > room:
+			sx = k * room / w
+			w = room
+			x = (box_width - w) / 2.0
+		elif box_width > 0:
+			if flags & 2:
+				x = (box_width - w) / 2.0
+			elif flags & 4:
+				x = box_width - w
+		if first > 0:
+			x += font.get_string_size(text.left(first), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * sx
+		return [font, Vector2(x, base - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
+
+	## The characters drawn in the clean font: the whole line, or its part first.. (count).
+	func shown_text() -> String:
+		return text.substr(first, count) if first > 0 or count >= 0 else text
+
+	func _draw_clean(item: CanvasItem, xf: Transform2D, color: Color, outline_dots: float) -> void:
+		var l := clean_layout()
+		if l.is_empty():
+			return
+		item.draw_set_transform_matrix(xf * Transform2D(0.0, Vector2(l[2], l[3]), 0.0, l[1]))
+		if outline_dots > 0.0:
+			item.draw_string_outline(RomTextHd.clean()["wide"], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT,
+				-1, CLEAN_SIZE, maxi(1, roundi(2.0 * outline_dots / l[3])), color)
+		else:
+			item.draw_string(l[0], Vector2.ZERO, shown_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE, color)
+		item.draw_set_transform_matrix(xf)
+
+	## The black under the glyphs (the ROM's cell; the clean fonts' outline).
+	func draw_cell(item: CanvasItem, xf := Transform2D.IDENTITY, mod := Color.WHITE) -> void:
+		if text == "":
+			return
+		item.draw_set_transform_matrix(xf)
+		if not RomTextHd.clean().is_empty():
+			_draw_clean(item, xf, Color(0, 0, 0, 1) * mod,
+				OUTLINE_DOTS if RomTextHd.info(font_id).get("outline", false) else CELL_DOTS)
+		else:
+			item.draw_string(RomTextHd.vector_font(font_id), Vector2(0, ascent), RomTextHd.plane(text, CELL_PLANE),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 1) * mod)
+		item.draw_set_transform_matrix(Transform2D.IDENTITY)
+
+	## The glow (to be added to what is under it).
+	func draw_glow(item: CanvasItem, xf := Transform2D.IDENTITY, mod := Color.WHITE) -> void:
+		var st := RomTextHd.style()
+		if text == "" or float(st["glow"]) <= 0.0:
+			return
+		item.draw_set_transform_matrix(xf)
+		var g: Color = st["glow_color"] * float(st["glow"])
+		g.a = 1.0
+		if not RomTextHd.clean().is_empty():
+			for r in [2.0, 1.5, 1.1, 0.75, 0.4]:   # widening outlines, added: soft light around the strokes
+				_draw_clean(item, xf, Color(g.r * 0.3, g.g * 0.3, g.b * 0.3, 1) * mod, r)
+		else:
+			item.draw_string(RomTextHd.glow_font(font_id), Vector2(0, ascent), text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+				font_size, g * mod)
+		item.draw_set_transform_matrix(Transform2D.IDENTITY)
+
+	## The lit dots in the text colour (shaded fonts: one layer per level, brighter over dimmer).
+	func draw_ink(item: CanvasItem, xf := Transform2D.IDENTITY, mod := Color.WHITE) -> void:
+		if text == "":
+			return
+		item.draw_set_transform_matrix(xf)
+		var color: Color = RomTextHd.style()["color"]
+		var levels: Array = RomTextHd.info(font_id).get("levels", [15])
+		if not RomTextHd.clean().is_empty():
+			var top := float(levels.max()) / 15.0
+			_draw_clean(item, xf, Color(color.r * top, color.g * top, color.b * top, 1) * mod, 0.0)
+		else:
+			var font := RomTextHd.vector_font(font_id)
+			for k in levels.size():
+				var lv := float(levels[k]) / 15.0
+				var s := text if k == 0 else RomTextHd.plane(text, LEVEL_PLANE + 0x100 * k)
+				item.draw_string(font, Vector2(0, ascent), s, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+					Color(color.r * lv, color.g * lv, color.b * lv, 1) * mod)
+		item.draw_set_transform_matrix(Transform2D.IDENTITY)

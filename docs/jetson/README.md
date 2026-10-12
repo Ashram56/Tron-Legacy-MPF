@@ -85,6 +85,9 @@ a clean work folder).
     for those tasks;
   - new `restart()`: back to the first frame on a worker task, showing the current frame meanwhile. Looping uses
     it, and so does `gozen_player.gd`'s `play()`.
+  - `close()` never waits for an open or a restart still running: the video goes to the worker that frees it once
+    that task is done (`_open_video()` and `_seek_start()` take the video they work on). A playlist switch during a
+    loop restart froze every screen 0.3-0.6 s (2026-10-12, Xavier NX, docs/performance.md).
 - **Checked:** with timing logs over a 2-minute game, the longest video step on the main thread went from
   2.4 s to 10 ms. Report: [upstream_issues/gde-gozen-main-thread-stalls.md](../upstream_issues/gde-gozen-main-thread-stalls.md).
 

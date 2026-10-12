@@ -65,12 +65,15 @@ var _frames_hd := {}
 var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' text lines (FrameText)
 var _frame_shapes = null         # media/dmd_hd/shapes.json: the frames drawn as rectangles (FrameText)
 const LetterPanel := preload("res://tron/letter_panel.gd")
+const DmdSlide := preload("res://tron/dmd_slide.gd")
+const DmdEffectSlide := preload("res://tron/dmd_effect_slide.gd")
 const PRELOAD_IN_FLIGHT := 8       # background loads running at once (more would queue ahead of the game's own)
 var _preload: Array[String] = []    # resources loading in the background (_start_preload)
 var _to_preload: Array[String] = []   # resources not requested yet, in effect order
 var _preload_start := 0
 var _letters: Array[String] = []
 var _preloaded: Array[Resource] = []   # the preloaded ones: holding them keeps them in Godot's resource cache
+var _to_warm: Array[SpriteFrames] = []   # preloaded scenes' sprite frames whose HD frames are not built yet (_warm_scene)
 
 
 static func choose(args: PackedStringArray, env_mode: String, setting: String) -> String:
@@ -219,6 +222,7 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	set_process(false)
+	tree_exiting.connect(DmdSlide.clear_pool)   # the effects' slides kept for reuse, freed at exit
 	if hd and font != "rom":
 		preload("res://tron/rom_text_hd.gd").load_baked(font)
 	if hd:
@@ -275,11 +279,36 @@ func service_setting(var_name: String, value) -> void:
 ## already in Godot's resource cache, the slide's load() calls return at once.
 ## The letter pictures (solid*, hollow*) are loaded the same way, whatever their effect's size, and their glows made
 ## on worker threads (tron/letter_panel.gd start_glow()).
+## Then, with tron/dmd/preload_small (default on), every other effect the same way, after the large ones: a small
+## slide's scene, read from disk and dropped from the cache once the slide was removed, cost 35-50 ms at each show,
+## and building its HD frames 50-70 ms more the first time (Xavier NX: a 0.1-0.15 s hitch at about 40% of the
+## slides shown, docs/performance.md). Each preloaded scene's HD frames are built once, as soon as it is loaded
+## (_warm_scene()), so a slide shown later finds them made.
 func _start_preload() -> void:
 	var min_frames := int(ProjectSettings.get_setting("tron/dmd/preload_min_frames", 40))
+	var small := bool(ProjectSettings.get_setting("tron/dmd/preload_small", true)) and min_frames > 0
 	var glows := float(text_style()["glow"]) > 0.0
+	var later: Array[String] = []
+	var data := DmdEffectSlide.renderer() == "data"
+	var seen := {}
 	for d in DirAccess.get_directories_at(MEDIA_HD):
 		var paths: Array[String] = []
+		if data:          # the pictures its data names (frames shared between effects load once), and its slide
+			for path in _data_pictures(MEDIA + d + "/effect.json"):
+				if seen.has(path):
+					continue
+				seen[path] = true
+				var f := path.get_file()
+				if glows and (f.begins_with("solid") or f.begins_with("hollow")):
+					_letters.append(path)
+				elif not (f.begins_with("solid") or f.begins_with("hollow")):
+					paths.append(path)
+			paths.append("res://slides/deffs/%s.tscn" % d)
+			if min_frames > 0 and paths.size() > min_frames:
+				_to_preload.append_array(paths)
+			elif small:
+				later.append_array(paths)
+			continue
 		for f in DirAccess.get_files_at(MEDIA_HD + d):
 			f = f.trim_suffix(".import")          # an exported game lists the .import files
 			var path := MEDIA_HD + d + "/" + f
@@ -289,15 +318,32 @@ func _start_preload() -> void:
 				paths.append(path)                # effect frames
 			elif glows and (f.begins_with("solid") or f.begins_with("hollow")):
 				_letters.append(path)
-		if min_frames <= 0 or paths.size() < min_frames:
-			continue
-		var scene := "res://slides/deffs/%s.tscn" % d
+		var scene := MEDIA + d + "/nodes.tscn"           # tron/dmd/renderer="nodes": the effect's node scene
 		if ResourceLoader.exists(scene):
 			paths.append(scene)
-		_to_preload.append_array(paths)
-	_to_preload = _letters + _to_preload
+		if min_frames > 0 and paths.size() > min_frames:
+			_to_preload.append_array(paths)
+		elif small:
+			later.append_array(paths)
+	_to_preload = _letters + _to_preload + later
 	_preload_start = Time.get_ticks_msec()
 	set_process(not _to_preload.is_empty())
+
+
+## The pictures an effect's data names (tron/dmd_effect.gd), as drawn: in HD their media/dmd_hd/ twins.
+func _data_pictures(effect_path: String) -> Array[String]:
+	var out: Array[String] = []
+	for it in DmdEffectSlide.DmdEffect.items_of(effect_path):
+		var pics: Array = []
+		match it["type"]:
+			"frames":
+				pics = it["frames"].map(func(f): return f[0])
+			"letters":
+				pics = it["sprites"].map(func(sp): return sp["pic"])
+		for p in pics:
+			var big := MEDIA_HD + str(p).trim_prefix(MEDIA) if str(p).begins_with(MEDIA) else str(p)
+			out.append(big if ResourceLoader.exists(big) else str(p))
+	return out
 
 
 func _process(_delta: float) -> void:
@@ -320,12 +366,51 @@ func _process(_delta: float) -> void:
 			_preloaded.append(ResourceLoader.load_threaded_get(_preload[i]))
 			if _preload[i] in _letters:
 				LetterPanel.start_glow(_preloaded[-1])
+			elif _preloaded[-1] is PackedScene:
+				_warm_scene(_preloaded[-1])
 			taken += 1
 		_preload.remove_at(i)                    # loaded, or failed (the slide then loads it itself)
-	if _preload.is_empty() and _to_preload.is_empty():
+	if _warm_ready() and _preload.is_empty() and _to_preload.is_empty():
 		set_process(false)
 		print("DMD: %d effect frames and scenes preloaded in %.1f s" % [_preloaded.size(),
 				(Time.get_ticks_msec() - _preload_start) / 1000.0])
+
+
+## Builds the HD frames of a preloaded slide scene's sprites (_hd_frames(), cached by the scene's own SpriteFrames),
+## so showing the slide only looks them up. Its HD pictures were preloaded before it (same effect, same queue).
+## A SpriteFrames whose HD pictures are still loading waits in _to_warm (a load() of one of them here would block
+## the main thread until its worker finished).
+func _warm_scene(scene: PackedScene) -> void:
+	var state := scene.get_state()
+	for n in state.get_node_count():
+		for p in state.get_node_property_count(n):
+			var v = state.get_node_property_value(n, p)
+			if v is SpriteFrames and not _frames_hd.has(v):
+				_to_warm.append(v)
+
+
+## Builds the waiting HD frames whose pictures are all in the cache; true when none waits.
+func _warm_ready() -> bool:
+	var i := 0
+	while i < _to_warm.size():
+		var frames: SpriteFrames = _to_warm[i]
+		var cached := true
+		for anim in frames.get_animation_names():
+			for f in frames.get_frame_count(anim):
+				var tex := frames.get_frame_texture(anim, f)
+				if tex and tex.resource_path.begins_with(MEDIA) and not ResourceLoader.has_cached(
+						MEDIA_HD + tex.resource_path.trim_prefix(MEDIA)) and ResourceLoader.exists(
+						MEDIA_HD + tex.resource_path.trim_prefix(MEDIA)):
+					cached = false
+					break
+			if not cached:
+				break
+		if cached or (_preload.is_empty() and _to_preload.is_empty()):   # all loads done: build it anyway
+			_hd_frames(frames)
+			_to_warm.remove_at(i)
+		else:
+			i += 1
+	return _to_warm.is_empty()
 
 
 ## The HD twin of a classic DMD picture, or null.
@@ -521,8 +606,9 @@ class FrameText extends Node2D:
 ## A plain label on the DMD (game/slides/text_page.tscn: attract pages, initials entry): the text colour, and
 ## the glow drawn behind it (LabelGlow).
 func _style_label(label: Label) -> void:
-	if label.has_meta("dmd_glow_copy") or label.has_meta("dmd_text_hd"):
+	if label.has_meta("dmd_glow_copy") or label.has_meta("dmd_text_hd") or label.has_meta("dmd_styled"):
 		return
+	label.set_meta("dmd_styled", true)     # once: a reused slide (tron/dmd_slide.gd) enters the tree again
 	label.add_theme_color_override("font_color", text_color)
 	if glow > 0.0:
 		label.add_child(LabelGlow.new(label, glow_color, glow), false, INTERNAL_MODE_FRONT)

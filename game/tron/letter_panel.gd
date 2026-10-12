@@ -142,6 +142,27 @@ static func _glow_of(tex: Texture2D) -> Texture2D:
 	return glow
 
 
+## Drops every glow made (at exit: textures kept in static variables would be freed after the renderer).
+static func clear_glows() -> void:
+	_glow_lock.lock()
+	var tasks := _glow_tasks.values()
+	_glow_tasks.clear()
+	_glow_lock.unlock()
+	for t in tasks:
+		WorkerThreadPool.wait_for_task_completion(t)
+	_glow_lock.lock()
+	_glow_textures.clear()
+	_glow_lock.unlock()
+
+
+## A letter picture's glow when it is made, else null (never waits: tron/dmd_effect.gd asks at every change).
+static func made_glow(tex: Texture2D) -> Texture2D:
+	_glow_lock.lock()
+	var made := _glow_textures.has(tex)
+	_glow_lock.unlock()
+	return _glow_of(tex) if made else null
+
+
 ## The letter's size in dots (its picture's size times the sprite's scale).
 static func _dots(sprite: Sprite2D) -> Vector2i:
 	return Vector2i((sprite.texture.get_size() * sprite.scale).round())
@@ -213,6 +234,14 @@ func _exit_tree() -> void:
 func update(_settings: Dictionary, kwargs: Dictionary = {}) -> void:
 	for k in kwargs:
 		_values[k] = kwargs[k]
+	_apply()
+
+
+## Back to time 0 with no values (tron/dmd_slide.gd reuses slides).
+func pool_reset() -> void:
+	_elapsed_ms = 0.0
+	_seeked = false
+	_values = {}
 	_apply()
 
 
