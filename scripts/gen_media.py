@@ -277,7 +277,7 @@ def arcade_slide(folder, folder_rel, panel):
         groups[group].append('ExtResource("{}")'.format(rid))
     name = "deff_{:03d}".format(ARCADE_DEFF)
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + 3), '',
-             '[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]',
+             '[ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]',
              '[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]',
              '[ext_resource type="Script" path="res://tron/score_display.gd" id="score"]'] + ext
     parts += ['', '[node name="{}" type="Control"]'.format(name), 'layout_mode = 3', 'anchors_preset = 0',
@@ -320,7 +320,7 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
         entries.append('{{"duration": {:.1f}, "texture": ExtResource("{}")}}'.format(ms, seen[digest]))
     letter_ext, letter_nodes_ = letter_nodes(deff_id, letters, folder_rel) if letters else ([], [])
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + len(letter_ext) + (3 if frames else 2)), '',
-             '[ext_resource type="Script" path="res://addons/mpf-gmc/classes/mpf_slide.gd" id="slide"]']
+             '[ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]']
     if any(layouts) or panel:
         parts.append('[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]')
     if panel:

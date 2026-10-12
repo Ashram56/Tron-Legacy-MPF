@@ -216,6 +216,14 @@ func update(_settings: Dictionary, kwargs: Dictionary = {}) -> void:
 	_apply()
 
 
+## Back to time 0 with no values (tron/dmd_slide.gd reuses slides).
+func pool_reset() -> void:
+	_elapsed_ms = 0.0
+	_seeked = false
+	_values = {}
+	_apply()
+
+
 func seek_ms(t: float) -> void:
 	_seeked = true
 	_add_glows(true)   # a render (scripts/render_diff.py) shows every glow from the first frame

@@ -65,6 +65,7 @@ var _frames_hd := {}
 var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' text lines (FrameText)
 var _frame_shapes = null         # media/dmd_hd/shapes.json: the frames drawn as rectangles (FrameText)
 const LetterPanel := preload("res://tron/letter_panel.gd")
+const DmdSlide := preload("res://tron/dmd_slide.gd")
 const PRELOAD_IN_FLIGHT := 8       # background loads running at once (more would queue ahead of the game's own)
 var _preload: Array[String] = []    # resources loading in the background (_start_preload)
 var _to_preload: Array[String] = []   # resources not requested yet, in effect order
@@ -220,6 +221,7 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	set_process(false)
+	tree_exiting.connect(DmdSlide.clear_pool)   # the effects' slides kept for reuse, freed at exit
 	if hd and font != "rom":
 		preload("res://tron/rom_text_hd.gd").load_baked(font)
 	if hd:
@@ -569,8 +571,9 @@ class FrameText extends Node2D:
 ## A plain label on the DMD (game/slides/text_page.tscn: attract pages, initials entry): the text colour, and
 ## the glow drawn behind it (LabelGlow).
 func _style_label(label: Label) -> void:
-	if label.has_meta("dmd_glow_copy") or label.has_meta("dmd_text_hd"):
+	if label.has_meta("dmd_glow_copy") or label.has_meta("dmd_text_hd") or label.has_meta("dmd_styled"):
 		return
+	label.set_meta("dmd_styled", true)     # once: a reused slide (tron/dmd_slide.gd) enters the tree again
 	label.add_theme_color_override("font_color", text_color)
 	if glow > 0.0:
 		label.add_child(LabelGlow.new(label, glow_color, glow), false, INTERNAL_MODE_FRONT)

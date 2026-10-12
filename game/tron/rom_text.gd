@@ -114,6 +114,19 @@ func seek_ms(t: float) -> void:
 	_apply_time()
 
 
+## Back to the line of a slide just built (tron/dmd_slide.gd reuses slides): no text, time 0, first screen.
+func pool_reset() -> void:
+	_elapsed_ms = 0.0
+	_seeked = false
+	_use_alt = false
+	_screen_on = screens.has(0) if screens.size() else true
+	visible = _screen_on
+	modulate = Color(1, 1, 1, 1)
+	text = ""
+	_layout()
+	_apply_time()
+
+
 func _process(delta: float) -> void:
 	if not _seeked:
 		_elapsed_ms += delta * 1000.0
