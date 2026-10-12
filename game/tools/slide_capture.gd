@@ -33,7 +33,7 @@ func _run(jobs: Array) -> void:
 		var mvars: Dictionary = job.get("machine_vars", {})
 		for k in mvars:
 			MPF.game.update_machine({"name": k, "value": mvars[k]})
-		var anim: AnimatedSprite2D = slide.get_node_or_null("Anim")
+		var anim: AnimatedSprite2D = slide.find_child("Anim", true, false)
 		if anim:
 			anim.pause()
 		var n := 0
@@ -56,7 +56,7 @@ func _shown_and_pooled(slide: Node, slide_name: String, kwargs: Dictionary) -> N
 	add_child(slide)
 	await get_tree().process_frame
 	get_tree().call_group("rom_timed", "seek_ms", 3000.0)
-	var anim: AnimatedSprite2D = slide.get_node_or_null("Anim")
+	var anim: AnimatedSprite2D = slide.find_child("Anim", true, false)
 	if anim:
 		anim.frame = anim.sprite_frames.get_frame_count(anim.animation) - 1
 	await RenderingServer.frame_post_draw

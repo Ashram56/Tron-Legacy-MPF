@@ -106,9 +106,13 @@ func remove(with_animation: bool = true) -> void:
 		animation_player.stop()
 	elif current_animation == CoreAnimation.REMOVED:
 		return
-	var updaters := _updaters.duplicate()
+	var kept := {}                     # this slide's updaters, and those of a slide scene shown inside it
+	for s in [self] + find_children("*", "", true, false):
+		if s is MPFSceneBase:
+			kept[s] = s._updaters.duplicate()
 	if get_parent():
 		get_parent().remove_child(self)
-	_updaters = updaters
+	for s in kept:
+		s._updaters = kept[s]
 	if not give(self):
 		queue_free()

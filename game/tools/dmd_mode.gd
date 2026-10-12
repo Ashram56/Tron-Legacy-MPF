@@ -66,6 +66,7 @@ var _frame_text = null           # media/dmd_hd/text.json: the recorded frames' 
 var _frame_shapes = null         # media/dmd_hd/shapes.json: the frames drawn as rectangles (FrameText)
 const LetterPanel := preload("res://tron/letter_panel.gd")
 const DmdSlide := preload("res://tron/dmd_slide.gd")
+const DmdEffectSlide := preload("res://tron/dmd_effect_slide.gd")
 const PRELOAD_IN_FLIGHT := 8       # background loads running at once (more would queue ahead of the game's own)
 var _preload: Array[String] = []    # resources loading in the background (_start_preload)
 var _to_preload: Array[String] = []   # resources not requested yet, in effect order
@@ -288,8 +289,26 @@ func _start_preload() -> void:
 	var small := bool(ProjectSettings.get_setting("tron/dmd/preload_small", true)) and min_frames > 0
 	var glows := float(text_style()["glow"]) > 0.0
 	var later: Array[String] = []
+	var data := DmdEffectSlide.renderer() == "data"
+	var seen := {}
 	for d in DirAccess.get_directories_at(MEDIA_HD):
 		var paths: Array[String] = []
+		if data:          # the pictures its data names (frames shared between effects load once), and its slide
+			for path in _data_pictures(MEDIA + d + "/effect.json"):
+				if seen.has(path):
+					continue
+				seen[path] = true
+				var f := path.get_file()
+				if glows and (f.begins_with("solid") or f.begins_with("hollow")):
+					_letters.append(path)
+				elif not (f.begins_with("solid") or f.begins_with("hollow")):
+					paths.append(path)
+			paths.append("res://slides/deffs/%s.tscn" % d)
+			if min_frames > 0 and paths.size() > min_frames:
+				_to_preload.append_array(paths)
+			elif small:
+				later.append_array(paths)
+			continue
 		for f in DirAccess.get_files_at(MEDIA_HD + d):
 			f = f.trim_suffix(".import")          # an exported game lists the .import files
 			var path := MEDIA_HD + d + "/" + f
@@ -299,7 +318,7 @@ func _start_preload() -> void:
 				paths.append(path)                # effect frames
 			elif glows and (f.begins_with("solid") or f.begins_with("hollow")):
 				_letters.append(path)
-		var scene := "res://slides/deffs/%s.tscn" % d
+		var scene := MEDIA + d + "/nodes.tscn"           # tron/dmd/renderer="nodes": the effect's node scene
 		if ResourceLoader.exists(scene):
 			paths.append(scene)
 		if min_frames > 0 and paths.size() > min_frames:
@@ -309,6 +328,22 @@ func _start_preload() -> void:
 	_to_preload = _letters + _to_preload + later
 	_preload_start = Time.get_ticks_msec()
 	set_process(not _to_preload.is_empty())
+
+
+## The pictures an effect's data names (tron/dmd_effect.gd), as drawn: in HD their media/dmd_hd/ twins.
+func _data_pictures(effect_path: String) -> Array[String]:
+	var out: Array[String] = []
+	for it in DmdEffectSlide.DmdEffect.items_of(effect_path):
+		var pics: Array = []
+		match it["type"]:
+			"frames":
+				pics = it["frames"].map(func(f): return f[0])
+			"letters":
+				pics = it["sprites"].map(func(sp): return sp["pic"])
+		for p in pics:
+			var big := MEDIA_HD + str(p).trim_prefix(MEDIA) if str(p).begins_with(MEDIA) else str(p)
+			out.append(big if ResourceLoader.exists(big) else str(p))
+	return out
 
 
 func _process(_delta: float) -> void:

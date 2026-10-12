@@ -15,6 +15,7 @@ section 2a.
 | Small effects preloaded too, after the large ones, HD frames built ahead | `tron/dmd/preload_small=true`, `game/tools/dmd_mode.gd` (`_warm_scene()`) | Full game, mode 5: frames over 100 ms 68 to 46, slowest effect 0.20-0.26 s to 0.11 s; preload 14.5 to 18.5 s, +62 MB video memory | `false` |
 | HD text labels keep their theme | `game/tron/rom_text.gd` `_layout()`: in HD the ROM font, size and spacing go only to classic labels | Each text line got the ROM font re-applied at every update though its own glyphs are hidden in HD: about 25 ms per slide shown. Full game, mode 5: frames over 100 ms 46 to 10-12, frames over 2 vblanks 264 to 147-149, 58.0-58.1 FPS | - |
 | Display effects' slides reused | `game/tron/dmd_slide.gd` (slides of `game/slides/deffs/` and `text_page.tscn`), GMC's `media.gd` patched by `scripts/gmc_patch.py`; `tron/dmd/pool_slides` | A removed slide waits, reset to its start, for its next show instead of being freed and built again from its scene (about 12 ms to build and 25 ms more in its first frame on the Xavier NX). Xavier NX gain: to be measured | `tron/dmd/pool_slides=false`, `TRON_DMD_POOL=0` |
+| Display effects drawn from data into one picture | `game/tron/dmd_effect.gd` (an effect's data, `game/media/dmd/<deff>/effect.json` from `scripts/gen_media.py`), `game/tron/dmd_screen.gd` (autoload: one SubViewport, 128x32 classic or the window's DMD area in HD, rendered only when the picture changes), `game/tron/dmd_effect_slide.gd` (each effect's slide, one node); `tron/dmd/renderer` | x86 under Xvfb (software rendering, `portal_multiball`, 75 s, HD): median frame 29.9 to 5.8 ms, frames over 2 vblanks 569 to 33; Godot resident peak 980 to 890 MB, video memory 710 to 609 MB, effects preload 9.5 to 5.3 s (2744 to 2463 resources). Xavier NX gain: to be measured | `tron/dmd/renderer="nodes"`, `TRON_DMD_RENDERER=nodes` |
 | Video switches never wait for a worker | `pup_addons/gde_gozen/video_playback.gd` `close()` | A screen switching video while its previous one was still opening or restarting for a loop waited for it on the main thread: 0.3-0.6 s freezes of every screen in some games | - |
 | HD effect frames VRAM-compressed | `scripts/gen_media.py` `HD_FRAME_IMPORT` | 7 to 1.5 ms per frame loaded, half the GPU memory | - |
 | Letter glows on worker threads | `game/tron/letter_panel.gd` | Deff 94 380 to 25-36 ms; nothing made with the glow off | - |
@@ -153,6 +154,23 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   A replay of `portal_multiball` reused a slide for 24 of its 40 shows (the first show of each effect builds it); Godot
   logs the count at exit (`DMD: slide pool: ...`). `tests/test_dmd_hd.py` checks that a reused slide renders exactly
   as a new one, in classic (the ROM's frames) and HD. `tron/dmd/pool_slides=false` or `TRON_DMD_POOL=0` turns it off.
+- Display effects drawn from data (`game/tron/dmd_effect.gd`, `dmd_screen.gd`, `dmd_effect_slide.gd`, 2026-10-12):
+  each effect's node scene had dozens of nodes (frames, text labels with glow and ink twins, letters, the status
+  panel), each one a canvas item Godot sorted and drew at every frame, and each text line's shaping redone when a
+  slide was built. `scripts/gen_media.py` now writes every effect as data too (`game/media/dmd/<deff>/effect.json`:
+  rectangles, a frame list naming its pictures, text lines with their ROM layout, letters, the panel), and the slide
+  in `game/slides/deffs/` is one node that keeps the effect's time and values. The autoload `DmdScreen` builds a
+  draw list of the effect on top (one list, six canvas items: pictures, glows, ink, and the same three clipped for a
+  zoomed line) into its own SubViewport, rendered only when the list changes (a new frame, a blink, new values), and
+  the slide shows that texture. Text is shaped once per line and drawn straight from the font's cache. Identical
+  frames across effects (417 of 4123 entries, the Sea of Simulation stages) point at one picture, and only the
+  pictures the data names are preloaded (HD twins in HD), so the classic frames are no longer loaded in HD.
+  Classic renders dot for dot as the node scenes for all 145 effects (`tests/test_dmd_hd.py`
+  `test_effect_data_and_node_scenes_agree`); HD differs only where glows overlap. The content stays open: the data
+  names picture files, so redrawn or HD pictures replace them, and a scene `game/dmd_custom/<deff>.tscn` (any nodes,
+  videos included) replaces an effect's data ([development.md](development.md), "Display effects").
+  `tron/dmd/renderer="nodes"` or `TRON_DMD_RENDERER=nodes` shows the node scenes (`game/media/dmd/<deff>/nodes.tscn`)
+  as before. The service menu and attract pages stay GMC slides.
 - Preloading every effect (`preload_min_frames=1`) was measured and not kept: 2677 resources instead of 1575,
   15-16 s instead of 11 s, about 130 MB more video memory (Godot video memory peak 480-518 MB instead of 345-386 MB),
   and an effect shown during the longer preload waited for it (deff 104 0.49 s); effects shown for the first time

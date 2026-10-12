@@ -11,6 +11,7 @@ config/features=PackedStringArray("4.6", "Mobile")
 [autoload]
 
 DmdMode="*res://tools/dmd_mode.gd"
+DmdScreen="*res://tron/dmd_screen.gd"
 MPF="*res://addons/mpf-gmc/mpf_gmc.gd"
 DmdCapture="*res://tools/dmd_capture.gd"
 ProcDmd="*res://tools/proc_dmd.gd"
@@ -37,6 +38,7 @@ dmd/text_scale=0.85
 dmd/preload_min_frames=40
 dmd/preload_small=true
 dmd/pool_slides=true
+dmd/renderer="data"
 
 [editor_plugins]
 

@@ -196,6 +196,35 @@ def text_node(i, lay, name=None, var=None):
     return out
 
 
+# the root script of an effect's node scene (media/dmd/<name>/nodes.tscn), shown inside its GMC slide
+NODES_SLIDE = "res://addons/mpf-gmc/classes/mpf_slide.gd"
+TEXT_KEYS = ("fit_fonts", "fit_ys", "fit_width", "alt_x", "alt_y", "alt_when_empty", "screens", "show_after_ms",
+             "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms", "cycle_offset_ms", "blink_dark",
+             "level_steps")
+
+
+def text_items(i, lay, name=None, var=None):
+    """The effect data's items (tron/dmd_effect.gd) of text line i: as text_node, the twin first."""
+    out = []
+    if lay.get("twin"):
+        out += text_items(i, dict({k: v for k, v in lay.items() if k not in ("twin", "alt_when_empty")},
+                                  **lay["twin"]), (name or "Line%d" % i) + "Twin", var or "line%d" % i)
+    item = {"type": "text", "name": name or "Line%d" % i, "var": var or "line%d" % i, "font": lay["font"],
+            "x": lay["x"], "y": lay["y"], "flags": lay["flags"]}
+    item.update({k: lay[k] for k in TEXT_KEYS if lay.get(k)})
+    return out + [item]
+
+
+def rect_item(name, x, y, w, h, level):
+    return {"type": "rect", "name": name, "x": x, "y": y, "w": w, "h": h, "level": level, "color": level_rgb(level)}
+
+
+def level_rgb(level):
+    """level_color's numbers (as the scenes round them, so both draw the same dots)."""
+    r, g, b = (float(v) for v in DMD_COLOR[6:-4].split(", "))
+    return [float("{:.4g}".format(c * level / 15)) for c in (r, g, b)]
+
+
 def level_color(level):
     """DMD_COLOR at palette level 0-15 (the slide tint keeps the level in the red channel)."""
     r, g, b = (float(v) for v in DMD_COLOR[6:-4].split(", "))
@@ -232,6 +261,21 @@ def score_display_nodes(score_lines=True, match=False):
     return out
 
 
+def score_display_items(score_lines=True, match=False):
+    """The effect data's items of score_display_nodes (same names, same order)."""
+    import rom_layout
+    out = []
+    for name, var, x, y, flags in rom_layout.SCORE_PANEL:
+        if score_lines or name not in ("Credits", "Replay"):
+            out += text_items(0, {"font": 0, "x": x, "y": y, "flags": flags}, name, var)
+    out.append(rect_item("Separator", 40, 0, 1, 32, 1))
+    for k, (name, x) in enumerate((("BarDs", 4), ("BarBumpers", 16), ("BarSpinners", 28))):
+        out += [rect_item("Dash%d" % k, x, 31, 10, 1, 1), rect_item(name, x, 31, 0, 1, 15)]
+    for name in ("BarZfs", "BarClu", "BarGem"):
+        out.append(rect_item(name, 40, 0, 1, 0, 15))
+    return out + [{"type": "panel", "score_lines": score_lines, "match": match}]
+
+
 def letter_nodes(deff_id, spec, folder_rel):
     """ext_resources and nodes of a letter effect (LETTER_DEFFS): Solid0-3 and Hollow0-3 sprites and
     tron/letter_panel.gd showing them from the event args."""
@@ -240,6 +284,7 @@ def letter_nodes(deff_id, spec, folder_rel):
     from PIL import Image
     z = zipfile.ZipFile(os.path.join(PKG, "media", "rom_images_all.zip"))
     ext, nodes = ['[ext_resource type="Script" path="res://tron/letter_panel.gd" id="letters"]'], []
+    sprites = []
     for i, solid in enumerate(spec["images"]):
         for kind, image, level in (("Solid", solid, 15), ("Hollow", solid + 10, UNLIT_LEVEL)):
             fname = "{}{}.png".format(kind.lower(), i)
@@ -252,13 +297,21 @@ def letter_nodes(deff_id, spec, folder_rel):
                       'centered = false',
                       'position = Vector2({}, {})'.format(LETTER_X + LETTER_DX * i, spec.get("y", LETTER_Y)),
                       'metadata/letter = "{}"'.format(LETTER_CHARS[solid - LETTER_IMAGE0])]
+            sprites.append({"name": "{}{}".format(kind, i), "pic": "res://{}/{}".format(folder_rel, fname),
+                            "x": LETTER_X + LETTER_DX * i, "y": spec.get("y", LETTER_Y), "level": level,
+                            "color": level_rgb(level),
+                            "letter": LETTER_CHARS[solid - LETTER_IMAGE0]})
     nodes += ['', '[node name="LetterPanel" type="Node" parent="."]', 'script = ExtResource("letters")',
               'lit_key = "{}"'.format(spec.get("lit", "")), 'new_key = "{}"'.format(spec.get("new", "")),
               'all_new = {}'.format("true" if spec.get("all_new") else "false"),
               'frame_ms = {}'.format(round(spec["ticks"] * TICK_MS, 2)), 'blink_shift = {}'.format(spec["shift"]),
               'solid_after = {}'.format(spec["solid_after"]),
               'hide_after_ms = {}'.format(round(spec.get("hide_after_frame", 0) * spec["ticks"] * TICK_MS))]
-    return ext, nodes
+    item = {"type": "letters", "sprites": sprites, "lit_key": spec.get("lit", ""), "new_key": spec.get("new", ""),
+            "all_new": bool(spec.get("all_new")), "frame_ms": round(spec["ticks"] * TICK_MS, 2),
+            "blink_shift": spec["shift"], "solid_after": spec["solid_after"],
+            "hide_after_ms": round(spec.get("hide_after_frame", 0) * spec["ticks"] * TICK_MS)}
+    return ext, nodes, item
 
 
 def arcade_slide(folder, folder_rel, panel):
@@ -268,6 +321,7 @@ def arcade_slide(folder, folder_rel, panel):
     index = json.load(open(os.path.join(folder, "parts", "index.json"), encoding="utf-8"))
     ext = ['[ext_resource type="Script" path="res://tron/arcade_reel.gd" id="reel"]']
     groups = {"cabinets": [], "icons_a": [], "icons_b": []}
+    pics = {"cabinets": [], "icons_a": [], "icons_b": []}
     files = [("cabinets", "cab%d" % i, c["file"]) for i, c in enumerate(index["cabinets"])]
     for a in sorted(index["awards"], key=lambda a: a["award_id"]):
         files += [("icons_a", "a%d" % a["award_id"], a["file_a"]), ("icons_b", "b%d" % a["award_id"], a["file_b"])]
@@ -275,9 +329,10 @@ def arcade_slide(folder, folder_rel, panel):
         Image.open(os.path.join(folder, "parts", fname)).convert("RGBA").save(os.path.join(GAME, folder_rel, fname))
         ext.append('[ext_resource type="Texture2D" path="res://{}/{}" id="{}"]'.format(folder_rel, fname, rid))
         groups[group].append('ExtResource("{}")'.format(rid))
+        pics[group].append("res://{}/{}".format(folder_rel, fname))
     name = "deff_{:03d}".format(ARCADE_DEFF)
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + 3), '',
-             '[ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]',
+             '[ext_resource type="Script" path="{}" id="slide"]'.format(NODES_SLIDE),
              '[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]',
              '[ext_resource type="Script" path="res://tron/score_display.gd" id="score"]'] + ext
     parts += ['', '[node name="{}" type="Control"]'.format(name), 'layout_mode = 3', 'anchors_preset = 0',
@@ -291,9 +346,30 @@ def arcade_slide(folder, folder_rel, panel):
     parts.append('frame_ms = {}'.format(round(ARCADE_FRAME_MS, 2)))
     parts += rect_node("PanelClear", 0, 0, 41, 32, 0)
     parts += score_display_nodes(False, panel == "match")
-    with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(parts) + "\n")
+    items = [rect_item("Background", 0, 0, 128, 32, 0),
+             dict({"type": "arcade", "name": "Reel", "frame_ms": round(ARCADE_FRAME_MS, 2)}, **pics),
+             rect_item("PanelClear", 0, 0, 41, 32, 0)] + score_display_items(False, panel == "match")
+    write_effect(name, folder_rel, parts, items)
     return name
+
+
+def write_effect(name, folder_rel, scene, items):
+    """A display effect's outputs: its data (media/dmd/<name>/effect.json, drawn by tron/dmd_screen.gd), its node
+    scene (media/dmd/<name>/nodes.tscn, shown instead with tron/dmd/renderer="nodes") and its GMC slide
+    (slides/deffs/<name>.tscn, tron/dmd_effect_slide.gd: draws the data, or shows the node scene or a custom scene
+    res://dmd_custom/<name>.tscn)."""
+    with open(os.path.join(GAME, folder_rel, "nodes.tscn"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(scene) + "\n")
+    with open(os.path.join(GAME, folder_rel, "effect.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"name": name, "items": items}, f, indent=1)
+        f.write("\n")
+    proxy = ['[gd_scene load_steps=2 format=3]', '',
+             '[ext_resource type="Script" path="res://tron/dmd_effect_slide.gd" id="slide"]', '',
+             '[node name="{}" type="Control"]'.format(name), 'layout_mode = 3', 'anchors_preset = 0',
+             'offset_right = 128.0', 'offset_bottom = 32.0', 'script = ExtResource("slide")',
+             'effect = "res://{}/effect.json"'.format(folder_rel)]
+    with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(proxy) + "\n")
 
 
 def loop_period(frames):
@@ -305,22 +381,32 @@ def loop_period(frames):
     return next((p for p in range(1, n // 2 + 1) if all(h[i] == h[i + p] for i in range(n - p))), None)
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None):
+# Pictures shared between effects in their data: (md5 of the 128x32 frame, recorded) -> the first effect's file. The
+# Sea of Simulation stages (deffs 116-124) draw the same animation: an effect's data names the first copy, so the copies
+# are never loaded (11% of the frames). Recorded frames (source "reference") share only with recorded frames: their HD
+# twins have their text cleared (scripts/frame_text.py).
+SHARED = {}
+
+
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
+    files, order = {}, []           # the effect data's frames: picture file and duration
     for i, (img, ms) in enumerate(frames):
         digest = hashlib.md5(img.tobytes()).hexdigest()
         if digest not in seen:
             fname = "f{:03d}.png".format(len(seen))
+            files[digest] = SHARED.setdefault((digest, recorded), "res://{}/{}".format(folder_rel, fname))
             img.save(os.path.join(GAME, folder_rel, fname))
             seen[digest] = "t{}".format(len(seen))
             ext.append('[ext_resource type="Texture2D" path="res://{}/{}" id="{}"]'.format(
                 folder_rel, fname, seen[digest]))
         entries.append('{{"duration": {:.1f}, "texture": ExtResource("{}")}}'.format(ms, seen[digest]))
-    letter_ext, letter_nodes_ = letter_nodes(deff_id, letters, folder_rel) if letters else ([], [])
+        order.append((digest, ms))
+    letter_ext, letter_nodes_, letter_item = letter_nodes(deff_id, letters, folder_rel) if letters else ([], [], None)
     parts = ['[gd_scene load_steps={} format=3]'.format(len(ext) + len(letter_ext) + (3 if frames else 2)), '',
-             '[ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]']
+             '[ext_resource type="Script" path="{}" id="slide"]'.format(NODES_SLIDE)]
     if any(layouts) or panel:
         parts.append('[ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]')
     if panel:
@@ -346,8 +432,19 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
             parts += text_node(i, lay)
     if panel:
         parts += score_display_nodes(deff_id == 19, panel == "match")
-    with open(os.path.join(GAME, "slides", "deffs", name + ".tscn"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(parts) + "\n")
+    items = [rect_item("Background", 0, 0, 128, 32, 0)]
+    if frames:
+        items.append({"type": "frames", "name": "Anim", "loop": bool(loop),
+                      "frames": [[files[k], round(ms, 1)] for k, ms in order]})
+    items += [rect_item("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0) for k, (x0, y0, x1, y1) in enumerate(fills)]
+    if letter_item:
+        items.append(letter_item)
+    for i, lay in enumerate(layouts):
+        if lay:
+            items += text_items(i, lay)
+    if panel:
+        items += score_display_items(deff_id == 19, panel == "match")
+    write_effect(name, folder_rel, parts, items)
     return name
 
 
@@ -409,7 +506,7 @@ def build_deffs(only_data):
             period = loop_period(frames)
             frames = frames[:period] if period else frames
         write_slide(deff_id, frames, layouts, loop, rel, panel,
-                    fills.get(deff_id, ()) if source == "graphics" else (), letters)
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference")
     return out
 
 
