@@ -265,7 +265,9 @@ class MediaBridge:
             out[key] = self._bar(key, secs)
         for name, key in (("zuse", "bar_zfs"), ("clu", "bar_clu"), ("gem", "bar_gem")):
             clock = getattr(feats.get(name), "clock", None)
-            out[key] = self._bar(key, clock.seconds if clock else 0)
+            # *_end_show_total zeroes the bar (FUN_01023010(0) in clu_end_show_total 0x01001df4, gem 0x01013b48,
+            # zfs 0x0103171c): a mode ended early (all shots made) keeps its seconds but shows no bar
+            out[key] = self._bar(key, clock.seconds if clock and clock.running() else 0)
         return out
 
     def score_changed(self, *_):
