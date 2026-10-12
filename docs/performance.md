@@ -12,6 +12,7 @@ section 2a.
 | Pipeline cache saved while running | `rendering/rendering_device/pipeline_cache/save_chunk_size_mb=0.1` | With the render thread, Godot's save at exit fails, so every start recompiled every pipeline: 1.4-4.7 s at the first use of an effect. Gone from the second start | - |
 | Worker pool | `threading/worker_pool/low_priority_thread_ratio=0.5` | Background loads get 2 threads on 4 cores instead of 1: stalls 1.3 to 0.6-0.95 s where loads overlap | - |
 | Large effects preloaded | `tron/dmd/preload_min_frames=40`, `game/tools/dmd_mode.gd` | Deff 86 0.89 s to under 0.1 s; about +200 MB | `0` |
+| Small effects preloaded too, after the large ones, HD frames built ahead | `tron/dmd/preload_small=true`, `game/tools/dmd_mode.gd` (`_warm_scene()`) | Full game, mode 5: frames over 100 ms 68 to 46, slowest effect 0.20-0.26 s to 0.11 s; preload 14.5 to 18.5 s, +62 MB video memory | `false` |
 | HD effect frames VRAM-compressed | `scripts/gen_media.py` `HD_FRAME_IMPORT` | 7 to 1.5 ms per frame loaded, half the GPU memory | - |
 | Letter glows on worker threads | `game/tron/letter_panel.gd` | Deff 94 380 to 25-36 ms; nothing made with the glow off | - |
 | Clean fonts baked at setup | `game/tools/bake_fonts.gd`, `scripts/setup.py` | 20-30 s freezes on first text gone | - |
@@ -121,6 +122,15 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   are made on worker threads from the start (the letter pictures load with the effects preload). Deff 94 created
   380 to 25-36 ms; slowest display effect in the clip suite 0.56 s (deff 95) to 0.19 s, in the full game 0.55 s to
   0.24 s (every effect under 0.25 s).
+- Small effects preloaded after the large ones (`tron/dmd/preload_small`, 2026-10-12, Xavier NX mode 5, full game with
+  the PuP on the two-screen cabinet): every hitch over 100 ms (68) came within 0.5 s after a slide was created (16% for
+  random times), on first and repeat shows alike. Queuing the remaining effects' frames and scenes after the large
+  ones (the large ones keep their place, so no early effect waits behind them) and building each scene's HD sprite
+  frames as soon as its pictures are in the cache: 46 frames over 100 ms, slowest effect 0.11 s (was 0.20-0.26 s),
+  57.3 FPS (56.9), preload 2744 resources in 18.5 s (1607 in 14.5 s), Godot video memory peak 697 MB (635 MB). What is
+  left is per show, not per load: a slide takes about 18 ms to build, then about 35 ms more in its frame and 55 ms in
+  its first draw, the same with the text glow off, the ROM fonts or no separate render thread (timed with a
+  `node_added` / `ready` / `frame_post_draw` probe); the next step needs a renderer-level profile.
 - Preloading every effect (`preload_min_frames=1`) was measured and not kept: 2677 resources instead of 1575,
   15-16 s instead of 11 s, about 130 MB more video memory (Godot video memory peak 480-518 MB instead of 345-386 MB),
   and an effect shown during the longer preload waited for it (deff 104 0.49 s); effects shown for the first time

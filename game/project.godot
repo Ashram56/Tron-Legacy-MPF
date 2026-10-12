@@ -35,6 +35,7 @@ dmd/text_glow=0.8
 dmd/font="rajdhani"
 dmd/text_scale=0.85
 dmd/preload_min_frames=40
+dmd/preload_small=true
 
 [editor_plugins]
 
