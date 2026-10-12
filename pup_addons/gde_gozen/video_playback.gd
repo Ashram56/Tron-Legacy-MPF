@@ -74,8 +74,9 @@ var _resolution: Vector2i = Vector2i.ZERO
 var _shader_material: ShaderMaterial = null
 
 var _video_thread: int = -1
-var _opened_audio: AudioStreamFFmpeg = null ## Opened by _open_video() on the worker thread, set on the main one.
+var _opened_audio: Array = [] ## The audio stream _open_video() opens on the worker thread, taken on the main one.
 var _release_tasks: Array[int] = [] ## Worker tasks freeing closed videos (see close()).
+var _abandoned: Array = [] ## [task, [video]]: videos closed while a worker still opened or restarted them (see close()).
 var _restart_thread: int = -1 ## Worker task seeking back to the first frame (see restart()).
 const QUEUE_FRAMES: int = 3 ## Frames decoded ahead per video (see _process()).
 var _decode_task: int = -1 ## Worker task decoding the next frame into _queue (see _fill_queue()).
@@ -129,6 +130,10 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	close()
+	for item: Array in _abandoned:
+		WorkerThreadPool.wait_for_task_completion(item[0])
+		item[1].clear()
+	_abandoned.clear()
 	for task: int in _release_tasks:
 		WorkerThreadPool.wait_for_task_completion(task)
 	_release_tasks.clear()
@@ -169,7 +174,8 @@ func set_video_path(new_path: String) -> void:
 		video.disable_debug()
 
 	# The audio stream opens on the worker thread too: opening either on the main thread stalls every frame drawn
-	_video_thread = WorkerThreadPool.add_task(_open_video.bind(enable_audio))
+	_opened_audio = []
+	_video_thread = WorkerThreadPool.add_task(_open_video.bind(video, path, enable_audio, _opened_audio))
 
 
 ## Update the video manually by providing a GoZenVideo instance and an optional AudioStreamWAV.
@@ -315,15 +321,18 @@ func next_frame(skip: bool = false) -> bool:
 
 
 func close() -> void:
-	# Making certain no tasks are still running in separate threads before closing.
-	if _video_thread != -1:
-		var error: int = WorkerThreadPool.wait_for_task_completion(_video_thread)
-		if error != OK:
-			printerr("Something went wrong waiting for task completion! %s" % error)
-		_video_thread = -1
-	if _restart_thread != -1:
-		WorkerThreadPool.wait_for_task_completion(_restart_thread)
-		_restart_thread = -1
+	# A worker still opening or restarting the video keeps it until it is done (_process() then frees it on a worker):
+	# waiting for it here held the main thread, and every screen, up to 0.6 s when a playlist switched while a loop
+	# restart or an open was under way (several decoders being created at once on the Jetson)
+	var busy: int = -1
+	for task: int in [_video_thread, _restart_thread]:
+		if task != -1:
+			if WorkerThreadPool.is_task_completed(task):
+				WorkerThreadPool.wait_for_task_completion(task)
+			else:
+				busy = task
+	_video_thread = -1
+	_restart_thread = -1
 	_wait_decode()
 
 	if video != null:
@@ -333,8 +342,11 @@ func close() -> void:
 		# worker thread drop the last reference instead of the main one
 		var holder: Array = [video]
 		video = null
-		_release_tasks.append(WorkerThreadPool.add_task(_release_video.bind(holder)))
-	_opened_audio = null
+		if busy != -1:
+			_abandoned.append([busy, holder])
+		else:
+			_release_tasks.append(WorkerThreadPool.add_task(_release_video.bind(holder)))
+	_opened_audio = []
 
 	if audio_player:
 		audio_player.stop()
@@ -412,15 +424,20 @@ func _process(delta: float) -> void:
 			printerr("Something went wrong waiting for task completion! %s" % error)
 
 		_video_thread = -1
-		if _opened_audio != null:
-			audio_player.stream = _opened_audio
-			_opened_audio = null
+		if not _opened_audio.is_empty():
+			audio_player.stream = _opened_audio[0]
+			_opened_audio = []
 		_update_video(video)
 		if enable_auto_play:
 			play()
 
 	while not _release_tasks.is_empty() and WorkerThreadPool.is_task_completed(_release_tasks[0]):
 		WorkerThreadPool.wait_for_task_completion(_release_tasks.pop_front())
+	for i: int in range(_abandoned.size() - 1, -1, -1):
+		if WorkerThreadPool.is_task_completed(_abandoned[i][0]):
+			WorkerThreadPool.wait_for_task_completion(_abandoned[i][0])
+			_release_tasks.append(WorkerThreadPool.add_task(_release_video.bind(_abandoned[i][1])))
+			_abandoned.remove_at(i)
 
 
 ## Plays from the first frame again, like [code]seek_frame(0)[/code] then [code]play()[/code], but seeking on a worker
@@ -432,11 +449,11 @@ func restart() -> void:
 	if is_playing:
 		pause()
 	_wait_decode()
-	_restart_thread = WorkerThreadPool.add_task(_seek_start)
+	_restart_thread = WorkerThreadPool.add_task(_seek_start.bind(video))
 
 
-func _seek_start() -> void:
-	if video.seek_frame(0):
+func _seek_start(of: GoZenVideo) -> void:
+	if of.seek_frame(0):
 		printerr("Couldn't seek frame!")
 
 
@@ -680,15 +697,17 @@ func duration_to_formatted_string(duration_in_seconds: float) -> String:
 	return "%02d:%02d:%02d" % [hours, minutes, seconds]
 
 
-func _open_video(with_audio: bool = false) -> void:
-	if video.open(path):
+## On a worker thread: everything it touches is passed in, so close() can leave it running (the video and its
+## path, and audio_out, which receives the audio stream).
+func _open_video(of: GoZenVideo, file: String, with_audio: bool, audio_out: Array) -> void:
+	if of.open(file):
 		printerr("Error opening video!")
 	if with_audio:
 		var stream: AudioStreamFFmpeg = AudioStreamFFmpeg.new()
-		if stream.open(path, -1) != OK:
-			printerr("Failed to open AudioStreamFFmpeg for: %s" % path)
+		if stream.open(file, -1) != OK:
+			printerr("Failed to open AudioStreamFFmpeg for: %s" % file)
 		else:
-			_opened_audio = stream
+			audio_out.append(stream)
 
 
 ## On a worker thread (close()): drops the last reference to a closed video, which frees it and its decoder.

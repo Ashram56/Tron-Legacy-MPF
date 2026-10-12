@@ -13,6 +13,8 @@ section 2a.
 | Worker pool | `threading/worker_pool/low_priority_thread_ratio=0.5` | Background loads get 2 threads on 4 cores instead of 1: stalls 1.3 to 0.6-0.95 s where loads overlap | - |
 | Large effects preloaded | `tron/dmd/preload_min_frames=40`, `game/tools/dmd_mode.gd` | Deff 86 0.89 s to under 0.1 s; about +200 MB | `0` |
 | Small effects preloaded too, after the large ones, HD frames built ahead | `tron/dmd/preload_small=true`, `game/tools/dmd_mode.gd` (`_warm_scene()`) | Full game, mode 5: frames over 100 ms 68 to 46, slowest effect 0.20-0.26 s to 0.11 s; preload 14.5 to 18.5 s, +62 MB video memory | `false` |
+| HD text labels keep their theme | `game/tron/rom_text.gd` `_layout()`: in HD the ROM font, size and spacing go only to classic labels | Each text line got the ROM font re-applied at every update though its own glyphs are hidden in HD: about 25 ms per slide shown. Full game, mode 5: frames over 100 ms 46 to 10-12, frames over 2 vblanks 264 to 147-149, 58.0-58.1 FPS | - |
+| Video switches never wait for a worker | `pup_addons/gde_gozen/video_playback.gd` `close()` | A screen switching video while its previous one was still opening or restarting for a loop waited for it on the main thread: 0.3-0.6 s freezes of every screen in some games | - |
 | HD effect frames VRAM-compressed | `scripts/gen_media.py` `HD_FRAME_IMPORT` | 7 to 1.5 ms per frame loaded, half the GPU memory | - |
 | Letter glows on worker threads | `game/tron/letter_panel.gd` | Deff 94 380 to 25-36 ms; nothing made with the glow off | - |
 | Clean fonts baked at setup | `game/tools/bake_fonts.gd`, `scripts/setup.py` | 20-30 s freezes on first text gone | - |
@@ -130,7 +132,17 @@ Per clip, after start-up: 0 frames over 2 vblanks, 0 video frames skipped, A/V d
   57.3 FPS (56.9), preload 2744 resources in 18.5 s (1607 in 14.5 s), Godot video memory peak 697 MB (635 MB). What is
   left is per show, not per load: a slide takes about 18 ms to build, then about 35 ms more in its frame and 55 ms in
   its first draw, the same with the text glow off, the ROM fonts or no separate render thread (timed with a
-  `node_added` / `ready` / `frame_post_draw` probe); the next step needs a renderer-level profile.
+  `node_added` / `ready` / `frame_post_draw` probe).
+- HD text labels keep their theme (2026-10-12, same set-up): timing each GDScript step of a slide show found
+  `rom_text.gd` `_layout()` re-applying the ROM font, size and spacing to the label at every update (15 ms per slide
+  in the theme calls, more in the re-shaping that follows), although in HD the label's own glyphs are hidden and its
+  RomTextHd child draws the line. Without it: a slide builds in 12 ms (19), its frame 28 ms (45); full game 10-12
+  frames over 100 ms (46), 147-149 over 2 vblanks (264), 58.0-58.1 FPS. A normal frame's process-to-drawn time is
+  27.5 ms here, so a slide's first draw still costs about 25 ms more.
+- Video switches never wait for a worker (`video_playback.gd` `close()`): a playlist switching while a loop restart or
+  an open of the same screen was under way waited for it on the main thread, 0.3-0.6 s with several decoders being
+  created at once (seen at the end of Light Cycle Multiball, 2 runs in 5). The video now goes to the worker that
+  frees it once that task is done.
 - Preloading every effect (`preload_min_frames=1`) was measured and not kept: 2677 resources instead of 1575,
   15-16 s instead of 11 s, about 130 MB more video memory (Godot video memory peak 480-518 MB instead of 345-386 MB),
   and an effect shown during the longer preload waited for it (deff 104 0.49 s); effects shown for the first time
