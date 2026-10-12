@@ -187,9 +187,11 @@ func _layout() -> void:
 	elif rom_flags & 4:
 		left = x + 1 - w
 	var line_h := int(m["ascent"]) + int(m["descent"])
-	add_theme_font_override("font", font_file(font_id))
-	add_theme_font_size_override("font_size", line_h)
-	add_theme_constant_override("line_spacing", 0)
+	if not hd():    # HD: the RomTextHd child draws the line and the label's own glyphs are hidden; giving it the
+		# ROM font again at every update re-themed and re-shaped it, about 25 ms per slide shown on a Xavier NX
+		add_theme_font_override("font", font_file(font_id))
+		add_theme_font_size_override("font_size", line_h)
+		add_theme_constant_override("line_spacing", 0)
 	position = Vector2(left, y - int(m["ascent"]) + 1)
 	size = Vector2(maxi(w, 1) + 2, line_h)
 	if hd():
