@@ -192,6 +192,8 @@ class TronOS(CustomCode):
         from tron.settings import Adjustments, Audits, DisplaySettings   # noqa: E402
         self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
         self.display_settings = DisplaySettings(self.machine)  # HD text glow and size, persisted
+        from tron.scorbit import Scorbit             # noqa: E402
+        self.scorbit = Scorbit(self)                           # scores to Scorbit, when set up (docs/scorbit.md)
         self.audits = Audits(self.machine)                     # ROM audit counters, persisted
         from tron.credits import Credits             # noqa: E402
         self.credit_model = Credits(self)                      # credits and pricing, persisted
