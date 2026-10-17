@@ -44,7 +44,7 @@ outside the repository (a reinstall keeps it, as it keeps every untracked file).
 600, as ssh keeps its keys) each time it starts. Anyone with root, or who logs in as the game's user, can
 still read it, and so can anyone who takes the storage out: a program that uses a key must be able to read
 it. What limits the harm: the key is encrypted with a secret inside Scorbit's library, so it only works
-through the SDK; it signs as your provider for score posting, not your Scorbit account; Scorbit can revoke
+through the SDK; the SDK signs its requests to Scorbit with it (it is not your Scorbit login); if it leaks, ask Scorbit to revoke
 it and issue a new one. To go further: no shared login on the cabinet (change the default `jetson`
 password, ssh by key only), and an encrypted disk if the storage could be taken.
 
