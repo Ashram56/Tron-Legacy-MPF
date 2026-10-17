@@ -4,6 +4,7 @@
     python scripts/setup.py                 # everything, MPF Monitor included; safe to re-run (steps in place are skipped)
     python scripts/setup.py --no-monitor    # without MPF Monitor (mpf-monitor, Qt)
     python scripts/setup.py --vpx           # also the Visual Pinball X bridge's packages (docs/vpx.md)
+    python scripts/setup.py --scorbit       # also the Scorbit SDK, Linux only (docs/scorbit.md)
     python scripts/setup.py --dry-run       # print the plan (URLs, paths) and change nothing
     python scripts/setup.py --dry-run --os windows --arch x86_64   # the plan for another host
 
@@ -20,6 +21,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import urllib.error
 import urllib.request
@@ -97,6 +99,39 @@ class Setup:
 
     def has_module(self, py, name):
         return subprocess.run([py, "-c", "import " + name], capture_output=True).returncode == 0
+
+    def scorbit(self):
+        """--scorbit: the `scorbit` wrapper in .venv and the SDK's native library in tools/scorbit/lib."""
+        self.say("== Scorbit SDK {} (docs/scorbit.md)".format(tc.SCORBIT_VERSION))
+        if self.os != "linux":
+            self.say("   skipped: Scorbit publishes its SDK library for Linux only; the game runs without it")
+            return
+        py = tc.venv_python(self.os)
+        if self.dry or self.args.upgrade or not self.has_module(py, "scorbit._version"):
+            self.run([py, "-m", "pip", "install", "--quiet"] + tc.SCORBIT_REQUIREMENTS)
+        url = tc.scorbit_url(self.arch)
+        lib = tc.scorbit_lib_dir()
+        self.say("   url:  " + url)
+        self.say("   lib:  " + lib)
+        stamp = os.path.join(lib, "libscorbit_sdk.so." + tc.SCORBIT_VERSION)
+        if self.dry:
+            return
+        if os.path.exists(stamp):
+            self.say("   in place")
+            return
+        if os.path.isdir(lib):
+            fsutil.remove_dir(lib)
+        os.makedirs(lib)
+        with tarfile.open(fileobj=io.BytesIO(download(url)), mode="r:gz") as tar:
+            for member in tar.getmembers():
+                # the library and its two version links, flat in tools/scorbit/lib (no paths from the archive)
+                if member.name.startswith("opt/scorbit/lib/") and (member.isfile() or member.issym()):
+                    member.name = os.path.basename(member.name)
+                    if member.issym() and os.sep in member.linkname:
+                        continue
+                    tar.extract(member, lib, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+        if not os.path.exists(stamp):
+            raise SystemExit("no libscorbit_sdk.so.{} in {}".format(tc.SCORBIT_VERSION, url))
 
     def godot(self):
         self.say("== Godot {} ({} {})".format(tc.GODOT_VERSION, self.os, self.arch))
@@ -261,6 +296,8 @@ def main(argv=None):
     p.set_defaults(monitor=True)
     p.add_argument("--vpx", action="store_true",
                    help="also install the Visual Pinball X bridge's packages (olefile; pywin32 on Windows)")
+    p.add_argument("--scorbit", action="store_true",
+                   help="also install the Scorbit SDK {} (Linux only; docs/scorbit.md)".format(tc.SCORBIT_VERSION))
     p.add_argument("--upgrade", action="store_true", help="re-run pip install even if MPF is there")
     p.add_argument("--skip-godot", action="store_true", help="no Godot, GMC or Godot import (MPF and tests only)")
     p.add_argument("--skip-media", action="store_true", help="no generated media (config only)")
@@ -269,6 +306,8 @@ def main(argv=None):
     s.say("Workspace {} on {} {}{}".format(tc.ROOT, s.os, s.arch, " (dry run)" if s.dry else ""))
     s.assets()
     s.venv()
+    if args.scorbit:
+        s.scorbit()
     if not args.skip_godot:
         s.godot()
         s.gmc()

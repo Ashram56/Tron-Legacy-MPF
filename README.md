@@ -144,6 +144,11 @@ any layout.
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.
 
+**Scorbit and Wi-Fi.** The service menu's UTILITIES has a NETWORK menu (Wi-Fi scan and password, on Linux:
+[docs/network.md](docs/network.md)) and a SCORBIT menu. Scorbit (live scores in the Scorbit app) needs its SDK
+(`python3 scripts/setup.py --scorbit`, Linux only) and your Scorbit credentials in `game/scorbit.local.cfg`:
+[docs/scorbit.md](docs/scorbit.md).
+
 ## Screens and PuP settings
 
 Put your settings in `game/pup.local.cfg`. It uses the same sections as [`game/pup.cfg`](game/pup.cfg),
@@ -234,6 +239,7 @@ PuP media), `game/addons/` (GMC and the video add-ons), `game/logs/`, `game/data
 - [docs/install_findings.md](docs/install_findings.md): what testing the one-line installers found (tokens, Windows, Linux arm64).
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.
 - [docs/vpx.md](docs/vpx.md): Visual Pinball X played by MPF.
+- [docs/scorbit.md](docs/scorbit.md) and [docs/network.md](docs/network.md): Scorbit, and Wi-Fi from the service menu.
 - [docs/jetson/README.md](docs/jetson/README.md): the game on an NVIDIA Jetson (Orin, Xavier NX).
 - [docs/rom_differences.md](docs/rom_differences.md): where the game differs from the ROM, and ROM quirks that are not bugs.
 - [docs/performance.md](docs/performance.md): the settings that keep every frame on time, and how to measure.
