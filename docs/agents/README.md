@@ -96,7 +96,7 @@ Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue
 menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the options).
 
 Scorbit and Wi-Fi (2026-10-16, branch `claude/scorbit-support-2e998i`): UTILITIES > GO TO NETWORK MENU (nmcli or
-wpa_cli backend) and GO TO SCORBIT MENU; Scorbit SDK 2.0.4 via `setup.py --scorbit` (Linux only), credentials in
+wpa_cli backend) and GO TO SCORBIT MENU; Scorbit SDK 2.0.4 via `setup.py --scorbit` (Linux only), modes played and completed (completions need an SDK after 2.0.4), credentials in
 `game/scorbit.local.cfg` ([docs/scorbit.md](../scorbit.md), [docs/network.md](../network.md)). Open: the owner's
 Scorbit provider credentials; a check of both Wi-Fi backends and of pairing on the cabinet.
 

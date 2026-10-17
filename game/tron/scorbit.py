@@ -9,8 +9,8 @@ library, Linux only), pairing the cabinet with a venue in the Scorbit app, and t
   so the adjustment editor edits them.
 - os.scorbit (Scorbit): starts the SDK when the settings and credentials allow it, follows MPF's game
   events, and on the MPF clock every TICK seconds sends what changed (scores, active player, ball, the
-  multiball modes) with one commit. The SDK's callbacks run in its own threads: they only store plain
-  values, which the clock tick reads; nothing touches MPF from them.
+  running modes, the modes completed since the last tick) with one commit. The SDK's callbacks run in its
+  own threads: they only store plain values, which the clock tick reads; nothing touches MPF from them.
 
 When the SDK is not installed (Windows, macOS, a workspace set up without --scorbit) or not configured, the
 game runs as before and the service menu says why Scorbit is off.
@@ -39,6 +39,30 @@ MODES = {
     0x37: "MB:Portal Multiball",
     0x34: "NA:Sea of Simulation",
 }
+# timed modes shown while their clock task or its end grace runs (tron/features/timed_modes.Countdown)
+TASK_MODES = {
+    "NA:CLU Hurry-Up": (0xc0, 0xc1),
+    "NA:GEM Hurry-Up": (0xc2, 0xc3),
+    "NA:ZUSE Fast Scoring": (0x59, 0x5b),
+    "NA:Find Flynn": (0xd1,),
+}
+# completed modes (achievements; SDK set_mode_completed, after 2.0.4): an item collected (ROM hook
+# item_collect, outside Sea of Simulation, whose stages collect items too) ...
+ITEM_MODES = {
+    1: "NA:GEM Hurry-Up",           # a GEM award
+    2: "NA:CLU Hurry-Up",           # every CLU shot made
+    3: "NA:ZUSE Fast Scoring",      # all four ZUSE targets
+    4: "MB:Quorra Multiball",       # super jackpot
+    5: "MB:Disc Multiball",         # super jackpot
+    6: "MB:Light Cycle Multiball",  # super jackpot
+    7: "NA:Recognizer",             # five Recognizer hits light Disc Battle
+    8: "NA:TRON Targets",           # T, R and O awards all started
+}
+# ... an audit counter going up (Find Flynn calls its item_collect directly) ...
+AUDIT_MODES = {0x88: "NA:Find Flynn", 0x8b: "MB:Portal Multiball"}    # Flynn found, Portal super jackpot
+# ... or a game flag set: 0x36 Sea of Simulation completed
+FLAG_MODES = {0x36: "NA:Sea of Simulation"}
+SOS_RUNNING = 0x34
 # the SDK's AuthStatus values, as the service menu shows them
 STATUS_TEXT = {0: "NOT CONNECTED", 1: "CONNECTING", 2: "CHECKING PAIRING", 3: "NOT PAIRED", 4: "PAIRED",
                5: "AUTHENTICATION FAILED"}
@@ -175,8 +199,13 @@ class Scorbit:
         self.players = {}                       # {player number: Scorbit name} of claimed players
         self._sent = {}
         self._modes = set()
+        self._completed = []                    # completed modes not sent yet
+        self._audits = {}
+        self._flags = set()
         self._game = False
         self._clock = None
+        self._warned = False
+        os_.register("item_collect", self._item_collected)
         ev = self.machine.events
         ev.add_handler("game_started", self._game_started)
         ev.add_handler("game_ended", self._game_ended)
@@ -335,6 +364,9 @@ class Scorbit:
         self._game = True
         self._sent = {}
         self._modes = set()
+        self._completed = []
+        self._audits = {a: self._audit(a) for a in AUDIT_MODES}
+        self._flags = {f for f in FLAG_MODES if self.os.flag(f)}
         if self.gs:
             self.gs.set_game_started(self._sdk.GameStartOrigin.StartButton)
             self._tick()
@@ -352,8 +384,47 @@ class Scorbit:
             return None, set()
         scores = tuple(int(p.score) for p in game.player_list)
         state = {"scores": scores, "player": game.player.number, "ball": max(1, min(9, game.player.ball))}
-        modes = {name for flag, name in MODES.items() if self.os.flag(flag)}
+        os_ = self.os
+        modes = {name for flag, name in MODES.items() if os_.flag(flag)}
+        modes |= {name for name, tasks in TASK_MODES.items() if any(os_.task_running(t) for t in tasks)}
         return state, modes
+
+    def _audit(self, counter):
+        try:
+            return int(self.os.audits[counter])
+        except Exception:                       # noqa: BLE001
+            return 0
+
+    def _item_collected(self, item):
+        """ROM hook item_collect (MPF thread): queue the completed mode for the next tick."""
+        name = ITEM_MODES.get(item)
+        if name and self._game and not self.os.flag(SOS_RUNNING):
+            self._completed.append(name)
+
+    def completions(self):
+        """The completed modes since the last tick: the queued items, the audits and flags that went up."""
+        done, self._completed = self._completed, []
+        for counter, name in AUDIT_MODES.items():
+            count = self._audit(counter)
+            if count > self._audits.get(counter, count):
+                done.append(name)
+            self._audits[counter] = count
+        flags = {f for f in FLAG_MODES if self.os.flag(f)}
+        done += [FLAG_MODES[f] for f in sorted(flags - self._flags)]
+        self._flags = flags
+        return done
+
+    def _send_completed(self, gs, done):
+        """set_mode_completed came after SDK 2.0.4: with an older SDK the completions are not sent."""
+        send = getattr(gs, "set_mode_completed", None)
+        if not send:
+            if done and not self._warned:
+                log.info("Scorbit SDK %s has no set_mode_completed: completed modes are not sent", SDK_VERSION)
+                self._warned = True
+            return False
+        for name in done:
+            send(name)
+        return bool(done)
 
     def _tick(self, *args):
         gs = self.gs
@@ -386,6 +457,8 @@ class Scorbit:
             gs.remove_mode(mode)
             changed = True
         self._modes = modes
+        if self._send_completed(gs, self.completions()):
+            changed = True
         if changed:
             gs.commit()
 

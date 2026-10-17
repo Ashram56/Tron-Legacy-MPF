@@ -3,7 +3,7 @@
 [Scorbit](https://scorbit.io) shows a game's live scores in its app, lets players claim their scores, and
 keeps leaderboards. This game talks to it through the
 [Scorbit SDK](https://github.com/scorbit-io/scorbit_sdk) (version 2.0.4): it sends the scores, the active
-player, the ball and the running multiballs while a game is played, and it can pair the cabinet with a venue
+player, the ball and the modes played and completed while a game is played, and it can pair the cabinet with a venue
 from the service menu. Scorbit is an addition: the ROM has no network (docs/rom_differences.md).
 
 The SDK's library is built for Linux only (x86_64 and arm64: a Linux PC, the Jetson cabinet). On Windows and
@@ -58,9 +58,30 @@ UTILITIES > **GO TO SCORBIT MENU**:
 ## 4. What is sent
 
 While a game runs, every half second when something changed: each player's score, the active player, the
-ball (1-9), and these modes while they run: `MB:Disc Multiball`, `MB:End of Line`, `MB:Quorra Multiball`,
-`MB:Light Cycle Multiball`, `MB:Portal Multiball`, `NA:Sea of Simulation`. The game start and end are sent
-when MPF starts and ends the game. When Scorbit asks for diagnostics, the newest MPF logs (`game/logs/`,
+ball (1-9), and the modes. Scorbit keeps them in the game's history, so a player sees which modes each game
+played and completed. The game start and end are sent when MPF starts and ends the game.
+
+**Modes played** (sent while they run): `MB:Disc Multiball`, `MB:End of Line`, `MB:Quorra Multiball`,
+`MB:Light Cycle Multiball`, `MB:Portal Multiball`, `NA:Sea of Simulation`, `NA:CLU Hurry-Up`,
+`NA:GEM Hurry-Up`, `NA:ZUSE Fast Scoring` and `NA:Find Flynn`.
+
+**Modes completed** (one event each time; Scorbit's achievements read them):
+
+| Mode | Completed when |
+|---|---|
+| `NA:Find Flynn` | Flynn is found |
+| `NA:CLU Hurry-Up` | every CLU shot is made |
+| `NA:GEM Hurry-Up` | a GEM award is collected |
+| `NA:ZUSE Fast Scoring` | all four ZUSE targets are hit |
+| `MB:Quorra Multiball`, `MB:Disc Multiball`, `MB:Light Cycle Multiball`, `MB:Portal Multiball` | a super jackpot |
+| `NA:Recognizer` | five Recognizer hits light Disc Battle |
+| `NA:TRON Targets` | the T, R and O awards have all been started |
+| `NA:Sea of Simulation` | its last stage is won (its stages, which also collect items, do not count on their own) |
+
+These are the moments the ROM counts as an item collected (the Find Flynn insert), plus Portal and Sea of
+Simulation. Scorbit's completed modes (`set_mode_completed`) came after SDK 2.0.4: with 2.0.4 the modes
+played are sent and the completions are skipped (the log says so once); a later SDK sends them with no
+change to the game. When Scorbit asks for diagnostics, the newest MPF logs (`game/logs/`,
 at most five) are uploaded. The cabinet does not take game starts or credits from the Scorbit app.
 
 ## 5. For developers

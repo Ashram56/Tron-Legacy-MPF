@@ -349,9 +349,10 @@ class FakeGameState:
         self.calls = []
         self.status = 3
         self.machine_uuid = "c0ffee00-0000-0000-0000-000000000001"
+        self.missing = set()                    # methods this SDK version lacks
 
     def __getattr__(self, name):
-        if name.startswith(("set_", "add_", "remove_", "commit", "destroy", "upload")):
+        if name not in self.__dict__.get("missing", ()) and name.startswith(("set_", "add_", "remove_", "commit", "destroy", "upload")):
             return lambda *args, **kwargs: self.calls.append((name,) + args)
         raise AttributeError(name)
 
@@ -457,6 +458,41 @@ class TestScorbit(ScorbitCase):
         self.assertIsNone(self.machine.game)
         self.assertEqual("set_game_finished", self.gs.calls[-1][0])
 
+    def test_timed_modes_and_completed_modes(self):
+        self.tron.adj[31] = 1
+        self.start_game()
+        self.tron.task_start(0xc0, 1000, lambda: None)     # CLU hurry-up clock
+        self.advance_time_and_run(0.6)
+        self.assertEqual([("add_mode", "NA:CLU Hurry-Up")], self.calls("add_mode"))
+        self.tron.hook("item_collect", 2)                  # every CLU shot made
+        self.tron.audit(0x88)                              # Flynn found
+        self.tron.task_kill(0xc0)
+        self.advance_time_and_run(0.6)
+        self.assertEqual([("set_mode_completed", "NA:CLU Hurry-Up"), ("set_mode_completed", "NA:Find Flynn")],
+                         self.calls("set_mode_completed"))
+        self.assertEqual([("remove_mode", "NA:CLU Hurry-Up")], self.calls("remove_mode"))
+        self.assertEqual("commit", self.gs.calls[-1][0])
+        # Sea of Simulation's stages collect items too: only the whole mode counts
+        self.tron.flag_set(0x34)
+        self.tron.hook("item_collect", 5)
+        self.advance_time_and_run(0.6)
+        self.assertEqual(2, len(self.calls("set_mode_completed")))
+        self.tron.flag_clear(0x34)
+        self.tron.flag_set(0x36)
+        self.advance_time_and_run(1.2)
+        self.assertEqual([("set_mode_completed", "NA:Sea of Simulation")], self.calls("set_mode_completed")[2:])
+
+    def test_sdk_without_mode_completed(self):
+        """SDK 2.0.4 has no set_mode_completed: the running modes are still sent."""
+        self.gs.missing.add("set_mode_completed")
+        self.tron.adj[31] = 1
+        self.start_game()
+        self.tron.flag_set(0x29)
+        self.tron.hook("item_collect", 4)
+        self.advance_time_and_run(0.6)
+        self.assertEqual([("add_mode", "MB:Quorra Multiball")], self.calls("add_mode"))
+        self.assertEqual([], self.calls("set_mode_completed"))
+
     def test_pairing_and_unpair_screens(self):
         self.network_menu("GO TO SCORBIT MENU")
         self.goto("SCORBIT STATUS")
@@ -539,6 +575,8 @@ class TestScorbitSdk(TestScorbit):
         self.start_game()
         self.tron.score_add(5000)
         self.tron.flag_set(0x24)
+        self.tron.task_start(0xd1, 1000, lambda: None)
+        self.tron.audit(0x88)                          # a completed mode: skipped by SDK 2.0.4
         self.advance_time_and_run(1)
         self.drain()
         self.assertIsNone(self.machine.game)
@@ -548,6 +586,7 @@ class TestScorbitSdk(TestScorbit):
 
     test_config_sent_to_the_sdk = test_game_scores_ball_player_modes = None
     test_pairing_and_unpair_screens = test_settings_restart_and_off = test_diagnostics_upload = None
+    test_timed_modes_and_completed_modes = test_sdk_without_mode_completed = None
 
 
 class TestScorbitOff(ServiceCase):
