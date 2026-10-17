@@ -40,6 +40,14 @@ Neither form goes in git: `scorbit.local.cfg` is git-ignored, so the repository 
 `scorbit.cfg`. Check with `git status` that the file is not listed before you commit, and keep a copy of it
 outside the repository (a reinstall keeps it, as it keeps every untracked file).
 
+**Who can read it on the cabinet.** The game makes `scorbit.local.cfg` readable by its own user only (mode
+600, as ssh keeps its keys) each time it starts. Anyone with root, or who logs in as the game's user, can
+still read it, and so can anyone who takes the storage out: a program that uses a key must be able to read
+it. What limits the harm: the key is encrypted with a secret inside Scorbit's library, so it only works
+through the SDK; it signs as your provider for score posting, not your Scorbit account; Scorbit can revoke
+it and issue a new one. To go further: no shared login on the cabinet (change the default `jetson`
+password, ssh by key only), and an encrypted disk if the storage could be taken.
+
 ## 2. Install the SDK
 
 ```

@@ -609,6 +609,15 @@ class TestScorbitOff(ServiceCase):
         self.goto("GO TO UTILITIES MENU", "GO TO SCORBIT MENU", "SCORBIT STATUS")
         self.assertEqual(sb.status_text(), self.shown[-1][1])
 
+    def test_local_config_owner_only(self):
+        game = tempfile.mkdtemp()
+        path = os.path.join(game, "scorbit.local.cfg")
+        with open(path, "w") as f:
+            f.write("[scorbit]\nprovider=p\n")
+        os.chmod(path, 0o644)
+        self.assertEqual("p", scorbit.load_config(game)["provider"])
+        self.assertEqual(0o600, os.stat(path).st_mode & 0o777)
+
     def test_public_config_has_no_credentials(self):
         cfg = scorbit.load_config(game_dir=tempfile.mkdtemp())
         self.assertEqual({}, cfg)

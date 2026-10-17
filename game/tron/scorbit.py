@@ -71,8 +71,21 @@ MIN_KEY_BYTES = 16 + 12 + 16    # salt, IV and tag of the SDK's encrypted key (s
 log = logging.getLogger("Scorbit")
 
 
+def protect(path):
+    """The local file holds the encrypted key: readable by its owner only (POSIX), as ssh keeps its keys."""
+    try:
+        if os.name == "posix" and os.stat(path).st_mode & 0o077:
+            os.chmod(path, 0o600)
+            log.info("Scorbit: %s made readable by its owner only", path)
+    except OSError as e:
+        log.warning("Scorbit: cannot restrict %s: %s", path, e)
+
+
 def load_config(game_dir=GAME):
     """The [scorbit] keys of scorbit.cfg then scorbit.local.cfg (the later file wins)."""
+    local = os.path.join(game_dir, FILES[1])
+    if os.path.exists(local):
+        protect(local)
     parser = configparser.ConfigParser(interpolation=None)
     parser.read([os.path.join(game_dir, name) for name in FILES], encoding="utf-8")
     cfg = dict(parser["scorbit"]) if parser.has_section("scorbit") else {}
