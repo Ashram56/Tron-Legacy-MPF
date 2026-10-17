@@ -35,7 +35,7 @@ whose text is cut short, so a key that is not valid base64 shows `KEY IS NOT BAS
 SDK does not take it as is: `encrypted_key` is that key encrypted with the provider name and a secret built
 into Scorbit's ready-made library (the SDK's `encrypt_tool`, which Scorbit runs or supplies; one built from
 the public source lacks the secret, so its output does not work). Ask Scorbit support for the encrypted form
-when you only have the hex key; the game shows `KEY NOT ENCRYPTED` if the hex key is put in `encrypted_key`.
+(about 104 characters of letters, digits, `+` and `/`, often ending in `=`) when you only have a hex key; the game shows `KEY NOT ENCRYPTED` if the hex key is put in `encrypted_key`.
 Neither form goes in git: `scorbit.local.cfg` is git-ignored, so the repository holds only the empty
 `scorbit.cfg`. Check with `git status` that the file is not listed before you commit, and keep a copy of it
 outside the repository (a reinstall keeps it, as it keeps every untracked file).
