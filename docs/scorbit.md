@@ -31,6 +31,15 @@ when you reinstall, or the cabinet registers as a new device.
 The game checks the encrypted key before it starts the SDK: the SDK library stops the whole program on a key
 whose text is cut short, so a key that is not valid base64 shows `KEY IS NOT BASE64` instead.
 
+**The private key and the encrypted key.** Scorbit's private key for a provider is 64 hex characters. The
+SDK does not take it as is: `encrypted_key` is that key encrypted with the provider name and a secret built
+into Scorbit's ready-made library (the SDK's `encrypt_tool`, which Scorbit runs or supplies; one built from
+the public source lacks the secret, so its output does not work). Ask Scorbit support for the encrypted form
+when you only have the hex key; the game shows `KEY NOT ENCRYPTED` if the hex key is put in `encrypted_key`.
+Neither form goes in git: `scorbit.local.cfg` is git-ignored, so the repository holds only the empty
+`scorbit.cfg`. Check with `git status` that the file is not listed before you commit, and keep a copy of it
+outside the repository (a reinstall keeps it, as it keeps every untracked file).
+
 ## 2. Install the SDK
 
 ```

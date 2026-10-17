@@ -82,6 +82,8 @@ def load_config(game_dir=GAME):
 def key_problem(key):
     """Why the encrypted key cannot be used, None when it looks right. The SDK aborts the whole process
     (std::length_error) on a key whose base64 is cut short, so the game checks it first."""
+    if len(key) == 64 and all(c in "0123456789abcdefABCDEF" for c in key):
+        return "KEY NOT ENCRYPTED"      # the raw private key: Scorbit's encrypt_tool makes the base64 form
     try:
         raw = base64.b64decode(key, validate=True)
     except (binascii.Error, ValueError):

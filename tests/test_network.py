@@ -600,6 +600,7 @@ class TestScorbitOff(ServiceCase):
         self.assertEqual("BAD MACHINE ID", scorbit.config_problem(dict(CFG, machine_id="12a")))
         self.assertEqual("KEY IS NOT BASE64", scorbit.config_problem(dict(CFG, encrypted_key="abc")))
         self.assertEqual("KEY TOO SHORT", scorbit.config_problem(dict(CFG, encrypted_key="QUJDREVGR0g=")))
+        self.assertEqual("KEY NOT ENCRYPTED", scorbit.config_problem(dict(CFG, encrypted_key="0f" * 32)))
         self.assertIsNone(scorbit.config_problem(CFG))
         no_creds = scorbit.Scorbit(self.tron, cfg={}, sdk=fake_sdk())
         self.assertEqual("NOT CONFIGURED", no_creds.status_text())
