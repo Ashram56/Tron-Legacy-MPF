@@ -19,12 +19,15 @@ const DOTS_SHADER := preload("res://pup/dmd_dots.gdshader")
 const PupScreen := preload("res://pup/pup_screen.gd")
 const LightCycles := preload("res://pup/lightcycles.gd")
 const NEON_SHADER := preload("res://pup/neon_frame.gdshader")
+const ServiceBackglass := preload("res://pup/service_backglass.gd")
 
 var cfg := ConfigFile.new()
 var enabled := false
 var pack_dir := ""
 var media_dir := ""
 var manifest := {}                  # pack path ("Drain/Drain1.mp4") -> {out, w, h, duration}
+var still_path := ""                # the backglass still (manifest "still") the service menu draws on
+var service_backglass: ServiceBackglass     # the service menu on the backglass ([backglass] service_menu)
 var folders := {}                   # playlist folder (lower case) -> [pack paths], sorted
 var playlists := {}                 # playlist folder (lower case) -> {alpha_sort, volume}
 var screens := {}                   # PuP screen number -> PupScreen
@@ -48,6 +51,7 @@ func _ready() -> void:
 	# answered even with the PuP off, so MPF's hello is never "unhandled"; pup_ready only when it is on
 	MPF.server.registered_handlers["pup_play"] = [Callable(self, "_on_pup_play")]
 	MPF.server.registered_handlers["pup_hello"] = [Callable(self, "_on_pup_hello")]
+	MPF.server.registered_handlers["service_backglass"] = [Callable(self, "_on_service_backglass")]
 	if not _load_config():
 		return
 	_pick_video_player()
@@ -100,6 +104,8 @@ func _load_media() -> bool:
 		push_warning("PuP: %s is not valid: PuP off" % path)
 		return false
 	manifest = data.get("files", {})
+	if data.get("still") is String:
+		still_path = media_dir.path_join(data["still"])
 	for key in manifest.keys():
 		var folder: String = key.get_base_dir().to_lower()
 		if not folders.has(folder):
@@ -272,6 +278,10 @@ func _make_layered_window(section: String, defaults: Dictionary, volume: float) 
 			"bg_playlist": row.get("PlayList", ""), "bg_file": row.get("PlayFile", "")})
 		w.add_child(layer)
 		screens[n] = layer
+	if section == "backglass" and bool(setting("backglass", "service_menu", true)):
+		service_backglass = ServiceBackglass.new()
+		w.add_child(service_backglass)
+		service_backglass.setup(still_path, str(setting(section, "fit", "fit")), float(setting(section, "align", 0.5)))
 
 
 var _dmd_frame: TextureRect             # the pack's DMD panel art (background="frame" with a frame_image)
@@ -446,6 +456,15 @@ func _on_pup_hello(_message: Dictionary) -> void:
 	if not enabled or windows.is_empty():
 		return
 	MPF.server.send_event_with_args("pup_ready", {"ost": 1 if screens.has(MUSIC_SCREEN) else 0}, false)
+
+
+## The service menu's screen for the backglass (tron/service_backglass.py); dropped without a backglass.
+func _on_service_backglass(message: Dictionary) -> void:
+	if service_backglass == null:
+		return
+	var parsed = JSON.parse_string(str(message.get("state", "")))
+	if parsed is Dictionary:
+		service_backglass.show_state(parsed)
 
 
 func _on_pup_play(message: Dictionary) -> void:

@@ -9,12 +9,15 @@ Godot plays Theora video only, so every .mp4 becomes an .ogv (Theora + Vorbis); 
 macOS, the native_video add-on: pup_addons/native_video) the videos are only probed and Godot plays the pack's mp4s. The OST mp3s and the pictures
 are copied as they are: Godot loads them at run time. manifest.json lists each file with its converted path,
 size and length; the Godot PuP player (game/pup/pup_player.gd) reads it, and without it the PuP stays off.
+It also makes the backglass still the service menu draws on (game/pup/service_backglass.gd): the per-pixel
+median of the backglass loop (PuP screen 2), which keeps the art and drops what moves; manifest "still".
 
 Needs ffmpeg with libtheora: FFMPEG=<path>, or ffmpeg on the PATH, or `pip install imageio-ffmpeg` (into
 .venv: .venv/bin/pip or .venv\\Scripts\\pip), whose ffmpeg has it. Standard library only otherwise.
 """
 import argparse
 import concurrent.futures
+import csv
 import fnmatch
 import json
 import os
@@ -36,6 +39,9 @@ AUDIO_TO_OGG = (".wav",)
 SKIP_DIRS = {"pupcapture", "pup-pack_options"}       # DMD captures (scripts/pup/pup_captures.py) and the VPX options
 SIZE = re.compile(r"Stream #.*Video:.*?(\d{2,5})x(\d{2,5})")
 DURATION = re.compile(r"Duration: (\d+):(\d+):(\d+\.\d+)")
+STILL = "service/backglass_still.png"
+STILL_SCREEN = "2"                                   # Backglass - Underlay: the looping background
+STILL_FPS, STILL_FRAMES = 4.0, 255                   # tmedian takes at most 255 frames (radius 127)
 
 
 def find_ffmpeg():
@@ -135,6 +141,43 @@ def convert(ffmpeg, pack, out, job, args):
     return rel, entry, "converted"
 
 
+def background_video(pack):
+    """The pack's backglass background loop: screens.pup's PlayList/PlayFile of screen 2, else None."""
+    path = os.path.join(pack, "screens.pup")
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
+        for row in csv.DictReader(f):
+            if (row.get("ScreenNum") or "").strip() == STILL_SCREEN and row.get("PlayFile"):
+                video = os.path.join(pack, row["PlayList"].strip(), row["PlayFile"].strip())
+                return video if os.path.exists(video) else None
+    return None
+
+
+def make_still(ffmpeg, pack, out, force=False):
+    """The backglass still: the per-pixel median of the background loop over its whole length (ffmpeg tmedian,
+    one output frame), so the moving light streaks drop out and the art and both neon frames stay."""
+    src = background_video(pack)
+    if not src:
+        return None
+    dst = os.path.join(out, STILL)
+    if os.path.exists(dst) and os.path.getmtime(dst) >= os.path.getmtime(src) and not force:
+        return STILL
+    duration = probe(ffmpeg, src).get("duration") or 10.0
+    fps = min(STILL_FPS, (STILL_FRAMES - 1) / duration)
+    radius = max(1, min(127, (int(duration * fps) - 1) // 2))
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    tmp = dst + ".part.png"
+    result = subprocess.run([ffmpeg, "-v", "error", "-y", "-i", src, "-vf",
+                             "fps={:.3f},tmedian=radius={}".format(fps, radius), "-frames:v", "1", "-update", "1",
+                             tmp], capture_output=True, text=True, errors="replace")
+    if result.returncode != 0 or not os.path.exists(tmp):
+        print("  backglass still FAILED: " + result.stderr.strip()[-300:], flush=True)
+        return None
+    fsutil.replace(tmp, dst)
+    return STILL
+
+
 def main(argv=None):
     cfg = settings.load()
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -171,8 +214,10 @@ def main(argv=None):
                 continue
             files[rel] = entry
             print("  [{}/{}] {} {}".format(n, len(jobs), what, rel), flush=True)
+    still = make_still(ffmpeg, args.pack, args.out, args.force)
+    print("  backglass still: {}".format(still or "none (no background loop)"), flush=True)
     with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump({"pack": os.path.relpath(args.pack, tc.ROOT).replace(os.sep, "/"),
+        json.dump({"pack": os.path.relpath(args.pack, tc.ROOT).replace(os.sep, "/"), "still": still,
                    "files": dict(sorted(files.items()))}, f, indent=1)
     print("manifest: {} ({} files)".format(manifest_path, len(files)))
     if failed:

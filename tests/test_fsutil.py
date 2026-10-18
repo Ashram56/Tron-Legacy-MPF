@@ -79,5 +79,29 @@ class TestFsutil(unittest.TestCase):
             self.assertEqual(f.read(), "old")
 
 
+class TestUpscaleCache(unittest.TestCase):
+    def test_entry_being_replaced_is_upscaled_instead(self):
+        """Windows: a cache entry another worker is replacing can't be opened; the worker upscales the picture
+        itself instead of failing setup."""
+        from PIL import Image
+        import dmd_hd
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        src, dst, cache = (os.path.join(tmp, n) for n in ("src.png", "dst.png", "cache"))
+        Image.new("L", (4, 2), 255).save(src)
+        job = (src, dst, 2, "frame", cache)
+        dmd_hd.upscale_file(job)                              # fills the cache
+        os.remove(dst)
+        real = shutil.copyfile
+
+        def held(a, b, *args, **kw):
+            if os.path.dirname(a) == cache:
+                raise PermissionError("held")
+            return real(a, b, *args, **kw)
+        with mock.patch.object(shutil, "copyfile", held):
+            self.assertEqual(dst, dmd_hd.upscale_file(job))
+        self.assertTrue(os.path.exists(dst))
+
+
 if __name__ == "__main__":
     unittest.main()

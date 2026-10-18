@@ -18,6 +18,8 @@ MediaBridge.service_show):
   wider than the display shows 5 icons between the MORE arrows (images 12 and 13) and scrolls.
 - The test, audit and adjustment screens follow their ROM draw code (addresses at each screen class).
 The texts also go to the MPF event "tron_service_display" (line0-line2), which the tests read.
+With a PuP backglass, each screen's backglass() description (tron/service_backglass.py) goes there too: a
+larger view of the same screen, with the tested device placed on the playfield.
 """
 import datetime
 import os
@@ -25,7 +27,9 @@ import re
 
 from mpf.core.mode import Mode
 
+from tron import network
 from tron import rom_draw as rd
+from tron import service_backglass as bg
 from tron.hw_numbers import sam_number
 from tron.settings import service_data
 
@@ -39,9 +43,25 @@ CUSTOM_MESSAGE_LEN = 16
 CUSTOM_PRICING_MAX = 10
 LOCK_KEY = "service"
 # items of this game that the ROM does not have, by menu (docs/rom_differences.md): DISPLAY ADJUSTMENTS,
-# the HD display's text glow and size and the PuP DMD window's size (tron/settings.py DisplaySettings)
+# the HD display's text glow and size and the PuP DMD window's size (tron/settings.py DisplaySettings);
+# the NETWORK (Wi-Fi, tron/network.py) and SCORBIT (tron/scorbit.py) menus under UTILITIES
 GAME_ITEMS = {"ADJUSTMENTS": [{"text": "DISPLAY ADJUSTMENTS", "kind": "screen", "submenu": None,
-                               "shown_only_if": None}]}
+                               "shown_only_if": None}],
+              "UTILITIES": [{"text": "GO TO NETWORK MENU", "kind": "game_menu", "menu": "NETWORK"},
+                            {"text": "GO TO SCORBIT MENU", "kind": "game_menu", "menu": "SCORBIT"}]}
+
+
+def _game_menu(*texts):
+    return ([{"text": t, "kind": "screen", "submenu": None, "shown_only_if": None} for t in texts] +
+            [{"text": "RETURN TO UTILITIES MENU", "kind": "back"}, {"text": "EXIT SERVICE MENU", "kind": "exit"},
+             {"text": "DISPLAY HELP SCREEN", "kind": "help"}])
+
+
+# the menus this game adds (GAME_ITEMS kind "game_menu"), by title
+GAME_MENUS = {
+    "NETWORK": _game_menu("WI-FI STATUS", "SCAN WI-FI NETWORKS", "JOIN HIDDEN NETWORK", "FORGET WI-FI NETWORK"),
+    "SCORBIT": _game_menu("SCORBIT STATUS", "SCORBIT PAIRING", "SCORBIT ADJUSTMENTS", "SCORBIT UNPAIR"),
+}
 LIGHT_PRIORITY = 1000000
 
 # ROM draw constants
@@ -82,6 +102,10 @@ ICONS = {
     "INSTALL REDEMPTION SYSTEM": 154, "CHANGE REDEMPTION SETTINGS": 156, "UNINSTALL REDEMPTION SYSTEM": 158,
     "VIEW REDEMPTION DATA": 160,
     "DISPLAY ADJUSTMENTS": 88,
+    # the game's NETWORK and SCORBIT menus: the nearest ROM icons (serial/USB link, the tournament's)
+    "GO TO NETWORK MENU": 100, "GO TO SCORBIT MENU": 8,
+    "WI-FI STATUS": 100, "SCAN WI-FI NETWORKS": 100, "JOIN HIDDEN NETWORK": 100, "FORGET WI-FI NETWORK": 138,
+    "SCORBIT STATUS": 150, "SCORBIT PAIRING": 146, "SCORBIT ADJUSTMENTS": 88, "SCORBIT UNPAIR": 148,
     "GAME-SPECIFIC TESTS": 1429, "3-BANK MOTOR TEST": 1431, "DISC MOTOR TEST": 1433,
     "RECOGNIZER MOTOR TEST": 1435, "FIBER OPTIC LIGHT TUBE TEST": 1437,
 }
@@ -209,6 +233,11 @@ class Screen:
         """The DMD: a list of tron/rom_draw.py items (default: the common screen layout of the lines)."""
         return screen_draw(self.lines())
 
+    def backglass(self):
+        """The backglass: a description for game/pup/service_backglass.gd (tron/service_backglass.py; default:
+        the screen's lines)."""
+        return {"kind": "message", "lines": [t for t in self.lines()[1:] if t]}
+
 
 class EntryScreen(Screen):
     """The service entry screen, deff 3 [0x01037a6c]: version, SERVICE MENU, PRESS 'SELECT' TO CONTINUE.
@@ -225,6 +254,9 @@ class EntryScreen(Screen):
         return [rd.text(game, 2, 64, 5), rd.text(version, 2, 0, 11, 1), rd.text(system, 2, 64, 11),
                 rd.text(hardware, 2, 127, 11, 4), rd.fit(self.title, 64, 23, TITLE_FONTS),
                 rd.fit(CONTINUE, 64, 30, SMALL_FONTS)]
+
+    def backglass(self):
+        return {"kind": "entry", "lines": [CONTINUE, " ".join(VERSION)]}
 
     def button(self, name):
         if name == "select":
@@ -243,7 +275,8 @@ class MenuScreen(Screen):
         self.pos = 0
 
     def items(self):
-        items = [i for i in service_data()["menus"][self.title] if self.svc.visible(i)]
+        menu = GAME_MENUS.get(self.title) or service_data()["menus"][self.title]
+        items = [i for i in menu if self.svc.visible(i)]
         items += GAME_ITEMS.get(self.title, [])
         # the game adds its items (GAME-SPECIFIC TESTS) at run time: the tail items stay last
         tail = [i for i in items if i["kind"] in ("back", "exit", "help")]
@@ -258,6 +291,10 @@ class MenuScreen(Screen):
         items = self.items()
         self.pos %= len(items)
         return menu_draw([item_icon(i) for i in items], self.pos, items[self.pos]["text"])
+
+    def backglass(self):
+        items = self.items()
+        return bg.menu_state(self, items, self.pos % len(items))
 
     def button(self, name):
         items = self.items()
@@ -397,6 +434,9 @@ class SwitchTestScreen(Screen):
             return [self.title, "NONE"]
         return [self.title, rom_label(self.last), switch_number_text(self.last)]
 
+    def backglass(self):
+        return bg.switches_state(self, "test", self.last.name if self.last else None, self.lines())
+
     def draw(self):
         lines = self.lines()
         out = switch_grid(self.machine) + [rd.fit(self.title, SW_TEXT_X, 8, SMALL_FONTS, width=76)]
@@ -416,6 +456,10 @@ class ActiveSwitchScreen(ListScreen):
 
     def entry_lines(self, entry):
         return [rom_label(entry), switch_number_text(entry)]
+
+    def backglass(self):
+        entry = self.current()
+        return bg.switches_state(self, "active", entry.name if entry else None, self.lines())
 
     def draw(self):
         lines = self.lines()
@@ -442,6 +486,12 @@ class SwitchAlertsScreen(ListScreen):
 
     def entry_lines(self, entry):
         return [rom_label(entry), "NOT ACTIVE", "{} OF {}".format(self.pos + 1, len(self.entries()))]
+
+    def backglass(self):
+        entry = self.current()
+        state = bg.switches_state(self, "alerts", entry.name if entry else None, self.lines())
+        state["alerts"] = [s.name for s in self.entries()]
+        return state
 
     def draw(self):
         """TECHNICIAN ALERTS [FUN_01040b94]: TECHNICIAN ALERT - (n/m) on row 4; NO / TECHNICIAN ALERTS in
@@ -487,6 +537,9 @@ class CoilTestScreen(ListScreen):
         coil.pulse()
         self.fired.append(coil.name)
 
+    def backglass(self):
+        return bg.coils_state(self)
+
     def _cycle(self):
         self.fire(self.current())
         self.refresh()
@@ -496,6 +549,7 @@ class CoilTestScreen(ListScreen):
     def button(self, name):
         if name == "select" and not self.cycling:
             self.fire(self.current())
+            self.refresh()                       # the backglass shows the coil fired
         else:
             super().button(name)
 
@@ -550,6 +604,9 @@ class LampTestScreen(ListScreen):
         lines = self.entry_lines(entry)
         return out + [rd.fit(t, LAMP_TEXT_X, y, (0,), width=100) for t, y in zip(lines, (15, 21))]
 
+    def backglass(self):
+        return bg.lamps_state(self)
+
     def enter(self):
         self._blink()
 
@@ -596,6 +653,9 @@ class TroughTestScreen(Screen):
         sc = self.machine.switch_controller
         states = " ".join("X" if sc.is_active(self.machine.switches[n]) else "-" for n in self.NAMES)
         return [self.title, "TROUGH 1-4: " + states, "SELECT=EJECT"]
+
+    def backglass(self):
+        return bg.trough_state(self, self.NAMES + ("s_trough_jam", "s_shooter_lane"))
 
     def draw(self):
         sc = self.machine.switch_controller
@@ -836,6 +896,10 @@ class MotorTestScreen(Screen):
             out.append(rd.fit(sw, 64, 22, SMALL_FONTS))
         return out + [rd.text("USE -/+ OR 'SELECT' TO TEST", 2, 64, 30)]
 
+    def backglass(self):
+        hints = [["SELECT", "start / stop"]] + ([["MINUS", "PLUS", "direction"]] if self.direction else [])
+        return {"kind": "message", "lines": self.lines()[1:], "hints": hints + [["BACK", "return"]]}
+
     def _set(self, on):
         self.running = on
         for coil in self.coils:
@@ -929,6 +993,9 @@ class AuditScreen(ListScreen):
         return [rd.fit("{} #{}".format(self.title, number), 64, 5, SMALL_FONTS),
                 rd.fit(audits.info[number]["name"], 64, 14, (6, 2, 0)), rd.fit(audits.text(number), 64, 22, (8, 2, 0))]
 
+    def backglass(self):
+        return bg.audits_state(self)
+
 
 def dump_audits(os_, path):
     """DUMP AUDITS TO USB: every audit as "number name value" lines (the USB stick is the data folder)."""
@@ -981,6 +1048,9 @@ class AdjustmentScreen(ListScreen):
         if notes:
             out.append(rd.fit("({})".format(", ".join(notes)), 64, 29, SMALL_FONTS))
         return out
+
+    def backglass(self):
+        return bg.adjust_state(self)
 
     def _blink(self):
         self.blink_on = not self.blink_on
@@ -1178,6 +1248,526 @@ class DateTimeScreen(Screen):
         self.refresh()
 
 
+# ---------------------------------------------------------------------------------------------- network and Scorbit
+# UTILITIES > GO TO NETWORK MENU and GO TO SCORBIT MENU, added by this game (docs/rom_differences.md,
+# docs/network.md, docs/scorbit.md). The ROM has no network: these screens use the layout of its utility
+# screens (header() over a rule, font 2 lines, font 8 values).
+
+POLL_SECONDS = 0.2           # a running Wi-Fi job is checked this often
+STATUS_SECONDS = 2.0         # WI-FI STATUS and SCORBIT STATUS read again this often
+REPEAT_DELAY, REPEAT_SECONDS = 0.4, 0.08     # MINUS / PLUS held in the text entry: the letter runs
+ENTRY_DONE = "\n"            # the text entry's END "character"
+ENTRY_CLASSES = (("LOWER CASE", "abcdefghijklmnopqrstuvwxyz"), ("UPPER CASE", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+                 ("NUMBER", "0123456789"), ("SYMBOL", " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"))
+ENTRY_CHARS = ENTRY_DONE + "".join(chars for _, chars in ENTRY_CLASSES)
+SYMBOL_NAMES = {" ": "SPACE", "_": "UNDERSCORE", "[": "LEFT BRACKET", "]": "RIGHT BRACKET", "\\": "BACKSLASH",
+                "^": "CARET", "`": "BACKQUOTE", "{": "LEFT BRACE", "}": "RIGHT BRACE", "|": "VERTICAL BAR",
+                "~": "TILDE", "$": "DOLLAR", "#": "HASH"}
+ENTRY_PITCH, ENTRY_X, ENTRY_BASE = 6, 7, 17
+ENTRY_SHOWN = (rd.WIDTH - 2 * ENTRY_X) // ENTRY_PITCH + 1     # letters in view (the text scrolls left)
+
+
+def drawable(ch, font):
+    """The ROM font has the character (always True before the fonts are generated)."""
+    glyphs = rd.fonts().get(font)
+    return not glyphs or ch in glyphs["glyphs"]
+
+
+class JobScreen(Screen):
+    """A screen that runs a Wi-Fi call (tron/network.py Job) without stopping the game loop: run() starts it,
+    the MPF clock polls it and calls then(result) once it is done."""
+
+    def __init__(self, svc, title):
+        super().__init__(svc, title)
+        self.job = None
+        self._then = None
+        self._poll = None
+
+    def run(self, func, then, *args):
+        self.job = self.svc.start_job(func, *args)
+        self._then = then
+        self._check()
+
+    def _check(self):
+        self._poll = None
+        if self.job is None:
+            return
+        if self.job.done:
+            job, self.job = self.job, None
+            self._then(job.result)
+            if self.svc.stack and self.svc.stack[-1] is self:
+                self.refresh()
+            return
+        self._poll = self.machine.clock.schedule_once(self._check, POLL_SECONDS)
+
+    def leave(self):
+        if self._poll:
+            self.machine.clock.unschedule(self._poll)
+            self._poll = None
+        self.job = None
+
+    @property
+    def busy(self):
+        return self.job is not None
+
+
+def wifi_lines(info):
+    """WI-FI STATUS: (state, network, address) as the display says them."""
+    if info is None:
+        return "READING", "", ""
+    state = info.get("state", "")
+    if state != "CONNECTED":
+        return state or "UNKNOWN", "", ""
+    signal = info.get("signal")
+    ip = info.get("ip") or "NO ADDRESS"
+    return "CONNECTED", info.get("ssid", "").upper(), ip + ("  {}%".format(signal) if signal is not None else "")
+
+
+class WifiStatusScreen(JobScreen):
+    """WI-FI STATUS: connected or not, the network's name, the address and the signal, read again every
+    STATUS_SECONDS."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "WI-FI STATUS")
+        self.info = None
+        self._again = None
+
+    def enter(self):
+        self._read()
+
+    def _read(self):
+        self._again = None
+        self.run(self.svc.wifi.status, self._got)
+
+    def _got(self, result):
+        self.info = result if isinstance(result, dict) and "state" in result else {
+            "state": (result or {}).get("message", "ERROR")}
+        self._again = self.machine.clock.schedule_once(self._read, STATUS_SECONDS)
+
+    def leave(self):
+        super().leave()
+        if self._again:
+            self.machine.clock.unschedule(self._again)
+            self._again = None
+
+    def lines(self):
+        return [self.title] + [t for t in wifi_lines(self.info) if t]
+
+    def draw(self):
+        state, ssid, ip = wifi_lines(self.info)
+        out = header(self.title) + [rd.fit(state, 64, 15, (2, 0))]
+        if ssid:
+            out.append(rd.fit(ssid, 64, 23, (8, 2, 0)))
+        if ip:
+            out.append(rd.fit(ip, 64, 31, SMALL_FONTS))
+        return out
+
+
+class WifiScanScreen(JobScreen):
+    """SCAN WI-FI NETWORKS: the networks in range, strongest first (the connected one first); MINUS / PLUS
+    choose one, SELECT joins it (a secured one asks for its password first; an empty password uses the one
+    saved for it). BACK and SELECT on the menu item scan again."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "SCAN WI-FI NETWORKS")
+        self.networks = None
+        self.error = None
+        self.pos = 0
+
+    def enter(self):
+        self.scan()
+
+    def scan(self):
+        self.networks, self.error = None, None
+        self.run(self.svc.wifi.scan, self._got)
+
+    def _got(self, result):
+        if isinstance(result, list):
+            self.networks = result
+        else:
+            self.networks, self.error = [], (result or {}).get("message", "ERROR")
+        self.pos = 0
+
+    def current(self):
+        if not self.networks:
+            return None
+        self.pos %= len(self.networks)
+        return self.networks[self.pos]
+
+    def detail(self, net):
+        return "{}%{}{}".format(net["signal"], "  SECURED" if net["secure"] else "  OPEN",
+                                "  CONNECTED" if net["in_use"] else "")
+
+    def lines(self):
+        if not self.svc.wifi.available:
+            return [self.title, "WI-FI NOT AVAILABLE"]
+        if self.networks is None:
+            return [self.title, "SCANNING"]
+        net = self.current()
+        if net is None:
+            return [self.title, self.error or "NO NETWORKS FOUND"]
+        return ["NETWORK {} OF {}".format(self.pos + 1, len(self.networks)), net["ssid"].upper(), self.detail(net)]
+
+    def draw(self):
+        lines = self.lines()
+        if len(lines) == 2:
+            return header(self.title) + [rd.fit(lines[1], 64, 20, (8, 2, 0))]
+        return header(lines[0]) + [rd.fit(lines[1], 64, 19, (8, 2, 0)), rd.fit(lines[2], 64, 29, SMALL_FONTS)]
+
+    def backglass(self):
+        if self.current() is None:
+            return {"kind": "message", "lines": self.lines()[1:]}
+        return bg.networks_state(self)
+
+    def button(self, name):
+        net = self.current()
+        if name in ("minus", "plus") and net:
+            self.pos = (self.pos + (1 if name == "plus" else -1)) % len(self.networks)
+            self.refresh()
+        elif name == "select" and net and not self.busy:
+            ssid = net["ssid"]
+            if net["secure"]:
+                self.svc.push(TextEntryScreen(self.svc, "PASSWORD", "PASSWORD FOR " + ssid.upper(), 63,
+                                              lambda pw: self.svc.push(WifiConnectScreen(self.svc, ssid, pw))))
+            else:
+                self.svc.push(WifiConnectScreen(self.svc, ssid, None))
+        elif name == "back":
+            super().button(name)
+
+
+class WifiConnectScreen(JobScreen):
+    """Joining a network: CONNECTING, then CONNECTED or nmcli's reason; SELECT or BACK returns to the
+    network menu."""
+
+    def __init__(self, svc, ssid, password, hidden=False):
+        super().__init__(svc, "JOIN NETWORK")
+        self.ssid, self.hidden = ssid, hidden
+        self._password = password
+        self.result = None
+
+    def enter(self):
+        password, self._password = self._password, None     # kept no longer than the call
+        self.run(self.svc.wifi.connect, self._got, self.ssid, password or None, self.hidden)
+
+    def _got(self, result):
+        self.result = result or {"ok": False, "message": "FAILED"}
+
+    def lines(self):
+        if self.result is None:
+            return [self.title, "CONNECTING TO", self.ssid.upper()]
+        return [self.title, self.ssid.upper(), self.result["message"]]
+
+    def draw(self):
+        if self.result is None:
+            return header(self.title) + [rd.text("CONNECTING TO", 2, 64, 15), rd.fit(self.ssid.upper(), 64, 24,
+                                                                                     (8, 2, 0))]
+        return header(self.title) + [rd.fit(self.ssid.upper(), 64, 14, (2, 0)),
+                                     rd.fit(self.result["message"], 64, 23, (8, 2, 0)),
+                                     rd.fit(CONTINUE, 64, 31, SMALL_FONTS)]
+
+    def button(self, name):
+        if name in ("select", "back") and not self.busy:
+            self.svc.pop_to_menu()
+
+
+class WifiForgetScreen(JobScreen):
+    """FORGET WI-FI NETWORK: the connected network; SELECT disconnects it and deletes its saved password."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "FORGET WI-FI NETWORK")
+        self.ssid = None
+        self.result = None
+        self.read = False
+
+    def enter(self):
+        self.run(self.svc.wifi.status, self._status)
+
+    def _status(self, info):
+        self.read = True
+        self.ssid = info.get("ssid") if isinstance(info, dict) and info.get("state") == "CONNECTED" else None
+
+    def _forgot(self, result):
+        self.result = result or {"ok": False, "message": "FAILED"}
+
+    def lines(self):
+        if not self.read:
+            return [self.title, "READING"]
+        if not self.ssid:
+            return [self.title, "NOT CONNECTED"]
+        if self.result is None:
+            return [self.title, self.ssid.upper(), "PRESS 'SELECT' TO FORGET" if not self.busy else "FORGETTING"]
+        return [self.title, self.ssid.upper(), self.result["message"]]
+
+    def draw(self):
+        lines = self.lines()
+        out = header(self.title) + [rd.fit(lines[1], 64, 18, (8, 2, 0))]
+        return out + ([rd.fit(lines[2], 64, 29, SMALL_FONTS)] if len(lines) > 2 else [])
+
+    def button(self, name):
+        if name == "select" and self.ssid and not self.busy:
+            if self.result is not None:
+                self.svc.pop()
+                return
+            self.run(self.svc.wifi.forget, self._forgot, self.ssid)
+            self.refresh()
+        elif name == "back" and not self.busy:
+            self.svc.pop()
+
+
+class TextEntryScreen(Screen):
+    """Text with the four coin-door buttons (a Wi-Fi network's name or password): MINUS / PLUS change the
+    letter (held, they run), SELECT adds it, BACK deletes the last one (and leaves when there is none), the
+    flipper buttons jump to the previous / next kind of character (lower case, upper case, numbers,
+    symbols); END, before the lower case letters, finishes and calls done(text).
+
+    The ROM fonts have capitals only: a lower case letter shows as a small capital (font 2) next to the
+    capitals (font 8), and the line under the text names the kind of the letter being chosen."""
+
+    FLIPPERS = {"s_left_flipper": -1, "s_right_flipper": 1}
+
+    def __init__(self, svc, title, prompt, max_len, done, text=""):
+        super().__init__(svc, title)
+        self.prompt, self.max_len, self.done = prompt, max_len, done
+        self.text = list(text)
+        self.char = ENTRY_CHARS.index("a")
+        self._repeat = None
+        self._handlers = []
+
+    def enter(self):
+        sc = self.machine.switch_controller
+        for name, step in self.FLIPPERS.items():
+            if name in self.machine.switches:
+                self._handlers.append(sc.add_switch_handler(name, self.jump, callback_kwargs={"step": step}))
+
+    def leave(self):
+        for handler in self._handlers:
+            self.machine.switch_controller.remove_switch_handler_by_key(handler)
+        self._handlers = []
+        self._stop_repeat()
+
+    @property
+    def current(self):
+        return ENTRY_CHARS[self.char]
+
+    def kind(self, ch=None):
+        ch = self.current if ch is None else ch
+        if ch == ENTRY_DONE:
+            return "END"
+        for name, chars in ENTRY_CLASSES:
+            if ch in chars:
+                return SYMBOL_NAMES.get(ch, name) if name == "SYMBOL" else name
+
+    def lines(self):
+        shown = "END" if self.current == ENTRY_DONE else self.current
+        return [self.prompt, "".join(self.text), "> {} ({})".format(shown, self.kind())]
+
+    def backglass(self):
+        return bg.text_state(self, secret=self.title == "PASSWORD")
+
+    def draw(self):
+        out = header(self.prompt)
+        text = self.text + [self.current]
+        first = max(0, len(text) - ENTRY_SHOWN)
+        for i, ch in enumerate(text[first:]):
+            x = ENTRY_X + ENTRY_PITCH * i
+            if ch == ENTRY_DONE:
+                out.append(rd.text("END", 0, x - 1, ENTRY_BASE, 1))
+            elif ch.islower():
+                out.append(rd.text(ch.upper(), 2, x + 2, ENTRY_BASE))      # small capital
+            elif ch != " " and drawable(ch, 8):
+                out.append(rd.text(ch, 8, x + 2, ENTRY_BASE))
+            elif ch != " ":
+                out.append(rd.box(x, ENTRY_BASE - 4, 5, 5, 6))            # a symbol the font lacks
+        x = ENTRY_X + ENTRY_PITCH * (len(text) - 1 - first)
+        out.append(rd.box(x - (1 if self.current == ENTRY_DONE else 0),
+                          ENTRY_BASE + 2, 12 if self.current == ENTRY_DONE else 5, 1, 15))
+        hint = "SELECT TO FINISH" if self.current == ENTRY_DONE else self.kind()
+        out.append(rd.fit(hint, 64, 25, (0,)))
+        out.append(rd.fit("BACK=DELETE  FLIPPERS=KIND", 64, 31, (0,)))
+        return out
+
+    def step(self, direction):
+        self.char = (self.char + direction) % len(ENTRY_CHARS)
+        self.refresh()
+
+    def jump(self, step):
+        """A flipper button: the first character of the previous / next kind (END sits before lower case)."""
+        starts = [0] + [ENTRY_CHARS.index(chars[0]) for _, chars in ENTRY_CLASSES]
+        i = max(k for k, s in enumerate(starts) if s <= self.char)
+        self.char = starts[(i + step) % len(starts)]
+        self.refresh()
+
+    def _held(self, name, direction):
+        sw = self.machine.switches.get("s_service_" + name)
+        if sw is not None and self.machine.switch_controller.is_active(sw):
+            self.step(direction)
+            self._repeat = self.machine.clock.schedule_once(lambda: self._held(name, direction), REPEAT_SECONDS)
+        else:
+            self._repeat = None
+
+    def _stop_repeat(self):
+        if self._repeat:
+            self.machine.clock.unschedule(self._repeat)
+            self._repeat = None
+
+    def button(self, name):
+        if name in ("minus", "plus"):
+            direction = 1 if name == "plus" else -1
+            self._stop_repeat()
+            self.step(direction)
+            self._repeat = self.machine.clock.schedule_once(lambda: self._held(name, direction), REPEAT_DELAY)
+        elif name == "select":
+            if self.current == ENTRY_DONE:
+                text = "".join(self.text)
+                self.svc.pop()
+                self.done(text)
+                return
+            if len(self.text) < self.max_len:
+                self.text.append(self.current)
+            self.refresh()
+        elif name == "back":
+            if self.text:
+                self.text.pop()
+                self.refresh()
+            else:
+                self.svc.pop()
+
+
+class HiddenNetworkScreen(TextEntryScreen):
+    """JOIN HIDDEN NETWORK: the network's name, then its password (empty for an open network)."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "JOIN HIDDEN NETWORK", "NETWORK NAME", 32, self._named)
+
+    def _named(self, ssid):
+        if not ssid:
+            return
+        self.svc.push(TextEntryScreen(
+            self.svc, "PASSWORD", "PASSWORD FOR " + ssid.upper(), 63,
+            lambda pw: self.svc.push(WifiConnectScreen(self.svc, ssid, pw, hidden=True))))
+
+
+class ScorbitStatusScreen(Screen):
+    """SCORBIT STATUS: why Scorbit is off, or the SDK's connection and pairing state; the machine id, the
+    server and the cabinet's Scorbit UUID. Read again every STATUS_SECONDS."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "SCORBIT STATUS")
+        self._again = None
+
+    def enter(self):
+        self._again = self.machine.clock.schedule_interval(self.refresh, STATUS_SECONDS)
+
+    def leave(self):
+        if self._again:
+            self.machine.clock.unschedule(self._again)
+            self._again = None
+
+    def lines(self):
+        sb = self.os.scorbit
+        machine = sb.cfg.get("machine_id") or "-"
+        return [self.title, sb.status_text(), "MACHINE {}  {}".format(machine, sb.settings.hostname.upper())]
+
+    def draw(self):
+        title, status, machine = self.lines()
+        out = header(title) + [rd.fit(status, 64, 17, (8, 2, 0)), rd.fit(machine, 64, 25, SMALL_FONTS)]
+        uuid = self.os.scorbit.machine_uuid()
+        if uuid:
+            out.append(rd.fit(uuid.replace("-", "").upper(), 64, 31, (0,)))     # 32 digits: just fits
+        return out
+
+
+class ScorbitPairScreen(Screen):
+    """SCORBIT PAIRING: a pairing code from Scorbit (6 letters and digits) for the venue owner to enter in the
+    Scorbit app; SELECT asks for a new one. Shows PAIRED once Scorbit says so."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "SCORBIT PAIRING")
+        self._again = None
+
+    def enter(self):
+        sb = self.os.scorbit
+        if sb.running and sb.status_text() != "PAIRED":
+            sb.request_pair_code()
+        self._again = self.machine.clock.schedule_interval(self.refresh, POLL_SECONDS * 2)
+
+    def leave(self):
+        if self._again:
+            self.machine.clock.unschedule(self._again)
+            self._again = None
+
+    def lines(self):
+        sb = self.os.scorbit
+        if not sb.running:
+            return [self.title, "SCORBIT IS OFF", sb.status_text()]
+        status = sb.status_text()
+        if status == "PAIRED":
+            return [self.title, "PAIRED", "SCORBIT APP: MACHINE SETTINGS"]
+        if sb.pair_code:
+            return [self.title, sb.pair_code.upper(), "ENTER IN THE SCORBIT APP"]
+        if sb.pair_error:
+            return [self.title, sb.pair_error, "PRESS 'SELECT' TO TRY AGAIN"]
+        return [self.title, "ASKING SCORBIT", status]
+
+    def draw(self):
+        title, big, small = self.lines()
+        return header(title) + [rd.fit(big, 64, 22, (15, 12, 8, 2)), rd.fit(small, 64, 31, SMALL_FONTS)]
+
+    def backglass(self):
+        return {"kind": "message", "lines": self.lines()[1:], "big": True}
+
+    def button(self, name):
+        sb = self.os.scorbit
+        if name == "select" and sb.running and sb.status_text() != "PAIRED":
+            sb.request_pair_code()
+            self.refresh()
+        else:
+            super().button(name)
+
+
+class ScorbitUnpairScreen(Screen):
+    """SCORBIT UNPAIR: SELECT asks Scorbit to unpair the cabinet from its venue; the answer follows."""
+
+    def __init__(self, svc):
+        super().__init__(svc, "SCORBIT UNPAIR")
+        self.asked = False
+        self._again = None
+
+    def enter(self):
+        self._again = self.machine.clock.schedule_interval(self.refresh, POLL_SECONDS * 2)
+
+    def leave(self):
+        if self._again:
+            self.machine.clock.unschedule(self._again)
+            self._again = None
+
+    def lines(self):
+        sb = self.os.scorbit
+        if not sb.running:
+            return [self.title, "SCORBIT IS OFF", sb.status_text()]
+        if not self.asked:
+            return [self.title, sb.status_text(), "PRESS 'SELECT' TO UNPAIR"]
+        return [self.title, sb.unpair_result or "ASKING SCORBIT", CONTINUE if sb.unpair_result else ""]
+
+    def draw(self):
+        lines = self.lines()
+        out = header(lines[0]) + [rd.fit(lines[1], 64, 19, (8, 2, 0))]
+        return out + ([rd.fit(lines[2], 64, 29, SMALL_FONTS)] if lines[2] else [])
+
+    def button(self, name):
+        sb = self.os.scorbit
+        if name == "select" and sb.running:
+            if self.asked and sb.unpair_result:
+                self.svc.pop()
+                return
+            if not self.asked:
+                self.asked = True
+                sb.request_unpair()
+            self.refresh()
+        else:
+            super().button(name)
+
+
 # ---------------------------------------------------------------------------------------------- the mode
 
 class ServiceMode(Mode):
@@ -1189,7 +1779,11 @@ class ServiceMode(Mode):
         self.handlers = []
         self.lines = []
         self.draw_items = []
+        self.backglass = None
+        self._backglass_screen = None
         self.dump_path = os.path.join(self.machine.machine_path, "data", "audit_dump.txt")
+        self._wifi = None
+        self.jobs_inline = False
 
     @property
     def os(self):
@@ -1221,6 +1815,9 @@ class ServiceMode(Mode):
         os_ = self.os
         os_.in_service = False
         os_.media.service_hide()
+        self.backglass = {"show": False}
+        self._backglass_screen = None
+        os_.media.service_backglass(self.backglass)
         self.machine.events.post("tron_service_exited")
         if not self.machine.modes["attract"].active:
             self.machine.modes["attract"].start()
@@ -1247,12 +1844,39 @@ class ServiceMode(Mode):
     def exit(self):
         self.stop()
 
+    def pop_to_menu(self):
+        """Back to the menu under the screens of a task (a Wi-Fi join: list, password, result)."""
+        while len(self.stack) > 1 and not isinstance(self.stack[-1], MenuScreen):
+            self.stack.pop().leave()
+        self.render()
+
+    # ------------------------------------------------------------------ Wi-Fi
+
+    @property
+    def wifi(self):
+        """The Wi-Fi backend (tron/network.py), made on first use."""
+        if self._wifi is None:
+            self._wifi = network.wifi_backend()
+        return self._wifi
+
+    def start_job(self, func, *args):
+        """A Wi-Fi call in a worker thread (inline when jobs_inline is set: the tests)."""
+        if self.jobs_inline:
+            job = network.Job.__new__(network.Job)
+            job.done, job.result = False, None
+            job._run(func, *args)
+            return job
+        return network.Job(func, *args)
+
     def render(self):
         screen = self.stack[-1]
         lines = (screen.lines() + ["", "", ""])[:3]
         self.lines = lines
         self.draw_items = screen.draw()
         self.os.media.service_show(lines, self.draw_items)
+        self.backglass = bg.describe(self, with_devices=screen is not self._backglass_screen)
+        self._backglass_screen = screen
+        self.os.media.service_backglass(self.backglass)
         self.machine.events.post("tron_service_display", line0=lines[0], line1=lines[1], line2=lines[2])
 
     def visible(self, item):
@@ -1274,6 +1898,8 @@ class ServiceMode(Mode):
         kind, text = item["kind"], item["text"]
         if kind == "submenu":
             self.push(MenuScreen(self, menu_numbers()[item["submenu"]]))
+        elif kind == "game_menu":
+            self.push(MenuScreen(self, item["menu"]))
         elif kind == "back":
             self.pop()
         elif kind == "exit":
@@ -1366,6 +1992,14 @@ class ServiceMode(Mode):
             "STANDARD ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "standard"),
             "FEATURE ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "feature"),
             "DISPLAY ADJUSTMENTS": lambda: AdjustmentScreen(self, text, None, os_.display_settings),
+            "WI-FI STATUS": lambda: WifiStatusScreen(self),
+            "SCAN WI-FI NETWORKS": lambda: WifiScanScreen(self),
+            "JOIN HIDDEN NETWORK": lambda: HiddenNetworkScreen(self),
+            "FORGET WI-FI NETWORK": lambda: WifiForgetScreen(self),
+            "SCORBIT STATUS": lambda: ScorbitStatusScreen(self),
+            "SCORBIT PAIRING": lambda: ScorbitPairScreen(self),
+            "SCORBIT ADJUSTMENTS": lambda: AdjustmentScreen(self, text, None, os_.scorbit.settings),
+            "SCORBIT UNPAIR": lambda: ScorbitUnpairScreen(self),
             "ENTER CUSTOM MESSAGE": lambda: CustomMessageScreen(self),
             "SET DATE/TIME": lambda: DateTimeScreen(self),
             "SET CUSTOM PRICING": lambda: CustomPricingScreen(self),
@@ -1402,6 +2036,7 @@ class ServiceMode(Mode):
         scores and credits."""
         self.os.adj.factory_reset()
         self.os.display_settings.factory_reset()
+        self.os.scorbit.settings.factory_reset()
         self.os.audits.reset_all()
         self.reset_high_scores(3)
         self.reset_credits()
