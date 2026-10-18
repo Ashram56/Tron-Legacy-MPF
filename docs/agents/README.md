@@ -95,10 +95,14 @@ Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue
 `--dmd-tint orange`, `--dmd-text-glow 0`. The operator can also set the text glow and size in the service
 menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the options).
 
-Scorbit and Wi-Fi (2026-10-16, branch `claude/scorbit-support-2e998i`): UTILITIES > GO TO NETWORK MENU (nmcli or
+Scorbit and Wi-Fi (2026-10-16, merged with PR #50 on 2026-10-18): UTILITIES > GO TO NETWORK MENU (nmcli or
 wpa_cli backend) and GO TO SCORBIT MENU; Scorbit SDK 2.0.4 via `setup.py --scorbit` (Linux only), modes played and completed (completions need an SDK after 2.0.4), credentials in
 `game/scorbit.local.cfg` ([docs/scorbit.md](../scorbit.md), [docs/network.md](../network.md)). Open: the owner's
 Scorbit provider credentials; a check of both Wi-Fi backends and of pairing on the cabinet.
+
+Service menu icons of the items the game adds (FEATURE AUDITS/ADJUSTMENTS, DISPLAY ADJUSTMENTS, NETWORK, SCORBIT):
+its own, in the ROM's style, game images 9000+ in `game/service_icons/` drawn as text art by
+`scripts/gen_service_icons.py` (2026-10-18; the owner asked for them, his look is open).
 
 ### Owner decisions (keep adding)
 

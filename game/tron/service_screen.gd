@@ -4,7 +4,8 @@ extends Control
 ## - {"t", "f", "x", "y", "a", "l"}: text t in ROM font f (game/fonts), baseline row y, a = flags (1 left edge
 ##   at x, 2 centred on x, 4 right edge at x), measured as the ROM measures it (RomText.rom_width), at palette
 ##   level l (0-15, default 15);
-## - {"i", "x", "y"}: ROM image i (assets/mpf_package/media/rom_images_all.zip, "%04d.png"), top left at x, y;
+## - {"i", "x", "y"}: ROM image i (assets/mpf_package/media/rom_images_all.zip, "%04d.png"; 9000+ the game's,
+##   game/service_icons), top left at x, y;
 ## - {"r": [x, y, w, h], "l"}: a filled rectangle at palette level l (0-15).
 ## Everything is tinted with the DMD colour; in the HD mode (tools/dmd_mode.gd) with the DMD text colour, the
 ## text drawn from the ROM fonts' vector outlines with its glow (tron/rom_text_hd.gd).
@@ -13,6 +14,8 @@ const RomText = preload("res://tron/rom_text.gd")
 const RomTextHd = preload("res://tron/rom_text_hd.gd")
 const DMD_COLOR := Color(1, 0.45, 0.05, 1)
 const IMAGES_ZIP := "../assets/mpf_package/media/rom_images_all.zip"
+const GAME_ICONS := "res://service_icons/%04d.png"      # the icons of the items the game adds (gen_service_icons.py)
+const GAME_ICONS_FROM := 9000
 
 static var _zip: ZIPReader = null
 static var _textures: Dictionary = {}
@@ -47,6 +50,8 @@ static func texture(n: int) -> Texture2D:
 		if _zip.open(ProjectSettings.globalize_path("res://").path_join(IMAGES_ZIP)) != OK:
 			push_warning("service_screen: no %s" % IMAGES_ZIP)
 	var bytes := _zip.read_file("%04d.png" % n) if _zip else PackedByteArray()
+	if n >= GAME_ICONS_FROM:
+		bytes = FileAccess.get_file_as_bytes(GAME_ICONS % n)
 	if bytes.size():
 		var img := Image.new()
 		if img.load_png_from_buffer(bytes) == OK:

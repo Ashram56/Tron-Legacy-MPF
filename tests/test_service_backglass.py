@@ -262,3 +262,19 @@ class TestNetworkAndScorbit(NetworkCase):
         self.assertEqual("message", state["kind"])
         self.assertTrue(state["big"])
         self.assertEqual(self.top.lines()[1:], state["lines"])
+
+
+class TestGameIcons(ServiceCase):
+
+    def test_added_items_have_their_own_icons(self):
+        """The items this game adds use its icons (scripts/gen_service_icons.py), both images of each on disk,
+        and no two items share one."""
+        sys.path.insert(0, os.path.join(ROOT, "scripts"))
+        import gen_service_icons
+        from tron import service
+        made = gen_service_icons.icons()
+        for text, n in made.items():
+            self.assertEqual(n, service.ICONS[text], text)
+            for k in (0, 1):
+                self.assertTrue(os.path.exists(os.path.join(GAME, "service_icons", "%04d.png" % (n + k))), text)
+        self.assertEqual(len(made), len(set(made.values())))
