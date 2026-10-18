@@ -116,8 +116,11 @@ def upscale_file(job):
         data = fp.read()
     cached = os.path.join(cache, cache_key(data, f, kind) + ".png") if cache else None
     if cached and os.path.exists(cached):
-        shutil.copyfile(cached, dst)
-        return dst
+        try:
+            shutil.copyfile(cached, dst)
+            return dst
+        except PermissionError:
+            pass        # Windows: another worker is replacing this entry right now; upscale it here instead
     img = Image.open(src)
     out = upscale_sprite(img, f) if kind == "sprite" else upscale_frame(img, f)
     out.save(dst, optimize=False, compress_level=6)
