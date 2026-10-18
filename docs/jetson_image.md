@@ -222,7 +222,7 @@ cat /etc/nv_tegra_release                     # R35 (release), REVISION: 6.4
 lsblk                                         # / on mmcblk1p1 (SD) or nvme0n1p1 (NVMe), full size
 networkctl; ip a                              # eth0 / wlan0
 wpa_passphrase "SSID" "pass" | sudo tee -a /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
-sudo systemctl restart wpa_supplicant@wlan0   # join Wi-Fi
+sudo systemctl restart wpa_supplicant@wlan0   # join Wi-Fi (or the game's service menu: docs/network.md)
 ffmpeg -c:v h264_nvv4l2dec -i v.mp4 -f null - # hardware decode through NVIDIA's FFmpeg
 docker info | grep -i runtime                 # Default Runtime: nvidia
 startx                                        # from the console as jetson

@@ -31,3 +31,5 @@ game/**/*.import
 game/fonts_ttf/baked/
 # Jetson image build output (scripts/jetson_image/build/build-native.sh, run from its folder)
 /scripts/jetson_image/build/work/
+# Scorbit credentials of this cabinet (docs/scorbit.md)
+game/scorbit.local.cfg

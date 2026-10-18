@@ -38,6 +38,11 @@ MONITOR_REQUIREMENTS = ["mpf-monitor==" + MPF_MONITOR_VERSION,
 # Visual Pinball X (setup.py --vpx): olefile reads the table's script out of the .vpx (scripts/vpx_table.py),
 # pywin32 runs the TronMPF.Controller COM server VPX talks to (scripts/vpx_bridge.py, Windows only).
 VPX_REQUIREMENTS = ["olefile>=0.46", 'pywin32>=306; sys_platform == "win32"']
+# Scorbit (setup.py --scorbit, docs/scorbit.md): the `scorbit` wrapper from PyPI and its native library from the
+# SDK's GitHub release, the same version; the release builds the library for Linux only (amd64, arm64, armhf)
+SCORBIT_VERSION = "2.0.4"
+SCORBIT_REQUIREMENTS = ["scorbit==" + SCORBIT_VERSION]
+SCORBIT_ARCHES = {"x86_64": "amd64", "arm64": "arm64"}
 # mpf-monitor 1.0.0 on PyPI (wheel and sdist) lacks its Qt Designer files, so `mpf monitor` stops with
 # "searchable_tree.ui: No such file". setup.py puts them in from the release's git tag.
 MPF_MONITOR_UI_FILES = ("events_table.ui", "inspector.ui", "searchable_table.ui", "searchable_tree.ui")
@@ -123,6 +128,17 @@ def godot_asset(os_name=None, arch=None):
 
 def godot_url(os_name=None, arch=None):
     return GODOT_RELEASES + godot_asset(os_name, arch)
+
+
+def scorbit_url(arch=None):
+    """The Scorbit SDK's native library for Linux on this CPU (the "u18" build: glibc 2.27+)."""
+    return ("https://github.com/scorbit-io/scorbit_sdk/releases/download/{0}/scorbit_sdk-{0}-{1}_u18.tar.gz"
+            .format(SCORBIT_VERSION, SCORBIT_ARCHES[host_arch(arch)]))
+
+
+def scorbit_lib_dir(root=ROOT):
+    """tools/scorbit/lib: libscorbit_sdk.so* (game/tron/scorbit.py points the wrapper here)."""
+    return os.path.join(root, "tools", "scorbit", "lib")
 
 
 def godot_dir(root=ROOT):
