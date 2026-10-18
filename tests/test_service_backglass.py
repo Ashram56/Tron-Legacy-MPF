@@ -7,6 +7,7 @@ import sys
 import tempfile
 from unittest import mock
 
+from tests.test_network import NetworkCase
 from tests.test_service import ServiceCase
 from tests.tron_test import GAME, ROOT
 
@@ -220,3 +221,44 @@ class TestStill(ServiceCase):
             self.assertEqual(os.path.join(pack, "Background - Backglass", "BG.mp4"), gen_pup.background_video(pack))
             os.remove(os.path.join(pack, "screens.pup"))
             self.assertIsNone(gen_pup.background_video(pack))
+
+
+class TestNetworkAndScorbit(NetworkCase):
+    """The NETWORK and SCORBIT menus (UTILITIES, added by this game) on the backglass."""
+
+    def test_menus_networks_password_and_pairing(self):
+        self.enter()
+        self.goto("GO TO UTILITIES MENU")
+        state = self.svc.backglass
+        network = next(i for i in state["items"] if i["text"] == "GO TO NETWORK MENU")
+        self.assertIn("SCAN WI-FI NETWORKS", [c[0] for c in network["children"]])
+        self.goto("GO TO NETWORK MENU", "SCAN WI-FI NETWORKS")
+        state = self.svc.backglass
+        self.assertEqual("rows", state["kind"])
+        self.assertEqual([[1, "GRID", "80%  SECURED"], [2, "ARCADE", "40%  OPEN"]], state["rows"])
+        self.press("plus")
+        self.assertEqual(1, self.svc.backglass["sel"])
+        self.press("minus")
+        self.press("select")                              # a secured network: its password
+        self.press("select")                              # a
+        self.press("plus")
+        state = self.svc.backglass
+        self.assertEqual("text", state["kind"])
+        self.assertEqual("*", state["text"])              # the password never shows on the backglass
+        self.assertEqual("*", state["char"])
+        self.assertEqual([1, 63], state["count"])
+        self.assertEqual("a", self.shown[-1][1])           # the DMD shows it, as the ROM's editors do
+
+    def test_hidden_network_name_shows(self):
+        self.enter()
+        self.goto("GO TO UTILITIES MENU", "GO TO NETWORK MENU", "JOIN HIDDEN NETWORK")
+        self.press("select")
+        self.assertEqual("a", self.svc.backglass["text"])
+
+    def test_pairing_code_is_big(self):
+        self.enter()
+        self.goto("GO TO UTILITIES MENU", "GO TO SCORBIT MENU", "SCORBIT PAIRING")
+        state = self.svc.backglass
+        self.assertEqual("message", state["kind"])
+        self.assertTrue(state["big"])
+        self.assertEqual(self.top.lines()[1:], state["lines"])

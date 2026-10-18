@@ -896,6 +896,10 @@ class MotorTestScreen(Screen):
             out.append(rd.fit(sw, 64, 22, SMALL_FONTS))
         return out + [rd.text("USE -/+ OR 'SELECT' TO TEST", 2, 64, 30)]
 
+    def backglass(self):
+        hints = [["SELECT", "start / stop"]] + ([["MINUS", "PLUS", "direction"]] if self.direction else [])
+        return {"kind": "message", "lines": self.lines()[1:], "hints": hints + [["BACK", "return"]]}
+
     def _set(self, on):
         self.running = on
         for coil in self.coils:
@@ -1410,6 +1414,11 @@ class WifiScanScreen(JobScreen):
             return header(self.title) + [rd.fit(lines[1], 64, 20, (8, 2, 0))]
         return header(lines[0]) + [rd.fit(lines[1], 64, 19, (8, 2, 0)), rd.fit(lines[2], 64, 29, SMALL_FONTS)]
 
+    def backglass(self):
+        if self.current() is None:
+            return {"kind": "message", "lines": self.lines()[1:]}
+        return bg.networks_state(self)
+
     def button(self, name):
         net = self.current()
         if name in ("minus", "plus") and net:
@@ -1551,6 +1560,9 @@ class TextEntryScreen(Screen):
     def lines(self):
         shown = "END" if self.current == ENTRY_DONE else self.current
         return [self.prompt, "".join(self.text), "> {} ({})".format(shown, self.kind())]
+
+    def backglass(self):
+        return bg.text_state(self, secret=self.title == "PASSWORD")
 
     def draw(self):
         out = header(self.prompt)
@@ -1700,6 +1712,9 @@ class ScorbitPairScreen(Screen):
     def draw(self):
         title, big, small = self.lines()
         return header(title) + [rd.fit(big, 64, 22, (15, 12, 8, 2)), rd.fit(small, 64, 31, SMALL_FONTS)]
+
+    def backglass(self):
+        return {"kind": "message", "lines": self.lines()[1:], "big": True}
 
     def button(self, name):
         sb = self.os.scorbit

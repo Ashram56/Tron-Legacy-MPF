@@ -184,6 +184,8 @@ func _paint() -> void:
 			_paint_coils()
 		"trough":
 			_paint_trough()
+		"text":
+			_paint_text()
 		_:
 			_paint_message()
 	_paint_footer()
@@ -213,8 +215,36 @@ func _paint_message() -> void:
 	var box := Rect2(460, 467 - h * 0.5, 1000, h)
 	_box(box, CYAN, PANEL, 2, 12, true)
 	_text(Vector2(960, box.position.y + 70), str(state.get("title", "")), 48, ICE, _orb, 0, true, 920, CYAN)
+	var big := bool(state.get("big", false))
 	for i in lines.size():
-		_text(Vector2(960, box.position.y + 150 + i * 64), str(lines[i]), 36, ICE, _raj, 0, false, 920)
+		if big and i == 0:
+			_text(Vector2(960, box.position.y + 170), str(lines[0]), 84, AMBER, _orb, 0, true, 920, ORANGE)
+		else:
+			_text(Vector2(960, box.position.y + 150 + i * 64 + (60 if big else 0)), str(lines[i]), 36, ICE, _raj, 0,
+				false, 920)
+
+
+## A name or password being typed: the text in large letters, the character being chosen in a cursor box.
+func _paint_text() -> void:
+	var box := Rect2(360, 250, 1200, 420)
+	_box(box, CYAN, PANEL, 2, 12, true)
+	_text(Vector2(960, 310), str(state.get("prompt", "")), 40, ICE, _orb, 0, true, 1120, CYAN)
+	var typed := str(state.get("text", ""))
+	var ch := str(state.get("char", ""))
+	var size := 64
+	var shown := typed
+	while shown.length() > 1 and _orb.get_string_size(shown + "WW", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > 1100:
+		shown = shown.substr(1)                        # the end of a long text, as the DMD scrolls it
+	var w := _orb.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var cw := maxf(48.0, _orb.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 20)
+	var x := 960 - (w + cw) * 0.5
+	_text(Vector2(x, 450), shown, size, ICE, _orb, -1, false)
+	var cur := Rect2(x + w + 6, 410, cw, 80)
+	_box(cur, ORANGE, PANEL_HOT, 2, 8, true)
+	_text(cur.get_center(), ch, 44 if ch == "END" else size, AMBER, _orb, 0, false)
+	_text(Vector2(960, 560), str(state.get("char_kind", "")), 32, ORANGE, _raj, 0, false, 1100)
+	var count: Array = state.get("count", [0, 0])
+	_text(Vector2(960, 620), "%d OF %d CHARACTERS" % [int(count[0]), int(count[1])], 26, SOFT, _raj, 0, false)
 
 
 func _short(text: String) -> String:

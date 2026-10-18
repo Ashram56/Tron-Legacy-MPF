@@ -17,7 +17,9 @@ they do); the kinds and their own keys:
 - "lamps": "group", "number", "lit" [names lit now], "focus" [names of the group], "on";
 - "coils": "list" [names], "sel", "fired" (the last one fired), "cycling", "flashers";
 - "trough": "switches" [{name, active}];
-- "message": "lines".
+- "text": a text being typed (a Wi-Fi name or password), "prompt", "text" (a password as stars), "char" (the
+  character being chosen, "END" to finish), "char_kind", "count" [length, most];
+- "message": "lines", "big" (the first line large: Scorbit's pairing code).
 Device views ("switches", "lamps", "coils", "trough") carry "devices" when the screen opens: every switch, lamp and coil with its SAM
 number, ROM name, matrix cell, playfield position (game/monitor/monitor.yaml, fractions of
 game/monitor/playfield.jpg), insert colour (game/monitor/light_colors.csv), wire colours and pulse time.
@@ -72,6 +74,14 @@ SCREEN_INFO = {
     "ENTER CUSTOM MESSAGE": "The attract mode's message",
     "SET CUSTOM PRICING": "Coin units and units per credit",
     "SET DATE/TIME": "The game's clock",
+    "WI-FI STATUS": "Network, address and signal",
+    "SCAN WI-FI NETWORKS": "Networks in range; SELECT joins one",
+    "JOIN HIDDEN NETWORK": "Type a network's name and password",
+    "FORGET WI-FI NETWORK": "Remove the saved network",
+    "SCORBIT STATUS": "Connected, paired, the machine id",
+    "SCORBIT PAIRING": "A code to enter in the Scorbit app",
+    "SCORBIT ADJUSTMENTS": "Scorbit on or off, its server",
+    "SCORBIT UNPAIR": "Release the machine from its owner",
     "RETURN TO MAIN MENU": "Back to the main menu",
     "RETURN TO PREVIOUS MENU": "Back one menu",
     "EXIT SERVICE MENU": "Back to the attract mode",
@@ -94,6 +104,8 @@ HINTS = {
     "coils_cycling": [["BACK", "stop"]],
     "trough": [["SELECT", "eject a ball"], BACK],
     "message": [["SELECT", "continue"], BACK],
+    "text": [["MINUS", "PLUS", "letter"], ["SELECT", "add"], ["BACK", "del"], ["FLIPPERS", "set"]],
+    "networks": [["MINUS", "PLUS", "choose"], ["SELECT", "join"], BACK],
 }
 
 _TABLES = {}
@@ -228,9 +240,11 @@ def menu_state(screen, items, sel):
     for item in items:
         entry = {"text": item["text"], "icon": item_icon(item), "info": MAIN_INFO.get(item["text"], ""),
                  "children": []}
-        if item["kind"] == "submenu":
-            child = [i for i in menus.get(numbers.get(item["submenu"], ""), [])
-                     if screen.svc.visible(i) and i["kind"] not in ("back", "exit", "help")]
+        if item["kind"] in ("submenu", "game_menu"):
+            from tron.service import GAME_MENUS
+            menu = GAME_MENUS.get(item.get("menu"), []) if item["kind"] == "game_menu" else menus.get(
+                numbers.get(item["submenu"], ""), [])
+            child = [i for i in menu if screen.svc.visible(i) and i["kind"] not in ("back", "exit", "help")]
             entry["children"] = [[i["text"], SCREEN_INFO.get(i["text"], "")] for i in child]
         else:
             entry["info"] = entry["info"] or SCREEN_INFO.get(item["text"], "")
@@ -311,3 +325,23 @@ def trough_state(screen, names):
     switches = screen.machine.switches
     return {"kind": "trough", "switches": [{"name": n, "active": sc.is_active(switches[n])}
                                            for n in names if n in switches]}
+
+
+def networks_state(screen):
+    """SCAN WI-FI NETWORKS: a page of the networks in range (name, signal, secured, connected)."""
+    nets = screen.networks
+    pos = screen.pos % len(nets)
+    first, last = page_of(pos, len(nets), PAGE)
+    rows = [[first + k + 1, net["ssid"].upper(), screen.detail(net)] for k, net in enumerate(nets[first:last])]
+    return {"kind": "rows", "rows": rows, "sel": pos - first, "page": [first + 1, last, len(nets)],
+            "hints": HINTS["networks"]}
+
+
+def text_state(screen, secret):
+    """A text being typed; a password stays hidden on the backglass (stars; the DMD shows it, as typed)."""
+    from tron.service import ENTRY_DONE
+    typed = "".join(screen.text)
+    done = screen.current == ENTRY_DONE
+    return {"kind": "text", "prompt": screen.prompt, "text": "*" * len(typed) if secret else typed,
+            "char": "END" if done else ("*" if secret and screen.current != " " else screen.current),
+            "char_kind": "SELECT TO FINISH" if done else screen.kind(), "count": [len(typed), screen.max_len]}
