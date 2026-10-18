@@ -14,6 +14,8 @@ const DESIGN := Vector2(1920, 1080)
 const FADE_SECONDS := 0.5
 const PLAYFIELD := "res://monitor/playfield.jpg"
 const IMAGES_ZIP := "../assets/mpf_package/media/rom_images_all.zip"     # the ROM's images (menu icons)
+const GAME_ICONS := "res://service_icons/%04d.png"      # 9000+: the game's own (tron/service_screen.gd)
+const GAME_ICONS_FROM := 9000
 
 const CYAN := Color8(64, 200, 255)
 const ICE := Color8(190, 240, 255)
@@ -772,6 +774,8 @@ func _icon(n: int, pos: Vector2, scale: float, col: Color) -> void:
 			if _zip.open(ProjectSettings.globalize_path("res://").path_join(IMAGES_ZIP)) != OK:
 				push_warning("service backglass: no %s" % IMAGES_ZIP)
 		var bytes := _zip.read_file("%04d.png" % n) if _zip.get_files().size() else PackedByteArray()
+		if n >= GAME_ICONS_FROM:
+			bytes = FileAccess.get_file_as_bytes(GAME_ICONS % n)
 		var img := Image.new()
 		var out: Texture2D = null
 		if bytes.size() and img.load_png_from_buffer(bytes) == OK:
