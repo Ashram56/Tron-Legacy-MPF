@@ -18,6 +18,8 @@ MediaBridge.service_show):
   wider than the display shows 5 icons between the MORE arrows (images 12 and 13) and scrolls.
 - The test, audit and adjustment screens follow their ROM draw code (addresses at each screen class).
 The texts also go to the MPF event "tron_service_display" (line0-line2), which the tests read.
+With a PuP backglass, each screen's backglass() description (tron/service_backglass.py) goes there too: a
+larger view of the same screen, with the tested device placed on the playfield.
 """
 import datetime
 import os
@@ -26,6 +28,7 @@ import re
 from mpf.core.mode import Mode
 
 from tron import rom_draw as rd
+from tron import service_backglass as bg
 from tron.hw_numbers import sam_number
 from tron.settings import service_data
 
@@ -209,6 +212,11 @@ class Screen:
         """The DMD: a list of tron/rom_draw.py items (default: the common screen layout of the lines)."""
         return screen_draw(self.lines())
 
+    def backglass(self):
+        """The backglass: a description for game/pup/service_backglass.gd (tron/service_backglass.py; default:
+        the screen's lines)."""
+        return {"kind": "message", "lines": [t for t in self.lines()[1:] if t]}
+
 
 class EntryScreen(Screen):
     """The service entry screen, deff 3 [0x01037a6c]: version, SERVICE MENU, PRESS 'SELECT' TO CONTINUE.
@@ -225,6 +233,9 @@ class EntryScreen(Screen):
         return [rd.text(game, 2, 64, 5), rd.text(version, 2, 0, 11, 1), rd.text(system, 2, 64, 11),
                 rd.text(hardware, 2, 127, 11, 4), rd.fit(self.title, 64, 23, TITLE_FONTS),
                 rd.fit(CONTINUE, 64, 30, SMALL_FONTS)]
+
+    def backglass(self):
+        return {"kind": "entry", "lines": [CONTINUE, " ".join(VERSION)]}
 
     def button(self, name):
         if name == "select":
@@ -258,6 +269,10 @@ class MenuScreen(Screen):
         items = self.items()
         self.pos %= len(items)
         return menu_draw([item_icon(i) for i in items], self.pos, items[self.pos]["text"])
+
+    def backglass(self):
+        items = self.items()
+        return bg.menu_state(self, items, self.pos % len(items))
 
     def button(self, name):
         items = self.items()
@@ -397,6 +412,9 @@ class SwitchTestScreen(Screen):
             return [self.title, "NONE"]
         return [self.title, rom_label(self.last), switch_number_text(self.last)]
 
+    def backglass(self):
+        return bg.switches_state(self, "test", self.last.name if self.last else None, self.lines())
+
     def draw(self):
         lines = self.lines()
         out = switch_grid(self.machine) + [rd.fit(self.title, SW_TEXT_X, 8, SMALL_FONTS, width=76)]
@@ -416,6 +434,10 @@ class ActiveSwitchScreen(ListScreen):
 
     def entry_lines(self, entry):
         return [rom_label(entry), switch_number_text(entry)]
+
+    def backglass(self):
+        entry = self.current()
+        return bg.switches_state(self, "active", entry.name if entry else None, self.lines())
 
     def draw(self):
         lines = self.lines()
@@ -442,6 +464,12 @@ class SwitchAlertsScreen(ListScreen):
 
     def entry_lines(self, entry):
         return [rom_label(entry), "NOT ACTIVE", "{} OF {}".format(self.pos + 1, len(self.entries()))]
+
+    def backglass(self):
+        entry = self.current()
+        state = bg.switches_state(self, "alerts", entry.name if entry else None, self.lines())
+        state["alerts"] = [s.name for s in self.entries()]
+        return state
 
     def draw(self):
         """TECHNICIAN ALERTS [FUN_01040b94]: TECHNICIAN ALERT - (n/m) on row 4; NO / TECHNICIAN ALERTS in
@@ -487,6 +515,9 @@ class CoilTestScreen(ListScreen):
         coil.pulse()
         self.fired.append(coil.name)
 
+    def backglass(self):
+        return bg.coils_state(self)
+
     def _cycle(self):
         self.fire(self.current())
         self.refresh()
@@ -496,6 +527,7 @@ class CoilTestScreen(ListScreen):
     def button(self, name):
         if name == "select" and not self.cycling:
             self.fire(self.current())
+            self.refresh()                       # the backglass shows the coil fired
         else:
             super().button(name)
 
@@ -550,6 +582,9 @@ class LampTestScreen(ListScreen):
         lines = self.entry_lines(entry)
         return out + [rd.fit(t, LAMP_TEXT_X, y, (0,), width=100) for t, y in zip(lines, (15, 21))]
 
+    def backglass(self):
+        return bg.lamps_state(self)
+
     def enter(self):
         self._blink()
 
@@ -596,6 +631,9 @@ class TroughTestScreen(Screen):
         sc = self.machine.switch_controller
         states = " ".join("X" if sc.is_active(self.machine.switches[n]) else "-" for n in self.NAMES)
         return [self.title, "TROUGH 1-4: " + states, "SELECT=EJECT"]
+
+    def backglass(self):
+        return bg.trough_state(self, self.NAMES + ("s_trough_jam", "s_shooter_lane"))
 
     def draw(self):
         sc = self.machine.switch_controller
@@ -929,6 +967,9 @@ class AuditScreen(ListScreen):
         return [rd.fit("{} #{}".format(self.title, number), 64, 5, SMALL_FONTS),
                 rd.fit(audits.info[number]["name"], 64, 14, (6, 2, 0)), rd.fit(audits.text(number), 64, 22, (8, 2, 0))]
 
+    def backglass(self):
+        return bg.audits_state(self)
+
 
 def dump_audits(os_, path):
     """DUMP AUDITS TO USB: every audit as "number name value" lines (the USB stick is the data folder)."""
@@ -981,6 +1022,9 @@ class AdjustmentScreen(ListScreen):
         if notes:
             out.append(rd.fit("({})".format(", ".join(notes)), 64, 29, SMALL_FONTS))
         return out
+
+    def backglass(self):
+        return bg.adjust_state(self)
 
     def _blink(self):
         self.blink_on = not self.blink_on
@@ -1189,6 +1233,8 @@ class ServiceMode(Mode):
         self.handlers = []
         self.lines = []
         self.draw_items = []
+        self.backglass = None
+        self._backglass_screen = None
         self.dump_path = os.path.join(self.machine.machine_path, "data", "audit_dump.txt")
 
     @property
@@ -1221,6 +1267,9 @@ class ServiceMode(Mode):
         os_ = self.os
         os_.in_service = False
         os_.media.service_hide()
+        self.backglass = {"show": False}
+        self._backglass_screen = None
+        os_.media.service_backglass(self.backglass)
         self.machine.events.post("tron_service_exited")
         if not self.machine.modes["attract"].active:
             self.machine.modes["attract"].start()
@@ -1253,6 +1302,9 @@ class ServiceMode(Mode):
         self.lines = lines
         self.draw_items = screen.draw()
         self.os.media.service_show(lines, self.draw_items)
+        self.backglass = bg.describe(self, with_devices=screen is not self._backglass_screen)
+        self._backglass_screen = screen
+        self.os.media.service_backglass(self.backglass)
         self.machine.events.post("tron_service_display", line0=lines[0], line1=lines[1], line2=lines[2])
 
     def visible(self, item):

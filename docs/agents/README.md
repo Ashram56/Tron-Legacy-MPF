@@ -109,6 +109,7 @@ menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the optio
 | 2026-10-10 | Service menu DISPLAY ADJUSTMENTS: TEXT SIZE capped at 110% (above it stacked lines touch); TEXT GLOW OFF to 300%. |
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
 | 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
+| 2026-10-18 | Service menu duplicated on the backglass, the DMD keeping the ROM's look (same branch for DMD-only machines); both neon frames of the backglass art stay lit, content stays clear of the lower frame; fade in and out on entering and leaving the menu. |
 
 ### Ideas not built (ask before starting)
 
@@ -134,7 +135,10 @@ Built (in the fork Tron-Legacy-MPF-PuP, merged here 2026-10-10): Terry Red's "En
 DMD and topper windows, OST in place of the ROM music, GoZen (Linux, Windows) and native_video (macOS) players,
 Jetson hardware decoding: [docs/pup/README.md](../pup/README.md), [docs/jetson/README.md](../jetson/README.md),
 [docs/performance.md](../performance.md). The DMD window has the DMD with the light cycles round it or full size
-(320x80 mm, no light cycles): `[dmd] dmd_size`, service menu PUP DMD SIZE (2026-10-12). Open: after a display change, re-run `scripts/pup/pup_captures.py`
+(320x80 mm, no light cycles): `[dmd] dmd_size`, service menu PUP DMD SIZE (2026-10-12). The service menu
+also shows on the backglass (2026-10-18: `game/pup/service_backglass.gd`, `game/tron/service_backglass.py`; the DMD
+keeps the ROM's screens), fading in and out over a median still of the backglass loop made by `gen_pup.py`;
+`[backglass] service_menu`. Open: the owner's look on a real backglass; after a display change, re-run `scripts/pup/pup_captures.py`
 and fix the flagged rows of `game/tron_pup/trigger_map.yaml`.
 
 ## Owner preferences

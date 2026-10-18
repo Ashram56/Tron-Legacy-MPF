@@ -324,6 +324,16 @@ class MediaBridge:
         self._send("slides_play", {"service": {"action": "remove", "key": "service", "expire": None}},
                    need_data=False)
 
+    def service_backglass(self, state):
+        """The service menu on the PuP backglass (tron/service_backglass.py, drawn by
+        game/pup/service_backglass.gd): the screen's description as JSON; {"show": false} hides it. Nothing
+        listens without a PuP backglass."""
+        if not self.connected(need_data=False):
+            return
+        client = self.machine.bcp.transport.get_named_client("local_display")
+        self.machine.bcp.interface.bcp_trigger_client(client=client, name="service_backglass",
+                                                      state=json.dumps(state, separators=(",", ":")))
+
     def confirm_show(self, draw):
         """The end-the-game question before the service menu opens in a game (tron/os_layer.py, not in the
         ROM), above every deff."""

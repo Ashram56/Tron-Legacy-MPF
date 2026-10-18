@@ -104,6 +104,8 @@ borderless=true
   the game without the PuP.
 - `[backglass] fit`: the videos are 16:9 and the backglass 4:3: `fit` (black bars, `align` places the video),
   `fill` (crops the sides) or `stretch`.
+- `[backglass] service_menu=false` keeps the service menu on the DMD alone (see "The service menu on the
+  backglass" below).
 - `[dmd] background`: `lightcycles` (the default) draws the DMD in a neon frame over a live 3D chase
   (`game/pup/lightcycles.gd`): two 1982-style light cycles on a grid, their trails fading after about 3 s, a
   cycle that hits a trail, a wall or the other cycle derezzes and comes back. The middle of the DMD is a wall
@@ -163,6 +165,38 @@ WaylandEnable=false
 ```
 
 (GDM's file takes no comments at the end of a line.)
+
+## The service menu on the backglass
+
+With a backglass window, the operator service menu (coin door SELECT in attract mode) shows on the backglass
+too, while the DMD keeps the ROM's own screens, so a machine without the PuP (or with
+`[backglass] service_menu=false`) is the same game. The view fades in over the backglass art when the menu
+opens and fades out when it closes (0.5 s); the videos keep playing under it.
+
+| Service screen | On the backglass |
+|---|---|
+| entry, messages, resets, installs | the screen's text in a panel |
+| main menu | every entry as a tile (its ROM icon, what it holds), the selected one lit |
+| other menus | the whole list, and what the selected item holds |
+| audits | a page of 14 audits (number, name, value) |
+| adjustments | a page of 12: value, a bar for where it sits in its range with the factory value marked, changed values in orange, `DEFAULT` for the factory value; the row being edited in orange |
+| switch test, active switches, switch alerts | the playfield with every switch placed, closed ones green, the selected one ringed with its number, name, matrix column and row; the 8 x 8 matrix with the same colours; alerts in red |
+| lamp tests | every lamp on the playfield in its insert colour, the tested lamp (or row or column) blinking with the DMD; the lamp matrix in insert colours |
+| coil and flash lamp tests | the coils on the playfield, the selected one with its driver number, pulse time and wire colours; the drivers round it |
+| ball trough test | the trough's balls, the jam and shooter lane switches, where they are on the playfield |
+
+Under the window, the lower frame says where the operator is (`DIAGNOSTICS > SWITCH MENU > SWITCH TEST`) and
+which buttons do what. The picture behind it is a still of the pack's backglass loop that `gen_pup.py` makes
+at install (`pup_media/.../service/backglass_still.png`, the per-pixel median of the loop, so the moving light
+streaks drop out), darkened inside both neon frames; without it the two frames are drawn in neon on black.
+
+Where things are drawn from: switch, lamp and coil positions from the MPF Monitor layout
+(`game/monitor/monitor.yaml`), insert colours from the Visual Pinball table (`game/monitor/light_colors.csv`,
+the extractor's `color` column), wire colours and pulse times from the ROM's coil table (the Pro's on a Pro),
+the matrix cell from the switch or lamp number (column = (n - 1) / 8 + 1, row = (n - 1) mod 8 + 1). To look at
+a change without a cabinet, save descriptions (`tron/service_backglass.py` `describe()`, with `devices()`) as
+JSON files and render them: `godot --path game -s res://tools/service_backglass_shots.gd -- --states=DIR
+--out=DIR` (a real renderer: a display or Xvfb).
 
 ## How it works
 
