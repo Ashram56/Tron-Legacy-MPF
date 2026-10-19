@@ -8,11 +8,13 @@ its PuP player has its windows and media (game/pup/pup_player.gd); only then:
   music is stopped, so the PuP OST (PuP screen 15) is the only music. Without a ready PuP player (no media,
   PuP disabled, unit tests) the ROM music plays as before.
 """
+import asyncio
 import logging
+import os
 
 from mpf.core.mode import Mode
 
-from tron_pup import engine, settings
+from tron_pup import engine, pupfiles, remote, settings
 
 log = logging.getLogger("tron.pup")
 BCP_CLIENT = "local_display"
@@ -29,6 +31,7 @@ class PupMode(Mode):
         self.mute = False
         self._attract = None
         self._sound = None
+        self.remote = None
         if not self.pup.get("enabled", True):
             log.info("PuP disabled (game/pup.cfg or TRON_PUP=0)")
             return
@@ -49,6 +52,7 @@ class PupMode(Mode):
         events.add_handler("init_phase_5", self._hello)
         events.add_handler("mode_attract_started", self._attract_start)
         events.add_handler("mode_attract_stopped", self._attract_stop)
+        self._start_remote(pack)
         log.info("PuP: %d events, %d switches; rows without a mapping: %s", len(self.engine.events),
                  len(self.engine.switches), ", ".join(str(r.id) for r in self.engine.unmapped) or "none")
 
@@ -61,8 +65,34 @@ class PupMode(Mode):
         self.engine.on_switch(switch)
 
     def send(self, cmd):
+        if self.remote:
+            self.remote.send(cmd)
         if self.ready:
             self._bcp("pup_play", **{k: v for k, v in cmd.items() if v is not None})
+
+    # ------------------------------------------------------------------ remote screens
+
+    def _start_remote(self, pack):
+        """[remote] enabled: the PuP commands also go to remote displays (game/tron_pup/remote.py)."""
+        opts = self.cfg.get("remote", {})
+        if not opts.get("enabled", False):
+            return
+        self.remote = remote.RemoteServer(
+            pupfiles.load_screens(pack), pupfiles.load_playlists(pack), game=os.path.basename(pack),
+            host=str(opts.get("listen", "0.0.0.0")), port=int(opts.get("port", remote.PORT)),
+            discovery=bool(opts.get("discovery", True)))
+        task = asyncio.ensure_future(self.remote.start(), loop=self.machine.clock.loop)
+        task.add_done_callback(self._remote_started)
+        self.machine.events.add_handler("shutdown", self._stop_remote)
+
+    def _stop_remote(self, **kwargs):
+        if self.remote:
+            self.remote.close()
+
+    def _remote_started(self, task):
+        if not task.cancelled() and task.exception():
+            log.warning("remote PuP screens: cannot listen (%s); no remote displays", task.exception())
+            self.remote = None
 
     def _bcp(self, name, **kwargs):
         """BCP trigger straight to GMC (as tron/media_bridge.py does: GMC registers no MPF handler for it)."""
