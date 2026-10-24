@@ -44,7 +44,10 @@ static func _check_hwdec() -> void:
 	if dec and HWDEC_MEM in dev:
 		return
 	if _has_pi_decoder():
-		print("GoZen: Raspberry Pi decoder (bcm2835-codec): hardware decoding, GOZEN_HWDEC=0 turns it off")
+		# measured on a Pi 4 (backglass + DMD): v4l2m2m saves ~55 points of CPU but lowers the frame rate (17 against
+		# 21 fps) and doubles the video lag, so it is opt-in until the copy and decoder re-creation are fixed
+		OS.set_environment("GOZEN_HWDEC", "0")
+		print("GoZen: Raspberry Pi decoder (bcm2835-codec) found: software decoding, GOZEN_HWDEC=1 tries it")
 		return
 	OS.set_environment("GOZEN_HWDEC", "0")
 	print("GoZen: no Jetson or Raspberry Pi decoder device (/dev/%s, /dev/%s*): software decoding"
