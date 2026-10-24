@@ -1,0 +1,6 @@
+error: patch failed: SConstruct:34
+error: SConstruct: patch does not apply
+error: patch failed: src/gozen_video.cpp:1
+error: src/gozen_video.cpp: patch does not apply
+error: patch failed: src/gozen_video.hpp:33
+error: src/gozen_video.hpp: patch does not apply
