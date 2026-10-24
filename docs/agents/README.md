@@ -137,6 +137,11 @@ Docker, CI on three OSes. Open:
 2. A double-click launcher per platform (Windows shortcut or `.bat`, macOS `.command`) that runs `run.py` with
    the installed options: not built; the owner runs the command line today.
 3. Transformers has only the Windows installer; macOS and Linux installers, Docker and CI are not ported.
+4. Prebuilt bundle (2026-10-24, [docs/bundle.md](../bundle.md)): `scripts/package/build_bundle.py` makes the game with
+   its media and Godot import already built, per GPU family (arm64 ETC2 for a Raspberry Pi 4 and a Jetson, x86_64 S3TC),
+   with `bundle.json`, a settings schema and tool for a web page (`scripts/package/options.json`,
+   `bundle_options.py`) and the PuP install from the author's zip. Built and run on a PC; not run on a real Pi 4 or
+   Jetson. The web page and file serving are another project's.
 
 ## G, PuP Pack
 
