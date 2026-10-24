@@ -1,0 +1,64 @@
+name: bundle
+
+# Builds the prebuilt game bundles (docs/bundle.md) and attaches them to a DRAFT release for someone to
+# download; nothing is published. Run it by hand from the Actions tab (a workflow runs from the default branch,
+# so it exists there only after this file is merged to main).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Bundle version, e.g. 2026.10.24 (default: today's date and the commit)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write      # creates the draft release
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GIT_LFS_SKIP_SMUDGE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        # assets/ only (scripts/setup.py fetches it): the PuP Pack submodule is private and never in a bundle
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/toolchain.py
+
+      - name: Cache Godot
+        uses: actions/cache@v4
+        with:
+          path: tools/godot
+          key: godot-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/toolchain.py') }}
+
+      - name: Setup (venv, MPF, Godot, GMC, generated media)
+        run: python scripts/setup.py
+
+      - name: Build the bundles (arm64 for Pi 4 and Jetson, x86_64 for a PC)
+        run: |
+          set -e
+          ARGS=""
+          if [ -n "${{ inputs.version }}" ]; then ARGS="--version ${{ inputs.version }}"; fi
+          .venv/bin/python scripts/package/build_bundle.py --target arm64 --out dist $ARGS
+          .venv/bin/python scripts/package/build_bundle.py --target x86_64 --out dist $ARGS
+          ls -l dist
+
+      - name: Check the archives
+        run: |
+          cd dist
+          sha256sum -c *.sha256
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="bundle-$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"
+          gh release create "$TAG" dist/*.tar.xz dist/*.sha256 --draft \
+            --title "Game bundle $TAG" \
+            --notes "Prebuilt Tron Legacy MPF bundles (docs/bundle.md). arm64: Raspberry Pi 4 and Jetson (ETC2 textures). x86_64: a PC (S3TC). Not published: review, then publish or download."

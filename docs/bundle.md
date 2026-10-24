@@ -21,7 +21,9 @@ python scripts/package/build_bundle.py --target all       # both texture formats
 python scripts/package/build_bundle.py --version 2026.10.24 --out DIR --no-archive
 ```
 
-About 2.5 minutes after setup, on 4 cores (the Godot import is most of it); the archive has a `.sha256` next to it.
+The `bundle` workflow (Actions tab, run by hand once it is on `main`) does both targets on a GitHub runner and
+attaches the archives and hashes to a **draft** release, which nobody sees until it is published or the files are
+downloaded from it. About 2.5 minutes after setup, on 4 cores (the Godot import is most of it); the archive has a `.sha256` next to it.
 The build runs on a PC for an ARM target: the textures are made for the target's format, not the builder's.
 
 Measured 2026-10-24 (arm64 target, game commit 21af8ad plus this change): **235 MB packed, 633 MB unpacked**,
@@ -44,6 +46,50 @@ tron-legacy-mpf/
 Not in it, on purpose: the ROM, the decompile, rules and traces, the tests, the PuP Pack and its converted media,
 **any cabinet data**. The builder refuses to finish when `game/data`, `game/audits`, `game/logs`, any `*.local.cfg`,
 `options.json` or a Scorbit device key is in the tree; `tests/test_bundle.py` pins the list.
+
+## Structure of the asset
+
+One archive per target, `tron-legacy-mpf-<date>-<commit>-linux-<arm64|x86_64>.tar.xz`, with its `.sha256`. One
+top folder, `tron-legacy-mpf/`. Sizes are the arm64 bundle, measured 2026-10-24 (633 MB, 29 377 files).
+
+| Path | Size | What it is |
+|---|---|---|
+| `bundle.json` | 2 KB | the manifest, below |
+| `SHA256SUMS` | 3 MB | hash of every other file: `sha256sum -c SHA256SUMS --quiet` |
+| `scripts/` | small | `run.py` (the game's runner), `toolchain.py`, `fsutil.py`, `gmc_patch.py`; `pup/` (`pup_setup.py` installs a pack, `gen_pup.py`); `package/` (`start.py`, `bundle_options.py`, `options.json`) |
+| `game/` | 600 MB | the Godot project and the MPF machine folder (below) |
+| `game/.godot/` | about 100 MB | the Godot import for the target GPU: `imported/`, `global_script_class_cache.cfg`, `uid_cache.bin` |
+| `game/media/`, `game/sounds/` | 94 MB, 109 MB | generated DMD frames and effect timing, sounds |
+| `game/fonts/`, `game/fonts_ttf/` | 4.4 MB, 63 MB | ROM fonts, baked HD fonts (the 100 s step on a Jetson) |
+| `game/slides/`, `game/service_icons/`, `game/monitor/` | 1 MB | slide scenes, service menu icons, MPF Monitor layout |
+| `game/addons/` | 19 MB | `mpf-gmc` (patched) and `gde_gozen` with the target's GoZen build (`bin/`) |
+| `game/config/` | 200 KB | MPF config; `config/rom/` has the generated coil times, coils, lights, switches, P-ROC numbers, settings |
+| `game/tron/`, `game/tron_pup/`, `game/pup/`, `game/modes/`, `game/tools/` | 2 MB | the game's Python (rules, display, PuP) and Godot scripts |
+| `game/project.godot`, `pup.cfg`, `scorbit.cfg`, `gmc.cfg` | small | the project and the shipped settings files (defaults; local overrides are `*.local.cfg`) |
+| `assets/` | 16 MB | the run-time subset of the ROM-derived assets: `mpf_package/` (config, `event_map.csv`, `lamp_effects.csv`, `service_menu.json`, `media/rom_images_all.zip`, `media/dmd/deff_*/timing.json`), `rom_data/{io,pro,settings,deffs}`, `io/`, `callouts/` |
+| `scenarios/` | small | a test scenario for a headless run |
+
+Created on the machine, not in the archive: `game/data`, `game/audits`, `game/logs`, `game/options.json`,
+`game/pup.local.cfg`, `game/scorbit.local.cfg`, `pup_pack/`, `pup_media/`, and `.venv/` / `tools/godot/` if the
+base system does not provide them.
+
+### `bundle.json`
+
+| Field | Meaning |
+|---|---|
+| `format` | 1; a loader refuses a higher number |
+| `id`, `name`, `version`, `built` | `tron-legacy-mpf`, display name, `<date>-<commit>`, UTC build time |
+| `target` | `os`, `arch` (`arm64` or `x86_64`), `texture_formats` (`etc2`, `s3tc` or `all`): the GPU family the import is made for |
+| `source` | `game_commit` and `assets_commit` the bundle was built from |
+| `requires` | `python`, `python_packages`, `godot`, `mpf_gmc`, `programs`, and `env` (`GODOT`, `TRON_VENV` overrides) |
+| `run` | `start` (the command), `start_note`, `cwd` (relative to the bundle), `ports` (5050 Godot/GMC, 5051 MPF, localhost only) |
+| `options` | `schema` (path), `tool` (path), `count`: see Settings |
+| `pup` | `install` and `status` commands, `pack_dir`, `media_dir`, `needs_restart`; the pack is never in the bundle |
+| `keep_on_update` | paths to copy from the old install to a new one |
+| `sizes` | `stage_bytes` (unpacked), `textures` (count per import format) |
+
+A loader (an installer page, for example) needs only this file: check `target.arch` against the machine, show
+`version`, unpack, run `sha256sum -c`, show the settings from `options.schema`, run `run.start`.
 
 ## Texture formats: one bundle per GPU family
 
