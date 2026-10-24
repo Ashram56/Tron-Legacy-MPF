@@ -11,6 +11,7 @@ const HEIGHT := 32
 const FPS := 30.0
 
 var _last := PackedByteArray()
+var _last_data := PackedByteArray()
 var _elapsed := 0.0
 
 func _ready() -> void:
@@ -26,12 +27,19 @@ func _process(delta: float) -> void:
 	var image := get_viewport().get_texture().get_image()
 	if image.get_width() != WIDTH or image.get_height() != HEIGHT:
 		image.resize(WIDTH, HEIGHT, Image.INTERPOLATE_NEAREST)
+	if image.get_format() != Image.FORMAT_RGBA8:
+		image.convert(Image.FORMAT_RGBA8)
+	# An unchanged picture (most of the time) is one memcmp, not 4096 dots converted.
+	var data := image.get_data()
+	if data == _last_data:
+		return
+	_last_data = data
 	var frame := PackedByteArray()
 	frame.resize(WIDTH * HEIGHT)
-	for y in HEIGHT:
-		for x in WIDTH:
-			var dot := image.get_pixel(x, y)
-			frame[y * WIDTH + x] = clampi(roundi(maxf(dot.r, maxf(dot.g, dot.b)) * 15.0), 0, 15)
+	for i in WIDTH * HEIGHT:
+		var o := i * 4
+		var v := maxi(data[o], maxi(data[o + 1], data[o + 2]))
+		frame[i] = (v * 15 + 127) / 255       # shade 0-15: the brightest channel, rounded
 	if frame == _last:
 		return
 	_last = frame
