@@ -23,6 +23,16 @@ const HWDEC_DEVICES: Array[String] = ["nvhost-nvdec", "v4l2-nvdec"]
 static var _hwdec_checked := false
 
 
+## The Raspberry Pi's H.264 decoder: a V4L2 memory-to-memory device named bcm2835-codec-decode (usually /dev/video10).
+## GoZen then tries FFmpeg's h264_v4l2m2m (scripts/gozen/gozen_v4l2m2m.patch) and falls back to software.
+static func _has_pi_decoder() -> bool:
+	for d in DirAccess.get_directories_at("/sys/class/video4linux"):
+		var f := FileAccess.open("/sys/class/video4linux/%s/name" % d, FileAccess.READ)
+		if f and f.get_as_text().begins_with("bcm2835-codec-decode"):
+			return true
+	return false
+
+
 static func _check_hwdec() -> void:
 	if _hwdec_checked or OS.has_environment("GOZEN_HWDEC") or OS.get_name() != "Linux":
 		return
@@ -31,10 +41,14 @@ static func _check_hwdec() -> void:
 	var dev := DirAccess.get_files_at("/dev")
 	var dec := Array(dev).any(func(f: String) -> bool:
 		return HWDEC_DEVICES.any(func(d: String) -> bool: return f.begins_with(d)))
-	if not (dec and HWDEC_MEM in dev):
-		OS.set_environment("GOZEN_HWDEC", "0")
-		print("GoZen: no Jetson decoder device (/dev/%s, /dev/%s*): software decoding"
-				% [HWDEC_MEM, "*, /dev/".join(HWDEC_DEVICES)])
+	if dec and HWDEC_MEM in dev:
+		return
+	if _has_pi_decoder():
+		print("GoZen: Raspberry Pi decoder (bcm2835-codec): hardware decoding, GOZEN_HWDEC=0 turns it off")
+		return
+	OS.set_environment("GOZEN_HWDEC", "0")
+	print("GoZen: no Jetson or Raspberry Pi decoder device (/dev/%s, /dev/%s*): software decoding"
+			% [HWDEC_MEM, "*, /dev/".join(HWDEC_DEVICES)])
 
 
 func _ready() -> void:
