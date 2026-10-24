@@ -47,11 +47,12 @@ GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV
   or `scripts/install/install_jetson_hwdec.sh`, see `pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md)
   for the fixes it needs); other Linux PCs decode in software.
 - **Raspberry Pi 4** (Raspberry Pi kernel, `bcm2835-codec-decode` at `/dev/video10`): FFmpeg's `h264_v4l2m2m` after the
-  Jetson's, tried when the game finds that device (`gozen_player.gd`), software if it fails to open. Needs a
-  `libgozen` built with `scripts/gozen/gozen_v4l2m2m*.patch` (`scripts/build_gozen.sh arm64`; the committed arm64
-  binary predates them, so until it is rebuilt the Pi falls back to software). H.264 up to 1080p30 only, frames are
-  copied (YUV420P, no scaling), so the CPU gain is modest (observed ~35 points); opening and closing several
-  decoders at once has hung the kernel driver on the Pi (vchiq timeouts) — `GOZEN_HWDEC=0` turns it off.
+  Jetson's, tried only with `GOZEN_HWDEC=1` (`gozen_player.gd`; software if it fails to open). Needs a `libgozen`
+  built with `scripts/gozen/gozen_v4l2m2m*.patch` (`scripts/build_gozen.sh arm64`; the committed arm64 binary
+  predates them). H.264 up to 1080p30 only, frames are copied (YUV420P, no scaling): with backglass and DMD it saves
+  ~55 points of CPU but gives 17 instead of 21 fps and doubles the video lag (3.5 s against 1.9 s), hence opt-in.
+  A first run that ended with several decoders closing at once hung the kernel driver until a reboot (vchiq
+  timeouts); later runs, including a clean stop, did not.
 
 `python scripts/pup/video_check.py` checks the decoding without the game: it decodes a few pack videos on the GPU,
 then in software (`GOZEN_HWDEC=0`), and prints per video `GPU (NV12)` or `software` and how many times faster
