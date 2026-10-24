@@ -12,6 +12,7 @@ const PLAYBACK := "res://addons/gde_gozen/video_playback.gd"
 var bus := "sfx"
 var _playback: Control
 var _loop := false
+var _covered_pause := false      # paused by set_covered()
 
 
 ## The Jetson device nodes the hardware decoder needs (in /dev). Without them, libnvmpi's NVIDIA libraries do not
@@ -71,6 +72,7 @@ func _ready() -> void:
 
 
 func open(path: String, loop: bool, volume_db: float) -> void:
+	_covered_pause = false
 	_loop = loop
 	_playback.loop = loop
 	_playback.audio_player.volume_db = volume_db
@@ -83,8 +85,28 @@ func play() -> void:
 
 
 func stop() -> void:
+	_covered_pause = false
 	_playback.close()
 	_playback.video_texture.hide()
+
+
+## pup_player.gd: a layer fully covered by an opaque video above stops decoding and goes on from the same frame when
+## uncovered (a silent one only: one with sound keeps playing). On a Raspberry Pi 4 a second running hardware decoder
+## slows the GPU down by a third (38 FPS instead of 26 with a 1080p pop-up over a 1080p background).
+func set_covered(covered: bool) -> void:
+	if covered:
+		if _playback.is_playing and _playback.audio_player.stream == null:
+			_playback.pause()
+			_covered_pause = true
+	elif _covered_pause:
+		_covered_pause = false
+		if _playback.is_open():
+			_playback.play()
+
+
+## A frame of an open video is on screen (pup_screen.gd's covers()).
+func showing() -> bool:
+	return _playback != null and _playback.video_texture.visible and _playback.is_open()
 
 
 func _on_ended() -> void:
