@@ -12,6 +12,7 @@ const PLAYBACK := "res://addons/gde_gozen/video_playback.gd"
 var bus := "sfx"
 var _playback: Control
 var _loop := false
+var _covered_pause := false      # paused by set_covered()
 
 
 ## The Jetson device nodes the hardware decoder needs (in /dev). Without them, libnvmpi's NVIDIA libraries do not
@@ -23,6 +24,16 @@ const HWDEC_DEVICES: Array[String] = ["nvhost-nvdec", "v4l2-nvdec"]
 static var _hwdec_checked := false
 
 
+## The Raspberry Pi's H.264 decoder: a V4L2 memory-to-memory device named bcm2835-codec-decode (usually /dev/video10).
+## GoZen then tries FFmpeg's h264_v4l2m2m (scripts/gozen/gozen_v4l2m2m.patch) and falls back to software.
+static func _has_pi_decoder() -> bool:
+	for d in DirAccess.get_directories_at("/sys/class/video4linux"):
+		var f := FileAccess.open("/sys/class/video4linux/%s/name" % d, FileAccess.READ)
+		if f and f.get_as_text().begins_with("bcm2835-codec-decode"):
+			return true
+	return false
+
+
 static func _check_hwdec() -> void:
 	if _hwdec_checked or OS.has_environment("GOZEN_HWDEC") or OS.get_name() != "Linux":
 		return
@@ -31,10 +42,17 @@ static func _check_hwdec() -> void:
 	var dev := DirAccess.get_files_at("/dev")
 	var dec := Array(dev).any(func(f: String) -> bool:
 		return HWDEC_DEVICES.any(func(d: String) -> bool: return f.begins_with(d)))
-	if not (dec and HWDEC_MEM in dev):
+	if dec and HWDEC_MEM in dev:
+		return
+	if _has_pi_decoder():
+		# measured on a Pi 4 (backglass + DMD): v4l2m2m saves ~55 points of CPU but lowers the frame rate (17 against
+		# 21 fps) and doubles the video lag, so it is opt-in until the copy and decoder re-creation are fixed
 		OS.set_environment("GOZEN_HWDEC", "0")
-		print("GoZen: no Jetson decoder device (/dev/%s, /dev/%s*): software decoding"
-				% [HWDEC_MEM, "*, /dev/".join(HWDEC_DEVICES)])
+		print("GoZen: Raspberry Pi decoder (bcm2835-codec) found: software decoding, GOZEN_HWDEC=1 tries it")
+		return
+	OS.set_environment("GOZEN_HWDEC", "0")
+	print("GoZen: no Jetson or Raspberry Pi decoder device (/dev/%s, /dev/%s*): software decoding"
+			% [HWDEC_MEM, "*, /dev/".join(HWDEC_DEVICES)])
 
 
 func _ready() -> void:
@@ -54,6 +72,7 @@ func _ready() -> void:
 
 
 func open(path: String, loop: bool, volume_db: float) -> void:
+	_covered_pause = false
 	_loop = loop
 	_playback.loop = loop
 	_playback.audio_player.volume_db = volume_db
@@ -66,8 +85,28 @@ func play() -> void:
 
 
 func stop() -> void:
+	_covered_pause = false
 	_playback.close()
 	_playback.video_texture.hide()
+
+
+## pup_player.gd: a layer fully covered by an opaque video above stops decoding and goes on from the same frame when
+## uncovered (a silent one only: one with sound keeps playing). On a Raspberry Pi 4 a second running hardware decoder
+## slows the GPU down by a third (38 FPS instead of 26 with a 1080p pop-up over a 1080p background).
+func set_covered(covered: bool) -> void:
+	if covered:
+		if _playback.is_playing and _playback.audio_player.stream == null:
+			_playback.pause()
+			_covered_pause = true
+	elif _covered_pause:
+		_covered_pause = false
+		if _playback.is_open():
+			_playback.play()
+
+
+## A frame of an open video is on screen (pup_screen.gd's covers()).
+func showing() -> bool:
+	return _playback != null and _playback.video_texture.visible and _playback.is_open()
 
 
 func _on_ended() -> void:

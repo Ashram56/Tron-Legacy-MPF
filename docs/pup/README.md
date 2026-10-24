@@ -46,6 +46,25 @@ GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV
 - **Jetson** (JetPack 5 or 6): the hardware decoder once libnvmpi is installed (the Linux install line does it,
   or `scripts/install/install_jetson_hwdec.sh`, see `pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md)
   for the fixes it needs); other Linux PCs decode in software.
+- **Raspberry Pi 4** (Raspberry Pi kernel, `bcm2835-codec-decode` at `/dev/video10`): FFmpeg's `h264_v4l2m2m` after the
+  Jetson's, tried only with `GOZEN_HWDEC=1` (`gozen_player.gd`; software if it fails to open). Needs a `libgozen`
+  built with `scripts/gozen/gozen_v4l2m2m*.patch` (`scripts/build_gozen.sh arm64`; the committed arm64 binary
+  predates them). H.264 up to 1080p30 only, frames are copied (YUV420P, no scaling): with backglass and DMD it saves
+  ~55 points of CPU but gives 17 instead of 21 fps and doubles the video lag (3.5 s against 1.9 s), hence opt-in.
+  A first run that ended with several decoders closing at once hung the kernel driver until a reboot (vchiq
+  timeouts); later runs, including a clean stop, did not.
+  With `scripts/gozen/gozen_zerocopy.patch` (and `video_playback.gd`, Render thread "safe", OpenGL ES) the frames are
+  not copied any more: the decoder's buffer is exported as a dmabuf, imported on the GPU per plane (EGLImage) and
+  shown as a Godot texture (`GOZEN_ZEROCOPY=0` turns it off). Measured on a Pi 4 (classic DMD, 1080p backglass full
+  screen, 60 s): Godot's CPU 160 % -> 93 %, video lag 4.4 s -> 0.9 s, but the GPU is then the limit: Godot's canvas
+  shader fills only ~150-200 Mpixel/s on the V3D, and Mesa copies each linear (imported) plane to a tiled shadow at
+  every draw (`V3D_DEBUG=perf`: "Updating ... shadow for linear texture", ~1.6 ms per 1080p plane). What helped,
+  with the original 1080p videos (15 -> 22.6 fps, 31 fps at a 1280x720 render size): the unshaded
+  `yuv_to_rgb_fast*.gdshader` (used when a video has no rotation, interlacing or alpha), no full-window `ColorRect`
+  behind the screens, a layer fully covered by an opaque video above it neither drawn nor decoded (a silent one
+  pauses; a running hardware decoder slows the GPU by 15-30 %), and `[backglass] render_size=[1280, 720]` (the window
+  drawn at that size and scaled up; the videos keep their resolution; off by default). A DMD lightcycles
+  background (3D with glow in a 1032x256 viewport) costs ~27 ms a frame on the Pi 4.
 
 `python scripts/pup/video_check.py` checks the decoding without the game: it decodes a few pack videos on the GPU,
 then in software (`GOZEN_HWDEC=0`), and prints per video `GPU (NV12)` or `software` and how many times faster

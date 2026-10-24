@@ -45,6 +45,22 @@ var native_video := false
 var gozen := false
 
 
+## Layers fully covered by an opaque video above them are not drawn, and pause when silent (pup_screen.set_covered()):
+## on a Raspberry Pi 4 a 1080p video layer costs ~6 ms of GPU to draw plus ~5 ms to convert its planes, and its
+## hardware decoder slows the GPU down, for nothing when hidden. The screens' own visibility is untouched.
+func _process(_delta: float) -> void:
+	for section in LAYERS:
+		var covered := false
+		for i in range(LAYERS[section].size() - 1, -1, -1):
+			var s = screens.get(LAYERS[section][i])
+			if s == null:
+				continue
+			if not s.audio_only:
+				s.set_covered(covered)
+			if not covered and s.covers():
+				covered = true
+
+
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
@@ -215,15 +231,20 @@ func _make_window(section: String) -> Window:
 	if section == "dmd" and _dmd_size_arg() != Vector2i.ZERO:
 		w.size = _dmd_size_arg()
 	w.position = DisplayServer.screen_get_position(screen) + Vector2i(int(pos_cfg[0]), int(pos_cfg[1]))
-	var back := ColorRect.new()
-	back.color = Color.BLACK
-	back.set_anchors_preset(Control.PRESET_FULL_RECT)
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	w.add_child(back)
+	# black behind the screens: the window's clear colour, not a full-window ColorRect (one more full-window layer
+	# drawn with Godot's canvas shader cost 3 to 6 FPS on a Raspberry Pi 4 with a 1080p backglass)
+	RenderingServer.set_default_clear_color(Color.BLACK)
 	add_child(w)
 	if bool(setting(section, "fullscreen", false)):
 		w.current_screen = screen
 		w.mode = Window.MODE_FULLSCREEN
+	# render_size = [w, h]: the window is drawn at that size and scaled up to the screen (fewer pixels for the GPU
+	# to fill: a Raspberry Pi 4 fills ~150-200 Mpixel/s with video layers); the videos keep their resolution
+	var render_size = setting(section, "render_size", [])
+	if render_size is Array and render_size.size() == 2 and int(render_size[0]) > 0:
+		w.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+		w.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		w.content_scale_size = Vector2i(int(render_size[0]), int(render_size[1]))
 	windows[section] = w
 	return w
 
