@@ -441,7 +441,7 @@ class TestEntrypoint(unittest.TestCase):
     def test_pin2dmd(self):
         self.assertEqual(["--", "--pin2dmd"], self.ep.godot_args({"TRON_PIN2DMD": "1"}))
         self.assertEqual(["--", "--pin2dmd=#2a6cff"], self.ep.godot_args({"TRON_PIN2DMD": "#2a6cff"}))
-        self.assertEqual(["--", "--proc-dmd", "--pin2dmd=rgb"],
+        self.assertEqual(["--", "--pin2dmd=rgb"],
                          self.ep.godot_args({"TRON_HW": "proc", "TRON_PIN2DMD": "rgb"}))
         self.assertIn("config,hw_virtual,pin2dmd,free_play", self.ep.mpf_command({"TRON_PIN2DMD": "1"}))
 

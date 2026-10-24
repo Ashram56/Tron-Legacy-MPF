@@ -15,3 +15,9 @@ pin2dmd:
 rgb_dmds:
   default:                # the PIN2DMD platform only accepts this name
     source_display: dmd
+
+# With the P-ROC (hw_proc) the PIN2DMD replaces the original DMD: the P-ROC's dmds: dmd goes to the virtual
+# platform, so nothing is sent to the DMD connector (run.py then also leaves out --proc-dmd).
+dmds:
+  dmd:
+    platform: virtual

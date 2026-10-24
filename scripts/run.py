@@ -310,7 +310,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     os.makedirs(logs, exist_ok=True)
     godot_log = godot_log or os.path.join(logs, "godot.log")
     gargs = list(godot_args)
-    if hw == "proc" and "--proc-dmd" not in gargs:    # also keeps the DMD classic: the P-ROC takes 128x32
+    if hw == "proc" and not pin2dmd and "--proc-dmd" not in gargs:    # (a PIN2DMD replaces it) also keeps the DMD classic: the P-ROC takes 128x32
         gargs = user_arg(gargs, "--proc-dmd")
     if pin2dmd:                         # "" = the default colour; also keeps the DMD classic (128x32)
         gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))

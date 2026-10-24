@@ -324,6 +324,10 @@ mpf game . -c config,hw_virtual,pin2dmd          # MPF alone (Godot started with
 docker: TRON_PIN2DMD=1 (or #RRGGBB, rgb)
 ```
 
+- **On the real machine** (`--hw proc`) the PIN2DMD is the DMD: `python scripts/run.py --hw proc --pin2dmd` sends no
+  `--proc-dmd` frames, and the overlay moves the P-ROC's `dmds: dmd` to the virtual platform, so nothing goes to the
+  P-ROC's DMD connector (a P-ROC DMD and a PIN2DMD together are not supported). Tested with `tests/test_pin2dmd.py`
+  on a mocked P-ROC and pyusb.
 - **Monochrome first**: the 16 shades of the DMD art (grey levels, ROM palette level / 15) scale the colour. `rgb` keeps
   whatever colours the picture has, which is the hook for a coloured 128x32 source later.
 - `pin2dmd: panel: rbg` in the overlay swaps green and blue for panels wired that way; `resolution` can be

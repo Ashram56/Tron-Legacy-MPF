@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from mpf.devices.rgb_dmd import RgbDmd
 from mpf.platforms import pin2dmd
 
+from tests.test_proc import ProcCase
 from tests.tron_test import TronTestCase
 
 WIDTH, HEIGHT = 128, 32
@@ -78,5 +79,23 @@ class TestPin2Dmd(Pin2DmdCase):
     def test_black_frame_is_black(self):
         self.assertEqual(0, sum(self.send(frame())[4:]))
 
-    def test_no_p_roc_dmd_on_the_virtual_machine(self):
-        self.assertNotIn("dmd", self.machine.dmds)
+
+class TestPin2DmdOnTheProc(ProcCase):
+    """The real machine: hw_proc + pin2dmd with a mocked P-ROC. The PIN2DMD takes the DMD; the P-ROC's DMD device
+    goes to the virtual platform."""
+
+    def get_config_file(self):
+        return "../../tests/machine_proc_pin2dmd.yaml"
+
+    def setUp(self):
+        self.find = patch.object(pin2dmd.usb.core, "find", return_value=MagicMock())
+        self.find.start()
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        self.find.stop()
+
+    def test_pin2dmd_replaces_the_proc_dmd(self):
+        self.assertEqual("virtual", self.machine.dmds["dmd"].config["platform"])
+        self.assertEqual("128x32", self.machine.rgb_dmds["default"].hw_device.resolution)

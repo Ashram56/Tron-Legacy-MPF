@@ -1,0 +1,7 @@
+#config_version=6
+
+# What "mpf game . -c config,hw_proc,pin2dmd" loads: the real machine with a PIN2DMD as its DMD (tests/test_pin2dmd.py).
+config:
+  - ../game/config/config.yaml
+  - ../game/config/hw_proc.yaml
+  - ../game/config/pin2dmd.yaml
