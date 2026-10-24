@@ -1,0 +1,16 @@
+diff --git a/src/gozen_video.cpp b/src/gozen_video.cpp
+index 7cf731a..ceb74c5 100644
+--- a/src/gozen_video.cpp
++++ b/src/gozen_video.cpp
+@@ -117,6 +117,11 @@ bool GoZenVideo::_open_decoder(const AVCodec* codec, bool hw) {
+ 				av_dict_set(&codec_options, "resize", (std::to_string(tw) + "x" + std::to_string(th)).c_str(), 0);
+ 		}
+ 	}
++	if (String(codec->name).ends_with("_v4l2m2m")) {
++		// 20 capture buffers by default; zero-copy imports each once. It holds up to 7: 12 leave the decoder 5.
++		String n = OS::get_singleton()->get_environment("GOZEN_V4L2_CAPTURE_BUFFERS");
++		av_dict_set(&codec_options, "num_capture_buffers", n.is_empty() ? "12" : n.utf8().get_data(), 0);
++	}
+ 	bool ok = avcodec_open2(av_codec_ctx.get(), codec, &codec_options) == 0;
+ 	av_dict_free(&codec_options);
+ 	return ok;
