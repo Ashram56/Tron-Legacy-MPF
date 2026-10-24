@@ -232,6 +232,7 @@ class TestRun(unittest.TestCase):
         """Pro by default; the VPW table and the ROM traces are the LE."""
         self.assertEqual("config,hw_proc_le", run.mpf_args("proc", machine="le")[3])
         self.assertEqual("config,hw_proc,fiber_optics", run.mpf_args("proc", fiber_optics=True)[3])
+        self.assertEqual("config,hw_proc,pin2dmd", run.mpf_args("proc", pin2dmd=True)[3])
         self.assertEqual("config,hw_vpx,free_play", run.mpf_args("vpx")[3])
         self.assertEqual("config,hw_vpx_pro,free_play", run.mpf_args("vpx", machine="pro")[3])
         self.assertEqual("config,hw_virtual,free_play", run.mpf_args("virtual", machine="pro")[3])

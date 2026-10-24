@@ -64,6 +64,10 @@ def godot_args(env):
     args += shlex.split(env.get("GODOT_ARGS", ""))
     if hardware(env) == "proc":
         args += ["--", "--proc-dmd"] if "--" not in args else ["--proc-dmd"]
+    if env.get("TRON_PIN2DMD", "").strip():     # "1" = the default colour, else #RRGGBB or rgb
+        value = env["TRON_PIN2DMD"].strip()
+        arg = "--pin2dmd" if truthy(value) else "--pin2dmd=" + value
+        args += ["--", arg] if "--" not in args else [arg]
     return args
 
 
@@ -78,7 +82,8 @@ def mpf_command(env):
     import toolchain as tc
     return tc.mpf_command() + run.mpf_args(hardware(env), text_ui=truthy(env.get("MPF_TEXT_UI")),
                                          free_play=truthy(env["FREE_PLAY"]) if env.get("FREE_PLAY") else None,
-                                         machine=machine(env), fiber_optics=truthy(env.get("TRON_FIBER_OPTICS")))
+                                         machine=machine(env), fiber_optics=truthy(env.get("TRON_FIBER_OPTICS")),
+                                         pin2dmd=bool(env.get("TRON_PIN2DMD", "").strip()))
 
 
 def monitor_command():

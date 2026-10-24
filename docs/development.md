@@ -113,6 +113,7 @@ UI). Godot's log is `game/logs/godot.log`.
 | `python scripts/run.py --monitor` | The same plus MPF Monitor (`mpf monitor`, layout in `game/monitor/`): click switches, see lamps and coils. |
 | `python scripts/run.py --scenario NAME` | Plays `assets/rules/traces/NAME.txt` in real time on smart_virtual. |
 | `python scripts/run.py --hw proc` | The real machine: Multimorphic P-ROC on the Stern SAM IO board; Godot gets `-- --proc-dmd` for the DMD. |
+| `python scripts/run.py --pin2dmd` | Any of the above plus a PIN2DMD on USB as an extra DMD output (classic 128x32, `--pin2dmd '#2a6cff'` for another colour): [docs/hardware.md](hardware.md), "PIN2DMD". |
 | `python scripts/run.py --hw vpx` | Visual Pinball X plays the VPW table and MPF replaces PinMAME, through the `TronMPF.Controller` bridge (Windows). Set-up, device map and checks: [docs/vpx.md](vpx.md). |
 
 **Playing on the desktop.** With the DMD window focused, keys close the machine's switches (`game/gmc.cfg`,

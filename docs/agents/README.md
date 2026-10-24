@@ -104,6 +104,11 @@ Service menu icons of the items the game adds (FEATURE AUDITS/ADJUSTMENTS, DISPL
 its own, in the ROM's style, game images 9000+ in `game/service_icons/` drawn as text art by
 `scripts/gen_service_icons.py` (2026-10-18; the owner asked for them, his look is open).
 
+PIN2DMD (2026-10-24, branch claude/project-thread-31bkyc): MPF 0.80.1 already has the `pin2dmd` platform and `rgb_dmds`;
+the game adds `game/tools/pin2dmd.gd` (`--pin2dmd[=COLOUR]`, classic 128x32 RGB frames as `rgb_dmd_frame`),
+`game/config/pin2dmd.yaml` and `run.py --pin2dmd` ([hardware.md](../hardware.md), "PIN2DMD"). Monochrome first; Serum on
+this path is not built (colour work stays private). Open: a check on a real PIN2DMD (colour order, firmware).
+
 ### Owner decisions (keep adding)
 
 | Date | Decision |

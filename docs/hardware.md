@@ -303,3 +303,33 @@ pin 3 settles it; if it is BLU-WHT, swap the two entries of `TUBES` in `tron/pro
 - GI on/off control: not driven (see above).
 - IO board status inputs (zero cross, lamp driver status, interlocks): the P-ROC cannot read them.
 - SAM's on-board sound: replaced by the PC (see above).
+
+## PIN2DMD (an RGB LED DMD on USB)
+
+A [PIN2DMD](https://pin2dmd.com) can show the DMD next to (or instead of) the screen and the P-ROC's DMD. MPF 0.80.1 already
+has the pieces: the `pin2dmd` platform (`mpf/platforms/pin2dmd.py`, pyusb, USB `0314:e457`, "virtual pinball" 6-bit-plane
+packets) and the `rgb_dmds` device, which takes 24-bit frames over BCP as `rgb_dmd_frame`. GMC does not need a screen
+for this: Godot reads back its own 128x32 picture, as `--proc-dmd` does.
+
+| Piece | What |
+|---|---|
+| `game/tools/pin2dmd.gd` | Godot autoload. With `-- --pin2dmd[=COLOUR]` it sends each changed frame (up to 30 per second) to MPF as a 12288-byte RGB frame, `rgb_dmd_frame` named `default`. The DMD is forced classic (exact 128x32 dots, no HD, no glow), like with `--proc-dmd`. |
+| `game/config/pin2dmd.yaml` | MPF overlay, given after the hardware overlay: `hardware: rgb_dmd: pin2dmd`, `pin2dmd: resolution 128x32, panel rgb`, `rgb_dmds: default`. |
+| `tests/test_pin2dmd.py` | Boots the overlay against a mocked pyusb and checks the device ids, the BCP frame and the USB packet (`81 C3 E9 12` + 6 planes). |
+
+```
+python scripts/run.py --pin2dmd                  # the original orange; add --hw proc, --monitor ... as usual
+python scripts/run.py --pin2dmd '#2a6cff'        # Tron blue; "rgb" sends the picture's own colours instead
+mpf game . -c config,hw_virtual,pin2dmd          # MPF alone (Godot started with "-- --pin2dmd")
+docker: TRON_PIN2DMD=1 (or #RRGGBB, rgb)
+```
+
+- **Monochrome first**: the 16 shades of the DMD art (grey levels, ROM palette level / 15) scale the colour. `rgb` keeps
+  whatever colours the picture has, which is the hook for a coloured 128x32 source later.
+- `pin2dmd: panel: rbg` in the overlay swaps green and blue for panels wired that way; `resolution` can be
+  `192x64` or `256x64` for the XL and HD models (only 128x32 is fed by the game today).
+- Needs pyusb (in the venv with setup.py) and libusb 1.0, and on Linux a udev rule for `0314:e457` to run without root
+  (`SUBSYSTEM=="usb", ATTR{idVendor}=="0314", ATTR{idProduct}=="e457", MODE="0666"`). MPF fails to start with "Pin2Dmd USB
+  device not found" if the PIN2DMD is missing or another program (DMDext) holds it.
+- **Not checked on a real PIN2DMD**: colour order and the firmware's "virtual pinball" mode. MPF's platform code is
+  used as is; the unit test checks the packets it produces, not the LEDs. Report the result and the panel type.

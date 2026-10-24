@@ -256,14 +256,15 @@ def overlay(hw, machine=None, scenario=None):
     return "hw_" + hw + ("" if machine == default else "_" + machine)
 
 
-def mpf_args(hw, scenario=None, text_ui=False, free_play=None, machine=None, fiber_optics=False):
+def mpf_args(hw, scenario=None, text_ui=False, free_play=None, machine=None, fiber_optics=False, pin2dmd=False):
     """free_play: add config/free_play.yaml (START without a coin); default on for the virtual machine and VPX,
     off for scenarios (the ROM traces insert a coin) and the real machine. machine: "pro" or "le" (overlay());
-    fiber_optics: add config/fiber_optics.yaml (drive the ramp light tubes on a Pro)."""
+    fiber_optics: add config/fiber_optics.yaml (drive the ramp light tubes on a Pro); pin2dmd: add
+    config/pin2dmd.yaml (a PIN2DMD on USB as an extra DMD output)."""
     if free_play is None:
         free_play = hw in ("virtual", "vpx") and not scenario
     configs = ["config", overlay(hw, machine, scenario)] + (["fiber_optics"] if fiber_optics else []) + (
-        ["free_play"] if free_play else [])
+        ["pin2dmd"] if pin2dmd else []) + (["free_play"] if free_play else [])
     args = ["game", ".", "-c", ",".join(configs)]
     if not text_ui:
         args.append("-t")
@@ -303,7 +304,7 @@ def scenario_path(name):
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
-        fiber_optics=False):
+        fiber_optics=False, pin2dmd=None):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -311,6 +312,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     gargs = list(godot_args)
     if hw == "proc" and "--proc-dmd" not in gargs:    # also keeps the DMD classic: the P-ROC takes 128x32
         gargs = user_arg(gargs, "--proc-dmd")
+    if pin2dmd:                         # "" = the default colour; also keeps the DMD classic (128x32)
+        gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
@@ -337,7 +340,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
                 tc.BCP_PORT, " (Godot exited)" if godot.poll() is not None else "", godot_log,
                 log_tail(godot_log)))
         print("GMC is listening", flush=True)
-        margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics)
+        margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics, bool(pin2dmd))
         print("Starting MPF: mpf " + " ".join(margs), flush=True)
         mpf = spawn(tc.mpf_command() + margs, log=mpf_log, cwd=tc.GAME, env=env)
         pinning = start_core_pinning(godot, mpf, virtual_display if virtual_display is not None
@@ -386,6 +389,9 @@ def main(argv=None):
                         "--scenario, the LE ROM's traces)")
     p.add_argument("--fiber-optics", action="store_true",
                    help="drive the ramp light tubes on a Pro too (always on with an LE)")
+    p.add_argument("--pin2dmd", nargs="?", const="default", metavar="COLOUR",
+                   help="also show the DMD on a PIN2DMD (USB; pip install pyusb): classic 128x32 in COLOUR (#RRGGBB, "
+                        "default the original orange) or rgb (the picture's own colours). docs/hardware.md, PIN2DMD")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
     p.add_argument("--scenario", help="play scenarios/NAME.txt or assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
                                       "(smart_virtual)")
@@ -431,7 +437,7 @@ def main(argv=None):
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, machine=args.machine, fiber_optics=args.fiber_optics, monitor=args.monitor,
-               scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
+               pin2dmd=args.pin2dmd, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
                                                      args.dmd_font, args.dmd_text_scale),

@@ -29,7 +29,8 @@ MPF_MONITOR_VERSION = "1.0.0"
 # cannot match to ruamel.yaml's requirement; with MPF Monitor installed `mpf` then fails to start. 0.2.14 is the
 # last with the dotted name. Python 3.13+ does not use the C library.
 # fonttools: the HD mode's vector fonts (scripts/font_outline.py)
-REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "fonttools>=4.40", "pytest",
+# pyusb: MPF's pin2dmd platform (run.py --pin2dmd); pure Python, it needs libusb 1.0 only when a PIN2DMD is used
+REQUIREMENTS = ["mpf==" + MPF_VERSION, "pillow>=10.1", "fonttools>=4.40", "pytest", "pyusb>=1.2",
                 'ruamel.yaml.clib==0.2.14; python_version < "3.13"']
 # PyQt6 6.8+ ships Linux arm64 wheels for glibc 2.39+ only (Ubuntu 24.04); 6.7 has them for glibc 2.28+, which
 # JetPack 5 (2.31) and 6 (2.35) need: without a wheel pip tries the sdist, which needs qmake
