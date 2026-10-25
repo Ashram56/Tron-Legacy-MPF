@@ -13,11 +13,14 @@ const WIDTH := 128
 const HEIGHT := 32
 const FPS := 30.0
 const DEFAULT_COLOR := "#ff730d"
+const FEED_ARG := "--zedmd-feed="      # path of game/native/zedmd_feed: frames go to it through a pipe, not to MPF
 
 var _color := Color(DEFAULT_COLOR)
 var _palette := PackedByteArray()      # 16 shades x 3 bytes
 var _last := PackedByteArray()
 var _elapsed := 0.0
+var _feed: FileAccess = null     # the feeder's stdin (scripts/run.py starts the game with --zedmd-feed=PATH)
+var _feed_pid := 0
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -25,6 +28,8 @@ func _ready() -> void:
 	for a in args:
 		if a == "--pin2dmd" or a == "--zedmd":
 			on = true
+		elif a.begins_with(FEED_ARG):
+			_start_feed(a.trim_prefix(FEED_ARG))
 		elif a.begins_with("--pin2dmd=") or a.begins_with("--zedmd="):
 			on = true
 			var v := a.substr(a.find("=") + 1).strip_edges().to_lower()
@@ -32,6 +37,20 @@ func _ready() -> void:
 				_color = Color(v)
 	set_process(on)
 	_palette = shade_palette(_color)
+
+func _start_feed(path: String) -> void:
+	var run := OS.execute_with_pipe(path, [])
+	if run.is_empty():
+		push_warning("zedmd_feed did not start: " + path)
+		return
+	_feed = run["stdio"]
+	_feed_pid = run["pid"]
+
+func _exit_tree() -> void:
+	if _feed_pid:
+		if _feed:
+			_feed.close()          # the feeder ends when its stdin closes
+		OS.kill(_feed_pid)
 
 ## 16 shades of one colour as 48 bytes (shade n = the colour at n / 15).
 static func shade_palette(color: Color) -> PackedByteArray:
@@ -63,7 +82,7 @@ func _process(delta: float) -> void:
 	if _elapsed < 1.0 / FPS:
 		return
 	_elapsed = 0.0
-	if not MPF.server._client:
+	if not _feed and not MPF.server._client:
 		return
 	var image := get_viewport().get_texture().get_image()
 	if image.get_width() != WIDTH or image.get_height() != HEIGHT:
@@ -72,4 +91,12 @@ func _process(delta: float) -> void:
 	if frame == _last:
 		return
 	_last = frame
+	if _feed:
+		if not OS.is_process_running(_feed_pid):
+			push_warning("zedmd_feed stopped")
+			_feed = null
+			return
+		_feed.store_buffer(frame)
+		_feed.flush()
+		return
 	MPF.server.send_bytes("rgb_dmd_frame", frame, {"name": "default"})

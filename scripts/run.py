@@ -200,6 +200,23 @@ def keep_screen_on():
         subprocess.run(["xset", "s", "off", "-dpms"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def zedmd_feed(python=False):
+    """Path of the native ZeDMD feeder (game/native/zedmd_feed), built with the C compiler when missing, or None when it
+    cannot be had or finds no ZeDMD (--probe): the game then uses the Python platform (game/tron/zedmd_native.py)."""
+    if python:
+        return None
+    src = os.path.join(tc.GAME, "native", "zedmd_feed", "zedmd_feed.c")
+    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed" + (".exe" if os.name == "nt" else ""))
+    if not os.path.exists(exe) or os.path.getmtime(exe) < os.path.getmtime(src):
+        cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
+        if not cc or os.name == "nt":
+            return None
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        if subprocess.call([cc, "-O2", "-o", exe, src], stderr=subprocess.DEVNULL) != 0:
+            return None
+    return exe if subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
+
+
 def user_arg(gargs, arg):
     """gargs plus arg after Godot's "--" (the args game scripts read with OS.get_cmdline_user_args)."""
     return list(gargs) + [arg] if "--" in gargs else list(gargs) + ["--", arg]
@@ -265,7 +282,7 @@ def mpf_args(hw, scenario=None, text_ui=False, free_play=None, machine=None, fib
     if free_play is None:
         free_play = hw in ("virtual", "vpx") and not scenario
     configs = ["config", overlay(hw, machine, scenario)] + (["fiber_optics"] if fiber_optics else []) + (
-        ["pin2dmd"] if pin2dmd else []) + (["zedmd"] if zedmd else []) + (["free_play"] if free_play else [])
+        ["pin2dmd"] if pin2dmd else []) + (["zedmd_feed" if zedmd == "feed" else "zedmd"] if zedmd else []) + (["free_play"] if free_play else [])
     args = ["game", ".", "-c", ",".join(configs)]
     if not text_ui:
         args.append("-t")
@@ -305,7 +322,7 @@ def scenario_path(name):
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
-        fiber_optics=False, pin2dmd=None, zedmd=None):
+        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -315,8 +332,11 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         gargs = user_arg(gargs, "--proc-dmd")
     if pin2dmd:                         # "" = the default colour; also keeps the DMD classic (128x32)
         gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))
-    if zedmd:                           # the same frames, MPF's zedmd platform
+    feed = zedmd_feed(zedmd_python) if zedmd else None
+    if zedmd:                           # the same frames: to the native feeder, else through MPF's platform
         gargs = user_arg(gargs, "--zedmd" + ("=" + zedmd if zedmd != "default" else ""))
+        if feed:
+            gargs = user_arg(gargs, "--zedmd-feed=" + feed)
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
@@ -343,7 +363,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
                 tc.BCP_PORT, " (Godot exited)" if godot.poll() is not None else "", godot_log,
                 log_tail(godot_log)))
         print("GMC is listening", flush=True)
-        margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics, bool(pin2dmd), bool(zedmd))
+        margs = mpf_args(hw, scenario, text_ui, free_play, machine, fiber_optics, bool(pin2dmd), (("feed" if feed else True) if zedmd else False))
         print("Starting MPF: mpf " + " ".join(margs), flush=True)
         mpf = spawn(tc.mpf_command() + margs, log=mpf_log, cwd=tc.GAME, env=env)
         pinning = start_core_pinning(godot, mpf, virtual_display if virtual_display is not None
@@ -398,6 +418,8 @@ def main(argv=None):
     p.add_argument("--zedmd", nargs="?", const="default", metavar="COLOUR",
                    help="also show the DMD on a ZeDMD (USB serial or Wi-Fi): classic 128x32 in COLOUR (#RRGGBB, "
                         "default the original orange). docs/hardware.md, ZeDMD")
+    p.add_argument("--zedmd-python", action="store_true",
+                   help="drive the ZeDMD from MPF's Python platform instead of the native feeder (game/native/zedmd_feed)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
     p.add_argument("--scenario", help="play scenarios/NAME.txt or assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
                                       "(smart_virtual)")
@@ -443,7 +465,7 @@ def main(argv=None):
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, machine=args.machine, fiber_optics=args.fiber_optics, monitor=args.monitor,
-               pin2dmd=args.pin2dmd, zedmd=args.zedmd, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
+               pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
                                                      args.dmd_font, args.dmd_text_scale),

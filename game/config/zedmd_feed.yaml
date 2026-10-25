@@ -1,0 +1,9 @@
+#config_version=6
+
+# A ZeDMD driven by the native feeder (game/native/zedmd_feed, started by Godot with "-- --zedmd --zedmd-feed=PATH"):
+# the frames never pass through MPF, so MPF only has to leave the original DMD connector alone. Given after the
+# hardware overlay (scripts/run.py --zedmd picks this one when the feeder is built and finds a ZeDMD, else zedmd.yaml).
+
+dmds:
+  dmd:
+    platform: virtual

@@ -361,5 +361,13 @@ mpf game . -c config,hw_virtual,zedmd            # MPF alone (Godot started with
 | `game/tron/zedmd_native.py` | The platform: USB serial (921600 baud, 115200 on the ESP32-S3's USB), port found by USB id or `ZEDMD_PORT`, frames sent from its own thread. |
 | `tests/test_zedmd.py` | The protocol against a fake device (handshake, zone packets, acknowledgements, clear) and the BCP frame reaching the serial port. |
 
+- **Native feeder** (`game/native/zedmd_feed/zedmd_feed.c`, C, libc only; Linux and macOS): `run.py --zedmd` builds it
+  with `cc` on first use and runs `zedmd_feed --probe`; when a ZeDMD answers, Godot starts it (`--zedmd-feed=PATH`) and
+  pipes it the 128x32 RGB frames (newest only), so nothing goes through BCP, MPF or Python, and MPF only gets
+  `config/zedmd_feed.yaml` (the original DMD connector left alone). No compiler, Windows, or no ZeDMD at probe time:
+  the Python platform above is used (`--zedmd-python` forces it). Godot still draws the DMD; a renderer outside Godot
+  is not built. On a Pi build it on the build box, not on the Pi: `cc -O2 -o game/native/bin/zedmd_feed game/native/zedmd_feed/zedmd_feed.c`.
+  Tests: `tests/test_zedmd_feed.py` (a pty as fake ZeDMD; its packets equal the Python platform's). **The Godot side
+  (`pin2dmd.gd`, `OS.execute_with_pipe`) was not run** (no Godot in the session that wrote it).
 - Written from libzedmd's source, **not yet tried on a real ZeDMD**: serial only (no Wi-Fi), the brightness command's
   payload and the 128x32 size are guesses to check. The owner's check: ports, firmware 5.x, colour order.
