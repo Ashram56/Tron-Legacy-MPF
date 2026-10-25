@@ -1,0 +1,1 @@
+Test bundle (PR #53 db5d15b+help, PR #55 merged). Rebuild: cat tron-legacy-mpf-2026.10.25-b9d03e0-linux-arm64.tar.xz.part* > tron-legacy-mpf-2026.10.25-b9d03e0-linux-arm64.tar.xz; sha256sum -c tron-legacy-mpf-2026.10.25-b9d03e0-linux-arm64.tar.xz.sha256
