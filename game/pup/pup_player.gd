@@ -45,6 +45,22 @@ var native_video := false
 var gozen := false
 
 
+## Layers fully covered by an opaque video above them are not drawn, and pause when silent (pup_screen.set_covered()):
+## on a Raspberry Pi 4 a 1080p video layer costs ~6 ms of GPU to draw plus ~5 ms to convert its planes, and its
+## hardware decoder slows the GPU down, for nothing when hidden. The screens' own visibility is untouched.
+func _process(_delta: float) -> void:
+	for section in LAYERS:
+		var covered := false
+		for i in range(LAYERS[section].size() - 1, -1, -1):
+			var s = screens.get(LAYERS[section][i])
+			if s == null:
+				continue
+			if not s.audio_only:
+				s.set_covered(covered)
+			if not covered and s.covers():
+				covered = true
+
+
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
@@ -156,7 +172,10 @@ func _build() -> void:
 	if str(setting("pup", "layout", "stack")) == "stack":
 		_stack_windows()
 	_layout_dmd()
-	windows["dmd"].size_changed.connect(_layout_dmd)
+	if _dmd_area:
+		_dmd_area.resized.connect(_layout_dmd)
+	else:
+		windows["dmd"].size_changed.connect(_layout_dmd)
 	_follow_service_settings.call_deferred()
 	if bool(setting("pup", "ost_music", true)):
 		var music := PupScreen.new()
@@ -215,15 +234,20 @@ func _make_window(section: String) -> Window:
 	if section == "dmd" and _dmd_size_arg() != Vector2i.ZERO:
 		w.size = _dmd_size_arg()
 	w.position = DisplayServer.screen_get_position(screen) + Vector2i(int(pos_cfg[0]), int(pos_cfg[1]))
-	var back := ColorRect.new()
-	back.color = Color.BLACK
-	back.set_anchors_preset(Control.PRESET_FULL_RECT)
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	w.add_child(back)
+	# black behind the screens: the window's clear colour, not a full-window ColorRect (one more full-window layer
+	# drawn with Godot's canvas shader cost 3 to 6 FPS on a Raspberry Pi 4 with a 1080p backglass)
+	RenderingServer.set_default_clear_color(Color.BLACK)
 	add_child(w)
 	if bool(setting(section, "fullscreen", false)):
 		w.current_screen = screen
 		w.mode = Window.MODE_FULLSCREEN
+	# render_size = [w, h]: the window is drawn at that size and scaled up to the screen (fewer pixels for the GPU
+	# to fill: a Raspberry Pi 4 fills ~150-200 Mpixel/s with video layers); the videos keep their resolution
+	var render_size = setting(section, "render_size", [])
+	if render_size is Array and render_size.size() == 2 and int(render_size[0]) > 0:
+		w.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+		w.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		w.content_scale_size = Vector2i(int(render_size[0]), int(render_size[1]))
 	windows[section] = w
 	return w
 
@@ -270,17 +294,35 @@ func _title_height(w: Window) -> int:
 
 func _make_layered_window(section: String, defaults: Dictionary, volume: float) -> void:
 	var w := _make_window(section)
+	# [backglass] rect = [x, y, w, h]: the screens' area in the window (its render_size pixels when it has one);
+	# with [dmd] window="stacked" and no rect, the window above the DMD band; else the whole window
+	var parent: Node = w
+	var rect = setting(section, "rect", [])
+	var stacked := section == "backglass" and dmd_window_mode() == "stacked"
+	if (rect is Array and rect.size() == 4 and float(rect[2]) > 0.0) or stacked:
+		var area := Control.new()
+		area.name = "pup_%s_screens" % section
+		area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		area.clip_contents = true
+		if rect is Array and rect.size() == 4 and float(rect[2]) > 0.0:
+			area.position = Vector2(float(rect[0]), float(rect[1]))
+			area.size = Vector2(float(rect[2]), float(rect[3]))
+		else:
+			area.anchor_right = 1.0
+			area.anchor_bottom = 1.0 - _dmd_band()
+		w.add_child(area)
+		parent = area
 	for n in LAYERS[section]:
 		var row: Dictionary = defaults.get(n, {})
 		var layer := PupScreen.new()
 		layer.setup(self, n, {"popup": n == LAYERS[section][1], "fit": setting(section, "fit", "fit"),
 			"align": setting(section, "align", 0.5), "bus": "sfx", "volume": volume,
 			"bg_playlist": row.get("PlayList", ""), "bg_file": row.get("PlayFile", "")})
-		w.add_child(layer)
+		parent.add_child(layer)
 		screens[n] = layer
 	if section == "backglass" and bool(setting("backglass", "service_menu", true)):
 		service_backglass = ServiceBackglass.new()
-		w.add_child(service_backglass)
+		parent.add_child(service_backglass)
 		service_backglass.setup(still_path, str(setting(section, "fit", "fit")), float(setting(section, "align", 0.5)))
 
 
@@ -289,12 +331,41 @@ var _dmd_crop := Rect2i()
 var _cycles: LightCycles                # the light cycle chase (background="lightcycles")
 var _neon: ColorRect                    # its neon frame round the DMD
 var _dmd_view: TextureRect              # the game's DMD (the main window's picture)
+var _dmd_area: Control                  # [dmd] window="backglass": the DMD's area in the backglass window
 var _service_dmd_size := -1             # the service menu's PUP DMD SIZE: -1 = pup.cfg's, 0 = cycles, 1 = full
 const FRAME_PAD := 20.0                 # the neon frame's line and its glow past the DMD (772 px wide DMD)
 
 
 func _make_dmd_window() -> void:
-	var w := _make_window("dmd")
+	var w: Node
+	var mode := dmd_window_mode()
+	if mode in ["stacked", "overlay"] and windows.has("backglass"):
+		# the DMD drawn in the backglass window: "stacked" in a band under the screens, "overlay" over their bottom;
+		# [dmd] rect = [x, y, w, h] (the backglass's render_size pixels when it has one) places it by hand. One full
+		# screen window page-flips: a second window made X copy the backglass at every frame (Raspberry Pi 4, 30 FPS
+		# cap: 21 instead of 29.6 FPS)
+		var bg: Window = windows["backglass"]
+		_dmd_area = Control.new()
+		_dmd_area.name = "pup_dmd"
+		_dmd_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_dmd_area.clip_contents = true
+		var r = setting("dmd", "rect", [])
+		if r is Array and r.size() == 4 and float(r[2]) > 0.0:
+			_dmd_area.position = Vector2(float(r[0]), float(r[1]))
+			_dmd_area.size = Vector2(float(r[2]), float(r[3]))
+		else:
+			_dmd_area.anchor_top = 1.0 - _dmd_band()
+			_dmd_area.anchor_right = 1.0
+			_dmd_area.anchor_bottom = 1.0
+		bg.add_child(_dmd_area)
+		w = _dmd_area
+	else:
+		var own := _make_window("dmd")
+		# "external": no DMD window on screen (the DMD goes to a real display fed by the game, a PIN2DMD or a
+		# ZeDMD), so a fullscreen backglass stays the only window and page-flips
+		if mode == "external":
+			own.hide()
+		w = own
 	var background := str(setting("dmd", "background", "lightcycles"))
 	var frame_path := str(setting("dmd", "frame_image", ""))
 	if background == "lightcycles":
@@ -335,9 +406,23 @@ func _make_dmd_window() -> void:
 	w.add_child(_dmd_view)
 
 
+## [dmd] window: "window" (its own window, the default), "external" (no DMD on screen: a PIN2DMD or ZeDMD shows it),
+## "stacked" (in the backglass window, in a band under its screens) or "overlay" (in the backglass window, over the
+## bottom of its screens). Also true, false and "none" (= "external"), "backglass" (= "overlay").
+func dmd_window_mode() -> String:
+	var mode := str(setting("dmd", "window", "window")).to_lower()
+	return {"true": "window", "false": "external", "none": "external", "backglass": "overlay"}.get(mode, mode)
+
+
+## The DMD band's share of the backglass window's height with "stacked" or "overlay": [dmd] band, 0.25 by default
+## (a 16:9 window: the videos 3/4 of its height above, the DMD 4:1 across the middle of the band under them).
+func _dmd_band() -> float:
+	return clampf(float(setting("dmd", "band", 0.25)), 0.1, 0.5)
+
+
 ## Frame and DMD laid out for the DMD window's current size (again on every resize and size change).
 func _layout_dmd() -> void:
-	var area := Vector2(windows["dmd"].size)
+	var area := _dmd_area.size if _dmd_area else Vector2(windows["dmd"].size)
 	var dmd_rect := Rect2(Vector2.ZERO, area)
 	var pa := pixel_aspect()
 	if _cycles:
@@ -399,7 +484,11 @@ func screen_mm() -> Vector2:
 
 
 func _dmd_screen() -> int:
-	return windows["dmd"].current_screen if windows.has("dmd") else int(setting("dmd", "screen", 0))
+	if windows.has("dmd"):
+		return windows["dmd"].current_screen
+	if _dmd_area:
+		return windows["backglass"].current_screen
+	return int(setting("dmd", "screen", 0))
 
 
 ## "cycles": lightcycles_dmd of the window's width, at most lightcycles_dmd_height of its height.
@@ -441,7 +530,7 @@ func service_setting(var_name: String, value) -> void:
 		return
 	var was := full_size_dmd()
 	_service_dmd_size = v
-	if full_size_dmd() != was and windows.has("dmd"):
+	if full_size_dmd() != was and (windows.has("dmd") or _dmd_area):
 		print("PuP: DMD %s (service menu)" % ("full size" if full_size_dmd() else "with the light cycles"))
 		_layout_dmd()
 
