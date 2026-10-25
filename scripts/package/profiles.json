@@ -20,7 +20,6 @@
            "why": "the hardware decoder halves the CPU, but the stock bcm2835-codec driver can oops: only with the fixed module"}
         ],
         "godot_args": [
-          {"args": ["--max-fps", "30"], "why": "the pack's videos are 30 fps; steady 30 fps instead of an uneven 45"},
           {"args": ["--render-thread", "separate"], "if": {"env": "MPF_GODOT_EGL_FIX"},
            "why": "only with a Godot carrying scripts/godot/egl_release_current.patch (Godot 4.6.3 crashes without it)"}
         ]
