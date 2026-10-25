@@ -341,9 +341,12 @@ docker: TRON_PIN2DMD=1 (or #RRGGBB)
 
 ## ZeDMD (an RGB LED DMD on USB serial or Wi-Fi)
 
-A [ZeDMD](https://github.com/PPUC/ZeDMD) takes the same frames as the PIN2DMD, through MPF's `zedmd` platform (libzedmd
-ships with MPF 0.80.1 for Linux x64/arm64, Windows x64 and macOS). Monochrome like the PIN2DMD: the 16 shades of the
-DMD art through one colour.
+A [ZeDMD](https://github.com/PPUC/ZeDMD) takes the same frames as the PIN2DMD, through the game's own platform
+`game/tron/zedmd_native.py`: pyserial only, the ZeDMD serial protocol written from libzedmd's `ZeDMDComm` (handshake,
+8x4-pixel zones of RGB888 that changed, render, clear, brightness). MPF 0.80.1's own `zedmd` platform needs libzedmd's
+compiled extension, which only loads on the Python build it was made for, and on a Raspberry Pi (arm64) it loads the x64
+library (`zedmd.py` tests `platform.machine`, not `platform.machine()`). Monochrome: the 16 shades of the DMD art
+through one colour.
 
 ```
 python scripts/run.py --zedmd                    # the original orange; add --hw proc, --monitor ... as usual
@@ -354,10 +357,9 @@ mpf game . -c config,hw_virtual,zedmd            # MPF alone (Godot started with
 | Piece | What |
 |---|---|
 | `game/tools/pin2dmd.gd` | Same autoload as for the PIN2DMD, also started by `-- --zedmd[=COLOUR]`. |
-| `game/config/zedmd.yaml` | MPF overlay: `hardware: rgb_dmd: zedmd`, `zedmd: width 128, height 32`, `rgb_dmds: default`; with `--hw proc` the P-ROC's DMD goes to the virtual platform. |
-| `tests/test_zedmd.py` | Boots the overlay against a mocked libzedmd and checks the BCP frame reaches `RenderRgb888` as a 128x32 picture. |
+| `game/config/zedmd.yaml` | MPF overlay: `mpf: platforms: zedmd_native`, `hardware: rgb_dmd: zedmd_native`, `zedmd: width 128, height 32`, `rgb_dmds: default`; with `--hw proc` the P-ROC's DMD goes to the virtual platform. |
+| `game/tron/zedmd_native.py` | The platform: USB serial (921600 baud, 115200 on the ESP32-S3's USB), port found by USB id or `ZEDMD_PORT`, frames sent from its own thread. |
+| `tests/test_zedmd.py` | The protocol against a fake device (handshake, zone packets, acknowledgements, clear) and the BCP frame reaching the serial port. |
 
-- libzedmd's extension is compiled for one Python build: on a Python it was not built for, MPF logs "Failed to load
-  ZeDMD libraries". On a Raspberry Pi (arm64) MPF 0.80.1 also loads the x64 library (`platform.machine` is not
-  called in `zedmd.py`): [MPF-Godot-Packaging](https://github.com/Ashram56/MPF-Godot-Packaging) carries the fix.
-- Not tried on a real ZeDMD (USB port, firmware): the owner's check.
+- Written from libzedmd's source, **not yet tried on a real ZeDMD**: serial only (no Wi-Fi), the brightness command's
+  payload and the 128x32 size are guesses to check. The owner's check: ports, firmware 5.x, colour order.
