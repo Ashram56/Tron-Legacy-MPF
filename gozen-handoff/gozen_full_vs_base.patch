@@ -1,0 +1,639 @@
+diff --git a/SConstruct b/SConstruct
+index 5e7fcdf..e5c9e50 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -34,15 +34,26 @@ if "linux" in platform:
+         LIBPATH=["ffmpeg/bin/lib", "ffmpeg/bin/lib64"],
+         LIBS=LIBS_COMMON,
+     )
+-    env.Append(LIBS=["tls", "ssl", "crypto", "vpx", "aom"])
+-
+-    if arch != "arm64":
+-        env.Append(LIBS=["z"])
++    # lean=yes: FFmpeg built without libvpx, libaom, LibreSSL and zlib (the Jetson build of
++    # Tron-Legacy-MPF-PuP, scripts/build_gozen.sh)
++    # (and with FFmpeg's assembly, whose static objects need -Bsymbolic to link into a shared library)
++    if ARGUMENTS.get("lean", "no") == "yes":
++        env.Append(LINKFLAGS=["-Wl,-Bsymbolic"])
++    else:
++        env.Append(LIBS=["tls", "ssl", "crypto", "vpx", "aom"])
++
++        if arch != "arm64":
++            env.Append(LIBS=["z"])
+     env.Append(LIBS=["m", "pthread", "dl"])
+ elif "windows" in platform:
+     env.Append(LINKFLAGS=["-static"], LIBS=LIBS_COMMON)
+ 
+-    env.Append(LIBS=["vpx", "aom"])
++    # lean=yes: FFmpeg without libvpx and libaom, with Direct3D 11 Video / DXVA2 decoding (Tron-Legacy-MPF-PuP,
++    # scripts/build_gozen.sh windows); FFmpeg loads d3d11.dll, dxgi.dll, d3d9.dll and dxva2.dll at run time
++    if ARGUMENTS.get("lean", "no") == "yes":
++        env.Append(LIBS=["ole32", "user32"])
++    else:
++        env.Append(LIBS=["vpx", "aom"])
+     env.Append(
+         CPPPATH=["ffmpeg/bin/include"],
+         LIBPATH=["ffmpeg/bin/lib", "ffmpeg/bin/lib64"],
+@@ -121,5 +132,10 @@ else:
+ 
+ # Godot compiling stuff
+ src = Glob("src/*.cpp")
++if "linux" in platform:
++    # gozen_v4l2.c reads FFmpeg's internal V4L2 M2M structs (zero-copy): FFmpeg's source tree and its config.h
++    env_c = env.Clone()
++    env_c.Append(CPPPATH=["ffmpeg"])
++    src += [env_c.SharedObject(f) for f in Glob("src/*.c")]
+ sharedlib = env.SharedLibrary(libpath, src)
+ Default(sharedlib)
+diff --git a/src/gozen_video.cpp b/src/gozen_video.cpp
+index bf3796f..338bb97 100644
+--- a/src/gozen_video.cpp
++++ b/src/gozen_video.cpp
+@@ -1,4 +1,136 @@
+ #include "gozen_video.hpp"
++#include "gozen_v4l2.h"
++
++#include <algorithm>
++#include <mutex>
++#include <string>
++
++
++// Windows hardware decoding (Direct3D 11 Video, else DXVA2: every GPU vendor, no extra library): one device for
++// every video, made on first use (FFmpeg locks it around each use), so opening a video does not make a device.
++static AVBufferRef* _hw_device(AVHWDeviceType type) {
++	static std::mutex mutex;
++	static AVBufferRef* devices[32] = {};
++	static bool failed[32] = {};
++	if ((int)type < 0 || (int)type >= 32)
++		return nullptr;
++	std::lock_guard<std::mutex> lock(mutex);
++	if (!devices[type] && !failed[type] && av_hwdevice_ctx_create(&devices[type], type, nullptr, nullptr, 0) < 0) {
++		devices[type] = nullptr;
++		failed[type] = true;
++		UtilityFunctions::print("GoZen: no ", av_hwdevice_get_type_name(type), " device on this PC");
++	}
++	return devices[type];
++}
++
++
++// FFmpeg asks for a pixel format when it meets the stream's parameters: the GPU's when it is offered, else the first
++// software one (FFmpeg offers software formats when the GPU cannot set itself up for this video).
++static enum AVPixelFormat _get_hw_format(AVCodecContext* ctx, const enum AVPixelFormat* formats) {
++	enum AVPixelFormat want = (enum AVPixelFormat)(intptr_t)ctx->opaque;
++	for (const enum AVPixelFormat* p = formats; *p != AV_PIX_FMT_NONE; p++)
++		if (*p == want)
++			return *p;
++	for (const enum AVPixelFormat* p = formats; *p != AV_PIX_FMT_NONE; p++) {
++		const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(*p);
++		if (desc && !(desc->flags & AV_PIX_FMT_FLAG_HWACCEL))
++			return *p;
++	}
++	return AV_PIX_FMT_NONE;
++}
++
++
++bool GoZenVideo::_open_hwaccel(const AVCodec* codec, AVHWDeviceType type) {
++	hw_pix_fmt = AV_PIX_FMT_NONE;
++	for (int i = 0;; i++) {
++		const AVCodecHWConfig* config = avcodec_get_hw_config(codec, i);
++		if (!config)
++			return false; // this decoder has no such hardware path in this FFmpeg
++		if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && config->device_type == type) {
++			hw_pix_fmt = config->pix_fmt;
++			break;
++		}
++	}
++	AVBufferRef* device = _hw_device(type);
++	if (!device) {
++		hw_pix_fmt = AV_PIX_FMT_NONE;
++		return false;
++	}
++	av_codec_ctx = make_unique_ffmpeg<AVCodecContext, AVCodecCtxDeleter>(avcodec_alloc_context3(codec));
++	if (av_codec_ctx == NULL || avcodec_parameters_to_context(av_codec_ctx.get(), av_stream->codecpar)) {
++		hw_pix_fmt = AV_PIX_FMT_NONE;
++		return false;
++	}
++	av_codec_ctx->hw_device_ctx = av_buffer_ref(device);
++	av_codec_ctx->opaque = (void*)(intptr_t)hw_pix_fmt;
++	av_codec_ctx->get_format = _get_hw_format;
++	av_codec_ctx->thread_count = 1; // the GPU decodes: one thread feeds it, and fewer frames are held in flight
++	if (avcodec_open2(av_codec_ctx.get(), codec, nullptr) != 0) {
++		hw_pix_fmt = AV_PIX_FMT_NONE;
++		return false;
++	}
++	return true;
++}
++
++
++// A frame the GPU decoded is copied to system memory (NV12 for 8-bit video) before _copy_frame_data() reads it.
++bool GoZenVideo::_hw_download() {
++	if (hw_pix_fmt == AV_PIX_FMT_NONE || av_frame->format != hw_pix_fmt)
++		return true;
++	if (!av_hw_frame)
++		av_hw_frame = make_unique_avframe();
++	av_frame_unref(av_hw_frame.get());
++	if (av_hwframe_transfer_data(av_hw_frame.get(), av_frame.get(), 0) < 0) {
++		_log_err("Couldn't copy the frame from the GPU");
++		return false;
++	}
++	av_frame_copy_props(av_hw_frame.get(), av_frame.get());
++	av_frame_unref(av_frame.get());
++	av_frame_move_ref(av_frame.get(), av_hw_frame.get());
++	return true;
++}
++
++
++bool GoZenVideo::_open_decoder(const AVCodec* codec, bool hw) {
++	av_codec_ctx = make_unique_ffmpeg<AVCodecContext, AVCodecCtxDeleter>(avcodec_alloc_context3(codec));
++	if (av_codec_ctx == NULL)
++		return false;
++	if (avcodec_parameters_to_context(av_codec_ctx.get(), av_stream->codecpar))
++		return false;
++	// FFmpeg's own tool sets these; the V4L2 M2M decoders convert pts to and from V4L2 timestamps with them, and
++	// without them every decoded frame comes back with AV_NOPTS_VALUE
++	if (String(codec->name).ends_with("_v4l2m2m")) {
++		av_codec_ctx->pkt_timebase = av_stream->time_base;
++		av_codec_ctx->time_base = av_stream->time_base;
++	}
++	FFmpeg::enable_multithreading(av_codec_ctx.get(), codec);
++	AVDictionary* codec_options = nullptr;
++	if (hw) {
++		// jetson-ffmpeg's nvmpi decoders: NV12 straight from the hardware (no conversion to YUV420P), and scaled down
++		// by the hardware (VIC) to the shown size, keeping the aspect (even sizes, never up)
++		av_dict_set(&codec_options, "output_format", "nv12", 0);
++		int w = av_stream->codecpar->width, h = av_stream->codecpar->height;
++		if (target_size.x > 0 && target_size.y > 0 && w > 0 && h > 0) {
++			double scale = std::min(1.0, std::min((double)target_size.x / w, (double)target_size.y / h));
++			int tw = std::max(2, (int)(w * scale + 1) & ~1), th = std::max(2, (int)(h * scale + 1) & ~1);
++			if (tw < w && th < h)
++				av_dict_set(&codec_options, "resize", (std::to_string(tw) + "x" + std::to_string(th)).c_str(), 0);
++		}
++	}
++	if (String(codec->name).ends_with("_v4l2m2m")) {
++		// 20 capture buffers by default; zero-copy imports each once. It holds up to 7: 12 leave the decoder 5.
++		String n = OS::get_singleton()->get_environment("GOZEN_V4L2_CAPTURE_BUFFERS");
++		av_dict_set(&codec_options, "num_capture_buffers", n.is_empty() ? "12" : n.utf8().get_data(), 0);
++		// NV12 (Y, then interleaved UV) rather than the stream's YUV420P: zero-copy imports and samples two planes
++		// per frame instead of three, and Mesa makes two tiled copies instead of three. FFmpeg asks the driver for
++		// pix_fmt first and falls back to the driver's own list. GOZEN_V4L2_PIXFMT=yuv420p keeps three planes.
++		if (OS::get_singleton()->get_environment("GOZEN_V4L2_PIXFMT") != "yuv420p")
++			av_codec_ctx->pix_fmt = AV_PIX_FMT_NV12;
++	}
++	bool ok = avcodec_open2(av_codec_ctx.get(), codec, &codec_options) == 0;
++	av_dict_free(&codec_options);
++	return ok;
++}
+ 
+ 
+ int GoZenVideo::open(const String& video_path) {
+@@ -142,33 +274,61 @@ int GoZenVideo::open(const String& video_path) {
+ 			}
+ 		}
+ 	}
+-	if (!av_codec) { // Set to normal decoder.
+-		av_codec = avcodec_find_decoder(av_stream->codecpar->codec_id);
+-	}
+-	if (!av_codec) { // Couldn't find decoder so exit.
+-		close();
+-		return _log_err("Couldn't find decoder");
+-	}
+-
+-	// Allocate codec context for decoder.
+-	av_codec_ctx = make_unique_ffmpeg<AVCodecContext, AVCodecCtxDeleter>(avcodec_alloc_context3(av_codec));
+-	if (av_codec_ctx == NULL) {
+-		close();
+-		return _log_err("Failed alloc codec");
+-	}
+-
+-	// Copying parameters.
+-	if (avcodec_parameters_to_context(av_codec_ctx.get(), av_stream->codecpar)) {
+-		close();
+-		return _log_err("Couldn't init codec");
++	// Hardware decoder first. Jetson: FFmpeg patched by jetson-ffmpeg registers <codec>_nvmpi, which loads libnvmpi.so
++	// at run time. Raspberry Pi 4 (and other V4L2 memory-to-memory decoders): FFmpeg's own <codec>_v4l2m2m on
++	// /dev/video10 (bcm2835-codec, H.264). GOZEN_HWDEC=0 turns it off. Falls back to the software decoder when no
++	// hardware one is there or it fails to open.
++	bool hw_tried = false;
++	if (!av_codec && OS::get_singleton()->get_environment("GOZEN_HWDEC") != "0") {
++		const AVCodecDescriptor* desc = avcodec_descriptor_get(av_stream->codecpar->codec_id);
++		const char* hw_suffixes[] = {"_nvmpi", "_v4l2m2m"};
++		for (const char* suffix : hw_suffixes) {
++			const AVCodec* hw_codec =
++				desc ? avcodec_find_decoder_by_name((String(desc->name) + suffix).utf8().get_data()) : nullptr;
++			if (!hw_codec)
++				continue;
++			hw_tried = true;
++			if (_open_decoder(hw_codec, String(suffix) == "_nvmpi")) {
++				av_codec = hw_codec;
++				UtilityFunctions::print("GoZen: hardware decoder ", hw_codec->name);
++				break;
++			}
++			UtilityFunctions::print("GoZen: hardware decoder ", hw_codec->name, " unavailable");
++			av_codec_ctx.reset();
++		}
++		if (!av_codec && hw_tried)
++			UtilityFunctions::print("GoZen: using software decoder");
++	}
++#ifdef _WIN32
++	// Windows: FFmpeg's own decoder with the GPU doing the decoding through Direct3D 11 Video, else DXVA2 (NVIDIA,
++	// AMD, Intel). GOZEN_HWDEC=0 turns it off, GOZEN_HWDEC=d3d11va or dxva2 asks for one of them only. A GPU that
++	// cannot decode this video makes FFmpeg fall back to software by itself (_get_hw_format()).
++	String hwdec = OS::get_singleton()->get_environment("GOZEN_HWDEC");
++	if (!av_codec && hwdec != "0") {
++		const AVCodec* sw_codec = avcodec_find_decoder(av_stream->codecpar->codec_id);
++		const AVHWDeviceType types[] = {AV_HWDEVICE_TYPE_D3D11VA, AV_HWDEVICE_TYPE_DXVA2};
++		for (AVHWDeviceType type : types) {
++			if (!sw_codec || (!hwdec.is_empty() && hwdec != "1" && hwdec != av_hwdevice_get_type_name(type)))
++				continue;
++			if (_open_hwaccel(sw_codec, type)) {
++				av_codec = sw_codec;
++				break;
++			}
++			av_codec_ctx.reset();
++		}
+ 	}
+-
+-	FFmpeg::enable_multithreading(av_codec_ctx.get(), av_codec);
+-
+-	// Open codec - Video.
+-	if (avcodec_open2(av_codec_ctx.get(), av_codec, NULL)) {
+-		close();
+-		return _log_err("Couldn't open codec");
++#endif
++	if (!av_codec || !av_codec_ctx) {
++		if (!av_codec || hw_tried)
++			av_codec = avcodec_find_decoder(av_stream->codecpar->codec_id);
++		if (!av_codec) { // Couldn't find decoder so exit.
++			close();
++			return _log_err("Couldn't find decoder");
++		}
++		if (!_open_decoder(av_codec)) {
++			close();
++			return _log_err("Couldn't open codec");
++		}
+ 	}
+ 
+ 	// Adjust resolution according to the aspect ratio.
+@@ -195,7 +355,8 @@ int GoZenVideo::open(const String& video_path) {
+ 		return _log_err("Couldn't alloc packed/frames");
+ 	}
+ 
+-	avcodec_flush_buffers(av_codec_ctx.get());
++	if (!av_codec || !String(av_codec->name).ends_with("_v4l2m2m"))
++		avcodec_flush_buffers(av_codec_ctx.get());
+ 	bool duration_from_bitrate = av_format_ctx->duration_estimation_method == AVFMT_DURATION_FROM_BITRATE;
+ 	int response = 0;
+ 	int attempts = 0;
+@@ -225,6 +386,21 @@ int GoZenVideo::open(const String& video_path) {
+ 		}
+ 	}
+ 
++	if (hw_pix_fmt != AV_PIX_FMT_NONE) {
++		if (av_frame->format == hw_pix_fmt)
++			UtilityFunctions::print("GoZen: hardware decoding ", av_codec->name, " (",
++									av_hwdevice_get_type_name(av_codec_ctx->hw_device_ctx
++																  ? ((AVHWDeviceContext*)av_codec_ctx->hw_device_ctx->data)->type
++																  : AV_HWDEVICE_TYPE_NONE),
++									")");
++		else
++			UtilityFunctions::print("GoZen: the GPU cannot decode this ", av_codec->name, " video, using software");
++		if (!_hw_download()) {
++			close();
++			return _log_err("Failed to copy the first frame from the GPU");
++		}
++	}
++
+ 	// Checking for interlacing and what type of interlacing.
+ 	if (av_frame->flags & AV_FRAME_FLAG_INTERLACED)
+ 		interlaced = av_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST ? 1 : 2;
+@@ -278,6 +454,14 @@ int GoZenVideo::open(const String& video_path) {
+ 	average_frame_duration = 10000000.0 / framerate; // eg. 1 sec / 25 fps = 400.000 ticks (40ms).
+ 	stream_time_base_video = av_q2d(av_stream->time_base) * 1000.0 * 10000.0; // Converting timebase to ticks.
+ 
++	// The decoder may scale (set_target_size()): the frames' own size is the one to copy
++	if (av_frame->width > 0 && av_frame->height > 0 &&
++		(av_frame->width != actual_resolution.x || av_frame->height != actual_resolution.y)) {
++		resolution = Vector2i(resolution.x * av_frame->width / std::max(1, actual_resolution.x),
++							  resolution.y * av_frame->height / std::max(1, actual_resolution.y));
++		actual_resolution = Vector2i(av_frame->width, av_frame->height);
++	}
++
+ 	// Check for alpha layer.
+ 	const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get((AVPixelFormat)av_frame->format);
+ 	has_alpha = desc && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
+@@ -286,6 +470,14 @@ int GoZenVideo::open(const String& video_path) {
+ 	}
+ 
+ 	pixel_format = av_get_pix_fmt_name((AVPixelFormat)av_frame->format);
++#ifdef __linux__
++	if (String(av_codec->name).ends_with("_v4l2m2m") && OS::get_singleton()->get_environment("GOZEN_ZEROCOPY") != "0" &&
++		(av_frame->format == AV_PIX_FMT_YUV420P || av_frame->format == AV_PIX_FMT_NV12)) {
++		GozenV4L2Buffer buffer;
++		if (gozen_v4l2_frame_buffer(av_codec_ctx.get(), av_frame.get(), &buffer) == 0)
++			zero_copy = new GoZenZeroCopy();
++	}
++#endif
+ 	_log(String("Selected pixel format is: ") + pixel_format);
+ 
+ 	// Preparing the data images.
+@@ -293,8 +485,14 @@ int GoZenVideo::open(const String& video_path) {
+ 	int uv_height = (actual_resolution.y + 1) / 2;
+ 	bool is_natively_supported = (av_frame->format == AV_PIX_FMT_YUV420P || av_frame->format == AV_PIX_FMT_YUVJ420P ||
+ 								  av_frame->format == AV_PIX_FMT_YUVA420P);
++	nv12 = av_frame->format == AV_PIX_FMT_NV12;
+ 
+-	if (is_natively_supported) {
++	if (nv12) {
++		padding = av_frame->linesize[0] - actual_resolution.x;
++		y_data = Image::create_empty(actual_resolution.x, actual_resolution.y, false, Image::FORMAT_R8);
++		u_data = Image::create_empty(uv_width, uv_height, false, Image::FORMAT_RG8);
++		v_data = Image::create_empty(1, 1, false, Image::FORMAT_R8);
++	} else if (is_natively_supported) {
+ 		padding = av_frame->linesize[0] - actual_resolution.x;
+ 		y_data = Image::create_empty(actual_resolution.x, actual_resolution.y, false, Image::FORMAT_R8);
+ 		u_data = Image::create_empty(uv_width, uv_height, false, Image::FORMAT_R8);
+@@ -363,9 +561,15 @@ void GoZenVideo::close() {
+ 	loaded = false;
+ 	current_frame = -1;
+ 
++#ifdef __linux__
++	GoZenZeroCopy::release(zero_copy); // its held frames keep the decoder's buffers (and the decoder) until freed
++	zero_copy = nullptr;
++#endif
+ 	av_packet.reset();
+ 	av_frame.reset();
+ 	av_sws_frame.reset();
++	av_hw_frame.reset();
++	hw_pix_fmt = AV_PIX_FMT_NONE;
+ 	sws_ctx.reset();
+ 
+ 	if (av_codec_ctx) {
+@@ -385,6 +589,9 @@ int GoZenVideo::seek_frame(int frame_nr) {
+ 
+ 	int response = 0;
+ 	int attempts = 0;
++	int eof_retries = 0;
++	int traced = 0, frames_seen = 0;
++	const bool trace = OS::get_singleton()->get_environment("GOZEN_TRACE") == "1";
+ 
+ 	// Video seeking.
+ 	if ((response = _seek_frame(frame_nr)) < 0)
+@@ -402,9 +609,17 @@ int GoZenVideo::seek_frame(int frame_nr) {
+ 				attempts++;
+ 				continue;
+ 			} else if (response == AVERROR_EOF) {
++				if (trace)
++					UtilityFunctions::print("GoZen trace: EOF in seek_frame(", frame_nr, ") after ", frames_seen, " frames, target ",
++											frame_timestamp, " attempts ", attempts);
++				if (++eof_retries > 5 || frame_nr <= 0) {
++					_log_err("End of file reached while seeking, giving up");
++					response = 1;
++					break;
++				}
+ 				_log_err("End of file reached! Going back 1 frame!");
+ 
+-				if ((response = _seek_frame(frame_nr--)) < 0)
++				if ((response = _seek_frame(--frame_nr)) < 0)
+ 					return _log_err("Couldn't seek");
+ 
+ 				continue;
+@@ -421,8 +636,20 @@ int GoZenVideo::seek_frame(int frame_nr) {
+ 		else
+ 			current_pts = av_frame->best_effort_timestamp;
+ 
+-		if (current_pts == AV_NOPTS_VALUE)
++		frames_seen++;
++		if (trace && traced++ < 12)
++			UtilityFunctions::print("GoZen trace: seek_frame(", frame_nr, ") frame ", frames_seen, " pts ", (int64_t)av_frame->pts,
++									" best_effort ", (int64_t)av_frame->best_effort_timestamp, " -> ",
++									(int64_t)(current_pts * stream_time_base_video), " target ", frame_timestamp);
++
++		if (current_pts == AV_NOPTS_VALUE) {
++			// a V4L2 M2M decoder that gives no pts: the first frame after the seek (a key frame) is the best there is
++			if (av_codec_ctx->codec && String(av_codec_ctx->codec->name).ends_with("_v4l2m2m")) {
++				_copy_frame_data();
++				break;
++			}
+ 			continue;
++		}
+ 
+ 		// Skip to actual requested frame.
+ 		if ((int64_t)(current_pts * stream_time_base_video) / 10000 >= frame_timestamp / 10000) {
+@@ -456,6 +683,46 @@ bool GoZenVideo::next_frame(bool skip) {
+ 	return true;
+ }
+ 
++bool GoZenVideo::is_zero_copy() const {
++#ifdef __linux__
++	return zero_copy && !zero_copy->failed();
++#else
++	return false;
++#endif
++}
++
++int64_t GoZenVideo::next_frame_held() {
++	if (!loaded)
++		return -1;
++	int64_t id = -1;
++	FFmpeg::get_frame(av_format_ctx.get(), av_codec_ctx.get(), av_stream->index, av_frame.get(), av_packet.get());
++#ifdef __linux__
++	if (is_zero_copy())
++		id = zero_copy->hold(av_codec_ctx.get(), av_frame.get(), decoder_generation);
++#endif
++	if (id < 0)
++		_copy_frame_data();
++	current_frame++;
++	av_frame_unref(av_frame.get());
++	av_packet_unref(av_packet.get());
++	return id;
++}
++
++Array GoZenVideo::show_held(int64_t id) {
++#ifdef __linux__
++	if (zero_copy)
++		return zero_copy->show(id);
++#endif
++	return Array();
++}
++
++void GoZenVideo::drop_held() {
++#ifdef __linux__
++	if (zero_copy)
++		zero_copy->drop_pending();
++#endif
++}
++
+ PackedInt32Array GoZenVideo::get_streams(int stream_type) {
+ 	if (!loaded) {
+ 		_log_err("file is not open");
+@@ -562,6 +829,8 @@ Dictionary GoZenVideo::get_chapter_metadata(int chapter_index) {
+ }
+ 
+ void GoZenVideo::_copy_frame_data() {
++	if (!_hw_download())
++		return;
+ 	if (av_frame->data[0] == nullptr) {
+ 		_log("Frame is empty");
+ 		return;
+@@ -590,6 +859,14 @@ void GoZenVideo::_copy_frame_data() {
+ 		}
+ 
+ 		av_frame_unref(av_sws_frame.get());
++	} else if (nv12) {
++		for (int i = 0; i < actual_resolution.y; i++) {
++			memcpy(y_data->ptrw() + i * actual_resolution.x, av_frame->data[0] + i * av_frame->linesize[0],
++				   actual_resolution.x);
++		}
++		for (int i = 0; i < uv_height; i++) {
++			memcpy(u_data->ptrw() + i * uv_width * 2, av_frame->data[1] + i * av_frame->linesize[1], uv_width * 2);
++		}
+ 	} else {
+ 		for (int i = 0; i < actual_resolution.y; i++) {
+ 			memcpy(y_data->ptrw() + i * actual_resolution.x, av_frame->data[0] + i * av_frame->linesize[0],
+@@ -609,8 +886,30 @@ void GoZenVideo::_copy_frame_data() {
+ 	}
+ }
+ 
+-int GoZenVideo::_seek_frame(int frame_nr) {
++// avcodec_flush_buffers() on a V4L2 M2M decoder (Raspberry Pi 4) leaves it answering EOF to every later request, so a
++// flush there recreates the decoder instead (same approach as nvmpi_flush.patch for the Jetson).
++// A restart in place (gozen_v4l2_restart(): STREAMOFF/STREAMON, as the V4L2 decoder interface defines a seek) comes
++// first: reopening /dev/video10 takes tens of ms at every loop of a video.
++void GoZenVideo::_flush_decoder() {
++	const AVCodec* codec = av_codec_ctx ? av_codec_ctx->codec : nullptr;
++	if (codec && String(codec->name).ends_with("_v4l2m2m")) {
++#ifdef __linux__
++		drop_held();
++		avcodec_flush_buffers(av_codec_ctx.get());
++		if (OS::get_singleton()->get_environment("GOZEN_V4L2_RESTART") != "0" && gozen_v4l2_restart(av_codec_ctx.get()) == 0)
++			return;
++		decoder_generation++;
++#endif
++		av_codec_ctx.reset();
++		if (!_open_decoder(codec))
++			UtilityFunctions::printerr("GoZen: could not reopen ", codec->name, " after a seek");
++		return;
++	}
+ 	avcodec_flush_buffers(av_codec_ctx.get());
++}
++
++int GoZenVideo::_seek_frame(int frame_nr) {
++	_flush_decoder();
+ 
+ 	frame_timestamp = (int64_t)(frame_nr * average_frame_duration);
+ 	return av_seek_frame(av_format_ctx.get(), -1, (start_time_video + frame_timestamp) / 10,
+@@ -631,6 +930,10 @@ void GoZenVideo::_bind_methods() {
+ 
+ 	BIND_METHOD_ARGS(seek_frame, "frame_nr");
+ 	BIND_METHOD_ARGS(next_frame, "skip");
++	BIND_METHOD(is_zero_copy);
++	BIND_METHOD(next_frame_held);
++	BIND_METHOD_ARGS(show_held, "id");
++	BIND_METHOD(drop_held);
+ 
+ 	BIND_METHOD_ARGS(get_streams, "stream_type");
+ 	BIND_METHOD_ARGS(get_stream_metadata, "stream_index");
+@@ -675,6 +978,9 @@ void GoZenVideo::_bind_methods() {
+ 
+ 	BIND_METHOD(is_full_color_range);
+ 	BIND_METHOD(is_using_sws);
++	BIND_METHOD_ARGS(set_target_size, "size");
++	BIND_METHOD(get_target_size);
++	BIND_METHOD(is_nv12);
+ 
+ 	BIND_METHOD(enable_debug);
+ 	BIND_METHOD(disable_debug);
+diff --git a/src/gozen_video.hpp b/src/gozen_video.hpp
+index ad7a971..223a61b 100644
+--- a/src/gozen_video.hpp
++++ b/src/gozen_video.hpp
+@@ -2,6 +2,7 @@
+ 
+ #include "ffmpeg.hpp"
+ #include "ffmpeg_helpers.hpp"
++#include "gozen_zerocopy.hpp"
+ 
+ #include <cmath>
+ #include <cstdint>
+@@ -33,6 +34,8 @@ class GoZenVideo : public Resource {
+ 	UniqueAVPacket av_packet;
+ 	UniqueAVFrame av_frame;
+ 	UniqueAVFrame av_sws_frame;
++	UniqueAVFrame av_hw_frame; // a GPU-decoded frame copied to system memory (Windows hardware decoding)
++	enum AVPixelFormat hw_pix_fmt = AV_PIX_FMT_NONE; // the GPU's frame format while decoding on it (Windows)
+ 	UniqueSwsCtx sws_ctx;
+ 
+ 	enum AVColorPrimaries color_profile;
+@@ -62,6 +65,7 @@ class GoZenVideo : public Resource {
+ 	bool loaded = false; // Is true after open().
+ 	bool debug = false;
+ 	bool using_sws = false; // This is set for when the pixel format is foreign and not directly supported by the addon.
++	bool nv12 = false; // NV12 frames (the Jetson's hardware decoder): u_data holds U and V interleaved (RG8), no v_data.
+ 	bool full_color_range = true;
+ 
+ 	int sws_flag = SWS_BILINEAR;
+@@ -75,6 +79,7 @@ class GoZenVideo : public Resource {
+ 
+ 	Vector2i resolution = Vector2i(0, 0);
+ 	Vector2i actual_resolution = Vector2i(0, 0);
++	Vector2i target_size = Vector2i(0, 0); // set_target_size(): the size the video is shown at (0 = full size).
+ 
+ 	Ref<Image> y_data;
+ 	Ref<Image> u_data;
+@@ -89,16 +94,26 @@ class GoZenVideo : public Resource {
+ 	PackedInt32Array audio_streams;
+ 	PackedInt32Array subtitle_streams;
+ 
++#ifdef __linux__
++	GoZenZeroCopy* zero_copy = nullptr; // V4L2 M2M frames shown straight from the decoder's buffers (see gozen_zerocopy.hpp)
++	int decoder_generation = 0; // +1 whenever the decoder is reopened (its buffers are new ones)
++#endif
++
+ 	// Private functions.
+ 	void _copy_frame_data();
+ 	void _clean_frame_data();
+ 
+ 	int _seek_frame(int frame_nr);
++	void _flush_decoder();
+ 
+ 	inline void _log(String message) {
+ 		if (debug)
+ 			UtilityFunctions::print("GoZenVideo: ", message, ".");
+ 	}
++	bool _open_decoder(const AVCodec* codec, bool hw = false);
++	bool _open_hwaccel(const AVCodec* codec, AVHWDeviceType type);
++	bool _hw_download();
++
+ 	inline bool _log_err(String message) {
+ 		UtilityFunctions::printerr("GoZenVideo: ", message, "!");
+ 		return false;
+@@ -116,6 +131,16 @@ class GoZenVideo : public Resource {
+ 	int seek_frame(int frame_nr);
+ 	bool next_frame(bool skip = false);
+ 
++	// Zero-copy (Raspberry Pi 4's V4L2 M2M decoder with Godot's OpenGL ES renderer; GOZEN_ZEROCOPY=0 turns it off):
++	// next_frame_held() decodes the next frame and keeps it in the decoder's buffer, returning its id for
++	// show_held(), or -1 when that frame could not be held (it was copied into the y/u/v images as by next_frame()).
++	// show_held() (render thread) gives the textures of a held frame (y, u, v; y, uv when NV12) as RIDs for the
++	// shader, letting go of the frames held before it; empty when it cannot (is_zero_copy() then turns false).
++	bool is_zero_copy() const;
++	int64_t next_frame_held();
++	Array show_held(int64_t id);
++	void drop_held();
++
+ 	PackedInt32Array get_streams(int stream_type);
+ 	Dictionary get_stream_metadata(int stream_index);
+ 
+@@ -126,6 +151,12 @@ class GoZenVideo : public Resource {
+ 	void set_headers(const String& headers_str) { headers = headers_str; }
+ 	String get_headers() const { return headers; }
+ 
++	// Before open(): the size the video is shown at. The Jetson's hardware decoder then scales its frames down to fit
++	// it (keeping the aspect) and hands them over as NV12, so a smaller window copies and uploads fewer pixels.
++	inline void set_target_size(const Vector2i& size) { target_size = size; }
++	inline Vector2i get_target_size() const { return target_size; }
++	inline bool is_nv12() const { return nv12; }
++
+ 	inline void set_sws_flag_bilinear() { sws_flag = SWS_BILINEAR; }
+ 	inline void set_sws_flag_bicubic() { sws_flag = SWS_BICUBIC; }
+ 
