@@ -5,7 +5,9 @@
     python scripts/package/start.py --seconds 20    # any run.py option; one given here wins over the saved one
 
 Settings are changed with scripts/package/bundle_options.py (docs/bundle.md). The board's profile
-(scripts/package/board_profile.py) adds its environment and Godot arguments, under the saved and given ones.
+(scripts/package/board_profile.py) adds its environment and Godot arguments, under the saved and given ones. With the
+DMD display on "auto" (`[dmd] window`), it looks for a PIN2DMD or a ZeDMD (scripts/package/dmd_panel.py): the game then
+shows the DMD on the panel found, else in the backglass window under the videos.
 """
 import os
 import sys
@@ -16,6 +18,7 @@ sys.path.insert(0, HERE)
 
 import board_profile  # noqa: E402
 import bundle_options  # noqa: E402
+import dmd_panel  # noqa: E402
 import run  # noqa: E402
 
 
@@ -36,6 +39,30 @@ def merge(saved, given):
     return out + list(given)
 
 
+def add_run_flag(argv, flag):
+    """run.py's arguments with flag before Godot's '--' (none added when it is there already)."""
+    head = argv[:argv.index("--")] if "--" in argv else argv
+    if any(a.split("=", 1)[0] == flag for a in head):
+        return argv
+    return head + [flag] + argv[len(head):]
+
+
+def dmd_panel_args(args, mode, find=dmd_panel.find):
+    """For [dmd] window="auto": sets TRON_DMD_PANEL (the game reads it) and, when run.py can drive the panel found,
+    asks it to. Returns run.py's arguments."""
+    if mode != "auto":
+        return args
+    panel = os.environ.get("TRON_DMD_PANEL")
+    if panel is None:
+        panel = find()
+        os.environ["TRON_DMD_PANEL"] = panel
+    print("DMD display auto: " + ("a {} answers, the DMD goes there".format(panel) if panel else
+                                  "no PIN2DMD or ZeDMD answers, the DMD goes under the backglass videos"), flush=True)
+    if panel and hasattr(run, "zedmd_feed"):        # run.py's --pin2dmd and --zedmd
+        args = add_run_flag(args, "--" + panel)
+    return args
+
+
 def main(argv=None):
     given = list(sys.argv[1:] if argv is None else argv)
     args = merge(bundle_options.run_args(), given)
@@ -47,6 +74,8 @@ def main(argv=None):
         args = board_profile.add_godot_args(args, extra)
         print("board profile {}: env {}, Godot {}".format(profile["id"], env or "-", " ".join(extra) or "-"),
               flush=True)
+    mode = bundle_options.get_values(["pup.dmd.window"]).get("pup.dmd.window")
+    args = dmd_panel_args(args, mode)
     return run.main(args)
 
 
