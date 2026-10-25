@@ -409,12 +409,12 @@ func _make_dmd_window() -> void:
 ## [dmd] window: "window" (its own window, the default), "external" (no DMD on screen: a PIN2DMD or ZeDMD shows it),
 ## "stacked" (in the backglass window, in a band under its screens) or "overlay" (in the backglass window, over the
 ## bottom of its screens). Also true, false and "none" (= "external"), "backglass" (= "overlay"). "auto" = "external"
-## when the launcher found a PIN2DMD or ZeDMD that answers (TRON_DMD_PANEL, scripts/package/board_profile.py), else
-## "stacked".
+## when the launcher found a PIN2DMD or ZeDMD that answers (TRON_DMD_PANEL, scripts/package/dmd_panel.py), else
+## "overlay" (the owner's choice on the Raspberry Pi 4, 2026-10-25).
 func dmd_window_mode() -> String:
 	var mode := str(setting("dmd", "window", "window")).to_lower()
 	if mode == "auto":
-		return "external" if OS.get_environment("TRON_DMD_PANEL") != "" else "stacked"
+		return "external" if OS.get_environment("TRON_DMD_PANEL") != "" else "overlay"
 	return {"true": "window", "false": "external", "none": "external", "backglass": "overlay"}.get(mode, mode)
 
 
