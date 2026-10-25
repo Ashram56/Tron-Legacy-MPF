@@ -294,17 +294,22 @@ func _title_height(w: Window) -> int:
 
 func _make_layered_window(section: String, defaults: Dictionary, volume: float) -> void:
 	var w := _make_window(section)
-	# [backglass] rect = [x, y, w, h]: the screens' area in the window (its render_size pixels when it has one),
-	# e.g. above a DMD drawn in the same window ([dmd] window="backglass"); the whole window when not given
+	# [backglass] rect = [x, y, w, h]: the screens' area in the window (its render_size pixels when it has one);
+	# with [dmd] window="stacked" and no rect, the window above the DMD band; else the whole window
 	var parent: Node = w
 	var rect = setting(section, "rect", [])
-	if rect is Array and rect.size() == 4 and float(rect[2]) > 0.0:
+	var stacked := section == "backglass" and dmd_window_mode() == "stacked"
+	if (rect is Array and rect.size() == 4 and float(rect[2]) > 0.0) or stacked:
 		var area := Control.new()
 		area.name = "pup_%s_screens" % section
 		area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		area.clip_contents = true
-		area.position = Vector2(float(rect[0]), float(rect[1]))
-		area.size = Vector2(float(rect[2]), float(rect[3]))
+		if rect is Array and rect.size() == 4 and float(rect[2]) > 0.0:
+			area.position = Vector2(float(rect[0]), float(rect[1]))
+			area.size = Vector2(float(rect[2]), float(rect[3]))
+		else:
+			area.anchor_right = 1.0
+			area.anchor_bottom = 1.0 - _dmd_band()
 		w.add_child(area)
 		parent = area
 	for n in LAYERS[section]:
@@ -333,28 +338,32 @@ const FRAME_PAD := 20.0                 # the neon frame's line and its glow pas
 
 func _make_dmd_window() -> void:
 	var w: Node
-	var mode := str(setting("dmd", "window", true)).to_lower()
-	if mode == "backglass" and windows.has("backglass"):
-		# [dmd] window="backglass": the DMD drawn in the backglass window, over its screens, at [dmd] rect = [x, y,
-		# w, h] (the backglass's render_size pixels when it has one; default: a band across its bottom quarter).
-		# One full screen window page-flips: a second window made X copy the backglass at every frame (Raspberry
-		# Pi 4, 30 FPS cap: 21 instead of 29.6 FPS)
+	var mode := dmd_window_mode()
+	if mode in ["stacked", "overlay"] and windows.has("backglass"):
+		# the DMD drawn in the backglass window: "stacked" in a band under the screens, "overlay" over their bottom;
+		# [dmd] rect = [x, y, w, h] (the backglass's render_size pixels when it has one) places it by hand. One full
+		# screen window page-flips: a second window made X copy the backglass at every frame (Raspberry Pi 4, 30 FPS
+		# cap: 21 instead of 29.6 FPS)
 		var bg: Window = windows["backglass"]
-		var space := Vector2(bg.content_scale_size) if bg.content_scale_size.x > 0 else Vector2(bg.size)
-		var r = setting("dmd", "rect", [0, space.y * 0.75, space.x, space.y * 0.25])
 		_dmd_area = Control.new()
 		_dmd_area.name = "pup_dmd"
 		_dmd_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_dmd_area.clip_contents = true
-		_dmd_area.position = Vector2(float(r[0]), float(r[1]))
-		_dmd_area.size = Vector2(float(r[2]), float(r[3]))
+		var r = setting("dmd", "rect", [])
+		if r is Array and r.size() == 4 and float(r[2]) > 0.0:
+			_dmd_area.position = Vector2(float(r[0]), float(r[1]))
+			_dmd_area.size = Vector2(float(r[2]), float(r[3]))
+		else:
+			_dmd_area.anchor_top = 1.0 - _dmd_band()
+			_dmd_area.anchor_right = 1.0
+			_dmd_area.anchor_bottom = 1.0
 		bg.add_child(_dmd_area)
 		w = _dmd_area
 	else:
 		var own := _make_window("dmd")
-		# [dmd] window=false: no DMD window on screen (the DMD goes to a real display, e.g. a PIN2DMD fed by the
-		# game), so a fullscreen backglass stays the only window and page-flips
-		if mode == "false":
+		# "external": no DMD window on screen (the DMD goes to a real display fed by the game, a PIN2DMD or a
+		# ZeDMD), so a fullscreen backglass stays the only window and page-flips
+		if mode == "external":
 			own.hide()
 		w = own
 	var background := str(setting("dmd", "background", "lightcycles"))
@@ -395,6 +404,20 @@ func _make_dmd_window() -> void:
 		mat.set_shader_parameter("dmd_size", Vector2(128, 32))
 		_dmd_view.material = mat
 	w.add_child(_dmd_view)
+
+
+## [dmd] window: "window" (its own window, the default), "external" (no DMD on screen: a PIN2DMD or ZeDMD shows it),
+## "stacked" (in the backglass window, in a band under its screens) or "overlay" (in the backglass window, over the
+## bottom of its screens). Also true, false and "none" (= "external"), "backglass" (= "overlay").
+func dmd_window_mode() -> String:
+	var mode := str(setting("dmd", "window", "window")).to_lower()
+	return {"true": "window", "false": "external", "none": "external", "backglass": "overlay"}.get(mode, mode)
+
+
+## The DMD band's share of the backglass window's height with "stacked" or "overlay": [dmd] band, 0.25 by default
+## (a 16:9 window: the videos 3/4 of its height above, the DMD 4:1 across the middle of the band under them).
+func _dmd_band() -> float:
+	return clampf(float(setting("dmd", "band", 0.25)), 0.1, 0.5)
 
 
 ## Frame and DMD laid out for the DMD window's current size (again on every resize and size change).

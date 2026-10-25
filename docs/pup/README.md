@@ -74,7 +74,7 @@ GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV
   against 7 %). NV12 output (`gozen_v4l2_buffers_nv12.patch`) changes nothing measurable (GPU -3 points).
   `render_size=[960, 540]`: +4-5 fps. Vulkan (V3DV): 0.4-0.7 fps. A second window (an LCD DMD) loses the
   full screen page flip: 21 instead of 29.6 fps at the 30 fps cap, 10 fps with the light cycles; draw the DMD in
-  the backglass window instead (`[dmd] window="backglass"`, `game/pup.cfg`). `--render-thread separate` on
+  the backglass window instead (`[dmd] window="stacked"` or `"overlay"`, `game/pup.cfg`). `--render-thread separate` on
   OpenGL ES crashes Godot 4.6.3 ("Error initializing GLAD", SIGSEGV): `EGLManager::release_current()` leaves
   `current_window` set, so the render thread never makes the context current; fixed by one line
   (`current_window = nullptr;`, `scripts/godot/egl_release_current.patch`) in Godot's master, not in 4.6.3.
