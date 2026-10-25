@@ -7,11 +7,10 @@
       "match": ["Raspberry Pi 4", "raspberrypi,4-model-b"],
       "measured": "2026-10-25, Pi 4B, 1080p backglass, classic DMD: docs/pup/README.md, Raspberry Pi 4",
       "install": {
-        "options": {"dmd.mode": "classic", "pup.third_screen": false},
+        "options": {"dmd.mode": "classic", "pup.third_screen": false, "pup.dmd.window": "external", "pup.dmd.background": "none"},
         "cfg": {
           "pup.local.cfg": {
-            "backglass": {"fullscreen": true, "borderless": true, "render_size": [1280, 720], "rect": [160, 0, 960, 540]},
-            "dmd": {"window": "backglass", "rect": [0, 540, 1280, 180], "background": "none"}
+            "backglass": {"fullscreen": true, "borderless": true, "render_size": [1280, 720]}
           }
         }
       },

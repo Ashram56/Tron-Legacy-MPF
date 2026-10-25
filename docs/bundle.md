@@ -144,7 +144,7 @@ settings, in `scripts/package/profiles.json`, picked by `scripts/package/board_p
 
 | Profile | Install | Run |
 |---|---|---|
-| `rpi4` (measured 2026-10-25, `docs/pup/README.md`) | `dmd.mode` classic, no third screen; backglass full screen, borderless, `render_size` 1280x720, videos in `[160, 0, 960, 540]`, the LCD DMD in the backglass window under them (`[dmd] window="backglass"`, no light cycles) | `--max-fps 30`; `GOZEN_HWDEC=1` only with the fixed `bcm2835-codec` module in `/lib/modules/<kernel>/updates/`; `--render-thread separate` only when `MPF_GODOT_EGL_FIX` is set (a Godot with `scripts/godot/egl_release_current.patch`, from the board's image) |
+| `rpi4` (measured 2026-10-25, `docs/pup/README.md`) | `dmd.mode` classic, no third screen; backglass full screen, borderless, `render_size` 1280x720; no DMD on screen (`pup.dmd.window` external: a PIN2DMD or ZeDMD shows it), no light cycles. The web page's "DMD display" option switches to `stacked` (the LCD DMD under the videos, in the backglass window, same speed on the Pi) | `--max-fps 30`; `GOZEN_HWDEC=1` only with the fixed `bcm2835-codec` module in `/lib/modules/<kernel>/updates/`; `--render-thread separate` only when `MPF_GODOT_EGL_FIX` is set (a Godot with `scripts/godot/egl_release_current.patch`, from the board's image) |
 
 The board's own system (the Godot build, the kernel module, `/etc/default/...`) stays in the board's image.
 
@@ -168,7 +168,7 @@ Every value is validated before anything is written; one bad value writes nothin
 | Group | Options | Stored in |
 |---|---|---|
 | display | `dmd.mode`, `dmd.tint`, `dmd.font`, `dmd.text_scale` (0.5-1.1), `dmd.text_glow` (0-3), `dmd.text_color`, `dmd.dots`, `dmd.size` | `game/options.json`, added by `start.py` as `run.py --dmd-...` |
-| PuP | `pup.enabled`, `pup.third_screen`, `pup.ost_music`, `pup.video_volume`, `pup.music_volume`, `pup.layout`, `pup.backglass.enabled`, `pup.backglass.service_menu`, `pup.dmd.dmd_size` | `game/pup.local.cfg` (the cfg the game reads after `pup.cfg`) |
+| PuP | `pup.enabled`, `pup.third_screen`, `pup.ost_music`, `pup.video_volume`, `pup.music_volume`, `pup.layout`, `pup.backglass.enabled`, `pup.backglass.service_menu`, `pup.dmd.dmd_size`, `pup.dmd.window`, `pup.dmd.background` | `game/pup.local.cfg` (the cfg the game reads after `pup.cfg`) |
 | machine | `machine.hw` (virtual, proc), `machine.model` (pro, le), `machine.free_play`, `machine.fiber_optics` | `game/options.json`, as `run.py --hw`, `--machine`, `--free-play`/`--no-free-play`, `--fiber-optics` |
 | Scorbit | `scorbit.provider`, `scorbit.machine_id`, `scorbit.encrypted_key` (secret), `scorbit.hostname` | `game/scorbit.local.cfg`, mode 0600 |
 
