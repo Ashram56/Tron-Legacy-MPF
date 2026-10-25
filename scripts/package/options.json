@@ -58,7 +58,7 @@
      "help": "cycles: a smaller DMD with the light cycles round it. full: a real DMD's size, no light cycles. The service menu (PUP DMD SIZE) chooses too, and wins.",
      "target": {"cfg": "pup.local.cfg", "section": "dmd", "key": "dmd_size"}, "restart": true},
     {"id": "pup.dmd.window", "group": "pup", "label": "DMD display", "type": "choice", "choices": ["window", "external", "stacked", "overlay", "auto"], "default": "window",
-     "help": "window: its own window. external: none on screen, a PIN2DMD or ZeDMD shows it. stacked: under the backglass videos, in the backglass window. overlay: over the bottom of the backglass videos. stacked and overlay keep one full screen window (much faster on a Raspberry Pi 4). auto: external when a PIN2DMD or ZeDMD answers at start, else stacked.",
+     "help": "window: its own window. external: none on screen, a PIN2DMD or ZeDMD shows it. stacked: under the backglass videos, in the backglass window. overlay: over the bottom of the backglass videos. stacked and overlay keep one full screen window (much faster on a Raspberry Pi 4). auto: external when a PIN2DMD or ZeDMD answers at start, else overlay.",
      "target": {"cfg": "pup.local.cfg", "section": "dmd", "key": "window"}, "restart": true},
     {"id": "pup.dmd.background", "group": "pup", "label": "DMD background", "type": "choice", "choices": ["lightcycles", "frame", "none"], "default": "lightcycles",
      "help": "lightcycles: a live 3D light cycle chase round the DMD (too heavy for a Raspberry Pi 4). frame: the PuP Pack's DMD panel art. none: black.",

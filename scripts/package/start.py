@@ -7,7 +7,7 @@
 Settings are changed with scripts/package/bundle_options.py (docs/bundle.md). The board's profile
 (scripts/package/board_profile.py) adds its environment and Godot arguments, under the saved and given ones. With the
 DMD display on "auto" (`[dmd] window`), it looks for a PIN2DMD or a ZeDMD (scripts/package/dmd_panel.py): the game then
-shows the DMD on the panel found, else in the backglass window under the videos.
+shows the DMD on the panel found, else in the backglass window over the videos.
 """
 import os
 import sys
@@ -57,7 +57,7 @@ def dmd_panel_args(args, mode, find=dmd_panel.find):
         panel = find()
         os.environ["TRON_DMD_PANEL"] = panel
     print("DMD display auto: " + ("a {} answers, the DMD goes there".format(panel) if panel else
-                                  "no PIN2DMD or ZeDMD answers, the DMD goes under the backglass videos"), flush=True)
+                                  "no PIN2DMD or ZeDMD answers, the DMD goes over the backglass videos"), flush=True)
     if panel and hasattr(run, "zedmd_feed"):        # run.py's --pin2dmd and --zedmd
         args = add_run_flag(args, "--" + panel)
     return args
