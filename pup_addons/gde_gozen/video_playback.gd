@@ -93,8 +93,8 @@ var _nv12: bool = false ## The decoder gives NV12: u_data holds U and V (RG8), t
 static var _copy_planes: bool = int(ProjectSettings.get_setting("rendering/driver/threads/thread_model", 1)) == 2
 ## Zero-copy (GoZenVideo.is_zero_copy(): the Raspberry Pi 4's hardware decoder with the Compatibility renderer): queued
 ## frames stay in the decoder's buffers ({"frame": int, "held": id}) and are shown as GPU textures of those buffers,
-## nothing copied or uploaded. Late frames are skipped instead of slipping the clock. Needs the render thread to be the
-## main one (thread model "safe"), as show_held() makes GL calls.
+## nothing copied or uploaded. Late frames are skipped instead of slipping the clock. show_held() makes GL calls: with a
+## separate render thread it runs there (RenderingServer.call_on_render_thread()).
 var _zero_copy: bool = false
 var _held_bound: bool = false ## The shader samples a held frame's textures, not y_texture/u_texture/v_texture.
 var _clock: float = 0.0 ## Seconds of video played; frame n is due at n / _frame_rate (playback_speed moves it).
@@ -233,8 +233,7 @@ func _update_video(new_video: GoZenVideo) -> void:
 	_frame_count = video.get_frame_count()
 	_has_alpha = video.get_has_alpha()
 	_nv12 = video.has_method("is_nv12") and video.is_nv12()
-	# (the render thread, not the thread_model setting: --render-thread on the command line overrides it)
-	_zero_copy = video.has_method("is_zero_copy") and video.is_zero_copy() and RenderingServer.is_on_render_thread()
+	_zero_copy = video.has_method("is_zero_copy") and video.is_zero_copy()
 
 	video_streams = video.get_streams(STREAM_TYPE.VIDEO)
 	audio_streams = video.get_streams(STREAM_TYPE.AUDIO)
@@ -682,17 +681,29 @@ func _set_frame_image(planes: Array = []) -> void:
 ## Shows a frame held in the decoder's buffer: the shader samples its textures (RIDs straight into the material, as
 ## they are not Texture resources). A frame that cannot be shown is lost; zero-copy stops when it is impossible.
 func _show_held(id: int) -> void:
-	var rids: Array = video.show_held(id)
+	_held_bound = true
+	if RenderingServer.is_on_render_thread():
+		_show_held_now(id, video)
+	else:
+		RenderingServer.call_on_render_thread(_show_held_now.bind(id, video))
+
+
+## On the render thread. of: the video the frame belongs to (the node may have opened another one since).
+func _show_held_now(id: int, of: GoZenVideo) -> void:
+	if of != video or not is_instance_valid(of):
+		return
+	var rids: Array = of.show_held(id)
 	if rids.is_empty():
-		if not video.is_zero_copy():
+		if not of.is_zero_copy():
 			_zero_copy = false
 		return
+	if not _held_bound:
+		return   # unbound meanwhile (a copied frame or a close came first)
 	var material: RID = _shader_material.get_rid()
 	RenderingServer.material_set_param(material, "y_data", rids[0])
 	RenderingServer.material_set_param(material, "u_data", rids[1])
 	if not _nv12:
 		RenderingServer.material_set_param(material, "v_data", rids[2])
-	_held_bound = true
 
 
 func _unbind_held() -> void:

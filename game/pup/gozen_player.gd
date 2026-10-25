@@ -45,8 +45,9 @@ static func _check_hwdec() -> void:
 	if dec and HWDEC_MEM in dev:
 		return
 	if _has_pi_decoder():
-		# measured on a Pi 4 (backglass + DMD): v4l2m2m saves ~55 points of CPU but lowers the frame rate (17 against
-		# 21 fps) and doubles the video lag, so it is opt-in until the copy and decoder re-creation are fixed
+		# opt-in: with zero-copy it halves the CPU and the videos keep time (Pi 4, classic DMD, 1280x720 backglass:
+		# 44-47 fps, no lag, 176-195 % CPU against 50 fps, 0.7 s lag, 330 % in software), but the stock bcm2835-codec
+		# driver can oops when a decoder stops (docs/pup/README.md); set GOZEN_HWDEC=1 once it is fixed
 		OS.set_environment("GOZEN_HWDEC", "0")
 		print("GoZen: Raspberry Pi decoder (bcm2835-codec) found: software decoding, GOZEN_HWDEC=1 tries it")
 		return
