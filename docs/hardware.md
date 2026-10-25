@@ -319,17 +319,17 @@ for this: Godot reads back its own 128x32 picture, as `--proc-dmd` does.
 
 ```
 python scripts/run.py --pin2dmd                  # the original orange; add --hw proc, --monitor ... as usual
-python scripts/run.py --pin2dmd '#2a6cff'        # Tron blue; "rgb" sends the picture's own colours instead
+python scripts/run.py --pin2dmd '#2a6cff'        # Tron blue (always monochrome: the public game sends no colour pictures)
 mpf game . -c config,hw_virtual,pin2dmd          # MPF alone (Godot started with "-- --pin2dmd")
-docker: TRON_PIN2DMD=1 (or #RRGGBB, rgb)
+docker: TRON_PIN2DMD=1 (or #RRGGBB)
 ```
 
 - **On the real machine** (`--hw proc`) the PIN2DMD is the DMD: `python scripts/run.py --hw proc --pin2dmd` sends no
   `--proc-dmd` frames, and the overlay moves the P-ROC's `dmds: dmd` to the virtual platform, so nothing goes to the
   P-ROC's DMD connector (a P-ROC DMD and a PIN2DMD together are not supported). Tested with `tests/test_pin2dmd.py`
   on a mocked P-ROC and pyusb.
-- **Monochrome first**: the 16 shades of the DMD art (grey levels, ROM palette level / 15) scale the colour. `rgb` keeps
-  whatever colours the picture has, which is the hook for a coloured 128x32 source later.
+- **Monochrome only** (owner decision, 2026-10-25): the 16 shades of the DMD art (grey levels, ROM palette level / 15)
+  scale one colour; the colour is the only setting.
 - `pin2dmd: panel: rbg` in the overlay swaps green and blue for panels wired that way; `resolution` can be
   `192x64` or `256x64` for the XL and HD models (only 128x32 is fed by the game today).
 - Needs pyusb (in the venv with setup.py) and libusb 1.0, and on Linux a udev rule for `0314:e457` to run without root
@@ -337,3 +337,27 @@ docker: TRON_PIN2DMD=1 (or #RRGGBB, rgb)
   device not found" if the PIN2DMD is missing or another program (DMDext) holds it.
 - **Not checked on a real PIN2DMD**: colour order and the firmware's "virtual pinball" mode. MPF's platform code is
   used as is; the unit test checks the packets it produces, not the LEDs. Report the result and the panel type.
+
+
+## ZeDMD (an RGB LED DMD on USB serial or Wi-Fi)
+
+A [ZeDMD](https://github.com/PPUC/ZeDMD) takes the same frames as the PIN2DMD, through MPF's `zedmd` platform (libzedmd
+ships with MPF 0.80.1 for Linux x64/arm64, Windows x64 and macOS). Monochrome like the PIN2DMD: the 16 shades of the
+DMD art through one colour.
+
+```
+python scripts/run.py --zedmd                    # the original orange; add --hw proc, --monitor ... as usual
+python scripts/run.py --zedmd '#2a6cff'
+mpf game . -c config,hw_virtual,zedmd            # MPF alone (Godot started with "-- --zedmd")
+```
+
+| Piece | What |
+|---|---|
+| `game/tools/pin2dmd.gd` | Same autoload as for the PIN2DMD, also started by `-- --zedmd[=COLOUR]`. |
+| `game/config/zedmd.yaml` | MPF overlay: `hardware: rgb_dmd: zedmd`, `zedmd: width 128, height 32`, `rgb_dmds: default`; with `--hw proc` the P-ROC's DMD goes to the virtual platform. |
+| `tests/test_zedmd.py` | Boots the overlay against a mocked libzedmd and checks the BCP frame reaches `RenderRgb888` as a 128x32 picture. |
+
+- libzedmd's extension is compiled for one Python build: on a Python it was not built for, MPF logs "Failed to load
+  ZeDMD libraries". On a Raspberry Pi (arm64) MPF 0.80.1 also loads the x64 library (`platform.machine` is not
+  called in `zedmd.py`): [MPF-Godot-Packaging](https://github.com/Ashram56/MPF-Godot-Packaging) carries the fix.
+- Not tried on a real ZeDMD (USB port, firmware): the owner's check.

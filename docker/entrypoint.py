@@ -64,7 +64,7 @@ def godot_args(env):
     args += shlex.split(env.get("GODOT_ARGS", ""))
     if hardware(env) == "proc" and not env.get("TRON_PIN2DMD", "").strip():    # a PIN2DMD replaces the P-ROC DMD
         args += ["--", "--proc-dmd"] if "--" not in args else ["--proc-dmd"]
-    if env.get("TRON_PIN2DMD", "").strip():     # "1" = the default colour, else #RRGGBB or rgb
+    if env.get("TRON_PIN2DMD", "").strip():     # "1" = the default colour, else #RRGGBB
         value = env["TRON_PIN2DMD"].strip()
         arg = "--pin2dmd" if truthy(value) else "--pin2dmd=" + value
         args += ["--", arg] if "--" not in args else [arg]

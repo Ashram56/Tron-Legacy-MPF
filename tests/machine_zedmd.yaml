@@ -1,0 +1,7 @@
+#config_version=6
+
+# What "mpf game . -c config,hw_virtual,zedmd" loads, as one file for the unit tests: tests/test_zedmd.py.
+config:
+  - ../game/config/config.yaml
+  - ../game/config/hw_virtual.yaml
+  - ../game/config/zedmd.yaml

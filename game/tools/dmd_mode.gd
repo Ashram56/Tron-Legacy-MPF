@@ -4,7 +4,7 @@ extends Node
 ## frames, made by scripts/gen_fonts.py and scripts/gen_media.py with scripts/dmd_hd.py).
 ##
 ## Chosen, first match wins:
-##   1. --proc-dmd (the P-ROC feeds the machine's own 128x32 DMD) or --pin2dmd (a PIN2DMD): always classic;
+##   1. --proc-dmd (the P-ROC feeds the machine's own 128x32 DMD) or --pin2dmd / --zedmd (a PIN2DMD, a ZeDMD): always classic;
 ##   2. the user arg --dmd=hd|classic   (godot --path game -- --dmd=classic; scripts/run.py --dmd classic);
 ##   3. render captures (--job=, slide_capture; --capture-dir=, render_check): classic, so the ROM checks
 ##      compare dots;
@@ -78,7 +78,7 @@ var _to_warm: Array[SpriteFrames] = []   # preloaded scenes' sprite frames whose
 
 static func _pin2dmd(args: PackedStringArray) -> bool:
 	for a in args:
-		if a == "--pin2dmd" or a.begins_with("--pin2dmd="):
+		if a == "--pin2dmd" or a.begins_with("--pin2dmd=") or a == "--zedmd" or a.begins_with("--zedmd="):
 			return true
 	return false
 
