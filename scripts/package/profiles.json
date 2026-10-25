@@ -1,0 +1,31 @@
+{
+  "_about": "Settings per board for one bundle of an architecture (docs/bundle.md, Board profiles). scripts/package/board_profile.py picks the first profile whose match is in /proc/device-tree/model or compatible. 'install' is applied once, at install, only to the settings nobody has set (option ids of options.json, then cfg keys of game/<file>); 'run' is worked out at each start: env (when the variable is not set already) and Godot arguments (when the command line has none of that name), each only if its 'if' holds.",
+  "profiles": [
+    {
+      "id": "rpi4",
+      "label": "Raspberry Pi 4",
+      "match": ["Raspberry Pi 4", "raspberrypi,4-model-b"],
+      "measured": "2026-10-25, Pi 4B, 1080p backglass, classic DMD: docs/pup/README.md, Raspberry Pi 4",
+      "install": {
+        "options": {"dmd.mode": "classic", "pup.third_screen": false},
+        "cfg": {
+          "pup.local.cfg": {
+            "backglass": {"fullscreen": true, "borderless": true, "render_size": [1280, 720], "rect": [160, 0, 960, 540]},
+            "dmd": {"window": "backglass", "rect": [0, 540, 1280, 180], "background": "none"}
+          }
+        }
+      },
+      "run": {
+        "env": [
+          {"name": "GOZEN_HWDEC", "value": "1", "if": {"file": "/lib/modules/{kernel}/updates/bcm2835-codec.ko"},
+           "why": "the hardware decoder halves the CPU, but the stock bcm2835-codec driver can oops: only with the fixed module"}
+        ],
+        "godot_args": [
+          {"args": ["--max-fps", "30"], "why": "the pack's videos are 30 fps; steady 30 fps instead of an uneven 45"},
+          {"args": ["--render-thread", "separate"], "if": {"env": "MPF_GODOT_EGL_FIX"},
+           "why": "only with a Godot carrying scripts/godot/egl_release_current.patch (Godot 4.6.3 crashes without it)"}
+        ]
+      }
+    }
+  ]
+}

@@ -242,3 +242,76 @@ class TestBuilder(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBoardProfile(unittest.TestCase):
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(ROOT, "scripts", "package"))
+        import board_profile
+        self.bp = board_profile
+        self.saved = os.environ.pop("TRON_BOARD_PROFILE", None)
+
+    def tearDown(self):
+        if self.saved is not None:
+            os.environ["TRON_BOARD_PROFILE"] = self.saved
+
+    def test_profiles_are_valid(self):
+        schema = bo.by_id(bo.load_schema())
+        for p in self.bp.load():
+            for oid, value in p.get("install", {}).get("options", {}).items():
+                self.assertEqual(bo.convert(schema[oid], value), value, oid)   # a known option, a valid value
+            for name in p.get("install", {}).get("cfg", {}):
+                self.assertTrue(os.path.exists(os.path.join(GAME, name.replace(".local", ""))), name)
+            for a in p.get("run", {}).get("godot_args", []):
+                self.assertTrue(a["args"] and a["args"][0].startswith("--"))
+
+    def test_detect_by_device_tree(self):
+        profiles = self.bp.load()
+        self.assertEqual(self.bp.detect(profiles, ["Raspberry Pi 4 Model B Rev 1.1"])["id"], "rpi4")
+        self.assertEqual(self.bp.detect(profiles, ["raspberrypi,4-model-b", "brcm,bcm2711"])["id"], "rpi4")
+        self.assertIsNone(self.bp.detect(profiles, ["NVIDIA Jetson Xavier NX Developer Kit"]))
+        self.assertIsNone(self.bp.detect(profiles, []))
+        os.environ["TRON_BOARD_PROFILE"] = "rpi4"
+        self.assertEqual(self.bp.detect(profiles, [])["id"], "rpi4")
+
+    def test_apply_sets_only_what_is_unset_and_only_once(self):
+        profile = next(p for p in self.bp.load() if p["id"] == "rpi4")
+        with tempfile.TemporaryDirectory() as game:
+            bo.set_values({"dmd.mode": "hd"}, game=game)
+            path = os.path.join(game, "pup.local.cfg")
+            bo.cfg_write(path, "dmd", "window", "false")
+            self.bp.apply(profile, game=game)
+            self.assertEqual(bo.get_values(["dmd.mode"], game=game), {"dmd.mode": "hd"})    # the operator's
+            self.assertEqual(bo.cfg_read(path, "dmd", "window"), "false")
+            self.assertEqual(bo.cfg_read(path, "backglass", "render_size"), "[1280, 720]")
+            self.assertEqual(bo.get_values(["pup.third_screen"], game=game), {"pup.third_screen": False})
+            bo.cfg_write(path, "backglass", "render_size", None)                         # removed by the operator
+            self.assertIn("earlier install", self.bp.apply(profile, game=game)[0])
+            self.assertIsNone(bo.cfg_read(path, "backglass", "render_size"))
+
+    def test_run_settings_and_godot_args(self):
+        profile = {"id": "t", "run": {"env": [{"name": "A", "value": "1", "if": {"file": "/nonexistent/{kernel}"}},
+                                              {"name": "B", "value": "2"}],
+                                      "godot_args": [{"args": ["--max-fps", "30"]},
+                                                     {"args": ["--render-thread", "separate"], "if": {"env": "NOPE_X"}}]}}
+        os.environ.pop("NOPE_X", None)
+        self.assertEqual(self.bp.run_settings(profile), ({"B": "2"}, ["--max-fps", "30"]))
+        os.environ["NOPE_X"] = "1"
+        try:
+            self.assertEqual(self.bp.run_settings(profile)[1], ["--max-fps", "30", "--render-thread", "separate"])
+        finally:
+            del os.environ["NOPE_X"]
+        self.assertEqual(self.bp.add_godot_args(["--dmd", "classic"], ["--max-fps", "30"]),
+                         ["--dmd", "classic", "--", "--max-fps", "30"])
+        self.assertEqual(self.bp.add_godot_args(["--", "--max-fps", "60"], ["--max-fps", "30", "--fullscreen"]),
+                         ["--", "--max-fps", "60", "--fullscreen"])
+        self.assertEqual(self.bp.add_godot_args(["--seconds", "5"], []), ["--seconds", "5"])
+
+    def test_gozen_features(self):
+        with tempfile.TemporaryDirectory() as stage:
+            b = os.path.join(stage, "game", "addons", "gde_gozen", "bin")
+            os.makedirs(b)
+            with open(os.path.join(b, "libgozen.linux.template_release.arm64.so"), "wb") as f:
+                f.write(b"\0ff_h264_v4l2m2m_decoder\0GOZEN_ZEROCOPY\0")
+            self.assertEqual(bb.gozen_features(stage), {"libgozen.linux.template_release.arm64.so": ["v4l2m2m", "zero_copy"]})

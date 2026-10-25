@@ -4,7 +4,8 @@
     python scripts/package/start.py                 # as saved
     python scripts/package/start.py --seconds 20    # any run.py option; one given here wins over the saved one
 
-Settings are changed with scripts/package/bundle_options.py (docs/bundle.md).
+Settings are changed with scripts/package/bundle_options.py (docs/bundle.md). The board's profile
+(scripts/package/board_profile.py) adds its environment and Godot arguments, under the saved and given ones.
 """
 import os
 import sys
@@ -13,6 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))   # scripts/
 sys.path.insert(0, HERE)
 
+import board_profile  # noqa: E402
 import bundle_options  # noqa: E402
 import run  # noqa: E402
 
@@ -36,7 +38,16 @@ def merge(saved, given):
 
 def main(argv=None):
     given = list(sys.argv[1:] if argv is None else argv)
-    return run.main(merge(bundle_options.run_args(), given))
+    args = merge(bundle_options.run_args(), given)
+    profile = None if os.environ.get("TRON_BOARD_PROFILE") == "none" else board_profile.detect()
+    if profile:
+        env, extra = board_profile.run_settings(profile)
+        env = {k: v for k, v in env.items() if k not in os.environ}
+        os.environ.update(env)
+        args = board_profile.add_godot_args(args, extra)
+        print("board profile {}: env {}, Godot {}".format(profile["id"], env or "-", " ".join(extra) or "-"),
+              flush=True)
+    return run.main(args)
 
 
 if __name__ == "__main__":

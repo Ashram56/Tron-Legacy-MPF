@@ -127,6 +127,27 @@ PuP Pack in `pup_pack/` and `pup_media/`. **Updating** is: unpack a newer bundle
 is never stale (`toolchain.media_stale` returns nothing when `bundle.json` exists), so `run.py` does not try to
 regenerate media that the bundle cannot regenerate (it has no generator inputs).
 
+## Board profiles
+
+One bundle per architecture serves every board of it (the arm64 one: Raspberry Pi 4 and Jetson; its GoZen has
+both boards' decoders, `bundle.json` `gozen` lists what each build carries). What differs between boards is
+settings, in `scripts/package/profiles.json`, picked by `scripts/package/board_profile.py` from the device tree
+(`/proc/device-tree/model` or `compatible`; nothing on a PC; `TRON_BOARD_PROFILE=<id>` or `none` by hand):
+
+- **install**: run once by the installer (`bundle.json` `profiles.apply`, after unpacking): sets the profile's
+  options (`options.json` ids) and cfg keys (`game/pup.local.cfg`) **that nobody has set**, and records the profile in
+  `game/data/board_profile.json`; a later install of the same profile changes nothing, so a setting the operator
+  removed stays removed. Kept across updates with the rest of `keep_on_update`.
+- **run**: worked out by `start.py` at each start, under the saved and given flags: environment variables (only when
+  not set already) and Godot arguments (only when the command line has none of that name), each with an `if` checked
+  on the machine: `{"file": ...}` (`{kernel}` = `uname -r`) or `{"env": ...}`.
+
+| Profile | Install | Run |
+|---|---|---|
+| `rpi4` (measured 2026-10-25, `docs/pup/README.md`) | `dmd.mode` classic, no third screen; backglass full screen, borderless, `render_size` 1280x720, videos in `[160, 0, 960, 540]`, the LCD DMD in the backglass window under them (`[dmd] window="backglass"`, no light cycles) | `--max-fps 30`; `GOZEN_HWDEC=1` only with the fixed `bcm2835-codec` module in `/lib/modules/<kernel>/updates/`; `--render-thread separate` only when `MPF_GODOT_EGL_FIX` is set (a Godot with `scripts/godot/egl_release_current.patch`, from the board's image) |
+
+The board's own system (the Godot build, the kernel module, `/etc/default/...`) stays in the board's image.
+
 ## Settings
 
 `scripts/package/options.json` lists every setting a person can change, with type, range, default, help text, the
