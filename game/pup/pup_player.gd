@@ -345,10 +345,23 @@ func _make_dmd_window() -> void:
 		# screen window page-flips: a second window made X copy the backglass at every frame (Raspberry Pi 4, 30 FPS
 		# cap: 21 instead of 29.6 FPS)
 		var bg: Window = windows["backglass"]
-		_dmd_area = Control.new()
+		var radius := float(setting("dmd", "corner_radius", 0.0))
+		if radius > 0.0:
+			# [dmd] corner_radius: the area is a black panel with round corners that clips the DMD drawn in it, to
+			# match a frame of the backglass art round it
+			var panel := Panel.new()
+			var box := StyleBoxFlat.new()
+			box.bg_color = Color.BLACK
+			box.set_corner_radius_all(int(round(radius)))
+			box.anti_aliasing = true
+			panel.add_theme_stylebox_override("panel", box)
+			panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+			_dmd_area = panel
+		else:
+			_dmd_area = Control.new()
+			_dmd_area.clip_contents = true
 		_dmd_area.name = "pup_dmd"
 		_dmd_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_dmd_area.clip_contents = true
 		var r = setting("dmd", "rect", [])
 		if r is Array and r.size() == 4 and float(r[2]) > 0.0:
 			_dmd_area.position = Vector2(float(r[0]), float(r[1]))
