@@ -119,6 +119,7 @@ its own, in the ROM's style, game images 9000+ in `game/service_icons/` drawn as
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
 | 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
 | 2026-10-18 | Service menu duplicated on the backglass, the DMD keeping the ROM's look (same branch for DMD-only machines); both neon frames of the backglass art stay lit, content stays clear of the lower frame; fade in and out on entering and leaving the menu. |
+| 2026-10-25 | Frames capped at 30 FPS on every platform (`game/project.godot`; `run.py --max-fps`, the bundle's frame rate option). Raspberry Pi 4: the LCD DMD drawn in the backglass window (`[dmd] window`: overlay in prod; the bundle's `auto` = a PIN2DMD or ZeDMD when one answers, else stacked), no light cycles. |
 
 ### Ideas not built (ask before starting)
 
