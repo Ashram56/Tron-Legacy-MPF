@@ -29,7 +29,7 @@
      "help": "HD only. 0 = off. N = N round dots per DMD dot (2 looks good from 1280 px up).",
      "target": {"arg": "--dmd-dots"}, "restart": true},
     {"id": "display.max_fps", "group": "display", "label": "Frame rate cap", "type": "integer", "min": 0, "max": 240, "default": 30,
-     "help": "Frames per second at most. 30 matches the PuP Pack's videos and keeps the frames steady; 60 for a smoother DMD where the GPU keeps up; 0 = no cap.",
+     "help": "Frames per second at most. 30 matches the PuP Pack's videos and keeps the frames steady; 60 for a smoother DMD where the GPU keeps up; 0 = no cap. On a 75 or 144 Hz screen pick 0 or a divisor of its rate (72 on 144 Hz): 30 would judder.",
      "target": {"arg": "--max-fps"}, "restart": true},
     {"id": "dmd.size", "group": "display", "label": "DMD window size", "type": "size", "default": "1024x256",
      "help": "WIDTHxHEIGHT, for example 1920x480.",
