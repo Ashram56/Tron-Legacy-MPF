@@ -1,0 +1,56 @@
+From 129408db904602d798c7a2072a44c2cf6bfb219f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 26 Oct 2026 01:04:04 +0000
+Subject: [PATCH] PuP: [dmd] filter (linear or nearest) and view_size (the DMD
+ exactly that big, a whole number of pixels per dot)
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Gs2mgVu8CL9ZK82gxDKYYk
+---
+ game/pup.cfg           | 2 ++
+ game/pup/pup_player.gd | 9 ++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/game/pup.cfg b/game/pup.cfg
+index 2b2009f..83a6b69 100644
+--- a/game/pup.cfg
++++ b/game/pup.cfg
+@@ -71,6 +71,8 @@ service_menu=true
+ ; "overlay" a full screen backglass is the only window and the X server page-flips it (Raspberry Pi 4: 29.6
+ ; instead of 21 FPS with a 30 FPS cap). The service menu stays in the screens' area. corner_radius: with "stacked" or
+ ; "overlay", the DMD's area becomes a black panel with corners that round (same pixels as rect), 0 = square.
++; filter: "linear" or "nearest" scaling of the DMD picture (default linear in HD, nearest otherwise); view_size =
++; [w, h]: the DMD exactly that big in its area (rect's pixels), for a whole number of pixels per dot.
+ window="window"
+ band=0.25
+ corner_radius=0
+diff --git a/game/pup/pup_player.gd b/game/pup/pup_player.gd
+index 5e67995..9e13765 100644
+--- a/game/pup/pup_player.gd
++++ b/game/pup/pup_player.gd
+@@ -409,7 +409,9 @@ func _make_dmd_window() -> void:
+ 	# the game's HD DMD mode (tools/dmd_mode.gd) draws smooth text at its window's size and has its own dots
+ 	var dmd_mode = get_node_or_null("/root/DmdMode")
+ 	var hd: bool = dmd_mode != null and bool(dmd_mode.get("hd"))
+-	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
++	# [dmd] filter: "linear" or "nearest" scaling of the DMD picture (default: linear in HD, nearest otherwise)
++	var linear := str(setting("dmd", "filter", "linear" if hd else "nearest")) == "linear"
++	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if linear else CanvasItem.TEXTURE_FILTER_NEAREST
+ 	_dmd_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ 	if bool(setting("dmd", "dots", true)) and not hd:
+ 		var mat := ShaderMaterial.new()
+@@ -470,6 +472,11 @@ func _layout_dmd() -> void:
+ 	var dmd_size := Vector2(128, 32 * pa)
+ 	var k := minf(dmd_rect.size.x / dmd_size.x, dmd_rect.size.y / dmd_size.y)
+ 	_dmd_view.size = dmd_size * k
++	# [dmd] view_size = [w, h]: the DMD exactly that big (its area's pixels), centred, for a whole number of
++	# pixels per dot (256x64 dots in 512x128: no moire)
++	var v = setting("dmd", "view_size", [])
++	if v is Array and v.size() == 2 and float(v[0]) > 0.0:
++		_dmd_view.size = Vector2(float(v[0]), float(v[1]))
+ 	_dmd_view.position = dmd_rect.position + (dmd_rect.size - _dmd_view.size) * 0.5
+ 
+ 
+-- 
+2.43.0
+
