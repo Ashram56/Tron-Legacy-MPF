@@ -409,7 +409,9 @@ func _make_dmd_window() -> void:
 	# the game's HD DMD mode (tools/dmd_mode.gd) draws smooth text at its window's size and has its own dots
 	var dmd_mode = get_node_or_null("/root/DmdMode")
 	var hd: bool = dmd_mode != null and bool(dmd_mode.get("hd"))
-	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
+	# [dmd] filter: "linear" or "nearest" scaling of the DMD picture (default: linear in HD, nearest otherwise)
+	var linear := str(setting("dmd", "filter", "linear" if hd else "nearest")) == "linear"
+	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if linear else CanvasItem.TEXTURE_FILTER_NEAREST
 	_dmd_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if bool(setting("dmd", "dots", true)) and not hd:
 		var mat := ShaderMaterial.new()
@@ -470,6 +472,11 @@ func _layout_dmd() -> void:
 	var dmd_size := Vector2(128, 32 * pa)
 	var k := minf(dmd_rect.size.x / dmd_size.x, dmd_rect.size.y / dmd_size.y)
 	_dmd_view.size = dmd_size * k
+	# [dmd] view_size = [w, h]: the DMD exactly that big (its area's pixels), centred, for a whole number of
+	# pixels per dot (256x64 dots in 512x128: no moire)
+	var v = setting("dmd", "view_size", [])
+	if v is Array and v.size() == 2 and float(v[0]) > 0.0:
+		_dmd_view.size = Vector2(float(v[0]), float(v[1]))
 	_dmd_view.position = dmd_rect.position + (dmd_rect.size - _dmd_view.size) * 0.5
 
 
