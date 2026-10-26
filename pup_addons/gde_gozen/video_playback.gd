@@ -98,6 +98,11 @@ static var _copy_planes: bool = int(ProjectSettings.get_setting("rendering/drive
 var _zero_copy: bool = false
 var _held_bound: bool = false ## The shader samples a held frame's textures, not y_texture/u_texture/v_texture.
 var _clock: float = 0.0 ## Seconds of video played; frame n is due at n / _frame_rate (playback_speed moves it).
+## The sound's output latency when the audio driver reports none (ALSA on a Raspberry Pi 4 says 0 while its buffer
+## holds about 0.1 s): GOZEN_AUDIO_LATENCY (seconds) if set, else audio/driver/output_latency (ms).
+static var _fallback_latency: float = float(OS.get_environment("GOZEN_AUDIO_LATENCY")) \
+		if OS.get_environment("GOZEN_AUDIO_LATENCY") != "" \
+		else float(ProjectSettings.get_setting("audio/driver/output_latency", 15)) / 1000.0
 var _audio_pitch_effect: AudioEffectPitchShift = AudioEffectPitchShift.new()
 
 var _ignore_path_setter: bool = false
@@ -400,8 +405,9 @@ func _process(delta: float) -> void:
 		# by the delay instead, except with zero-copy, where showing a frame costs nothing: late frames are skipped.
 		var audio_master: bool = enable_audio and audio_player.playing and audio_player.stream != null
 		if audio_master:            # the sound heard now: its position, minus what is still on its way out
+			var latency: float = AudioServer.get_output_latency()
 			_clock = maxf(audio_player.get_playback_position() + AudioServer.get_time_since_last_mix()
-					- AudioServer.get_output_latency(), _clock)
+					- (latency if latency > 0.0 else _fallback_latency), _clock)
 		else:
 			_clock += delta * playback_speed
 		_fill_queue()
