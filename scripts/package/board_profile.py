@@ -7,7 +7,8 @@
 
 TRON_BOARD_PROFILE=<id> picks a profile by hand, TRON_BOARD_PROFILE=none turns them off. The profile applied at
 install is recorded in game/data/board_profile.json: a later install of the same profile changes nothing, so a
-setting the operator removed stays removed.
+setting the operator removed stays removed. A profile's "limits" are the exception: what the board cannot run is
+put back to the profile's value at every install and start (enforce).
 """
 import json
 import os
@@ -65,16 +66,39 @@ def holds(cond):
     return False
 
 
+def enforce(profile, game=bo.GAME):
+    """Puts each limited option whose value (stored, else the game's default) the board does not allow back to the
+    profile's install value, else its first allowed choice. Returns the lines to log."""
+    limits = profile.get("limits", {})
+    if not limits:
+        return []
+    full = bo.by_id(bo.load_schema(limits={}))
+    have = bo.get_values(list(limits), game=game, schema=bo.load_schema(limits={}))
+    fix = {}
+    for oid, limit in limits.items():
+        value = have.get(oid, full[oid]["default"])
+        value = full[oid].get("aliases", {}).get(str(value).lower(), value)     # the game's older spellings
+        if value not in limit["choices"]:
+            want = profile.get("install", {}).get("options", {}).get(oid)
+            fix[oid] = (value, want if want in limit["choices"] else limit["choices"][0])
+    if fix:
+        bo.set_values({k: v[1] for k, v in fix.items()}, game=game, schema=bo.load_schema(limits=limits))
+    return ["{} = {} instead of {} (board profile {}: {})".format(k, json.dumps(new), json.dumps(old), profile["id"],
+                                                                  limits[k].get("why", "not on this board"))
+            for k, (old, new) in fix.items()]
+
+
 def apply(profile, game=bo.GAME, schema=None):
-    """Sets the profile's install settings that are not set yet; returns the lines to log."""
+    """Sets the profile's install settings that are not set yet, and its limits always; returns the lines to log."""
+    limited = enforce(profile, game)
     record = os.path.join(game, RECORD)
     try:
         with open(record, encoding="utf-8") as f:
             if json.load(f).get("profile") == profile["id"]:
-                return ["board profile {}: applied at an earlier install, left as it is".format(profile["id"])]
+                return limited + ["board profile {}: applied at an earlier install, left as it is".format(profile["id"])]
     except (OSError, ValueError):
         pass
-    log, inst = [], profile.get("install", {})
+    log, inst = limited, profile.get("install", {})
     have = bo.get_values(game=game, schema=schema)
     want = {k: v for k, v in inst.get("options", {}).items() if k not in have}
     if want:

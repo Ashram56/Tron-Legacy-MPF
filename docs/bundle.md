@@ -138,13 +138,18 @@ settings, in `scripts/package/profiles.json`, picked by `scripts/package/board_p
   options (`options.json` ids) and cfg keys (`game/pup.local.cfg`) **that nobody has set**, and records the profile in
   `game/data/board_profile.json`; a later install of the same profile changes nothing, so a setting the operator
   removed stays removed. Kept across updates with the rest of `keep_on_update`.
+- **limits**: what the board cannot run, per option: the only choices it allows and why (measured). The settings
+  page offers only those (`bundle_options.load_schema()` narrows the choices on that board and gives the reason in
+  `limited`), `bundle_options.py set` refuses the others, and the installer and `start.py` put a value outside them
+  (stored before, written by hand, or the game's default) back to the profile's install value at every install and
+  start. A flag typed on `start.py`'s own command line is not checked (for tests on the bench).
 - **run**: worked out by `start.py` at each start, under the saved and given flags: environment variables (only when
   not set already) and Godot arguments (only when the command line has none of that name), each with an `if` checked
   on the machine: `{"file": ...}` (`{kernel}` = `uname -r`) or `{"env": ...}`.
 
-| Profile | Install | Run |
-|---|---|---|
-| `rpi4` (measured 2026-10-25, `docs/pup/README.md`) | `dmd.mode` classic, no third screen; backglass full screen, borderless, `render_size` 1280x720; `pup.dmd.window` auto, no light cycles: at each start `start.py` looks for a panel (`scripts/package/dmd_panel.py`); a PIN2DMD on USB or a ZeDMD that answers its handshake gets the DMD (`external`, and `--pin2dmd` / `--zedmd` once run.py has them), else the DMD shows over the bottom of the videos in the backglass window (`overlay`, what the Pi runs in production; `stacked` puts it under them). A choice made on the web page's "DMD display" wins over auto | `GOZEN_HWDEC=1` only with the fixed `bcm2835-codec` module in `/lib/modules/<kernel>/updates/`; `--render-thread separate` only when `MPF_GODOT_EGL_FIX` is set (a Godot with `scripts/godot/egl_release_current.patch`, from the board's image) |
+| Profile | Limits | Install | Run |
+|---|---|---|---|
+| `rpi4` (measured 2026-10-25, `docs/pup/README.md`) | the owner's rule (2026-10-26): the DMD is a real panel (PIN2DMD, ZeDMD) or drawn in dots in the backglass window, never HD (`dmd.mode` classic; HD costs 45 points of CPU and a 50 s preload); never its own window (21 instead of 29.6 fps); no light cycles (10 fps) | `dmd.mode` classic, no third screen; backglass full screen, borderless, `render_size` 1280x720; `pup.dmd.window` auto, no light cycles: at each start `start.py` looks for a panel (`scripts/package/dmd_panel.py`); a PIN2DMD on USB or a ZeDMD that answers its handshake gets the DMD (`external`, and `--pin2dmd` / `--zedmd` once run.py has them), else the DMD shows over the bottom of the videos in the backglass window (`overlay`, what the Pi runs in production; `stacked` puts it under them). A choice made on the web page's "DMD display" wins over auto | `GOZEN_HWDEC=1` only with the fixed `bcm2835-codec` module in `/lib/modules/<kernel>/updates/`; `--render-thread separate` only when `MPF_GODOT_EGL_FIX` is set (a Godot with `scripts/godot/egl_release_current.patch`, from the board's image) |
 
 The board's own system (the Godot build, the kernel module, `/etc/default/...`) stays in the board's image.
 

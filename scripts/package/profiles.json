@@ -1,11 +1,19 @@
 {
-  "_about": "Settings per board for one bundle of an architecture (docs/bundle.md, Board profiles). scripts/package/board_profile.py picks the first profile whose match is in /proc/device-tree/model or compatible. 'install' is applied once, at install, only to the settings nobody has set (option ids of options.json, then cfg keys of game/<file>); 'run' is worked out at each start: env (when the variable is not set already) and Godot arguments (when the command line has none of that name), each only if its 'if' holds.",
+  "_about": "Settings per board for one bundle of an architecture (docs/bundle.md, Board profiles). scripts/package/board_profile.py picks the first profile whose match is in /proc/device-tree/model or compatible. 'install' is applied once, at install, only to the settings nobody has set (option ids of options.json, then cfg keys of game/<file>); 'run' is worked out at each start: env (when the variable is not set already) and Godot arguments (when the command line has none of that name), each only if its 'if' holds. 'limits' are what the platform cannot run: the only choices it allows for an option (with the reason); the settings page offers only those, bundle_options.py refuses the others, and install and each start put a stored value outside them back to the profile's.",
   "profiles": [
     {
       "id": "rpi4",
       "label": "Raspberry Pi 4",
       "match": ["Raspberry Pi 4", "raspberrypi,4-model-b"],
       "measured": "2026-10-25, Pi 4B, 1080p backglass, classic DMD: docs/pup/README.md, Raspberry Pi 4",
+      "limits": {
+        "dmd.mode": {"choices": ["classic"],
+                     "why": "the owner's rule (2026-10-26): on a Pi 4 the DMD is a real panel (PIN2DMD, ZeDMD) or drawn in dots over the backglass; HD costs 45 points of CPU and a 50 s preload"},
+        "pup.dmd.window": {"choices": ["external", "stacked", "overlay", "auto"],
+                           "why": "a DMD in its own window loses the page flip: 21 instead of 29.6 fps"},
+        "pup.dmd.background": {"choices": ["frame", "none"],
+                               "why": "the 3D light cycles run at 10 fps on the Pi 4"}
+      },
       "install": {
         "options": {"dmd.mode": "classic", "pup.third_screen": false, "pup.dmd.window": "auto", "pup.dmd.background": "none"},
         "cfg": {

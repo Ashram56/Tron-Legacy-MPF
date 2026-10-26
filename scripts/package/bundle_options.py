@@ -27,9 +27,29 @@ class OptionError(ValueError):
     pass
 
 
-def load_schema(path=SCHEMA):
+def load_schema(path=SCHEMA, limits=None):
+    """The schema, with the choices of each option the board's profile limits (profiles.json "limits") narrowed to
+    the ones the board allows and the reason in "limited". limits={} gives the whole schema."""
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        schema = json.load(f)
+    for opt in schema["options"]:
+        limit = (board_limits() if limits is None else limits).get(opt["id"])
+        if limit and opt["type"] == "choice":
+            opt["choices"] = [c for c in opt["choices"] if c in limit["choices"]]
+            opt["limited"] = limit.get("why", "")
+            if opt["default"] not in opt["choices"]:
+                opt["default"] = opt["choices"][0]
+    return schema
+
+
+def board_limits():
+    """The limits of this board's profile (scripts/package/board_profile.py), {} on a board without one."""
+    if os.environ.get("TRON_BOARD_PROFILE") == "none":
+        return {}
+    sys.path.insert(0, HERE)
+    import board_profile
+    profile = board_profile.detect()
+    return profile.get("limits", {}) if profile else {}
 
 
 def by_id(schema):

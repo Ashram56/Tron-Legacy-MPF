@@ -5,7 +5,8 @@
     python scripts/package/start.py --seconds 20    # any run.py option; one given here wins over the saved one
 
 Settings are changed with scripts/package/bundle_options.py (docs/bundle.md). The board's profile
-(scripts/package/board_profile.py) adds its environment and Godot arguments, under the saved and given ones. With the
+(scripts/package/board_profile.py) first puts back what the board cannot run (its "limits"), then adds its
+environment and Godot arguments, under the saved and given ones. A flag given here is not checked against the limits. With the
 DMD display on "auto" (`[dmd] window`), it looks for a PIN2DMD or a ZeDMD (scripts/package/dmd_panel.py): the game then
 shows the DMD on the panel found, else in the backglass window over the videos.
 """
@@ -68,6 +69,9 @@ def main(argv=None):
     args = merge(bundle_options.run_args(), given)
     profile = None if os.environ.get("TRON_BOARD_PROFILE") == "none" else board_profile.detect()
     if profile:
+        for line in board_profile.enforce(profile):
+            print(line, flush=True)
+        args = merge(bundle_options.run_args(), given)
         env, extra = board_profile.run_settings(profile)
         env = {k: v for k, v in env.items() if k not in os.environ}
         os.environ.update(env)

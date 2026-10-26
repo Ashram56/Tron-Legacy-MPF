@@ -278,17 +278,50 @@ class TestBoardProfile(unittest.TestCase):
     def test_apply_sets_only_what_is_unset_and_only_once(self):
         profile = next(p for p in self.bp.load() if p["id"] == "rpi4")
         with tempfile.TemporaryDirectory() as game:
-            bo.set_values({"dmd.mode": "hd"}, game=game)
+            bo.set_values({"machine.model": "le"}, game=game)
             path = os.path.join(game, "pup.local.cfg")
             bo.cfg_write(path, "dmd", "window", "false")
             self.bp.apply(profile, game=game)
-            self.assertEqual(bo.get_values(["dmd.mode"], game=game), {"dmd.mode": "hd"})    # the operator's
+            self.assertEqual(bo.get_values(["machine.model"], game=game), {"machine.model": "le"})    # the operator's
             self.assertEqual(bo.cfg_read(path, "dmd", "window"), "false")
             self.assertEqual(bo.cfg_read(path, "backglass", "render_size"), "[1280, 720]")
             self.assertEqual(bo.get_values(["pup.third_screen"], game=game), {"pup.third_screen": False})
             bo.cfg_write(path, "backglass", "render_size", None)                         # removed by the operator
             self.assertIn("earlier install", self.bp.apply(profile, game=game)[0])
             self.assertIsNone(bo.cfg_read(path, "backglass", "render_size"))
+
+    def test_limits_narrow_the_schema_and_are_put_back(self):
+        profile = next(p for p in self.bp.load() if p["id"] == "rpi4")
+        limits = profile["limits"]
+        full = bo.by_id(bo.load_schema(limits={}))
+        for oid, limit in limits.items():
+            self.assertTrue(limit["why"] and set(limit["choices"]) < set(full[oid]["choices"]), oid)
+            value = profile["install"]["options"].get(oid)
+            self.assertTrue(value is None or value in limit["choices"], oid)
+        narrow = bo.by_id(bo.load_schema(limits=limits))
+        self.assertEqual(narrow["dmd.mode"]["choices"], limits["dmd.mode"]["choices"])
+        self.assertIn("limited", narrow["dmd.mode"])
+        with self.assertRaises(bo.OptionError):
+            bo.convert(narrow["dmd.mode"], "hd")
+        os.environ["TRON_BOARD_PROFILE"] = "rpi4"                              # what the settings page sees on a Pi
+        self.assertNotIn("hd", bo.by_id(bo.load_schema())["dmd.mode"]["choices"])
+        with tempfile.TemporaryDirectory() as game:
+            with self.assertRaises(bo.OptionError):
+                bo.set_values({"dmd.mode": "hd"}, game=game)
+            bo.store_write({"dmd.mode": "hd"}, game=game)                       # set before, or by hand
+            path = os.path.join(game, "pup.local.cfg")
+            bo.cfg_write(path, "dmd", "window", "true")                          # the older spelling of "window"
+            bo.cfg_write(path, "dmd", "background", '"frame"')
+            log = self.bp.enforce(profile, game=game)
+            self.assertEqual(bo.get_values(["dmd.mode", "pup.dmd.window", "pup.dmd.background"], game=game),
+                             {"dmd.mode": "classic", "pup.dmd.window": "auto", "pup.dmd.background": "frame"})
+            self.assertEqual(len(log), 2)
+            self.assertEqual(self.bp.enforce(profile, game=game), [])
+            bo.unset_values(["pup.dmd.background"], game=game)                  # the game's default: light cycles
+            self.assertIn("pup.dmd.background", self.bp.enforce(profile, game=game)[0])
+            self.bp.apply(profile, game=game)
+            bo.store_write({"dmd.mode": "hd"}, game=game)
+            self.assertIn("instead of", self.bp.apply(profile, game=game)[0])    # limits hold after the first install
 
     def test_run_settings_and_godot_args(self):
         profile = {"id": "t", "run": {"env": [{"name": "A", "value": "1", "if": {"file": "/nonexistent/{kernel}"}},
