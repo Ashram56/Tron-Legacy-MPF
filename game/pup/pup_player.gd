@@ -347,15 +347,18 @@ func _make_dmd_window() -> void:
 		var bg: Window = windows["backglass"]
 		var radius := float(setting("dmd", "corner_radius", 0.0))
 		if radius > 0.0:
-			# [dmd] corner_radius: the area is a black panel with round corners that clips the DMD drawn in it, to
-			# match a frame of the backglass art round it
+			# [dmd] corner_radius: the area is a black panel with round corners, to match a frame of the backglass art
+			# round it. [dmd] corner_clip=true also clips the DMD to the round corners: off by default, as clipping
+			# cost ~20 points of GPU and tripled the late frames on a Raspberry Pi 4 (keep view_size inside the round
+			# area instead)
 			var panel := Panel.new()
 			var box := StyleBoxFlat.new()
 			box.bg_color = Color.BLACK
 			box.set_corner_radius_all(int(round(radius)))
 			box.anti_aliasing = true
 			panel.add_theme_stylebox_override("panel", box)
-			panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+			if str(setting("dmd", "corner_clip", "false")) == "true":
+				panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
 			_dmd_area = panel
 		else:
 			_dmd_area = Control.new()
