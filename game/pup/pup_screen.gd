@@ -84,6 +84,14 @@ func command(cmd: Dictionary) -> void:
 			if fg != null and _matches(fg, cmd):
 				_stop_fg()
 			return
+		"stopall":
+			# the foreground and the background (the OST of a game that was cancelled keeps looping otherwise)
+			fg = null
+			bg = {}
+			_stop_media()
+			if popup:
+				hide()
+			return
 		"stopplayer":
 			if fg != null:
 				_stop_fg()

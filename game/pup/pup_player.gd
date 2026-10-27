@@ -76,6 +76,11 @@ func _ready() -> void:
 	media_dir = root.path_join(setting("pup", "media_dir", "pup_media/trn_174h"))
 	if not _load_media():
 		return
+	# a cabinet shows no mouse pointer: "auto" hides it when the backglass covers the monitor (a windowed desktop
+	# test keeps it)
+	var hide_cursor := str(setting("pup", "hide_cursor", "auto")).to_lower()
+	if hide_cursor == "true" or (hide_cursor == "auto" and bool(setting("backglass", "fullscreen", false))):
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	enabled = true
 	_load_playlists()
 	call_deferred("_build")
