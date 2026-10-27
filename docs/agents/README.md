@@ -124,7 +124,6 @@ this path is not built (colour work stays private). Open: a check on a real PIN2
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
 | 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
 | 2026-10-18 | Service menu duplicated on the backglass, the DMD keeping the ROM's look (same branch for DMD-only machines); both neon frames of the backglass art stay lit, content stays clear of the lower frame; fade in and out on entering and leaving the menu. |
-| 2026-10-26 | **Raspberry Pi 4: no HD DMD** (platform limit, `scripts/package/profiles.json` `limits`, [bundle.md](../bundle.md)): the DMD is on an external panel (PIN2DMD, ZeDMD) or drawn in dots over the backglass window; the settings page offers only that and each install and start puts it back. Platform limits live in MPF-Godot-Packaging `platforms/limits.md`. |
 
 ### Ideas not built (ask before starting)
 
@@ -163,4 +162,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-27 (Pi 4 platform limits in the bundle profiles, PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-27 (PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
