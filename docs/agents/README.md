@@ -163,4 +163,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-27 (Pi 4 platform limits in the bundle profiles, PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
