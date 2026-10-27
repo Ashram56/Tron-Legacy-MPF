@@ -17,7 +17,7 @@ stale one):
 ```sh
 python scripts/package/build_bundle.py                    # dist/tron-legacy-mpf-<date>-<commit>-linux-arm64.tar.xz
 python scripts/package/build_bundle.py --target x86_64    # a PC
-python scripts/package/build_bundle.py --target all       # both texture formats, every GoZen build
+python scripts/package/build_bundle.py --target all       # universal: both texture formats, no binary (GoZen comes from the platform)
 python scripts/package/build_bundle.py --version 2026.10.24 --out DIR --no-archive
 ```
 
@@ -62,7 +62,7 @@ top folder, `tron-legacy-mpf/`. Sizes are the arm64 bundle, measured 2026-10-24 
 | `game/media/`, `game/sounds/` | 94 MB, 109 MB | generated DMD frames and effect timing, sounds |
 | `game/fonts/`, `game/fonts_ttf/` | 4.4 MB, 63 MB | ROM fonts, baked HD fonts (the 100 s step on a Jetson) |
 | `game/slides/`, `game/service_icons/`, `game/monitor/` | 1 MB | slide scenes, service menu icons, MPF Monitor layout |
-| `game/addons/` | 19 MB | `mpf-gmc` (patched) and `gde_gozen` with the target's GoZen build (`bin/`) |
+| `game/addons/` | 19 MB | `mpf-gmc` (patched) and `gde_gozen` with the target's GoZen build (`bin/`); none in a `--target all` or `--platform-addons` bundle: `bundle.json` `platform_addons: ["gde_gozen"]`, the platform (MPF-Godot-Packaging, the same binaries for every game) installs its own build for the machine |
 | `game/config/` | 200 KB | MPF config; `config/rom/` has the generated coil times, coils, lights, switches, P-ROC numbers, settings |
 | `game/tron/`, `game/tron_pup/`, `game/pup/`, `game/modes/`, `game/tools/` | 2 MB | the game's Python (rules, display, PuP) and Godot scripts |
 | `game/project.godot`, `pup.cfg`, `scorbit.cfg`, `gmc.cfg` | small | the project and the shipped settings files (defaults; local overrides are `*.local.cfg`) |

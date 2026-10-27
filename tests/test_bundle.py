@@ -228,6 +228,12 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(m["options"]["count"], len(bo.load_schema()["options"]))
         json.dumps(m)
 
+    def test_manifest_platform_addons(self):
+        self.assertEqual(bb.manifest("v1", "arm64", "etc2", {})["platform_addons"], [])
+        m = bb.manifest("v1", "all", "both", {}, platform_addons=True)
+        self.assertEqual(m["platform_addons"], ["gde_gozen"])
+        self.assertEqual(m["target"]["arch"], "arm64+x86_64")
+
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_asset_files_exist(self):
         for rel in bb.ASSET_FILES + bb.ASSET_DIRS:

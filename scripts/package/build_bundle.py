@@ -128,7 +128,7 @@ def check_workspace():
         raise SystemExit("the workspace is not ready (run `python scripts/setup.py` first):\n  " + "\n  ".join(problems))
 
 
-def stage_tree(stage, target):
+def stage_tree(stage, target, platform_addons=False):
     n = 0
     for rel in SCRIPTS:
         n += copy_file(os.path.join(ROOT, "scripts"), rel, os.path.join(stage, "scripts"))
@@ -142,6 +142,8 @@ def stage_tree(stage, target):
         for d in sorted(os.listdir(os.path.join(ROOT, folder))):
             n += copy_path(ROOT, "{}/{}/{}".format(folder, d, name), stage)
     # GoZen (the PuP videos) into game/addons, only the builds of this target
+    if platform_addons:
+        return n  # the platform (MPF-Godot-Packaging) installs GoZen for the machine's own architecture
     gozen_src = os.path.join(ROOT, "pup_addons", "gde_gozen")
     gozen_dst = os.path.join(stage, "game", "addons", "gde_gozen")
     keep = set(sum((GOZEN_BINS[t] for t in (GOZEN_BINS if target == "all" else [target])), []))
@@ -299,7 +301,7 @@ def gozen_features(stage):
     return out
 
 
-def manifest(version, target, formats, sizes, stage=None):
+def manifest(version, target, formats, sizes, stage=None, platform_addons=False):
     with open(os.path.join(HERE, "options.json"), encoding="utf-8") as f:
         options = json.load(f)
     return {
@@ -338,6 +340,8 @@ def manifest(version, target, formats, sizes, stage=None):
                      "detect": "python3 scripts/package/board_profile.py detect",
                      "ids": [p["id"] for p in board_profile.load()]},
         "gozen": gozen_features(stage) if stage else {},
+        # binary add-ons the platform installs (python -m mpf_godot addons GAME --video); none are in the bundle
+        "platform_addons": ["gde_gozen"] if platform_addons else [],
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/options.json", "game/pup.local.cfg",
                            "game/scorbit.local.cfg", "pup_pack", "pup_media"],
         "sizes": sizes,
@@ -364,6 +368,8 @@ def main(argv=None):
                    help="arm64: Raspberry Pi 4 and Jetson (ETC2/ASTC textures); x86_64: a PC (S3TC/BPTC); all: both")
     p.add_argument("--version", help="default: the date and the short commit, 2026.10.24-ab12cd3")
     p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
+    p.add_argument("--platform-addons", action="store_true",
+                   help="no binary add-on (GoZen) in the bundle: the platform installs them; implied by --target all")
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
     p.add_argument("--keep-stage", action="store_true")
     args = p.parse_args(argv)
@@ -371,6 +377,7 @@ def main(argv=None):
     commit = git("rev-parse", "--short", "HEAD") or "nogit"
     version = args.version or "{}-{}".format(datetime.date.today().strftime("%Y.%m.%d"), commit)
     formats = FORMATS[args.target]
+    platform_addons = args.platform_addons or args.target == "all"
     out = os.path.abspath(args.out)
     parent = os.path.join(out, "stage")
     stage = os.path.join(parent, NAME)
@@ -378,7 +385,7 @@ def main(argv=None):
         fsutil.remove_dir(parent)
     os.makedirs(stage)
     say("== staging the files ({}, textures {})".format(args.target, formats))
-    say("   {} files".format(stage_tree(stage, args.target)))
+    say("   {} files".format(stage_tree(stage, args.target, platform_addons)))
     bad = forbidden(stage)
     if bad:
         raise SystemExit("cabinet data in the bundle: " + ", ".join(bad))
@@ -394,7 +401,7 @@ def main(argv=None):
         raise SystemExit("the import made no {} textures: {}".format(formats, variants))
     sizes = {"stage_bytes": dir_size(stage), "textures": variants}
     with open(os.path.join(stage, "bundle.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest(version, args.target, formats, sizes, stage), f, indent=2)
+        json.dump(manifest(version, args.target, formats, sizes, stage, platform_addons), f, indent=2)
         f.write("\n")
     say("== SHA256SUMS: {} files".format(write_sums(stage)))
     if args.no_archive:
