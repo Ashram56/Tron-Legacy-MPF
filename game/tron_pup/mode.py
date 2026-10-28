@@ -8,16 +8,32 @@ its PuP player has its windows and media (game/pup/pup_player.gd); only then:
   music is stopped, so the PuP OST (PuP screen 15) is the only music. Without a ready PuP player (no media,
   PuP disabled, unit tests) the ROM music plays as before.
 """
+import asyncio
 import logging
+import os
+import sys
 
 from mpf.core.mode import Mode
 
-from tron_pup import engine, settings
+from tron_pup import engine, pupfiles, settings
 
 log = logging.getLogger("tron.pup")
 BCP_CLIENT = "local_display"
 HELLO_TRIES, HELLO_SECONDS = 15, 2.0
 MUSIC_SCREEN = 15                       # PuP screen 15: the OST (no window)
+
+
+def _platform_remote():
+    """The platform's remote PuP server (MPF-Godot-Packaging, mpf_godot/pup_remote/server.py), found as scripts/mpf_platform.py does."""
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import mpf_platform
+    where = mpf_platform.ensure()
+    if where not in sys.path:
+        sys.path.insert(0, where)
+    from mpf_godot.pup_remote import server
+    return server
 
 
 class PupMode(Mode):
@@ -30,6 +46,7 @@ class PupMode(Mode):
         self.mute = False
         self._attract = None
         self._sound = None
+        self.remote = None
         if not self.pup.get("enabled", True):
             log.info("PuP disabled (game/pup.cfg or TRON_PUP=0)")
             return
@@ -50,6 +67,7 @@ class PupMode(Mode):
         events.add_handler("init_phase_5", self._hello)
         events.add_handler("mode_attract_started", self._attract_start)
         events.add_handler("mode_attract_stopped", self._attract_stop)
+        self._start_remote(pack)
         events.add_handler("tron_service_entered", self._service_entered)
         log.info("PuP: %d events, %d switches; rows without a mapping: %s", len(self.engine.events),
                  len(self.engine.switches), ", ".join(str(r.id) for r in self.engine.unmapped) or "none")
@@ -63,8 +81,39 @@ class PupMode(Mode):
         self.engine.on_switch(switch)
 
     def send(self, cmd):
+        if self.remote:
+            self.remote.send(cmd)
         if self.ready:
             self._bcp("pup_play", **{k: v for k, v in cmd.items() if v is not None})
+
+    # ------------------------------------------------------------------ remote screens
+
+    def _start_remote(self, pack):
+        """[remote] enabled: the PuP commands also go to remote displays (the platform's pup_remote server)."""
+        opts = self.cfg.get("remote", {})
+        if not opts.get("enabled", False):
+            return
+        try:
+            remote = _platform_remote()
+        except (ImportError, SystemExit) as e:
+            log.warning("remote PuP screens: the platform (MPF-Godot-Packaging) is missing (%s); no remote displays", e)
+            return
+        self.remote = remote.RemoteServer(
+            pupfiles.load_screens(pack), pupfiles.load_playlists(pack), game=os.path.basename(pack),
+            host=str(opts.get("listen", "0.0.0.0")), port=int(opts.get("port", 5052)),
+            discovery=bool(opts.get("discovery", True)))
+        task = asyncio.ensure_future(self.remote.start(), loop=self.machine.clock.loop)
+        task.add_done_callback(self._remote_started)
+        self.machine.events.add_handler("shutdown", self._stop_remote)
+
+    def _stop_remote(self, **kwargs):
+        if self.remote:
+            self.remote.close()
+
+    def _remote_started(self, task):
+        if not task.cancelled() and task.exception():
+            log.warning("remote PuP screens: cannot listen (%s); no remote displays", task.exception())
+            self.remote = None
 
     def _bcp(self, name, **kwargs):
         """BCP trigger straight to GMC (as tron/media_bridge.py does: GMC registers no MPF handler for it)."""

@@ -83,3 +83,25 @@ class Trigger:
 
 def load_triggers(pack_dir):
     return [Trigger(row) for row in read_csv(os.path.join(pack_dir, "triggers.pup")) if _int(row.get("ID"))]
+
+
+def load_screens(pack_dir):
+    """screens.pup: {screen number: {"playlist", "file", "active"}} (each screen's default background)."""
+    screens = {}
+    for row in read_csv(os.path.join(pack_dir, "screens.pup")):
+        num = _int(row.get("ScreenNum"))
+        if num is not None:
+            screens[num] = {"playlist": row.get("PlayList", ""), "file": row.get("PlayFile", ""),
+                            "active": row.get("Active", "")}
+    return screens
+
+
+def load_playlists(pack_dir):
+    """playlists.pup: {folder (lower case): {"alpha_sort": bool, "volume": percent}}, as the Godot player reads it."""
+    lists = {}
+    for row in read_csv(os.path.join(pack_dir, "playlists.pup")):
+        folder = row.get("Folder", "")
+        if folder:
+            lists[folder.lower()] = {"alpha_sort": row.get("AlphaSort", "0") == "1",
+                                     "volume": _float(row.get("Volume"), 100.0)}
+    return lists

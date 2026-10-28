@@ -153,7 +153,10 @@ Jetson hardware decoding: [docs/pup/README.md](../pup/README.md), [docs/jetson/R
 (320x80 mm, no light cycles): `[dmd] dmd_size`, service menu PUP DMD SIZE (2026-10-12). The service menu
 also shows on the backglass (2026-10-18: `game/pup/service_backglass.gd`, `game/tron/service_backglass.py`; the DMD
 keeps the ROM's screens), fading in and out over a median still of the backglass loop made by `gen_pup.py`;
-`[backglass] service_menu`. Open: the owner's look on a real backglass; after a display change, re-run `scripts/pup/pup_captures.py`
+`[backglass] service_menu`. Remote topper on a Raspberry Pi (2026-10-19, Vincent: Pi 3 A+ first, Zero W to try;
+videos copied as they are, re-encoded only when the Pi can't decode them): `[remote] enabled`; server, rules, Pi agent and installer are the
+platform's (MPF-Godot-Packaging `mpf_godot/pup_remote/`), the game keeps `scripts/pup/topper_media.py`: [docs/pup/remote_topper.md](../pup/remote_topper.md); not yet run on a real Pi. Open: the remote topper on
+the Pi (the platform's pup-remote-topper.md, "To check on the Pi"); the owner's look on a real backglass; after a display change, re-run `scripts/pup/pup_captures.py`
 and fix the flagged rows of `game/tron_pup/trigger_map.yaml`.
 
 ## Owner preferences

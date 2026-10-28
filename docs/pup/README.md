@@ -134,6 +134,8 @@ borderless=true
 ```
 
 - `[pup] third_screen=false` turns the third screen off.
+- `[remote] enabled=true` also sends the topper's videos to a Raspberry Pi with its own screen in the topper:
+  [remote_topper.md](remote_topper.md).
 - `[pup] ost_music=false` keeps the ROM music (the videos still play).
 - `[pup] enabled=false`, or `TRON_PUP=0` in the environment, turns the whole PuP off: the game is then exactly
   the game without the PuP.
