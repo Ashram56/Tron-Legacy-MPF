@@ -55,7 +55,7 @@ class TestTopperMedia(unittest.TestCase):
             self.assertIn("4:4:4", manifest["TopperEvents/Jackpot.mp4"]["reencoded"])
             info = topper_media.probe("ffmpeg", os.path.join(out, "TopperEvents", "Jackpot.mp4"))
             self.assertEqual("", topper_media.why_reencode(info))
-            lib = tron_topper.load_library(out)
+            lib = load_topper().load_library(out)
             self.assertTrue(os.path.exists(lib.path(lib.pick("TopperEvents"))))
 
     def test_limits(self):
