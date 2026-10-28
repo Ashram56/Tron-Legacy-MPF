@@ -17,13 +17,13 @@ default) or 8 (20W): see [Xavier NX power modes](#xavier-nx-power-modes).
 | Layer | What it is | Ours | Built by |
 |---|---|---|---|
 | PuP screens | `game/pup/pup_screen.gd`, `game/pup/gozen_player.gd` | changed | - |
-| GoZen player script | `pup_addons/gde_gozen/video_playback.gd` (GDE GoZen's `VideoPlayback` node) | changed | - |
-| GoZen GDExtension | `pup_addons/gde_gozen/bin/libgozen.linux.*.so`, GDE GoZen at `f9448619` + FFmpeg 7.1 linked in | `scripts/gozen/gozen.patch` | `scripts/build_gozen.sh` (Docker) |
-| FFmpeg nvmpi wrapper | jetson-ffmpeg's `*_nvmpi` decoders, compiled into GoZen's FFmpeg (`nvmpi_dec.c`) | `scripts/gozen/nvmpi_flush.patch` (`ffmpeg/` part) | `scripts/build_gozen.sh` |
-| libnvmpi | jetson-ffmpeg at `8d70c17` (v3.10.0), installed in `/usr/local/lib`, loaded by the wrapper at run time | `scripts/gozen/nvmpi_flush.patch` (`src/` part) | `scripts/install/install_jetson_hwdec.sh` |
+| GoZen player script | `the platform's addons/gde_gozen (MPF-Godot-Packaging)/video_playback.gd` (GDE GoZen's `VideoPlayback` node) | changed | - |
+| GoZen GDExtension | `the platform's addons/gde_gozen (MPF-Godot-Packaging)/bin/libgozen.linux.*.so`, GDE GoZen at `f9448619` + FFmpeg 7.1 linked in | the platform's `fixes/` GoZen patch | the platform's GoZen build (Docker) |
+| FFmpeg nvmpi wrapper | jetson-ffmpeg's `*_nvmpi` decoders, compiled into GoZen's FFmpeg (`nvmpi_dec.c`) | `the platform's build/gozen/nvmpi_flush.patch` (`ffmpeg/` part) | the platform's `build/gozen/build_gozen.sh` |
+| libnvmpi | jetson-ffmpeg at `8d70c17` (v3.10.0), installed in `/usr/local/lib`, loaded by the wrapper at run time | `the platform's build/gozen/nvmpi_flush.patch` (`src/` part) | `scripts/install/install_jetson_hwdec.sh` |
 | NVIDIA | V4L2 decoder, NvMMLite, NvBufSurface (L4T BSP, `nvidia-l4t-multimedia*`) | - | JetPack |
 
-The wrapper and libnvmpi share one patch file. `build_gozen.sh` and `install_jetson_hwdec.sh` both apply the whole
+The wrapper and libnvmpi share one patch file. the platform's `build_gozen.sh` and `install_jetson_hwdec.sh` both apply the whole
 file to their jetson-ffmpeg checkout, so GoZen's FFmpeg and the board's libnvmpi always carry the same fixes.
 Changing only the `src/` part needs a new install on the board but no GoZen rebuild. Changing the `ffmpeg/`
 part (or `gozen.patch`) needs `bash scripts/build_gozen.sh arm64` and committing the new `.so` (fix 10: build from
@@ -140,7 +140,7 @@ YUV420P used to go through a CPU conversion. `video_playback.gd` asks for it wit
 44-46% of a core instead of 51-55%; clip suite 52.9 / 54.7 -> 53.4 / 55.7 FPS, frames over 2 vblanks 19 / 33 -> 18 /
 26 (docs/performance.md). With a `.so` without these methods the script keeps the three-plane path.
 
-Rebuilding GoZen: start from a clean work folder (`scripts/build_gozen.sh` with a fresh `GOZEN_WORK`, or delete its
+Rebuilding GoZen: start from a clean work folder (the platform's `build/gozen/build_gozen.sh` with a fresh `GOZEN_WORK`, or delete its
 `godot_cpp/bin` and object files). The committed `.so` files are the cross build on x86_64 (reproducible from any
 x86 machine); a native arm64 build on a Jetson has the same code, data and symbols and differs only by Ubuntu's
 SystemTap probe sections (`.note.stapsdt`, `.stapsdt.base`: its native libstdc++ has them, the cross one does not).
@@ -236,7 +236,7 @@ modes, slower per core than 5).
 
 ## Updating a pin
 To move jetson-ffmpeg or GDE GoZen to a newer revision:
-1. Change `JETSON_FFMPEG_REV` / `GOZEN_REV` in `scripts/build_gozen.sh` and the jetson-ffmpeg revision in
+1. Change `JETSON_FFMPEG_REV` / `GOZEN_REV` in the platform's `build/gozen/build_gozen.sh` and the jetson-ffmpeg revision in
    `scripts/install/install_jetson_hwdec.sh`. Both must name the same jetson-ffmpeg revision: the wrapper in GoZen
    and the library on the board have to match.
 2. Check that both patches still apply (`git apply --check`) and drop the hunks upstream has fixed (see the reports

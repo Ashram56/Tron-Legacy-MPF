@@ -1,6 +1,6 @@
 extends Control
 
-## A PuP screen's video player on Linux and Windows: GDE GoZen's VideoPlayback (FFmpeg; pup_addons/gde_gozen), which
+## A PuP screen's video player on Linux and Windows: GDE GoZen's VideoPlayback (FFmpeg; the platform's addons/gde_gozen (MPF-Godot-Packaging)), which
 ## plays the pack's mp4s as they are and decodes on the GPU: the Jetson's decoder when libnvmpi is installed,
 ## Direct3D 11 Video (else DXVA2) on Windows (docs/pup/README.md). Offers
 ## the parts of VideoStreamPlayer that pup_screen.gd uses: open(), play() (from the start), stop(), finished.
@@ -25,7 +25,7 @@ static var _hwdec_checked := false
 
 
 ## The Raspberry Pi's H.264 decoder: a V4L2 memory-to-memory device named bcm2835-codec-decode (usually /dev/video10).
-## GoZen then tries FFmpeg's h264_v4l2m2m (scripts/gozen/gozen_v4l2m2m.patch) and falls back to software.
+## GoZen then tries FFmpeg's h264_v4l2m2m (the platform's build/gozen/gozen_v4l2m2m.patch) and falls back to software.
 static func _has_pi_decoder() -> bool:
 	for d in DirAccess.get_directories_at("/sys/class/video4linux"):
 		var f := FileAccess.open("/sys/class/video4linux/%s/name" % d, FileAccess.READ)
