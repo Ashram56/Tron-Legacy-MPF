@@ -304,70 +304,34 @@ pin 3 settles it; if it is BLU-WHT, swap the two entries of `TUBES` in `tron/pro
 - IO board status inputs (zero cross, lamp driver status, interlocks): the P-ROC cannot read them.
 - SAM's on-board sound: replaced by the PC (see above).
 
-## PIN2DMD (an RGB LED DMD on USB)
+## PIN2DMD and ZeDMD (an RGB LED DMD)
 
-A [PIN2DMD](https://pin2dmd.com) can show the DMD next to (or instead of) the screen and the P-ROC's DMD. MPF 0.80.1 already
-has the pieces: the `pin2dmd` platform (`mpf/platforms/pin2dmd.py`, pyusb, USB `0314:e457`, "virtual pinball" 6-bit-plane
-packets) and the `rgb_dmds` device, which takes 24-bit frames over BCP as `rgb_dmd_frame`. GMC does not need a screen
-for this: Godot reads back its own 128x32 picture, as `--proc-dmd` does.
-
-| Piece | What |
-|---|---|
-| `game/tools/pin2dmd.gd` | Godot autoload. With `-- --pin2dmd[=COLOUR]` it sends each changed frame (up to 30 per second) to MPF as a 12288-byte RGB frame, `rgb_dmd_frame` named `default`. The DMD is forced classic (exact 128x32 dots, no HD, no glow), like with `--proc-dmd`. |
-| `game/config/pin2dmd.yaml` | MPF overlay, given after the hardware overlay: `hardware: rgb_dmd: pin2dmd`, `pin2dmd: resolution 128x32, panel rgb`, `rgb_dmds: default`. |
-| `tests/test_pin2dmd.py` | Boots the overlay against a mocked pyusb and checks the device ids, the BCP frame and the USB packet (`81 C3 E9 12` + 6 planes). |
-
-```
-python scripts/run.py --pin2dmd                  # the original orange; add --hw proc, --monitor ... as usual
-python scripts/run.py --pin2dmd '#2a6cff'        # Tron blue (always monochrome: the public game sends no colour pictures)
-mpf game . -c config,hw_virtual,pin2dmd          # MPF alone (Godot started with "-- --pin2dmd")
-docker: TRON_PIN2DMD=1 (or #RRGGBB)
-```
-
-- **On the real machine** (`--hw proc`) the PIN2DMD is the DMD: `python scripts/run.py --hw proc --pin2dmd` sends no
-  `--proc-dmd` frames, and the overlay moves the P-ROC's `dmds: dmd` to the virtual platform, so nothing goes to the
-  P-ROC's DMD connector (a P-ROC DMD and a PIN2DMD together are not supported). Tested with `tests/test_pin2dmd.py`
-  on a mocked P-ROC and pyusb.
-- **Monochrome only** (owner decision, 2026-10-25): the 16 shades of the DMD art (grey levels, ROM palette level / 15)
-  scale one colour; the colour is the only setting.
-- `pin2dmd: panel: rbg` in the overlay swaps green and blue for panels wired that way; `resolution` can be
-  `192x64` or `256x64` for the XL and HD models (only 128x32 is fed by the game today).
-- Needs pyusb (in the venv with setup.py) and libusb 1.0, and on Linux a udev rule for `0314:e457` to run without root
-  (`SUBSYSTEM=="usb", ATTR{idVendor}=="0314", ATTR{idProduct}=="e457", MODE="0666"`). MPF fails to start with "Pin2Dmd USB
-  device not found" if the PIN2DMD is missing or another program (DMDext) holds it.
-- **Not checked on a real PIN2DMD**: colour order and the firmware's "virtual pinball" mode. MPF's platform code is
-  used as is; the unit test checks the packets it produces, not the LEDs. Report the result and the panel type.
-
-
-## ZeDMD (an RGB LED DMD on USB serial or Wi-Fi)
-
-A [ZeDMD](https://github.com/PPUC/ZeDMD) takes the same frames as the PIN2DMD, through the game's own platform
-`game/tron/zedmd_native.py`: pyserial only, the ZeDMD serial protocol written from libzedmd's `ZeDMDComm` (handshake,
-8x4-pixel zones of RGB888 that changed, render, clear, brightness). MPF 0.80.1's own `zedmd` platform needs libzedmd's
-compiled extension, which only loads on the Python build it was made for, and on a Raspberry Pi (arm64) it loads the x64
-library (`zedmd.py` tests `platform.machine`, not `platform.machine()`). Monochrome: the 16 shades of the DMD art
-through one colour.
-
-```
-python scripts/run.py --zedmd                    # the original orange; add --hw proc, --monitor ... as usual
-python scripts/run.py --zedmd '#2a6cff'
-mpf game . -c config,hw_virtual,zedmd            # MPF alone (Godot started with "-- --zedmd")
-```
+The DMD can also be shown on a [PIN2DMD](https://pin2dmd.com) (USB) or a [ZeDMD](https://github.com/PPUC/ZeDMD) (USB
+serial), next to (or instead of) the screen and the P-ROC's DMD. **This output is the platform's, not this game's**: the
+Godot add-on that sends the frames (`addons/dmd_out`), the MPF overlays, the ZeDMD platform, the native feeder and the
+detection of which device is plugged in are in
+[MPF-Godot-Packaging](https://github.com/Ashram56/MPF-Godot-Packaging), [`platforms/dmd_devices.md`](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md),
+the same for every game. What this game does:
 
 | Piece | What |
 |---|---|
-| `game/tools/pin2dmd.gd` | Same autoload as for the PIN2DMD, also started by `-- --zedmd[=COLOUR]`. |
-| `game/config/zedmd.yaml` | MPF overlay: `mpf: platforms: zedmd_native`, `hardware: rgb_dmd: zedmd_native`, `zedmd: width 128, height 32`, `rgb_dmds: default`; with `--hw proc` the P-ROC's DMD goes to the virtual platform. |
-| `game/tron/zedmd_native.py` | The platform: USB serial (921600 baud, 115200 on the ESP32-S3's USB), port found by USB id or `ZEDMD_PORT`, frames sent from its own thread. |
-| `tests/test_zedmd.py` | The protocol against a fake device (handshake, zone packets, acknowledgements, clear) and the BCP frame reaching the serial port. |
+| `scripts/dmd_out.py` | Finds the platform (`$MPF_GODOT_PACKAGING`, or a folder `MPF-Godot-Packaging` beside this repository) and copies its add-on into `game/addons/dmd_out/` and the device's overlay into `game/config/` (both git-ignored) before a start; `python scripts/dmd_out.py detect` asks which device answers. |
+| `game/tools/dmd_out_loader.gd` | Autoload: starts the add-on when Godot gets `--pin2dmd` or `--zedmd`, else does nothing. |
+| `game/tools/dmd_mode.gd` | Keeps the DMD classic (exact 128x32 dots) when one of these args is given, like `--proc-dmd`. |
+| `scripts/run.py` | The flags below; `pip install pyusb` is in the requirements (PIN2DMD). |
 
-- **Native feeder** (`game/native/zedmd_feed/zedmd_feed.c`, C, libc only; Linux and macOS): `run.py --zedmd` builds it
-  with `cc` on first use and runs `zedmd_feed --probe`; when a ZeDMD answers, Godot starts it (`--zedmd-feed=PATH`) and
-  pipes it the 128x32 RGB frames (newest only), so nothing goes through BCP, MPF or Python, and MPF only gets
-  `config/zedmd_feed.yaml` (the original DMD connector left alone). No compiler, Windows, or no ZeDMD at probe time:
-  the Python platform above is used (`--zedmd-python` forces it). Godot still draws the DMD; a renderer outside Godot
-  is not built. On a Pi build it on the build box, not on the Pi: `cc -O2 -o game/native/bin/zedmd_feed game/native/zedmd_feed/zedmd_feed.c`.
-  Tests: `tests/test_zedmd_feed.py` (a pty as fake ZeDMD; its packets equal the Python platform's). **The Godot side
-  (`pin2dmd.gd`, `OS.execute_with_pipe`) was not run** (no Godot in the session that wrote it).
-- Written from libzedmd's source, **not yet tried on a real ZeDMD**: serial only (no Wi-Fi), the brightness command's
-  payload and the 128x32 size are guesses to check. The owner's check: ports, firmware 5.x, colour order.
+```sh
+python scripts/run.py --pin2dmd                # the original orange; add --hw proc, --monitor ...
+python scripts/run.py --pin2dmd '#2a6cff'      # Tron blue (the public game is always monochrome)
+python scripts/run.py --zedmd                  # native feeder when a ZeDMD answers, else MPF's Python platform
+python scripts/run.py --dmd-out auto           # the platform looks: PIN2DMD, ZeDMD or neither (the screen only)
+```
+
+On a P-ROC machine (`--hw proc`) the RGB DMD replaces the original DMD (the P-ROC's DMD connector is left alone; both
+together are not supported). A machine installed by the setup page picks the device by itself with `[dmd] window = auto`.
+
+**Not tried on a real PIN2DMD or ZeDMD**: the protocols follow libdmdutil's and libzedmd's source and are tested against
+fake devices in the platform's repository. To check: the PIN2DMD's colour order (`pin2dmd: panel: rbg` swaps green and
+blue) and firmware ("virtual pinball" mode), the ZeDMD's port, firmware 5.x and colour order. This game's own copy of the
+add-on, platform, feeder and their tests were removed in favour of the platform's (2026-10-28).
+

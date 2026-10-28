@@ -104,10 +104,12 @@ Service menu icons of the items the game adds (FEATURE AUDITS/ADJUSTMENTS, DISPL
 its own, in the ROM's style, game images 9000+ in `game/service_icons/` drawn as text art by
 `scripts/gen_service_icons.py` (2026-10-18; the owner asked for them, his look is open).
 
-PIN2DMD (2026-10-24, branch claude/project-thread-31bkyc): MPF 0.80.1 already has the `pin2dmd` platform and `rgb_dmds`;
-the game adds `game/tools/pin2dmd.gd` (`--pin2dmd[=COLOUR]`, classic 128x32 RGB frames as `rgb_dmd_frame`),
-`game/config/pin2dmd.yaml` and `run.py --pin2dmd` ([hardware.md](../hardware.md), "PIN2DMD"). Monochrome first; Serum on
-this path is not built (colour work stays private). Open: a check on a real PIN2DMD (colour order, firmware).
+PIN2DMD and ZeDMD (2026-10-24, branch claude/project-thread-31bkyc, PR #56; 2026-10-28 the platform's): the RGB DMD output
+(Godot add-on, MPF overlays, ZeDMD platform, native feeder, detection) is **MPF-Godot-Packaging's**, the same for every
+game ([platforms/dmd_devices.md](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md)); the game keeps `scripts/dmd_out.py`
+(installs it), `game/tools/dmd_out_loader.gd`, the classic-DMD rule in `dmd_mode.gd` and `run.py --pin2dmd|--zedmd|--dmd-out auto`
+([hardware.md](../hardware.md)). Monochrome in the public repo; colour work stays private. Open: a check on a real PIN2DMD
+and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publish (platform PR #13).
 
 ### Owner decisions (keep adding)
 

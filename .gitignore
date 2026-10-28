@@ -34,3 +34,8 @@ game/fonts_ttf/baked/
 # Scorbit credentials of this cabinet (docs/scorbit.md)
 game/scorbit.local.cfg
 game/native/bin/
+# the platform's DMD output, copied in by scripts/dmd_out.py
+game/addons/dmd_out/
+game/config/pin2dmd.yaml
+game/config/zedmd.yaml
+game/config/zedmd_feed.yaml

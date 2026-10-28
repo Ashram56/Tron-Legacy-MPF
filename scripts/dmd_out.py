@@ -5,7 +5,7 @@ native feeder. This file only finds that checkout and puts them where the game r
 
     python scripts/dmd_out.py detect      # pin2dmd, zedmd or nothing (the platform's mpf_godot.dmd_panel)
 
-MPF-Godot-Packaging: $MPF_GODOT_PACKAGING, else a folder beside this repository (MPF-Godot-Packaging, MPF-Godot).
+MPF-Godot-Packaging: $MPF_GODOT_PACKAGING (or $MPF_PLATFORM_DIR on a machine installed by the setup page), else a folder beside this repository (MPF-Godot-Packaging, MPF-Godot).
 """
 import os
 import shutil
@@ -21,7 +21,7 @@ OVERLAYS = {"pin2dmd": "pin2dmd.yaml", "zedmd": "zedmd.yaml", "feed": "zedmd_fee
 
 def platform_dir():
     """The MPF-Godot-Packaging checkout, or None."""
-    for c in (os.environ.get("MPF_GODOT_PACKAGING"), os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot-Packaging"),
+    for c in (os.environ.get("MPF_GODOT_PACKAGING"), os.environ.get("MPF_PLATFORM_DIR"), os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot-Packaging"),
               os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot")):
         if c and os.path.isfile(os.path.join(c, "addons", "dmd_out", "dmd_out.gd")):
             return c
