@@ -2,7 +2,7 @@
 
 Everything this repository changed or found that belongs to another project, grouped by the project to report it
 to. Bugs have a ready-to-file report (copy its title and body into a new GitHub issue); improvements list what to
-send and where it lives here. The fixes we carry until upstream has its own are in `scripts/gozen/`, and the
+send and where it lives here. The fixes we carry until upstream has its own are in `the platform's build/gozen/`, and the
 Xavier NX results behind them are in [../jetson/xavier_nx.md](../jetson/xavier_nx.md).
 
 ## Godot ([godotengine/godot](https://github.com/godotengine/godot/issues))
@@ -19,14 +19,14 @@ Xavier NX results behind them are in [../jetson/xavier_nx.md](../jetson/xavier_n
 |---|---|---|
 | [gde-gozen-main-thread-stalls.md](gde-gozen-main-thread-stalls.md) | bug | `VideoPlayback` opens, loops and frees videos on the main thread (1-2.5 s stalls with a hardware decoder) |
 | `seek_frame()` retry loop | bug | Near the end of a clip a catch-up `seek_frame()` retried at EOF for minutes on a busy low-priority worker; the game froze (9 min at 10 W, 2 cores). We never seek from decode tasks ([../jetson/README.md](../jetson/README.md) fix 9) |
-| Hardware decoder first (`<codec>_nvmpi`, fallback to software, `GOZEN_HWDEC=0`) | feature | `scripts/gozen/gozen.patch` |
-| `GoZenVideo.set_target_size()` and native NV12 | feature | Frames decoded at the size they are shown at, as NV12 (Y as R8, UV as RG8; `nv12` switch in both YUV shaders): 4-8x fewer pixels per frame. `gozen.patch`, `pup_addons/gde_gozen/*.gdshader`, `video_playback.gd` `decode_to_display_size` |
+| Hardware decoder first (`<codec>_nvmpi`, fallback to software, `GOZEN_HWDEC=0`) | feature | the platform's `fixes/` GoZen patch |
+| `GoZenVideo.set_target_size()` and native NV12 | feature | Frames decoded at the size they are shown at, as NV12 (Y as R8, UV as RG8; `nv12` switch in both YUV shaders): 4-8x fewer pixels per frame. `gozen.patch`, `the platform's addons/gde_gozen (MPF-Godot-Packaging)/*.gdshader`, `video_playback.gd` `decode_to_display_size` |
 | Frames decoded ahead | feature | `video_playback.gd`: up to 3 frames per video decoded on worker tasks; silent videos never drop a frame, videos with sound follow the audio clock. Video frames skipped 89 to 15 per clip, A/V drift 79-130 to 30-46 ms |
 | `lean=yes` SConstruct option | feature | FFmpeg without libvpx, libaom, LibreSSL and zlib (`gozen.patch`) |
 
 ## jetson-ffmpeg ([gjrtimmer/jetson-ffmpeg](https://github.com/gjrtimmer/jetson-ffmpeg/issues))
 
-All fixes are in `scripts/gozen/nvmpi_flush.patch`.
+All fixes are in `the platform's build/gozen/nvmpi_flush.patch`.
 
 | Report | Kind | Summary |
 |---|---|---|

@@ -9,6 +9,10 @@ run/main_scene="res://slides/window.tscn"
 run/max_fps=30
 config/features=PackedStringArray("4.6", "Mobile")
 
+[audio]
+
+driver/output_latency=60
+
 [autoload]
 
 DmdMode="*res://tools/dmd_mode.gd"

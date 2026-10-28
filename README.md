@@ -205,15 +205,13 @@ Tron-Legacy-MPF/
 │   ├── tron_pup/            (PuP) the trigger engine in MPF; trigger_map.yaml maps pack triggers to game effects
 │   ├── pup.cfg              (PuP) screen settings, every key documented; yours go in pup.local.cfg
 │   └── gmc.cfg              keyboard and window settings of the Godot media controller
-├── pup_addons/              (PuP) video add-ons setup.py copies into game/addons/
+├── pup_addons/              (PuP) native_video add-on (GoZen is the platform's: MPF-Godot-Packaging) setup.py copies into game/addons/
 │   ├── native_video/        Windows and macOS: plays the pack's mp4s
 │   ├── native_video_build/  the heap fix the macOS build applies
-│   └── gde_gozen/           Linux and Jetson: GDE GoZen with the hardware decoder
 ├── scripts/                 setup.py (install), run.py (play), the generators and checks
 │   ├── pup/                 (PuP) pup_setup (called by setup.py and run.py), gen_pup (media conversion),
 │   │                        pup_captures (trigger map check), pup_check (screens check)
 │   ├── install/             one-line installers per OS, P-ROC build, Jetson hardware decoder and self-test
-│   ├── gozen/               (PuP) the GoZen and jetson-ffmpeg patches build_gozen.sh applies
 │   ├── perf/                performance runs (docs/performance.md)
 │   └── clean_tree.py        removes empty leftover folders
 ├── scenarios/               (PuP) game scripts for run.py --scenario (a whole game to Portal Multiball)
