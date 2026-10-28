@@ -676,6 +676,16 @@ func load_audio(path: String) -> AudioStream:
 ## The pack's music (mp3, ogg) read and decoded on a worker at start, one file after the other, so no first play
 ## reads it on the main thread (20-60 ms per mp3 on a Jetson Xavier NX). Memory: the same as after a game that played them
 ## all, since every played stream stays cached anyway.
+var _preload_task := -1
+
+
+func _exit_tree() -> void:
+	# a task still running at quit is destroyed with the engine: abort() on macOS (GDScript lambda, freed mutex)
+	if _preload_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_preload_task)
+		_preload_task = -1
+
+
 func _preload_audio() -> void:
 	var paths: Array[String] = []
 	for key in manifest:
@@ -683,9 +693,10 @@ func _preload_audio() -> void:
 			var path := media_path(key)
 			if path != "":
 				paths.append(path)
-	if paths.is_empty():
+	# not in a headless tool run (setup's import and font bake): nothing plays there
+	if paths.is_empty() or DisplayServer.get_name() == "headless":
 		return
-	WorkerThreadPool.add_task(func():
+	_preload_task = WorkerThreadPool.add_task(func():
 		var t0 := Time.get_ticks_msec()
 		var bytes := 0
 		for path in paths:

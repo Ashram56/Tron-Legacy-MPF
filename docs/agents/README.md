@@ -104,6 +104,13 @@ Service menu icons of the items the game adds (FEATURE AUDITS/ADJUSTMENTS, DISPL
 its own, in the ROM's style, game images 9000+ in `game/service_icons/` drawn as text art by
 `scripts/gen_service_icons.py` (2026-10-18; the owner asked for them, his look is open).
 
+PIN2DMD and ZeDMD (2026-10-24, branch claude/project-thread-31bkyc, PR #56; 2026-10-28 the platform's): the RGB DMD output
+(Godot add-on, MPF overlays, ZeDMD platform, native feeder, detection) is **MPF-Godot-Packaging's**, the same for every
+game ([platforms/dmd_devices.md](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md)); the game keeps `scripts/dmd_out.py`
+(installs it), `game/tools/dmd_out_loader.gd`, the classic-DMD rule in `dmd_mode.gd` and `run.py --pin2dmd|--zedmd|--dmd-out auto`
+([hardware.md](../hardware.md)). Monochrome in the public repo; colour work stays private. Open: a check on a real PIN2DMD
+and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publish (platform PR #13).
+
 ### Owner decisions (keep adding)
 
 | Date | Decision |
@@ -166,4 +173,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-10 (PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-10-27 (PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
