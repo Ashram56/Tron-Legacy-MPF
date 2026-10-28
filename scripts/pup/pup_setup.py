@@ -50,7 +50,14 @@ NATIVE_DST = os.path.join(tc.GAME, "addons", "native_video")
 NATIVE_MIN_GODOT = (4, 6)           # native_video.gdextension compatibility_minimum
 
 
-GOZEN_SRC = os.path.join(tc.ROOT, "pup_addons", "gde_gozen")
+
+
+def gozen_src():
+    """GDE GoZen (patched, with its builds) comes from the platform (MPF-Godot-Packaging, scripts/mpf_platform.py)."""
+    import mpf_platform
+    return mpf_platform.addon("gde_gozen")
+
+
 GOZEN_DST = os.path.join(tc.GAME, "addons", "gde_gozen")
 
 
@@ -67,7 +74,7 @@ def native_video(os_name=None):
 def gozen(os_name=None, arch=None):
     """True where the PuP plays the pack's mp4s with GDE GoZen (Linux x86_64 and arm64, Windows x86_64: FFmpeg,
     decoding on the GPU: the Jetson's decoder when libnvmpi is installed, Direct3D 11 Video / DXVA2 on Windows,
-    see pup_addons/gde_gozen/README.md). TRON_GOZEN=0 leaves it out (Windows: native_video, Linux: Theora)."""
+    see the platform's addons/gde_gozen/README.md). TRON_GOZEN=0 leaves it out (Windows: native_video, Linux: Theora)."""
     if os.environ.get("TRON_GOZEN", "").strip().lower() in ("0", "false", "no", "off"):
         return False
     host, cpu = tc.host_os(os_name), tc.host_arch(arch)
@@ -81,9 +88,9 @@ def install_native_video():
 
 
 def install_gozen():
-    """Copies pup_addons/gde_gozen (GoZen built for this repo, see its README.md) to game/addons/."""
+    """Copies the platform's GDE GoZen (addons/gde_gozen of MPF-Godot-Packaging) to game/addons/."""
     say("   GDE GoZen add-on -> game/addons/gde_gozen (the pack's mp4s play without conversion)")
-    fsutil.copy_tree(GOZEN_SRC, GOZEN_DST)
+    fsutil.copy_tree(gozen_src(), GOZEN_DST)
 
 
 def say(text):

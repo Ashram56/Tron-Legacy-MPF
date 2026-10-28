@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # NVIDIA Jetson (JetPack 5 or 6): installs libnvmpi, which GDE GoZen's FFmpeg loads to decode the PuP videos on
-# the hardware decoder (pup_addons/gde_gozen/README.md), and everything it and Godot need on the Jetson, so it
+# the hardware decoder (the platform's addons/gde_gozen (MPF-Godot-Packaging)/README.md), and everything it and Godot need on the Jetson, so it
 # also works from a minimal or stripped root image. Safe to re-run. install_prereqs_linux.sh runs it by itself on
 # a Jetson (TRON_HWDEC=0 skips it); on its own:
 #
@@ -14,11 +14,11 @@
 # Steps: checks (root or sudo, apt, clock, disk), the build tools (Ubuntu apt), NVIDIA's L4T apt source if the
 # image lost it, the Multimedia API and libraries, the decoder device and the video group, the NVIDIA
 # GL/Vulkan/X driver and an X server for Godot, the loader path for NVIDIA's libraries, then jetson-ffmpeg at the revision GoZen was built with
-# (scripts/build_gozen.sh) in ~/.cache/tron-legacy-mpf/, its libnvmpi built and installed in /usr/local/lib.
+# (the platform's build/gozen/build_gozen.sh) in ~/.cache/tron-legacy-mpf/, its libnvmpi built and installed in /usr/local/lib.
 set -euo pipefail
 
 JETSON_FFMPEG_URL=https://github.com/gjrtimmer/jetson-ffmpeg
-JETSON_FFMPEG_REV=8d70c17efeee57f4d956df500fec78a73f8c27d4      # same as scripts/build_gozen.sh
+JETSON_FFMPEG_REV=8d70c17efeee57f4d956df500fec78a73f8c27d4      # same as the platform's build/gozen/build_gozen.sh
 NV_REPO=https://repo.download.nvidia.com/jetson
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/tron-legacy-mpf"
 SRC="$CACHE/jetson-ffmpeg"
@@ -355,14 +355,14 @@ else
     run git clone --quiet "$JETSON_FFMPEG_URL" "$SRC"
 fi
 run git -C "$SRC" checkout --quiet --force "$JETSON_FFMPEG_REV"
-# scripts/gozen/nvmpi_flush.patch, as in GoZen's build: libnvmpi closes a decoder in ~50 ms instead of ~1 s and
+# the platform's build/gozen/nvmpi_flush.patch, as in GoZen's build: libnvmpi closes a decoder in ~50 ms instead of ~1 s and
 # without crashing mid-stream, and the FFmpeg wrapper (the --test ffmpeg below) recreates the decoder on a flush.
 # Next to this script in a clone, else from GitHub ($TRON_BRANCH).
-NVMPI_PATCH="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../gozen/nvmpi_flush.patch"
+NVMPI_PATCH="${MPF_GODOT_PACKAGING:-$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../../../MPF-Godot-Packaging}/build/gozen/nvmpi_flush.patch"
 if [ ! -f "$NVMPI_PATCH" ]; then
     NVMPI_PATCH="$CACHE/nvmpi_flush.patch"
     run curl -fsSL -o "$NVMPI_PATCH" \
-        "https://raw.githubusercontent.com/Ashram56/Tron-Legacy-MPF/${TRON_BRANCH:-main}/scripts/gozen/nvmpi_flush.patch"
+        "https://raw.githubusercontent.com/Ashram56/MPF-Godot-Packaging/main/build/gozen/nvmpi_flush.patch"
 fi
 run git -C "$SRC" apply "$NVMPI_PATCH"
 # --no-stubs: fail rather than build the non-working stub library when the Multimedia API is missing

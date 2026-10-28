@@ -37,7 +37,7 @@ var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
 var _audio_lock := Mutex.new()      # _audio_cache: the music preload fills it on a worker (_preload_audio())
 ## Which add-on plays the pack's mp4s without conversion (_pick_video_player()), else Godot plays the Theora copies:
-## - GDE GoZen (Linux and Windows, pup_addons/gde_gozen): FFmpeg, with the GPU decoding (the Jetson's decoder when
+## - GDE GoZen (Linux and Windows, the platform's addons/gde_gozen (MPF-Godot-Packaging)): FFmpeg, with the GPU decoding (the Jetson's decoder when
 ##   libnvmpi is installed; Direct3D 11 Video / DXVA2 on Windows); the screens then use game/pup/gozen_player.gd;
 ## - the native_video add-on (macOS, and Windows' fallback, pup_addons/native_video).
 ## [pup] video_player (or TRON_VIDEO_PLAYER) = "native" picks native_video where both are installed (Windows).
