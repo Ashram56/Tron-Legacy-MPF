@@ -95,6 +95,11 @@ func _process(_delta: float) -> void:
 	_top = top
 	_list = list
 	_dirty = false
+	if OS.get_environment("TRON_DMD_DEBUG") != "":
+		for e in _list:
+			if e[0] == "htext":
+				print("DMD htext %s flags=%s width=%s xf=%s clip=%s k=%s vp=%s" % [e[1][0], e[1][5], e[1][4], e[2],
+						e[4], _vp.canvas_transform.x.x, _vp.size])
 	_clip = Rect2()
 	for e in _list:
 		if e[0] == "htext" and e[4] != Rect2():
