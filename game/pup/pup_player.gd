@@ -42,6 +42,8 @@ var _audio_lock := Mutex.new()      # _audio_cache: the music preload fills it o
 ## - the native_video add-on (macOS, and Windows' fallback, pup_addons/native_video).
 ## [pup] video_player (or TRON_VIDEO_PLAYER) = "native" picks native_video where both are installed (Windows).
 var native_video := false
+const GozenWarm := preload("res://pup/gozen_player.gd")
+
 var gozen := false
 
 
@@ -175,6 +177,32 @@ func _build() -> void:
 		placed.append("%s %s at %s" % [section, windows[section].size, windows[section].position])
 	print("PuP: windows %s, screens %s" % [", ".join(placed), screens.keys()])
 	_start_capture()
+	if gozen and bool(setting("pup", "warm_up", true)):
+		_warm_up.call_deferred()
+
+
+## The first clip with sound that opened after the game started always dropped a frame (a cold decoder: the hardware
+## decoder's first use, the audio decoder, the textures) while the game was still loading. Opening and playing one
+## muted, hidden clip of the same kind now, then freeing it, leaves the first real one warm.
+func _warm_up() -> void:
+	var key := ""
+	for k in manifest.keys():
+		if k.get_extension().to_lower() in ["mp4", "m4v", "mov"] and (key == "" or k.to_lower().contains("trailer")):
+			key = k
+			if k.to_lower().contains("trailer"):
+				break
+	if key == "" or screens.is_empty():
+		return
+	var warm := GozenWarm.new()
+	warm.bus = "sfx"
+	warm.modulate.a = 0.0
+	warm.size = Vector2(1920, 1080)   # a real decode size: the hardware path, not a thumbnail one
+	warm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(warm)
+	warm.open(media_path(key), false, -80.0)
+	await get_tree().create_timer(2.0).timeout
+	warm.stop()
+	warm.queue_free()
 
 
 ## Vsync on the backglass window only (else the first PuP window): with vsync on every window, each one's present
