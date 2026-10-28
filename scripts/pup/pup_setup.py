@@ -222,8 +222,13 @@ def setup(py=None, dry=False):
     ensure_ffmpeg(py)
     native = native_video() or gozen()
     # Windows gets both: GoZen plays, native_video is one setting away (game/pup/pup_player.gd)
+    # a bundle (bundle.json, docs/bundle.md) carries the add-on of its own platform in game/addons and has no
+    # pup_addons/ to copy from: keep what is there
+    bundled = os.path.exists(os.path.join(tc.ROOT, "bundle.json"))
     for wanted, install, addon in ((gozen(), install_gozen, GOZEN_DST),
                                    (native_video(), install_native_video, NATIVE_DST)):
+        if bundled:
+            continue
         if wanted:
             install()
         elif os.path.isdir(addon):        # a loaded add-on would play the mp4s instead of the conversions
