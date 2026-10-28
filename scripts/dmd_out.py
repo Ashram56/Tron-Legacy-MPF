@@ -15,14 +15,14 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import toolchain as tc  # noqa: E402
+import mpf_platform  # noqa: E402
 
 OVERLAYS = {"pin2dmd": "pin2dmd.yaml", "zedmd": "zedmd.yaml", "feed": "zedmd_feed.yaml"}
 
 
 def platform_dir():
-    """The MPF-Godot-Packaging checkout, or None."""
-    for c in (os.environ.get("MPF_GODOT_PACKAGING"), os.environ.get("MPF_PLATFORM_DIR"), os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot-Packaging"),
-              os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot")):
+    """The MPF-Godot-Packaging checkout with the DMD output (scripts/mpf_platform.py finds it), or None."""
+    for c in mpf_platform.candidates():
         if c and os.path.isfile(os.path.join(c, "addons", "dmd_out", "dmd_out.gd")):
             return c
     return None
