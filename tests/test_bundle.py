@@ -154,56 +154,6 @@ class TestBuilder(unittest.TestCase):
             if os.path.exists(os.path.join(ROOT, "scripts", mod + ".py")) or os.path.isdir(os.path.join(ROOT, "scripts", mod)):
                 self.assertTrue(any(s == mod + ".py" or s.startswith(mod + "/") for s in bb.SCRIPTS), mod)
 
-    def test_texture_formats(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = os.path.join(d, "project.godot")
-            shutil.copy(os.path.join(GAME, "project.godot"), path)
-            bb.set_texture_formats(path, "etc2")
-            text = open(path).read()
-            self.assertIn("import_etc2_astc=true", text)
-            self.assertIn("import_s3tc_bptc=false", text)
-            bb.set_texture_formats(path, "both")      # again: the old lines are replaced, not doubled
-            text = open(path).read()
-            self.assertEqual(text.count("import_etc2_astc"), 1)
-            self.assertIn("import_s3tc_bptc=true", text)
-            self.assertIn("thread_model=2", text)       # the rest of [rendering] is kept
-
-    def test_prune_formats_leaves_only_the_target_variant(self):
-        with tempfile.TemporaryDirectory() as d:
-            imported = os.path.join(d, ".godot", "imported")
-            os.makedirs(imported)
-            os.makedirs(os.path.join(d, "media"))
-            for ext in ("s3tc", "etc2"):
-                open(os.path.join(imported, "f.png-{}.{}.ctex".format("a" * 32, ext)), "w").close()
-            open(os.path.join(imported, "g.png-{}.ctex".format("b" * 32)), "w").close()
-            path = os.path.join(d, "media", "f.png.import")
-            with open(path, "w") as f:
-                f.write('[remap]\n\nimporter="texture"\npath.s3tc="res://.godot/imported/f.png-{0}.s3tc.ctex"\n'
-                        'path.etc2="res://.godot/imported/f.png-{0}.etc2.ctex"\nmetadata={{\n'
-                        '"imported_formats": ["s3tc_bptc", "etc2_astc"],\n"vram_texture": true\n}}\n\n[deps]\n\n'
-                        'dest_files=["res://.godot/imported/f.png-{0}.s3tc.ctex", '
-                        '"res://.godot/imported/f.png-{0}.etc2.ctex"]\n'.format("a" * 32))
-            self.assertEqual(bb.prune_formats(d, "etc2"), 1)
-            text = open(path).read()
-            self.assertNotIn("s3tc.ctex", text)
-            self.assertNotIn("path.s3tc", text)
-            self.assertIn('path.etc2=', text)
-            self.assertIn('"imported_formats": ["etc2_astc"],', text)
-            self.assertEqual(bb.count_variants(d), {"etc2": 1, "": 1})
-            self.assertEqual(bb.prune_formats(d, "both"), 0)
-
-    def test_seed_imports_only_for_effect_frames(self):
-        with tempfile.TemporaryDirectory() as d:
-            folder = os.path.join(d, "game", "media", "dmd_hd", "deff_001")
-            os.makedirs(folder)
-            for name in ("f000.png", "solid0.png", "hollow0.png"):
-                open(os.path.join(folder, name), "w").close()
-            open(os.path.join(d, "game", "media", "dmd_hd", "scale.json"), "w").close()
-            self.assertEqual(bb.seed_imports(d), 1)
-            self.assertTrue(os.path.exists(os.path.join(folder, "f000.png.import")))
-            self.assertFalse(os.path.exists(os.path.join(folder, "solid0.png.import")))
-            self.assertIn("compress/mode=2", open(os.path.join(folder, "f000.png.import")).read())
-
     def test_a_bundle_is_never_stale(self):
         import toolchain as tc
         with tempfile.TemporaryDirectory() as d:
@@ -211,28 +161,16 @@ class TestBuilder(unittest.TestCase):
             open(os.path.join(d, "bundle.json"), "w").close()
             self.assertIsNone(tc.media_stale(d))
 
-    def test_cabinet_data_is_refused(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "game", "data"))
-            self.assertEqual(bb.forbidden(d), ["game/data"])
-            os.makedirs(os.path.join(d, "game", "x"))
-            open(os.path.join(d, "game", "x", "scorbit.local.cfg"), "w").close()
-            self.assertIn(os.path.join("game", "x", "scorbit.local.cfg"), bb.forbidden(d))
-
-    def test_manifest(self):
-        m = bb.manifest("v1", "arm64", "etc2", {})
-        self.assertEqual(m["format"], 1)
-        self.assertEqual(m["run"]["start"], "python3 scripts/package/start.py")
-        self.assertEqual(m["requires"]["godot"], "4.6.3")
-        self.assertNotIn("pytest", " ".join(m["requires"]["python_packages"]))
-        self.assertEqual(m["options"]["count"], len(bo.load_schema()["options"]))
-        json.dumps(m)
-
-    def test_manifest_platform_addons(self):
-        self.assertEqual(bb.manifest("v1", "arm64", "etc2", {})["platform_addons"], [])
-        m = bb.manifest("v1", "all", "both", {}, platform_addons=True)
-        self.assertEqual(m["platform_addons"], ["gde_gozen"])
-        self.assertEqual(m["target"]["arch"], "arm64+x86_64")
+    def test_spec(self):
+        """What the platform's builder (MPF-Godot-Packaging mpf_godot/bundle.py) is given."""
+        sp = bb.spec("t")
+        self.assertEqual(sp["platform_addons"], ["gde_gozen"])
+        self.assertEqual(sp["git_exclude"], ["game/addons/"])        # no binary add-on from the game's tree
+        self.assertEqual(sp["run"]["start"], "python3 scripts/package/start.py")
+        self.assertNotIn("pytest", " ".join(sp["requires"]["python_packages"]))
+        self.assertEqual(sp["options"]["count"], len(bo.load_schema()["options"]))
+        self.assertIn("*.local.cfg", sp["never_names"])
+        json.dumps(sp)
 
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_asset_files_exist(self):
@@ -347,71 +285,9 @@ class TestBoardProfile(unittest.TestCase):
                          ["--", "--max-fps", "60", "--fullscreen"])
         self.assertEqual(self.bp.add_godot_args(["--seconds", "5"], []), ["--seconds", "5"])
 
-    def test_gozen_features(self):
-        with tempfile.TemporaryDirectory() as stage:
-            b = os.path.join(stage, "game", "addons", "gde_gozen", "bin")
-            os.makedirs(b)
-            with open(os.path.join(b, "libgozen.linux.template_release.arm64.so"), "wb") as f:
-                f.write(b"\0ff_h264_v4l2m2m_decoder\0GOZEN_ZEROCOPY\0")
-            self.assertEqual(bb.gozen_features(stage), {"libgozen.linux.template_release.arm64.so": ["v4l2m2m", "zero_copy"]})
-
 
 class TestDmdPanel(unittest.TestCase):
-    """scripts/package/dmd_panel.py on a fake sysfs, a ZeDMD on a pty; start.py's [dmd] window="auto"."""
-
-    def setUp(self):
-        sys.path.insert(0, os.path.join(ROOT, "scripts", "package"))
-        import dmd_panel
-        self.dp = dmd_panel
-        self.root = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.root)
-
-    def usb(self, name, vid, pid, tty=None):
-        dev = os.path.join(self.root, "devices", name)
-        os.makedirs(os.path.join(dev, "1-1:1.0"))
-        for f, v in (("idVendor", vid), ("idProduct", pid)):
-            with open(os.path.join(dev, f), "w") as fh:
-                fh.write(v + "\n")
-        os.makedirs(os.path.join(self.root, "bus", "usb", "devices"), exist_ok=True)
-        os.symlink(dev, os.path.join(self.root, "bus", "usb", "devices", name))
-        if tty:
-            os.makedirs(os.path.join(self.root, "class", "tty", tty), exist_ok=True)
-            os.symlink(os.path.join(dev, "1-1:1.0"), os.path.join(self.root, "class", "tty", tty, "device"))
-
-    def test_pin2dmd_by_usb_id(self):
-        self.usb("1-1", "0314", "e457")
-        self.assertEqual(self.dp.find(self.root), "pin2dmd")
-
-    def test_zedmd_ports_by_usb_id_and_nothing_else(self):
-        self.usb("1-1", "1a86", "7523", "ttyUSB0")
-        self.usb("1-2", "303a", "1001", "ttyACM0")
-        self.usb("1-3", "0403", "6010", "ttyUSB1")          # an FTDI (a P-ROC): not a ZeDMD
-        self.assertEqual(self.dp.serial_ports(self.root), [("/dev/ttyACM0", 115200), ("/dev/ttyUSB0", 921600)])
-        self.assertEqual(self.dp.find(os.path.join(self.root, "none")), "")
-
-    @unittest.skipUnless(hasattr(os, "openpty"), "needs a pty")
-    def test_handshake_on_a_pty(self):
-        import threading
-        import tty
-        master, slave = os.openpty()
-        tty.setraw(master)
-        name = os.ttyname(slave)
-
-        def zedmd(answer):
-            got = b""
-            while len(got) < 64:
-                got += os.read(master, 64 - len(got))
-            if got[:14] == self.dp.HANDSHAKE:
-                os.write(master, answer)
-
-        good = b"ZeDM" + bytes((128, 0, 32, 0)) + bytes(49) + b"R" + bytes(6)
-        for answer, expect in ((good, True), (bytes(64), False)):
-            t = threading.Thread(target=zedmd, args=(answer,), daemon=True)
-            t.start()
-            self.assertEqual(self.dp.zedmd_answers(name, 921600, timeout=1.5), expect)
-            t.join(2)
-        os.close(master)
-        os.close(slave)
+    """start.py's [dmd] window="auto": the detection itself is the platform's (mpf_godot.dmd_panel, tested there)."""
 
     def test_start_auto(self):
         saved = os.environ.pop("TRON_DMD_PANEL", None)
@@ -424,8 +300,5 @@ class TestDmdPanel(unittest.TestCase):
         os.environ.pop("TRON_DMD_PANEL")
         out = start.dmd_panel_args(list(args), "auto", find=lambda: "zedmd")
         self.assertEqual(os.environ["TRON_DMD_PANEL"], "zedmd")
-        if hasattr(start.run, "zedmd_feed"):
-            self.assertEqual(out, ["--hw", "proc", "--zedmd", "--", "--max-fps", "30"])
-        else:
-            self.assertEqual(out, args)
+        self.assertEqual(out, ["--hw", "proc", "--zedmd", "--", "--max-fps", "30"])
         self.assertEqual(start.add_run_flag(["--zedmd", "--", "--x"], "--zedmd"), ["--zedmd", "--", "--x"])

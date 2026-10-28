@@ -61,15 +61,15 @@ class TestSetup(unittest.TestCase):
         with mock.patch.dict(os.environ, {"TRON_GOZEN": "0"}):
             self.assertFalse(pup_setup.gozen("linux", "arm64"))
             self.assertFalse(pup_setup.gozen("windows", "x86_64"))
-        for name in ("gozen.gdextension", "video_playback.gd", "yuv_to_rgb_compatibility.gdshader",
-                     "bin/libgozen.linux.template_release.arm64.so",
-                     "bin/libgozen.linux.template_release.x86_64.so",
-                     "bin/libgozen.windows.template_release.x86_64.dll"):
-            self.assertTrue(os.path.exists(os.path.join(pup_setup.GOZEN_SRC, name)), name)
-        with open(os.path.join(pup_setup.GOZEN_SRC, "gozen.gdextension")) as f:
-            ext = f.read()
-        for key in ("windows.debug.x86_64", "windows.release.x86_64", "linux.release.arm64"):
-            self.assertIn(key, ext)
+        # the add-on itself is the platform's (MPF-Godot-Packaging addons/gde_gozen), not a copy in this repository
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "pup_addons", "gde_gozen")))
+        plat = os.environ.get("MPF_GODOT_PACKAGING")
+        if plat and os.path.isdir(os.path.join(plat, "addons", "gde_gozen")):
+            src = pup_setup.gozen_src()
+            with open(os.path.join(src, "gozen.gdextension")) as f:
+                ext = f.read()
+            for key in ("windows.debug.x86_64", "windows.release.x86_64", "linux.release.arm64"):
+                self.assertIn(key, ext)
 
     def test_video_player_setting(self):
         import configparser

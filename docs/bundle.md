@@ -1,6 +1,6 @@
 # The prebuilt bundle: the game with nothing left to build
 
-`scripts/package/build_bundle.py` makes one archive of the game as it runs: the generated MPF config, sounds,
+`scripts/package/build_bundle.py` (Tron's part) and the platform's builder (MPF-Godot-Packaging `python -m mpf_godot bundle`, `platforms/game-bundles.md`) make one archive of the game as it runs: the generated MPF config, sounds,
 DMD frames, slides, fonts, the baked HD fonts and the Godot import, so a machine that has MPF and Godot only
 unpacks it. No setup run, no media generation, no import (measured on a 4-core PC: 4 to 8 minutes, of which
 the media, the Godot import and the font bake are 85%; the font bake alone is about 100 s on a Jetson Xavier NX). It is the "game" half of a

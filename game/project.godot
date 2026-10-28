@@ -9,6 +9,10 @@ run/main_scene="res://slides/window.tscn"
 run/max_fps=30
 config/features=PackedStringArray("4.6", "Mobile")
 
+[audio]
+
+driver/output_latency=60
+
 [autoload]
 
 DmdMode="*res://tools/dmd_mode.gd"
@@ -16,6 +20,7 @@ DmdScreen="*res://tron/dmd_screen.gd"
 MPF="*res://addons/mpf-gmc/mpf_gmc.gd"
 DmdCapture="*res://tools/dmd_capture.gd"
 ProcDmd="*res://tools/proc_dmd.gd"
+DmdOutLoader="*res://tools/dmd_out_loader.gd"
 Pup="*res://pup/pup_player.gd"
 PerfProbe="*res://tools/perf_probe.gd"
 

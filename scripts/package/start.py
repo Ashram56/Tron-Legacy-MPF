@@ -7,7 +7,7 @@
 Settings are changed with scripts/package/bundle_options.py (docs/bundle.md). The board's profile
 (scripts/package/board_profile.py) first puts back what the board cannot run (its "limits"), then adds its
 environment and Godot arguments, under the saved and given ones. A flag given here is not checked against the limits. With the
-DMD display on "auto" (`[dmd] window`), it looks for a PIN2DMD or a ZeDMD (scripts/package/dmd_panel.py): the game then
+DMD display on "auto" (`[dmd] window`), it looks for a PIN2DMD or a ZeDMD (the platform's mpf_godot.dmd_panel, through scripts/dmd_out.py): the game then
 shows the DMD on the panel found, else in the backglass window over the videos.
 """
 import os
@@ -19,8 +19,8 @@ sys.path.insert(0, HERE)
 
 import board_profile  # noqa: E402
 import bundle_options  # noqa: E402
-import dmd_panel  # noqa: E402
 import run  # noqa: E402
+import dmd_out  # noqa: E402  (the platform's: which RGB DMD is plugged in)
 
 
 def merge(saved, given):
@@ -48,7 +48,7 @@ def add_run_flag(argv, flag):
     return head + [flag] + argv[len(head):]
 
 
-def dmd_panel_args(args, mode, find=dmd_panel.find):
+def dmd_panel_args(args, mode, find=dmd_out.detect):
     """For [dmd] window="auto": sets TRON_DMD_PANEL (the game reads it) and, when run.py can drive the panel found,
     asks it to. Returns run.py's arguments."""
     if mode != "auto":
@@ -59,7 +59,7 @@ def dmd_panel_args(args, mode, find=dmd_panel.find):
         os.environ["TRON_DMD_PANEL"] = panel
     print("DMD display auto: " + ("a {} answers, the DMD goes there".format(panel) if panel else
                                   "no PIN2DMD or ZeDMD answers, the DMD goes over the backglass videos"), flush=True)
-    if panel and hasattr(run, "zedmd_feed"):        # run.py's --pin2dmd and --zedmd
+    if panel:                                       # run.py's --pin2dmd and --zedmd (the platform's output)
         args = add_run_flag(args, "--" + panel)
     return args
 

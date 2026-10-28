@@ -42,7 +42,7 @@ main thread went from 2.4 s (a `close()`; opening averaged 0.8 s) to 10 ms. With
 steps took up to about 0.1 s before the changes.
 
 Our copy of the file, with the changes:
-https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/pup_addons/gde_gozen/video_playback.gd
+https://github.com/Ashram56/Tron-Legacy-MPF-PuP/blob/main/the platform's addons/gde_gozen (MPF-Godot-Packaging)/video_playback.gd
 
 ## Possibly related: hardware decoder selection
 

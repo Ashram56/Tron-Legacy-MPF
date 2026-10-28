@@ -29,7 +29,7 @@
         ],
         "godot_args": [
           {"args": ["--render-thread", "separate"], "if": {"env": "MPF_GODOT_EGL_FIX"},
-           "why": "only with a Godot carrying scripts/godot/egl_release_current.patch (Godot 4.6.3 crashes without it)"}
+           "why": "only with a Godot carrying the platform's build/godot/egl_release_current.patch (Godot 4.6.3 crashes without it)"}
         ]
       }
     }

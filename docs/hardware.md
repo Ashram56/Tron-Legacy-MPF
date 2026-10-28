@@ -303,3 +303,35 @@ pin 3 settles it; if it is BLU-WHT, swap the two entries of `TUBES` in `tron/pro
 - GI on/off control: not driven (see above).
 - IO board status inputs (zero cross, lamp driver status, interlocks): the P-ROC cannot read them.
 - SAM's on-board sound: replaced by the PC (see above).
+
+## PIN2DMD and ZeDMD (an RGB LED DMD)
+
+The DMD can also be shown on a [PIN2DMD](https://pin2dmd.com) (USB) or a [ZeDMD](https://github.com/PPUC/ZeDMD) (USB
+serial), next to (or instead of) the screen and the P-ROC's DMD. **This output is the platform's, not this game's**: the
+Godot add-on that sends the frames (`addons/dmd_out`), the MPF overlays, the ZeDMD platform, the native feeder and the
+detection of which device is plugged in are in
+[MPF-Godot-Packaging](https://github.com/Ashram56/MPF-Godot-Packaging), [`platforms/dmd_devices.md`](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md),
+the same for every game. What this game does:
+
+| Piece | What |
+|---|---|
+| `scripts/dmd_out.py` | Finds the platform (`$MPF_GODOT_PACKAGING`, or a folder `MPF-Godot-Packaging` beside this repository) and copies its add-on into `game/addons/dmd_out/` and the device's overlay into `game/config/` (both git-ignored) before a start; `python scripts/dmd_out.py detect` asks which device answers. |
+| `game/tools/dmd_out_loader.gd` | Autoload: starts the add-on when Godot gets `--pin2dmd` or `--zedmd`, else does nothing. |
+| `game/tools/dmd_mode.gd` | Keeps the DMD classic (exact 128x32 dots) when one of these args is given, like `--proc-dmd`. |
+| `scripts/run.py` | The flags below; `pip install pyusb` is in the requirements (PIN2DMD). |
+
+```sh
+python scripts/run.py --pin2dmd                # the original orange; add --hw proc, --monitor ...
+python scripts/run.py --pin2dmd '#2a6cff'      # Tron blue (the public game is always monochrome)
+python scripts/run.py --zedmd                  # native feeder when a ZeDMD answers, else MPF's Python platform
+python scripts/run.py --dmd-out auto           # the platform looks: PIN2DMD, ZeDMD or neither (the screen only)
+```
+
+On a P-ROC machine (`--hw proc`) the RGB DMD replaces the original DMD (the P-ROC's DMD connector is left alone; both
+together are not supported). A machine installed by the setup page picks the device by itself with `[dmd] window = auto`.
+
+**Not tried on a real PIN2DMD or ZeDMD**: the protocols follow libdmdutil's and libzedmd's source and are tested against
+fake devices in the platform's repository. To check: the PIN2DMD's colour order (`pin2dmd: panel: rbg` swaps green and
+blue) and firmware ("virtual pinball" mode), the ZeDMD's port, firmware 5.x and colour order. This game's own copy of the
+add-on, platform, feeder and their tests were removed in favour of the platform's (2026-10-28).
+

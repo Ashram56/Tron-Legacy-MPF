@@ -37,7 +37,7 @@ var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
 var _audio_lock := Mutex.new()      # _audio_cache: the music preload fills it on a worker (_preload_audio())
 ## Which add-on plays the pack's mp4s without conversion (_pick_video_player()), else Godot plays the Theora copies:
-## - GDE GoZen (Linux and Windows, pup_addons/gde_gozen): FFmpeg, with the GPU decoding (the Jetson's decoder when
+## - GDE GoZen (Linux and Windows, the platform's addons/gde_gozen (MPF-Godot-Packaging)): FFmpeg, with the GPU decoding (the Jetson's decoder when
 ##   libnvmpi is installed; Direct3D 11 Video / DXVA2 on Windows); the screens then use game/pup/gozen_player.gd;
 ## - the native_video add-on (macOS, and Windows' fallback, pup_addons/native_video).
 ## [pup] video_player (or TRON_VIDEO_PLAYER) = "native" picks native_video where both are installed (Windows).
@@ -76,6 +76,11 @@ func _ready() -> void:
 	media_dir = root.path_join(setting("pup", "media_dir", "pup_media/trn_174h"))
 	if not _load_media():
 		return
+	# a cabinet shows no mouse pointer: "auto" hides it when the backglass covers the monitor (a windowed desktop
+	# test keeps it)
+	var hide_cursor := str(setting("pup", "hide_cursor", "auto")).to_lower()
+	if hide_cursor == "true" or (hide_cursor == "auto" and bool(setting("backglass", "fullscreen", false))):
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	enabled = true
 	_load_playlists()
 	call_deferred("_build")
@@ -464,10 +469,26 @@ func _make_dmd_window() -> void:
 		# screen window page-flips: a second window made X copy the backglass at every frame (Raspberry Pi 4, 30 FPS
 		# cap: 21 instead of 29.6 FPS)
 		var bg: Window = windows["backglass"]
-		_dmd_area = Control.new()
+		var radius := float(setting("dmd", "corner_radius", 0.0))
+		if radius > 0.0:
+			# [dmd] corner_radius: the area is a black panel with round corners, to match a frame of the backglass art
+			# round it. [dmd] corner_clip=true also clips the DMD to the round corners: off by default, as clipping
+			# cost ~20 points of GPU and tripled the late frames on a Raspberry Pi 4 (keep view_size inside the round
+			# area instead)
+			var panel := Panel.new()
+			var box := StyleBoxFlat.new()
+			box.bg_color = Color.BLACK
+			box.set_corner_radius_all(int(round(radius)))
+			box.anti_aliasing = true
+			panel.add_theme_stylebox_override("panel", box)
+			if str(setting("dmd", "corner_clip", "false")) == "true":
+				panel.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+			_dmd_area = panel
+		else:
+			_dmd_area = Control.new()
+			_dmd_area.clip_contents = true
 		_dmd_area.name = "pup_dmd"
 		_dmd_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_dmd_area.clip_contents = true
 		var r = setting("dmd", "rect", [])
 		if r is Array and r.size() == 4 and float(r[2]) > 0.0:
 			_dmd_area.position = Vector2(float(r[0]), float(r[1]))
@@ -515,7 +536,9 @@ func _make_dmd_window() -> void:
 	# the game's HD DMD mode (tools/dmd_mode.gd) draws smooth text at its window's size and has its own dots
 	var dmd_mode = get_node_or_null("/root/DmdMode")
 	var hd: bool = dmd_mode != null and bool(dmd_mode.get("hd"))
-	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if hd else CanvasItem.TEXTURE_FILTER_NEAREST
+	# [dmd] filter: "linear" or "nearest" scaling of the DMD picture (default: linear in HD, nearest otherwise)
+	var linear := str(setting("dmd", "filter", "linear" if hd else "nearest")) == "linear"
+	_dmd_view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if linear else CanvasItem.TEXTURE_FILTER_NEAREST
 	_dmd_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if bool(setting("dmd", "dots", true)) and not hd:
 		var mat := ShaderMaterial.new()
@@ -576,6 +599,11 @@ func _layout_dmd() -> void:
 	var dmd_size := Vector2(128, 32 * pa)
 	var k := minf(dmd_rect.size.x / dmd_size.x, dmd_rect.size.y / dmd_size.y)
 	_dmd_view.size = dmd_size * k
+	# [dmd] view_size = [w, h]: the DMD exactly that big (its area's pixels), centred, for a whole number of
+	# pixels per dot (256x64 dots in 512x128: no moire)
+	var v = setting("dmd", "view_size", [])
+	if v is Array and v.size() == 2 and float(v[0]) > 0.0:
+		_dmd_view.size = Vector2(float(v[0]), float(v[1]))
 	_dmd_view.position = dmd_rect.position + (dmd_rect.size - _dmd_view.size) * 0.5
 
 
@@ -767,6 +795,16 @@ func load_audio(path: String) -> AudioStream:
 ## The pack's music (mp3, ogg) read and decoded on a worker at start, one file after the other, so no first play
 ## reads it on the main thread (20-60 ms per mp3 on a Jetson Xavier NX). Memory: the same as after a game that played them
 ## all, since every played stream stays cached anyway.
+var _preload_task := -1
+
+
+func _exit_tree() -> void:
+	# a task still running at quit is destroyed with the engine: abort() on macOS (GDScript lambda, freed mutex)
+	if _preload_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_preload_task)
+		_preload_task = -1
+
+
 func _preload_audio() -> void:
 	var paths: Array[String] = []
 	for key in manifest:
@@ -774,9 +812,10 @@ func _preload_audio() -> void:
 			var path := media_path(key)
 			if path != "":
 				paths.append(path)
-	if paths.is_empty():
+	# not in a headless tool run (setup's import and font bake): nothing plays there
+	if paths.is_empty() or DisplayServer.get_name() == "headless":
 		return
-	WorkerThreadPool.add_task(func():
+	_preload_task = WorkerThreadPool.add_task(func():
 		var t0 := Time.get_ticks_msec()
 		var bytes := 0
 		for path in paths:
