@@ -307,6 +307,8 @@ func _split_windows() -> void:
 	if area.size.x <= 0 or area.size.y <= 0:
 		return
 	var aspect := float(back.size.x) / maxf(1.0, float(back.size.y))
+	if column.size() == 2 and column[0] == windows.get("dmd") and column[1] == windows.get("topper") and _split_left_right(back, column, area):
+		return
 	var back_max := mini(area.size.x, int(floor(float(area.size.y) * aspect)))
 	# the column is what the full-height backglass leaves, times [pup] column_scale (2: twice as wide, so the DMD and the
 	# topper are twice as wide; the backglass gives that width up and stays 4:3, a smaller one)
@@ -339,6 +341,29 @@ func _split_windows() -> void:
 		w.size = Vector2i(int(floor(col_w * k)), int(round(shapes[i] * k)))
 		w.position = Vector2i(area.position.x + back_w, y)
 		y += w.size.y
+
+
+## The default split: the backglass over the DMD in a left column of `[pup] split_left` (0.5) of the monitor's width, the topper
+## filling the right column from top to bottom, so the whole screen is used: on 1920x1080 the backglass is 960x720, the DMD
+## 960x360 under it and the topper 960x1080. False (nothing placed) when the DMD would get under a seventh of the height.
+func _split_left_right(back: Window, column: Array[Window], area: Rect2i) -> bool:
+	var left_w := int(area.size.x * clampf(float(setting("pup", "split_left", 0.5)), 0.3, 0.7))
+	var aspect := float(back.size.x) / maxf(1.0, float(back.size.y))
+	var back_h := int(round(float(left_w) / aspect))
+	var dmd_h := area.size.y - back_h
+	if dmd_h < area.size.y / 7:
+		return false
+	var dmd: Window = column[0]
+	var topper: Window = column[1]
+	for w: Window in [back, dmd, topper]:
+		w.borderless = true
+	back.size = Vector2i(left_w, back_h)
+	back.position = area.position
+	dmd.size = Vector2i(left_w, dmd_h)
+	dmd.position = area.position + Vector2i(0, back_h)
+	topper.size = Vector2i(area.size.x - left_w, area.size.y)
+	topper.position = area.position + Vector2i(left_w, 0)
+	return true
 
 
 ## [pup] layout="stack": backglass, DMD and topper one under the other at the left of the backglass's monitor,
