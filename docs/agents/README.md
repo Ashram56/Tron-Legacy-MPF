@@ -124,6 +124,7 @@ this path is not built (colour work stays private). Open: a check on a real PIN2
 | 2026-10-10 | PuP videos on Windows play through GDE GoZen with GPU decoding (Direct3D 11 Video), like Linux; the native video add-on (it stuttered) stays as the fallback. Built in the PuP fork ([Tron-Legacy-MPF-PuP](https://github.com/Ashram56/Tron-Legacy-MPF-PuP) PR #15). |
 | 2026-10-10 | **PuP Pack merged into this repository** (the fork Tron-Legacy-MPF-PuP is history). Optional: the installers take the private `pup_pack` submodule only with a token or credentials that read it, else install the game alone; `--pup-zip` takes the author's zip. Godot 4.6.3 (the native video add-on needs 4.6), separate render thread on by default (`--no-render-thread`). Colourisation stays out of the public repo. |
 | 2026-10-18 | Service menu duplicated on the backglass, the DMD keeping the ROM's look (same branch for DMD-only machines); both neon frames of the backglass art stay lit, content stays clear of the lower frame; fade in and out on entering and leaving the menu. |
+| 2026-10-25 | Frames capped at 30 FPS on every platform (`game/project.godot`; `run.py --max-fps`, the bundle's frame rate option). Raspberry Pi 4: the LCD DMD drawn in the backglass window (`[dmd] window`: overlay in prod; the bundle's `auto` = a PIN2DMD or ZeDMD when one answers, else stacked), no light cycles. |
 
 ### Ideas not built (ask before starting)
 
@@ -142,6 +143,11 @@ Docker, CI on three OSes. Open:
 2. A double-click launcher per platform (Windows shortcut or `.bat`, macOS `.command`) that runs `run.py` with
    the installed options: not built; the owner runs the command line today.
 3. Transformers has only the Windows installer; macOS and Linux installers, Docker and CI are not ported.
+4. Prebuilt bundle (2026-10-24, [docs/bundle.md](../bundle.md)): `scripts/package/build_bundle.py` makes the game with
+   its media and Godot import already built, per GPU family (arm64 ETC2 for a Raspberry Pi 4 and a Jetson, x86_64 S3TC),
+   with `bundle.json`, a settings schema and tool for a web page (`scripts/package/options.json`,
+   `bundle_options.py`) and the PuP install from the author's zip. Built and run on a PC; not run on a real Pi 4 or
+   Jetson. The web page and file serving are another project's.
 
 ## G, PuP Pack
 

@@ -262,6 +262,20 @@ class TestRun(unittest.TestCase):
             run.main(["--no-text-ui"])
             self.assertNotIn("--render-thread", r.call_args.kwargs["godot_args"])
 
+    def test_max_fps(self):
+        """30 FPS by game/project.godot; --max-fps or TRON_MAX_FPS sets another cap (0 = none) as a Godot engine arg."""
+        with open(os.path.join(tc.GAME, "project.godot"), encoding="utf-8") as f:
+            self.assertIn("run/max_fps=30", f.read())
+        with mock.patch.object(run, "run", return_value=0) as r, mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TRON_MAX_FPS", None)
+            run.main(["--no-text-ui"])
+            self.assertNotIn("--max-fps", r.call_args.kwargs["godot_args"])
+            run.main(["--max-fps", "0", "--no-text-ui", "--", "--y"])
+            self.assertEqual(["--y", "--max-fps", "0"], r.call_args.kwargs["godot_args"][-3:])
+            os.environ["TRON_MAX_FPS"] = "60"
+            run.main(["--no-text-ui"])
+            self.assertEqual(["--max-fps", "60"], r.call_args.kwargs["godot_args"][-2:])
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux only")
     def test_core_pinning(self):
         """Godot's main thread alone on the last core, its other threads and MPF on the rest; off with TRON_PIN=0,

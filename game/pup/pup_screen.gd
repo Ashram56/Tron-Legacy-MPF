@@ -216,6 +216,23 @@ func _restart() -> void:
 	else:
 		_video.play()
 
+## True when this layer shows a video over the whole layer (a video has no alpha): the layers under it are hidden.
+func covers() -> bool:
+	if audio_only or not is_visible_in_tree() or _video == null or not _video.visible or _image.visible:
+		return false
+	if player.gozen and not _video.showing():
+		return false
+	return _video.position.x <= 1.0 and _video.position.y <= 1.0 \
+			and _video.position.x + _video.size.x >= size.x - 1.0 and _video.position.y + _video.size.y >= size.y - 1.0
+
+
+## Covered by an opaque video above (pup_player.gd): not drawn, and a silent video pauses until uncovered.
+func set_covered(covered: bool) -> void:
+	RenderingServer.canvas_item_set_visible(get_canvas_item(), visible and not covered)
+	if _video and player.gozen:
+		_video.set_covered(covered)
+
+
 # ------------------------------------------------------------------ layout
 
 func _layout() -> void:
