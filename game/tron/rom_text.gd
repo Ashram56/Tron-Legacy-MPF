@@ -11,6 +11,10 @@ extends MPFVariable
 
 @export var rom_font: int = 12
 @export var rom_x: int = 84
+## HD only (-1: rom_x): the line's x and fit width on the HD DMD, where the picture the ROM keeps the left ~41 dots for is
+## not drawn (text_page.tscn: centred on 84 looked pushed to the right); the classic DMD keeps the ROM's rom_x.
+@export var hd_x: int = -1
+@export var hd_fit_width: int = 0
 @export var rom_y: int = 16
 @export var rom_flags: int = 2
 @export var fit_fonts: PackedInt32Array = PackedInt32Array()
@@ -184,13 +188,13 @@ func _layout() -> void:
 		m = fm
 		shown = fs
 		y = fit_ys[i] if i < fit_ys.size() else rom_y
-		if rom_width(fm, fs) <= fit_width:
+		if rom_width(fm, fs) <= (hd_fit_width if hd_fit_width > 0 and hd() else fit_width):
 			break
 	if m.is_empty():
 		return
 	if shown != text:
 		text = shown
-	var x := alt_x if _use_alt else rom_x
+	var x := alt_x if _use_alt else (hd_x if hd_x >= 0 and hd() else rom_x)
 	if _use_alt:
 		y = alt_y
 	var w := rom_width(m, shown)
