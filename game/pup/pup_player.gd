@@ -839,6 +839,8 @@ func _start_capture() -> void:
 	timer.timeout.connect(func():
 		for section in windows:
 			windows[section].get_texture().get_image().save_png("%s/%s_%04d.png" % [dir, section, count[0]])
+		# the main window's picture too: what the DMD view shows (hidden, minimised, it is on no screenshot)
+		get_tree().root.get_texture().get_image().save_png("%s/main_%04d.png" % [dir, count[0]])
 		count[0] += 1)
 	add_child(timer)
 	timer.start()
