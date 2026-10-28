@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Build the prebuilt game bundle (docs/bundle.md): the game as it runs, with nothing left to generate or import.
+
+    python scripts/package/build_bundle.py --target all          # universal: arm64 + x86_64 textures, no binary
+    python scripts/package/build_bundle.py --target x86_64       # a PC only
+    python scripts/package/build_bundle.py --version 2026.10.24 --out /some/folder
+
+The builder is the platform's, the same for every game: `python -m mpf_godot bundle` in MPF-Godot-Packaging
+(set MPF_GODOT_PACKAGING to its checkout; default: a folder beside this repository). This file is what is Tron's:
+which files the game reads (the lists below), the options schema and tool, the board profiles, the PuP install, and
+the check that the generated media are current. It writes the game's bundle spec and calls the platform.
+
+No binary is in the bundle: GoZen and the other add-ons come from the platform (bundle.json platform_addons).
+Needs a workspace that scripts/setup.py has finished. No ROM, no PuP Pack, no credentials.
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))   # scripts/
+import gen_media  # noqa: E402  (HD_FRAME_IMPORT only)
+import toolchain as tc  # noqa: E402
+sys.path.insert(0, HERE)
+import board_profile  # noqa: E402
+import bundle_options  # noqa: E402
+
+ROOT = tc.ROOT
+NAME = "tron-legacy-mpf"
+
+SCRIPTS = ["run.py", "toolchain.py", "fsutil.py", "gmc_patch.py", "pup/__init__.py", "pup/pup_setup.py",
+           "pup/gen_pup.py", "package/__init__.py", "package/start.py", "package/bundle_options.py",
+           "package/options.json", "package/board_profile.py", "package/profiles.json", "package/dmd_panel.py"]
+
+GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs", "game/tron/media_data.json",
+             "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc"]
+
+ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
+               "assets/mpf_package/service_menu.json", "assets/mpf_package/media/rom_images_all.zip"]
+
+ASSET_DIRS = ["assets/mpf_package/config", "assets/rom_data/io", "assets/rom_data/pro", "assets/rom_data/settings",
+              "assets/rom_data/deffs", "assets/io", "assets/callouts"]
+
+ASSET_GLOBS = [("assets/mpf_package/media/dmd", "timing.json")]
+
+NEVER = ["game/data", "game/audits", "game/logs", "game/monitor/logs", "game/monitor/settings.ini",
+         "game/monitor/settings.ini.lock", "game/pup.local.cfg", "game/scorbit.local.cfg", "game/options.json",
+         "game/.godot"]
+
+
+def platform_dir():
+    for c in (os.environ.get("MPF_GODOT_PACKAGING"), os.path.join(os.path.dirname(ROOT), "MPF-Godot-Packaging"),
+              os.path.join(os.path.dirname(ROOT), "MPF-Godot")):
+        if c and os.path.isfile(os.path.join(c, "mpf_godot", "bundle.py")):
+            return c
+    raise SystemExit("MPF-Godot-Packaging not found: clone it beside this repository or set MPF_GODOT_PACKAGING")
+
+
+def check_workspace():
+    problems = []
+    if tc.media_stale():
+        problems.append("the generated media are out of date: " + tc.media_stale())
+    for rel in ("assets/mpf_package/service_menu.json", "game/config/rom", "game/media", "game/sounds",
+                "game/addons/mpf-gmc/plugin.cfg", "game/fonts_ttf/baked"):
+        if not os.path.exists(os.path.join(ROOT, rel)):
+            problems.append("missing " + rel)
+    if problems:
+        raise SystemExit("the workspace is not ready (run `python scripts/setup.py` first):\n  " + "\n  ".join(problems))
+
+
+def spec(template):
+    """The bundle spec the platform's builder reads (mpf_godot/bundle.py). `template` is the .import text of an HD frame."""
+    with open(os.path.join(HERE, "options.json"), encoding="utf-8") as f:
+        options = json.load(f)
+    asset_globs = []
+    for folder, name in ASSET_GLOBS:
+        for d in sorted(os.listdir(os.path.join(ROOT, folder))) if os.path.isdir(os.path.join(ROOT, folder)) else ():
+            asset_globs.append("{}/{}/{}".format(folder, d, name))
+    return {
+        "id": NAME,
+        "name": "Tron Legacy (Stern 2011), MPF recreation",
+        "game_dir": "game",
+        "git_tracked": ["game"],
+        "git_exclude": ["game/addons/"],
+        "copy": ["scripts/" + s for s in SCRIPTS] + GENERATED + ASSET_FILES + ASSET_DIRS + asset_globs,
+        "never": NEVER,
+        "never_names": ["*.local.cfg", "machine_vars.yaml", "scorbit_device_key.txt"],
+        "import_seed": [{"dir": "game/media/dmd_hd", "skip_prefixes": ["solid", "hollow"], "template": template}],
+        "platform_addons": ["gde_gozen"],
+        "source_commits": {"assets_commit": "HEAD:assets"},
+        "requires": {
+            "python": ">=3.10",
+            "python_packages": [r for r in tc.REQUIREMENTS if not r.startswith("pytest")],
+            "mpf_gmc": tc.GMC_VERSION + " (patched copy included)",
+            "programs": ["ffmpeg (PuP install: reads the pack's videos)", "xvfb-run (only without a screen)"],
+            "env": {"GODOT": "path of the Godot executable (default tools/godot/ in the bundle)",
+                    "TRON_VENV": "folder of the Python venv with MPF (default .venv in the bundle)"},
+        },
+        "run": {
+            "start": "python3 scripts/package/start.py",
+            "start_note": "adds the saved options (game/options.json) to scripts/run.py; any run.py flag can follow",
+            "cwd": ".",
+            "ports": {"5050": "Godot (GMC), localhost only", "5051": "MPF, localhost only (MPF Monitor)"},
+        },
+        "options": {"schema": "scripts/package/options.json", "tool": "scripts/package/bundle_options.py",
+                    "count": len(options["options"])},
+        "pup": {
+            "installed_from": "the pack's own zip (VP Universe), never in this bundle",
+            "install": "python3 scripts/pup/pup_setup.py --pup-zip ZIP_PATH_OR_URL",
+            "status": "python3 scripts/pup/pup_setup.py --status",
+            "pack_dir": "pup_pack/trn_174h", "media_dir": "pup_media/trn_174h",
+            "needs_restart": True,
+        },
+        "extra": {"profiles": {"file": "scripts/package/profiles.json",
+                               "apply": "python3 scripts/package/board_profile.py apply",
+                               "detect": "python3 scripts/package/board_profile.py detect",
+                               "ids": [p["id"] for p in board_profile.load()]}},
+        "keep_on_update": ["game/data", "game/audits", "game/logs", "game/options.json", "game/pup.local.cfg",
+                           "game/scorbit.local.cfg", "pup_pack", "pup_media"],
+    }
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
+                   help="arm64: Raspberry Pi 4 and Jetson (ETC2/ASTC textures); x86_64: a PC (S3TC/BPTC); all: both")
+    p.add_argument("--version", help="default: the date and the short commit, 2026.10.24-ab12cd3")
+    p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
+    p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
+    args = p.parse_args(argv)
+    check_workspace()
+    out = os.path.abspath(args.out)
+    os.makedirs(out, exist_ok=True)
+    template = os.path.join(out, "hd_frame.import.template")
+    with open(template, "w", encoding="utf-8", newline="\n") as f:
+        f.write(gen_media.HD_FRAME_IMPORT)
+    spec_path = os.path.join(ROOT, ".bundle_spec.json")
+    with open(spec_path, "w", encoding="utf-8") as f:
+        json.dump(spec(os.path.relpath(template, ROOT)), f, indent=2)
+    cmd = [sys.executable, "-m", "mpf_godot", "bundle", spec_path, "--target", args.target, "--out", out]
+    if args.version:
+        cmd += ["--version", args.version]
+    if args.no_archive:
+        cmd.append("--no-archive")
+    env = dict(os.environ, PYTHONPATH=platform_dir(), GODOT=os.environ.get("GODOT") or tc.godot_path())
+    try:
+        return subprocess.run(cmd, env=env, cwd=ROOT).returncode
+    finally:
+        os.remove(spec_path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

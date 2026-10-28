@@ -192,7 +192,10 @@ def media_fingerprint(root=ROOT):
 def media_stale(root=ROOT):
     """Why the generated media must be made again (None when current): never generated or stamped, made
     from other generator scripts or assets than these, or generated but not imported by Godot (the
-    slides then show no picture: Godot loads a PNG only through its .import file)."""
+    slides then show no picture: Godot loads a PNG only through its .import file). A bundle (bundle.json at the
+    root, docs/bundle.md) was made from a current workspace and has no generator inputs to compare: never stale."""
+    if os.path.exists(os.path.join(root, "bundle.json")):
+        return None
     stamp = os.path.join(root, "game", "media", ".generated")
     if not os.path.exists(stamp):
         return "no stamp of a complete media generation and Godot import ({})".format(stamp)
