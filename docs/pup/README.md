@@ -46,6 +46,41 @@ GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV
 - **Jetson** (JetPack 5 or 6): the hardware decoder once libnvmpi is installed (the Linux install line does it,
   or `scripts/install/install_jetson_hwdec.sh`, see `pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md)
   for the fixes it needs); other Linux PCs decode in software.
+- **Raspberry Pi 4** (Raspberry Pi kernel, `bcm2835-codec-decode` at `/dev/video10`): FFmpeg's `h264_v4l2m2m` after the
+  Jetson's, tried only with `GOZEN_HWDEC=1` (`gozen_player.gd`; software if it fails to open). Needs a `libgozen`
+  built with `scripts/gozen/gozen_v4l2m2m*.patch` (`scripts/build_gozen.sh arm64`; the committed arm64 binary
+  has them, with zero-copy and NV12). H.264 up to 1080p30 only, frames are copied (YUV420P, no scaling): with backglass and DMD it saves
+  ~55 points of CPU but gives 17 instead of 21 fps and doubles the video lag (3.5 s against 1.9 s), hence opt-in.
+  A first run that ended with several decoders closing at once hung the kernel driver until a reboot (vchiq
+  timeouts); later runs, including a clean stop, did not.
+  With `scripts/gozen/gozen_zerocopy.patch` (and `video_playback.gd`, Render thread "safe", OpenGL ES) the frames are
+  not copied any more: the decoder's buffer is exported as a dmabuf, imported on the GPU per plane (EGLImage) and
+  shown as a Godot texture (`GOZEN_ZEROCOPY=0` turns it off). Measured on a Pi 4 (classic DMD, 1080p backglass full
+  screen, 60 s): Godot's CPU 160 % -> 93 %, video lag 4.4 s -> 0.9 s, but the GPU is then the limit: Godot's canvas
+  shader fills only ~150-200 Mpixel/s on the V3D, and Mesa copies each linear (imported) plane to a tiled shadow at
+  every draw (`V3D_DEBUG=perf`: "Updating ... shadow for linear texture", ~1.6 ms per 1080p plane). What helped,
+  with the original 1080p videos (15 -> 22.6 fps, 31 fps at a 1280x720 render size): the unshaded
+  `yuv_to_rgb_fast*.gdshader` (used when a video has no rotation, interlacing or alpha), no full-window `ColorRect`
+  behind the screens, a layer fully covered by an opaque video above it neither drawn nor decoded (a silent one
+  pauses; a running hardware decoder slows the GPU by 15-30 %), and `[backglass] render_size=[1280, 720]` (the window
+  drawn at that size and scaled up; the videos keep their resolution; off by default). A DMD lightcycles
+  background (3D with glow in a 1032x256 viewport) costs ~27 ms a frame on the Pi 4.
+  Measured on 2026-10-25 (classic DMD on a PIN2DMD, 1080p backglass full screen at `render_size=[1280, 720]`,
+  zero-copy, the bcm2835-codec driver fixed, 60 s runs): software decoding 50 fps but the videos 0.7 s late
+  (2.6 s at p95) and 330 % CPU; hardware 44-47 fps, no lag, 176-195 % CPU. The limit is then the GPU (the
+  videos: ~91 % busy, 60 fps without them) and vsync rounding (a frame a little over 16.7 ms takes 33 ms).
+  The pack's videos are 30 fps, so `--max-fps 30` loses no video frame: 29.3 fps, 160-170 % CPU; with a separate
+  render thread (needs a Godot with the EGL fix below) 29.5 fps and the steadiest (3 % of frames over 40 ms
+  against 7 %). NV12 output (`gozen_v4l2_buffers_nv12.patch`) changes nothing measurable (GPU -3 points).
+  `render_size=[960, 540]`: +4-5 fps. Vulkan (V3DV): 0.4-0.7 fps. A second window (an LCD DMD) loses the
+  full screen page flip: 21 instead of 29.6 fps at the 30 fps cap, 10 fps with the light cycles; draw the DMD in
+  the backglass window instead (`[dmd] window="stacked"` or `"overlay"`, `game/pup.cfg`). `--render-thread separate` on
+  OpenGL ES crashes Godot 4.6.3 ("Error initializing GLAD", SIGSEGV): `EGLManager::release_current()` leaves
+  `current_window` set, so the render thread never makes the context current; fixed by one line
+  (`current_window = nullptr;`, `scripts/godot/egl_release_current.patch`) in Godot's master, not in 4.6.3.
+  The stock Raspberry Pi kernel's `bcm2835-codec` (6.18) has an inverted completion test when a decoder stops
+  (it returns at the first buffer back, warns "stop_streaming ... leaving buffer ... in active state" and can
+  oops): a hardware decoder needs the fixed module until the kernel has the fix, hence `GOZEN_HWDEC=1` opt-in.
 
 `python scripts/pup/video_check.py` checks the decoding without the game: it decodes a few pack videos on the GPU,
 then in software (`GOZEN_HWDEC=0`), and prints per video `GPU (NV12)` or `software` and how many times faster
