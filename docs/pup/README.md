@@ -109,8 +109,7 @@ Godot 4.6+ and a RenderingDevice renderer (the game uses Mobile). `TRON_NATIVE_V
 | `topper` (optional) | mode info, TRON / ZUSE letters, light cycles | 13 (underlay), 14 (top layer) |
 | (no window) | OST music | 15 |
 
-By default (`[pup] layout="split"`) the backglass opens at the left of the main monitor as large as its height allows (1440x1080
-on a 1920x1080 screen) and the DMD over the topper fill the column at the right (480 wide there), all borderless, the mouse pointer
+By default (`[pup] layout="split"`) the backglass opens at the left of the main monitor and the DMD over the topper fill the column at the right, twice as wide as the space a full-height backglass would leave (`[pup] column_scale`, 2): on a 1920x1080 screen the backglass is 960x720 and the column 960 wide (with 1: 1440x1080 and 480), all borderless, the mouse pointer
 hidden (`[pup] hide_cursor`) and the game's own 128x32 window out of sight (minimised, or moved off screen when the window manager
 ignores that). With the split layout a window whose `screen` is another monitor (`[dmd] screen`, `[topper] screen`, or the settings page's "DMD monitor" and "Topper monitor") fills that monitor, so the DMD can go to a second screen; "Backglass monitor" (`[backglass] screen`) picks the monitor of the backglass. `layout="stack"` puts the three windows one under the other at the left, backglass at the top, as large as the monitor's height allows. Every window
 can be resized and its content follows; `run.py --dmd-size WxH` sets the DMD window's size. For a cabinet,

@@ -270,8 +270,9 @@ func _check_main_window_hidden() -> void:
 
 
 ## [pup] layout="split" (the default): the backglass at the left, as large as the monitor's height allows (it keeps its own
-## shape, 4:3 by default), and the DMD over the topper in the column that is left at the right. All borderless, so the
-## sizes are exact: on 1920x1080 the backglass is 1440x1080 and the column 480 wide. A monitor that leaves the column less than
+## shape, 4:3 by default), and the DMD over the topper in the column at the right, `column_scale` (2) times as wide as the
+## space the full-height backglass leaves. All borderless, so the sizes are exact: on 1920x1080 the backglass is 960x720 and the
+## column 960 wide (the DMD about 960x240, the topper under it). A monitor that leaves the column less than
 ## a fifth of its width, or a fullscreen backglass, falls back to "stack". A DMD or topper whose `screen` is another monitor
 ## fills that monitor instead of joining the column.
 func _split_windows() -> void:
@@ -306,8 +307,14 @@ func _split_windows() -> void:
 	if area.size.x <= 0 or area.size.y <= 0:
 		return
 	var aspect := float(back.size.x) / maxf(1.0, float(back.size.y))
-	var back_w := mini(area.size.x, int(floor(float(area.size.y) * aspect)))
-	var col_w := area.size.x - back_w
+	var back_max := mini(area.size.x, int(floor(float(area.size.y) * aspect)))
+	# the column is what the full-height backglass leaves, times [pup] column_scale (2: twice as wide, so the DMD and the
+	# topper are twice as wide; the backglass gives that width up and stays 4:3, a smaller one)
+	var col_w := mini(int(float(area.size.x - back_max) * float(setting("pup", "column_scale", 2.0))), int(area.size.x * 0.6))
+	var back_w := area.size.x - col_w
+	if back_w > back_max:
+		back_w = back_max
+		col_w = area.size.x - back_w
 	if col_w < area.size.x / 5:
 		_stack_windows()
 		return
