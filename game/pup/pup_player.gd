@@ -344,17 +344,22 @@ func _split_windows() -> void:
 
 
 ## The default split: the backglass over the DMD in a left column of `[pup] split_left` (0.5) of the monitor's width, the topper
-## filling the right column from top to bottom, so the whole screen is used: on 1920x1080 the backglass is 960x720, the DMD
-## 960x360 under it and the topper 960x1080. False (nothing placed) when the DMD would get under a seventh of the height.
+## in the right column from top to bottom (its videos fitted, not cropped), so the whole screen is used. The DMD keeps its own
+## shape (4:1: its picture and frame are drawn for it, a taller window would only add margins) and the backglass takes the
+## height that is left, its videos fitted: on 1920x1080 the DMD is 960x240 at the bottom, the backglass 960x840 over it and the
+## topper 960x1080. False (nothing placed) when the backglass would get under 40 % of the height.
 func _split_left_right(back: Window, column: Array[Window], area: Rect2i) -> bool:
 	var left_w := int(area.size.x * clampf(float(setting("pup", "split_left", 0.5)), 0.3, 0.7))
-	var aspect := float(back.size.x) / maxf(1.0, float(back.size.y))
-	var back_h := int(round(float(left_w) / aspect))
-	var dmd_h := area.size.y - back_h
-	if dmd_h < area.size.y / 7:
-		return false
 	var dmd: Window = column[0]
 	var topper: Window = column[1]
+	var dmd_shape := float(dmd.size.y) / maxf(1.0, float(dmd.size.x))
+	var fixed := _dmd_size_arg()
+	if fixed != Vector2i.ZERO:
+		dmd_shape = float(fixed.y) / maxf(1.0, float(fixed.x))
+	var dmd_h := int(round(float(left_w) * dmd_shape))
+	var back_h := area.size.y - dmd_h
+	if back_h < int(area.size.y * 0.4):
+		return false
 	for w: Window in [back, dmd, topper]:
 		w.borderless = true
 	back.size = Vector2i(left_w, back_h)
