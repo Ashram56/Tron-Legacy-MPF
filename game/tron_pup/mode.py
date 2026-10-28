@@ -20,6 +20,7 @@ from tron_pup import engine, pupfiles, settings
 log = logging.getLogger("tron.pup")
 BCP_CLIENT = "local_display"
 HELLO_TRIES, HELLO_SECONDS = 15, 2.0
+MUSIC_SCREEN = 15                       # PuP screen 15: the OST (no window)
 
 
 def _platform_remote():
@@ -67,6 +68,7 @@ class PupMode(Mode):
         events.add_handler("mode_attract_started", self._attract_start)
         events.add_handler("mode_attract_stopped", self._attract_stop)
         self._start_remote(pack)
+        events.add_handler("tron_service_entered", self._service_entered)
         log.info("PuP: %d events, %d switches; rows without a mapping: %s", len(self.engine.events),
                  len(self.engine.switches), ", ".join(str(r.id) for r in self.engine.unmapped) or "none")
 
@@ -145,6 +147,11 @@ class PupMode(Mode):
         if seconds > 0:
             self._attract = self.machine.clock.schedule_interval(
                 lambda: self.machine.events.post("pup_attract_cycle"), seconds)
+
+    def _service_entered(self, **kwargs):
+        """The service menu ended the game without its game over: no trigger stops the OST, so stop it here."""
+        if self.ready:
+            self.send({"screen": MUSIC_SCREEN, "mode": "stopall"})
 
     def _attract_stop(self, **kwargs):
         if self._attract:

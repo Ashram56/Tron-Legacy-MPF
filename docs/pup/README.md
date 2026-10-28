@@ -37,14 +37,14 @@ change the captures or the trigger rows: run `python scripts/pup/pup_captures.py
 lines it flags in `game/tron_pup/trigger_map.yaml`.
 
 **Linux and Windows: GDE GoZen.** On Linux (x86_64 and arm64) and Windows (x86_64), `setup.py` installs GDE
-GoZen (`pup_addons/gde_gozen`, copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's
+GoZen (`the platform's addons/gde_gozen (MPF-Godot-Packaging)`, copied to the git-ignored `game/addons/gde_gozen/`), an FFmpeg add-on: the pack's
 mp4s play as they are and nothing is converted. Both platforms share the same player (`game/pup/gozen_player.gd`,
 GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV12 upload). The GPU decodes:
 - **Windows**: Direct3D 11 Video, else DXVA2, built into FFmpeg (NVIDIA, AMD and Intel GPUs, nothing to install).
   Godot's log says `GoZen: hardware decoding h264 (d3d11va)` for each video, or that the GPU cannot decode it
   and software is used. `GOZEN_HWDEC=0` forces software decoding, `GOZEN_HWDEC=dxva2` asks for DXVA2 only.
 - **Jetson** (JetPack 5 or 6): the hardware decoder once libnvmpi is installed (the Linux install line does it,
-  or `scripts/install/install_jetson_hwdec.sh`, see `pup_addons/gde_gozen/README.md`, and [jetson/README.md](../jetson/README.md)
+  or `scripts/install/install_jetson_hwdec.sh`, see `the platform's addons/gde_gozen (MPF-Godot-Packaging)/README.md`, and [jetson/README.md](../jetson/README.md)
   for the fixes it needs); other Linux PCs decode in software.
 - **Raspberry Pi 4** (Raspberry Pi kernel, `bcm2835-codec-decode` at `/dev/video10`): FFmpeg's `h264_v4l2m2m` after the
   Jetson's, tried only with `GOZEN_HWDEC=1` (`gozen_player.gd`; software if it fails to open). Needs a `libgozen`
