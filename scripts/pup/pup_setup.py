@@ -2,8 +2,7 @@
 """The PuP Pack part of the workspace: setup.py and run.py call it, or run it on its own.
 
     python scripts/pup/pup_setup.py            # pup_pack submodule, an ffmpeg with Theora, the converted media
-                                           # (Linux and Windows: GDE GoZen, macOS and Windows' fallback:
-                                           # the native_video add-on, which play the mp4s as they are)
+                                           # (Linux, Windows and macOS: GDE GoZen plays the mp4s as they are)
     python scripts/pup/pup_setup.py --status   # one line: is the PuP on, and if not why
     python scripts/pup/pup_setup.py --pup-zip PACK.zip   # the pack from a zip (a file or an https URL) instead of
                                                      # the pup_pack submodule; TRON_PUP_ZIP=PACK.zip does the
@@ -45,11 +44,7 @@ def status():
     return True, "PuP on: {} windows, {}".format(screens, music)
 
 
-NATIVE_SRC = os.path.join(tc.ROOT, "pup_addons", "native_video")
-NATIVE_DST = os.path.join(tc.GAME, "addons", "native_video")
-NATIVE_MIN_GODOT = (4, 6)           # native_video.gdextension compatibility_minimum
-
-
+GOZEN_DST = os.path.join(tc.GAME, "addons", "gde_gozen")
 
 
 def gozen_src():
@@ -58,33 +53,17 @@ def gozen_src():
     return mpf_platform.addon("gde_gozen")
 
 
-GOZEN_DST = os.path.join(tc.GAME, "addons", "gde_gozen")
-
-
-def native_video(os_name=None):
-    """True where setup installs the native_video add-on (macOS, and Windows as the fallback to GoZen that
-    [pup] video_player="native" or TRON_VIDEO_PLAYER=native picks; Godot 4.6+): Godot's own player only does
-    Theora, so elsewhere the videos are converted (or played by GoZen, gozen()). TRON_NATIVE_VIDEO=0 leaves it out."""
-    godot = tuple(int(n) for n in tc.GODOT_VERSION.split(".")[:2])
-    if os.environ.get("TRON_NATIVE_VIDEO") == "0":
-        return False
-    return tc.host_os(os_name) in ("windows", "macos") and godot >= NATIVE_MIN_GODOT
-
 
 def gozen(os_name=None, arch=None):
-    """True where the PuP plays the pack's mp4s with GDE GoZen (Linux x86_64 and arm64, Windows x86_64: FFmpeg,
+    """True where the PuP plays the pack's mp4s with GDE GoZen (Linux x86_64 and arm64, Windows x86_64, macOS: FFmpeg,
     decoding on the GPU: the Jetson's decoder when libnvmpi is installed, Direct3D 11 Video / DXVA2 on Windows,
-    see the platform's addons/gde_gozen/README.md). TRON_GOZEN=0 leaves it out (Windows: native_video, Linux: Theora)."""
+    see the platform's addons/gde_gozen/README.md). TRON_GOZEN=0 leaves it out (then the videos are converted to Theora)."""
     if os.environ.get("TRON_GOZEN", "").strip().lower() in ("0", "false", "no", "off"):
         return False
     host, cpu = tc.host_os(os_name), tc.host_arch(arch)
+    if host == "macos":                # the platform's universal dylib (software decoding)
+        return True
     return (host == "linux" and cpu in ("x86_64", "arm64")) or (host == "windows" and cpu == "x86_64")
-
-
-def install_native_video():
-    """Copies pup_addons/native_video (the build with the gdzig heap fix, see its FIX.md) to game/addons/."""
-    say("   native_video add-on -> game/addons/native_video (the pack's mp4s play without conversion)")
-    fsutil.copy_tree(NATIVE_SRC, NATIVE_DST)
 
 
 def install_gozen():
@@ -227,19 +206,15 @@ def setup(py=None, dry=False):
     if dry:
         return 0
     ensure_ffmpeg(py)
-    native = native_video() or gozen()
-    # Windows gets both: GoZen plays, native_video is one setting away (game/pup/pup_player.gd)
+    native = gozen()
     # a bundle (bundle.json, docs/bundle.md) carries the add-on of its own platform in game/addons and has no
-    # pup_addons/ to copy from: keep what is there
+    # platform to copy from: keep what is there
     bundled = os.path.exists(os.path.join(tc.ROOT, "bundle.json"))
-    for wanted, install, addon in ((gozen(), install_gozen, GOZEN_DST),
-                                   (native_video(), install_native_video, NATIVE_DST)):
-        if bundled:
-            continue
-        if wanted:
-            install()
-        elif os.path.isdir(addon):        # a loaded add-on would play the mp4s instead of the conversions
-            fsutil.remove_dir(addon)
+    if not bundled:
+        if native:
+            install_gozen()
+        elif os.path.isdir(GOZEN_DST):    # a loaded add-on would play the mp4s instead of the conversions
+            fsutil.remove_dir(GOZEN_DST)
     if not native:
         say("   converting the pack's videos (the first time takes a while; later runs only redo changed files)")
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),

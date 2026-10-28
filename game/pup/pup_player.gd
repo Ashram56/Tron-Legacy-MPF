@@ -37,11 +37,9 @@ var _last := {}                     # playlist -> last pick (random playlists)
 var _audio_cache := {}
 var _audio_lock := Mutex.new()      # _audio_cache: the music preload fills it on a worker (_preload_audio())
 ## Which add-on plays the pack's mp4s without conversion (_pick_video_player()), else Godot plays the Theora copies:
-## - GDE GoZen (Linux and Windows, the platform's addons/gde_gozen (MPF-Godot-Packaging)): FFmpeg, with the GPU decoding (the Jetson's decoder when
-##   libnvmpi is installed; Direct3D 11 Video / DXVA2 on Windows); the screens then use game/pup/gozen_player.gd;
-## - the native_video add-on (macOS, and Windows' fallback, pup_addons/native_video).
-## [pup] video_player (or TRON_VIDEO_PLAYER) = "native" picks native_video where both are installed (Windows).
-var native_video := false
+## - GDE GoZen (Linux, Windows and macOS, the platform's addons/gde_gozen (MPF-Godot-Packaging)): FFmpeg, with the GPU
+##   decoding (the Jetson's decoder when libnvmpi is installed; Direct3D 11 Video / DXVA2 on Windows; software on macOS);
+##   the screens then use game/pup/gozen_player.gd.
 var gozen := false
 
 
@@ -100,15 +98,10 @@ func _load_config() -> bool:
 
 
 func _pick_video_player() -> void:
-	var has_native := ClassDB.class_exists("NativeVideoStream")
 	var has_gozen := ClassDB.class_exists("GoZenVideo") \
 		and ResourceLoader.exists("res://addons/gde_gozen/video_playback.gd")
-	var want := OS.get_environment("TRON_VIDEO_PLAYER").strip_edges().to_lower()
-	if want.is_empty():
-		want = str(setting("pup", "video_player", "")).strip_edges().to_lower()
-	gozen = has_gozen and not (want == "native" and has_native)
-	native_video = has_native and not gozen
-	print("PuP video player: %s" % ("GDE GoZen" if gozen else ("native_video" if native_video else "Godot (Theora)")))
+	gozen = has_gozen
+	print("PuP video player: %s" % ("GDE GoZen" if gozen else "Godot (Theora)"))
 
 
 func setting(section: String, key: String, default = null):
@@ -742,20 +735,19 @@ func pick(playlist: String, file: String) -> String:
 	return media_path(key)
 
 
-## Where a pack file plays from: the pack's own video with the native_video add-on or GoZen, else the converted copy.
+## Where a pack file plays from: the pack's own video with GoZen, else the converted copy.
 func media_path(key: String) -> String:
 	var entry: Dictionary = manifest[key]
-	if (native_video or gozen) and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
+	if gozen and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
 		return pack_dir.path_join(key)
 	if not entry.has("out"):
-		push_warning("PuP: %s was not converted (gen_pup.py --native) and no video add-on is loaded" % key)
+		push_warning("PuP: %s was not converted (gen_pup.py --native) and GoZen is not loaded" % key)
 		return ""
 	return media_dir.path_join(entry.out)
 
 
 func video_stream(path: String) -> VideoStream:
-	var stream: VideoStream = ClassDB.instantiate("NativeVideoStream") if path.get_extension().to_lower() != "ogv" \
-		else VideoStreamTheora.new()
+	var stream: VideoStream = VideoStreamTheora.new()
 	stream.file = path
 	return stream
 

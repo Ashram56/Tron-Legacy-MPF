@@ -56,6 +56,3 @@ listed here for the record; the next upstream sync brings them back without conf
 Platform for the GoZen and jetson-ffmpeg reports: Jetson AGX Orin Developer Kit, L4T R36.4.3 (JetPack 6.2), and
 Jetson Xavier NX Developer Kit, L4T R35.6.4 (JetPack 5.1.4). The close crash did not show on the Xavier NX in 100
 runs; the other decoder bugs are on both.
-
-The `native_video` heap overrun is already reported upstream
-([claytercek/godot-native-video#26](https://github.com/claytercek/godot-native-video/issues/26)).
