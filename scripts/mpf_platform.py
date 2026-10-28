@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Where the platform is. The platform (MPF-Godot-Packaging) is what every game shares: the binary add-ons (GDE GoZen with
-its patches and builds, native_video, the RGB DMD output), the MPF/Godot toolchain, the setup page. This game takes them
+its patches and builds, the RGB DMD output), the MPF/Godot toolchain, the setup page. This game takes them
 from there instead of keeping copies.
 
 MPF-Godot-Packaging: $MPF_GODOT_PACKAGING (or $MPF_PLATFORM_DIR on a machine installed by the setup page), else a folder
@@ -39,13 +39,13 @@ def ensure():
     dest = os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot-Packaging")
     print("   cloning the platform (MPF-Godot-Packaging) -> " + dest, flush=True)
     if subprocess.call(["git", "clone", "--depth", "1", URL, dest]) != 0 or not os.path.isfile(os.path.join(dest, MARK)):
-        raise SystemExit("the platform (MPF-Godot-Packaging: GoZen, native_video, the DMD output) is missing and could not be "
+        raise SystemExit("the platform (MPF-Godot-Packaging: GoZen, the DMD output) is missing and could not be "
                          "cloned: clone {} beside this repository or set MPF_GODOT_PACKAGING".format(URL))
     return dest
 
 
 def addon(name):
-    """Path of the platform's add-on `name` (gde_gozen, native_video, dmd_out)."""
+    """Path of the platform's add-on `name` (gde_gozen, dmd_out)."""
     return os.path.join(ensure(), "addons", name)
 
 

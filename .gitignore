@@ -22,7 +22,6 @@ game/fonts/
 # PuP Pack: converted media (scripts/pup/gen_pup.py) and the per-cabinet screen settings
 /pup_media/
 game/pup.local.cfg
-game/addons/native_video/
 game/addons/gde_gozen/
 .cache/
 # Godot: the .uid next to each script and shader is committed (other files refer to it); .import files are

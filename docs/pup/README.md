@@ -86,19 +86,13 @@ GoZen's `video_playback.gd` with the frame queue and worker-thread opens, the NV
 then in software (`GOZEN_HWDEC=0`), and prints per video `GPU (NV12)` or `software` and how many times faster
 than real time it decodes (`game/tools/gozen_check.gd`).
 
-`TRON_GOZEN=0 python scripts/setup.py` leaves GoZen out (Linux: back to Theora; Windows: native_video). The
-binaries are rebuilt from pinned sources with `scripts/build_gozen.sh` (Docker).
+`TRON_GOZEN=0 python scripts/setup.py` leaves GoZen out (back to the converted Theora videos). The binaries are the
+platform's, rebuilt there from pinned sources (MPF-Godot-Packaging `build/gozen/`).
 
-**macOS, and Windows' fallback: native_video.** On macOS, and on Windows next to GoZen, `setup.py` installs the
-`native_video` add-on (`pup_addons/native_video`, copied to the git-ignored `game/addons/native_video/`), which
-plays the mp4s with the OS's decoder (AVFoundation, Media Foundation). On Windows it plays only when picked:
-`video_player="native"` under `[pup]` in `game/pup.local.cfg`, or `TRON_VIDEO_PLAYER=native` for one run; the
-log says `PuP video player: native_video` (or `GDE GoZen`). This build carries a fix for a heap overrun in the
-upstream release ([issue 26](https://github.com/claytercek/godot-native-video/issues/26),
-`pup_addons/native_video_build/`), so do not replace it with an upstream zip: the macOS dylibs come from the
-`native_video macOS build` workflow, the Windows DLLs from `pup_addons/native_video/FIX.md`. The add-on needs
-Godot 4.6+ and a RenderingDevice renderer (the game uses Mobile). `TRON_NATIVE_VIDEO=0` in the environment for
-`setup.py` leaves it out; with no add-on loaded the PuP plays the converted Theora videos.
+**macOS.** The same GoZen, a universal dylib (arm64 and Intel) with software decoding, built by the platform's
+`gozen_macos` workflow. There is no other video add-on: the `native_video` add-on (AVFoundation, Media Foundation) was
+removed on 2026-10-28, GoZen being the cross-platform player. The log says `PuP video player: GDE GoZen` (or `Godot
+(Theora)` with no add-on loaded, which plays the converted videos).
 
 ## The three screens
 
@@ -262,8 +256,7 @@ JSON files and render them: `godot --path game -s res://tools/service_backglass_
 
 The PuP touches the game in a few places only: the `pup.yaml` include in `game/config/config.yaml`, the `Pup`
 autoload in `game/project.godot`, the `pup_pack` submodule in `.gitmodules`, one `pup_setup` call each in
-`scripts/setup.py` and `scripts/run.py`; everything else is in its own files. It needs Godot 4.6+ (the native
-video add-on). What can need a hand after a game change:
+`scripts/setup.py` and `scripts/run.py`; everything else is in its own files. It needs Godot 4.6+. What can need a hand after a game change:
 
 - a DMD animation or effect number changed: `scripts/pup/pup_captures.py` marks the captures whose mapped effect no
   longer draws them (**check** in `docs/pup/captures.md`); fix those lines of `trigger_map.yaml`;

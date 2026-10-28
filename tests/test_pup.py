@@ -35,20 +35,6 @@ class TestPupFiles(unittest.TestCase):
 
 
 class TestSetup(unittest.TestCase):
-    def test_native_video_on_windows_and_macos(self):
-        sys.path.insert(0, os.path.join(ROOT, "scripts"))
-        from pup import pup_setup
-        with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": ""}):
-            self.assertTrue(pup_setup.native_video("windows"))
-            self.assertTrue(pup_setup.native_video("macos"))
-            self.assertFalse(pup_setup.native_video("linux"))
-        with mock.patch.dict(os.environ, {"TRON_NATIVE_VIDEO": "0"}):
-            self.assertFalse(pup_setup.native_video("windows"))
-        for name in ("native_video.gdextension", "native_video.windows.release.x86_64.dll",
-                     "native_video.windows.debug.x86_64.dll", "libnative_video.macos.debug.dylib",
-                     "libnative_video.macos.release.dylib"):
-            self.assertTrue(os.path.exists(os.path.join(pup_setup.NATIVE_SRC, name)), name)
-
     def test_gozen_on_linux_and_windows(self):
         sys.path.insert(0, os.path.join(ROOT, "scripts"))
         from pup import pup_setup
@@ -57,7 +43,7 @@ class TestSetup(unittest.TestCase):
             self.assertTrue(pup_setup.gozen("linux", "x86_64"))
             self.assertTrue(pup_setup.gozen("windows", "x86_64"))
             self.assertFalse(pup_setup.gozen("windows", "arm64"))
-            self.assertFalse(pup_setup.gozen("macos", "arm64"))
+            self.assertTrue(pup_setup.gozen("macos", "arm64"))
         with mock.patch.dict(os.environ, {"TRON_GOZEN": "0"}):
             self.assertFalse(pup_setup.gozen("linux", "arm64"))
             self.assertFalse(pup_setup.gozen("windows", "x86_64"))
@@ -71,13 +57,9 @@ class TestSetup(unittest.TestCase):
             for key in ("windows.debug.x86_64", "windows.release.x86_64", "linux.release.arm64"):
                 self.assertIn(key, ext)
 
-    def test_video_player_setting(self):
-        import configparser
-        cfg = configparser.ConfigParser(inline_comment_prefixes=(";",))
-        cfg.read(os.path.join(GAME, "pup.cfg"))
-        self.assertEqual('"gozen"', cfg["pup"]["video_player"])   # Windows: GoZen first, native_video fallback
+    def test_video_player_is_gozen_only(self):
         with open(os.path.join(GAME, "pup", "pup_player.gd")) as f:
-            self.assertIn("TRON_VIDEO_PLAYER", f.read())
+            self.assertNotIn("native_video", f.read())
         with open(os.path.join(GAME, "pup", "gozen_player.gd")) as f:   # the Jetson check is Linux only
             self.assertIn('OS.get_name() != "Linux"', f.read())
 

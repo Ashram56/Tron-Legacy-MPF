@@ -205,9 +205,6 @@ Tron-Legacy-MPF/
 │   ├── tron_pup/            (PuP) the trigger engine in MPF; trigger_map.yaml maps pack triggers to game effects
 │   ├── pup.cfg              (PuP) screen settings, every key documented; yours go in pup.local.cfg
 │   └── gmc.cfg              keyboard and window settings of the Godot media controller
-├── pup_addons/              (PuP) native_video add-on (GoZen is the platform's: MPF-Godot-Packaging) setup.py copies into game/addons/
-│   ├── native_video/        Windows and macOS: plays the pack's mp4s
-│   ├── native_video_build/  the heap fix the macOS build applies
 ├── scripts/                 setup.py (install), run.py (play), the generators and checks
 │   ├── pup/                 (PuP) pup_setup (called by setup.py and run.py), gen_pup (media conversion),
 │   │                        pup_captures (trigger map check), pup_check (screens check)
@@ -221,7 +218,7 @@ Tron-Legacy-MPF/
 │   ├── jetson/              NVIDIA Jetson set-up and video fixes, Xavier NX results
 │   └── upstream_issues/     reports for Godot, GoZen and jetson-ffmpeg, with their test programs
 ├── docker/                  optional Docker setup for Linux hosts
-└── .github/workflows/       CI tests on Windows, macOS and Linux; the macOS native_video build
+└── .github/workflows/       CI tests on Windows, macOS and Linux
 ```
 
 Setup and play create these, all ignored by Git: `.venv/` (Python), `tools/` (Godot), `pup_media/` (the converted
