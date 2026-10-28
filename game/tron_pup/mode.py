@@ -11,14 +11,28 @@ its PuP player has its windows and media (game/pup/pup_player.gd); only then:
 import asyncio
 import logging
 import os
+import sys
 
 from mpf.core.mode import Mode
 
-from tron_pup import engine, pupfiles, remote, settings
+from tron_pup import engine, pupfiles, settings
 
 log = logging.getLogger("tron.pup")
 BCP_CLIENT = "local_display"
 HELLO_TRIES, HELLO_SECONDS = 15, 2.0
+
+
+def _platform_remote():
+    """The platform's remote PuP server (MPF-Godot-Packaging, mpf_godot/pup_remote/server.py), found as scripts/mpf_platform.py does."""
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import mpf_platform
+    where = mpf_platform.ensure()
+    if where not in sys.path:
+        sys.path.insert(0, where)
+    from mpf_godot.pup_remote import server
+    return server
 
 
 class PupMode(Mode):
@@ -73,13 +87,18 @@ class PupMode(Mode):
     # ------------------------------------------------------------------ remote screens
 
     def _start_remote(self, pack):
-        """[remote] enabled: the PuP commands also go to remote displays (game/tron_pup/remote.py)."""
+        """[remote] enabled: the PuP commands also go to remote displays (the platform's pup_remote server)."""
         opts = self.cfg.get("remote", {})
         if not opts.get("enabled", False):
             return
+        try:
+            remote = _platform_remote()
+        except (ImportError, SystemExit) as e:
+            log.warning("remote PuP screens: the platform (MPF-Godot-Packaging) is missing (%s); no remote displays", e)
+            return
         self.remote = remote.RemoteServer(
             pupfiles.load_screens(pack), pupfiles.load_playlists(pack), game=os.path.basename(pack),
-            host=str(opts.get("listen", "0.0.0.0")), port=int(opts.get("port", remote.PORT)),
+            host=str(opts.get("listen", "0.0.0.0")), port=int(opts.get("port", 5052)),
             discovery=bool(opts.get("discovery", True)))
         task = asyncio.ensure_future(self.remote.start(), loop=self.machine.clock.loop)
         task.add_done_callback(self._remote_started)

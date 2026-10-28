@@ -2,7 +2,7 @@
 """The remote topper's videos: the PuP Pack's topper playlists, copied for the Raspberry Pi and sent to it.
 
     python scripts/pup/topper_media.py                        # pup_media/topper/: the files and manifest.json
-    python scripts/pup/topper_media.py --push pi@tron-topper.local   # ... and copied to the Pi (rsync or scp, SSH)
+    python scripts/pup/topper_media.py --push pi@pup-topper.local   # ... and copied to the Pi (rsync or scp, SSH)
     python scripts/pup/topper_media.py --dry-run              # what would be copied or re-encoded
 
 The topper's playlists are the ones its PuP screens (13 and 14) play: their default backgrounds (screens.pup) and
@@ -31,7 +31,7 @@ MAX_W, MAX_H, MAX_FPS = 1920, 1080, 30.5
 STREAM = re.compile(r"Stream #\S+.*?Video: (\w+)(?: \(([^)]*)\))?[^,]*, (\w+)")
 SIZE = re.compile(r"Video:.*?, (\d{2,5})x(\d{2,5})")
 FPS = re.compile(r"Video:.*?, ([\d.]+) fps")
-DEST = "tron-topper/media"                     # on the Pi, in the user's home
+DEST = "pup-topper/media"                     # on the Pi, in the user's home
 
 
 def topper_playlists(pack, screens=SCREENS):
