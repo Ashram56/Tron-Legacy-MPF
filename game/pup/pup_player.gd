@@ -169,8 +169,11 @@ func _build() -> void:
 	_make_dmd_window()
 	if bool(setting("pup", "third_screen", true)):
 		_make_layered_window("topper", defaults, video_volume)
-	if str(setting("pup", "layout", "stack")) == "stack":
-		_stack_windows()
+	match str(setting("pup", "layout", "split")):
+		"split":
+			_split_windows()
+		"stack":
+			_stack_windows()
 	_layout_dmd()
 	if _dmd_area:
 		_dmd_area.resized.connect(_layout_dmd)
@@ -186,8 +189,11 @@ func _build() -> void:
 		_preload_audio()
 	for n in screens:
 		screens[n].start_background()
+	if bool(setting("pup", "hide_cursor", true)):
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	if bool(setting("dmd", "hide_main_window", true)):
 		get_tree().root.mode = Window.MODE_MINIMIZED
+		_check_main_window_hidden.call_deferred()
 	_vsync_one_window()
 	var placed := []
 	for section in windows:
@@ -250,6 +256,82 @@ func _make_window(section: String) -> Window:
 		w.content_scale_size = Vector2i(int(render_size[0]), int(render_size[1]))
 	windows[section] = w
 	return w
+
+
+## A bare X server (no window manager, the x86 and Pi images) ignores "minimised": the main window, which stays the source of the
+## DMD picture and so cannot be closed or shrunk, is then moved far outside every monitor. Checked once, a second after start.
+func _check_main_window_hidden() -> void:
+	await get_tree().create_timer(1.0).timeout
+	var root := get_tree().root
+	if root.mode == Window.MODE_MINIMIZED:
+		return
+	root.position = Vector2i(-16000, -16000)
+	print("PuP: the main window is not minimised by this window manager, moved off screen")
+
+
+## [pup] layout="split" (the default): the backglass at the left, as large as the monitor's height allows (it keeps its own
+## shape, 4:3 by default), and the DMD over the topper in the column that is left at the right. All borderless, so the
+## sizes are exact: on 1920x1080 the backglass is 1440x1080 and the column 480 wide. A monitor that leaves the column less than
+## a fifth of its width, or a fullscreen backglass, falls back to "stack". A DMD or topper whose `screen` is another monitor
+## fills that monitor instead of joining the column.
+func _split_windows() -> void:
+	var back: Window = windows.get("backglass")
+	var screen := clampi(int(setting("backglass", "screen", 0)), 0, DisplayServer.get_screen_count() - 1)
+	var column: Array[Window] = []
+	for section in ["dmd", "topper"]:
+		if not windows.has(section) or windows[section].mode == Window.MODE_FULLSCREEN:
+			continue
+		var own := clampi(int(setting(section, "screen", 0)), 0, DisplayServer.get_screen_count() - 1)
+		if own != screen:
+			# [dmd] screen / [topper] screen on another monitor: the window fills that monitor
+			windows[section].borderless = true
+			windows[section].current_screen = own
+			windows[section].mode = Window.MODE_FULLSCREEN
+		else:
+			column.append(windows[section])
+	if back == null or back.mode == Window.MODE_FULLSCREEN or column.is_empty():
+		if back != null and back.mode != Window.MODE_FULLSCREEN and not column.is_empty():
+			_stack_windows()
+		elif back != null and back.mode != Window.MODE_FULLSCREEN:
+			# DMD and topper are on other monitors: the backglass alone, as large as its monitor allows
+			var a := DisplayServer.screen_get_usable_rect(screen)
+			var asp := float(back.size.x) / maxf(1.0, float(back.size.y))
+			back.borderless = true
+			back.size = Vector2i(mini(a.size.x, int(floor(a.size.y * asp))), int(round(minf(a.size.y, a.size.x / asp))))
+			back.position = a.position
+		else:
+			_stack_windows()
+		return
+	var area := DisplayServer.screen_get_usable_rect(screen)
+	if area.size.x <= 0 or area.size.y <= 0:
+		return
+	var aspect := float(back.size.x) / maxf(1.0, float(back.size.y))
+	var back_w := mini(area.size.x, int(floor(float(area.size.y) * aspect)))
+	var col_w := area.size.x - back_w
+	if col_w < area.size.x / 5:
+		_stack_windows()
+		return
+	back.borderless = true
+	back.size = Vector2i(back_w, int(round(float(back_w) / aspect)))
+	back.position = area.position
+	# the column: each window keeps its own shape (the DMD its --dmd-size shape when given); when both do not fit the
+	# height, both shrink together
+	var fixed := _dmd_size_arg()
+	var shapes := []
+	var total_h := 0.0
+	for w in column:
+		var src := fixed if (w == windows.get("dmd") and fixed != Vector2i.ZERO) else w.size
+		var h := float(col_w) * float(src.y) / maxf(1.0, float(src.x))
+		shapes.append(h)
+		total_h += h
+	var k := minf(1.0, float(area.size.y) / maxf(1.0, total_h))
+	var y := area.position.y
+	for i in column.size():
+		var w := column[i]
+		w.borderless = true
+		w.size = Vector2i(int(floor(col_w * k)), int(round(shapes[i] * k)))
+		w.position = Vector2i(area.position.x + back_w, y)
+		y += w.size.y
 
 
 ## [pup] layout="stack": backglass, DMD and topper one under the other at the left of the backglass's monitor,

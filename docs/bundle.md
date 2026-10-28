@@ -168,7 +168,7 @@ python3 scripts/package/bundle_options.py unset dmd.text_glow
 python3 scripts/package/bundle_options.py run-args                   # the run.py flags the saved values make
 ```
 
-Every value is validated before anything is written; one bad value writes nothing. The 25 options:
+Every value is validated before anything is written; one bad value writes nothing. The options:
 
 | Group | Options | Stored in |
 |---|---|---|
