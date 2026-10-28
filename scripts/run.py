@@ -32,6 +32,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dmd_out  # noqa: E402  (the platform's RGB DMD output)
 import gmc_patch  # noqa: E402
 from pup import pup_setup  # noqa: E402  (PuP Pack: docs/pup/README.md)
 import toolchain as tc  # noqa: E402
@@ -200,23 +201,6 @@ def keep_screen_on():
         subprocess.run(["xset", "s", "off", "-dpms"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def zedmd_feed(python=False):
-    """Path of the native ZeDMD feeder (game/native/zedmd_feed), built with the C compiler when missing, or None when it
-    cannot be had or finds no ZeDMD (--probe): the game then uses the Python platform (game/tron/zedmd_native.py)."""
-    if python:
-        return None
-    src = os.path.join(tc.GAME, "native", "zedmd_feed", "zedmd_feed.c")
-    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed" + (".exe" if os.name == "nt" else ""))
-    if not os.path.exists(exe) or os.path.getmtime(exe) < os.path.getmtime(src):
-        cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
-        if not cc or os.name == "nt":
-            return None
-        os.makedirs(os.path.dirname(exe), exist_ok=True)
-        if subprocess.call([cc, "-O2", "-o", exe, src], stderr=subprocess.DEVNULL) != 0:
-            return None
-    return exe if subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
-
-
 def user_arg(gargs, arg):
     """gargs plus arg after Godot's "--" (the args game scripts read with OS.get_cmdline_user_args)."""
     return list(gargs) + [arg] if "--" in gargs else list(gargs) + ["--", arg]
@@ -332,7 +316,9 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         gargs = user_arg(gargs, "--proc-dmd")
     if pin2dmd:                         # "" = the default colour; also keeps the DMD classic (128x32)
         gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))
-    feed = zedmd_feed(zedmd_python) if zedmd else None
+    if pin2dmd or zedmd:                # the platform's add-on and overlays (scripts/dmd_out.py), classic 128x32
+        dmd_env = dmd_out.prepare("zedmd" if zedmd else "pin2dmd")
+    feed = dmd_out.feeder(zedmd_python) if zedmd else None
     if zedmd:                           # the same frames: to the native feeder, else through MPF's platform
         gargs = user_arg(gargs, "--zedmd" + ("=" + zedmd if zedmd != "default" else ""))
         if feed:
@@ -346,6 +332,8 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
+    if pin2dmd or zedmd:
+        env.update(dmd_env)
     if scenario:
         env["TRON_LIVE_SCENARIO"] = scenario_path(scenario)
     if trace:
@@ -414,12 +402,15 @@ def main(argv=None):
                    help="drive the ramp light tubes on a Pro too (always on with an LE)")
     p.add_argument("--pin2dmd", nargs="?", const="default", metavar="COLOUR",
                    help="also show the DMD on a PIN2DMD (USB; pip install pyusb): classic 128x32 in COLOUR (#RRGGBB, "
-                        "default the original orange); always monochrome. docs/hardware.md, PIN2DMD")
+                        "default the original orange); always monochrome. The output is MPF-Godot-Packaging's "
+                        "(scripts/dmd_out.py). docs/hardware.md, PIN2DMD")
     p.add_argument("--zedmd", nargs="?", const="default", metavar="COLOUR",
                    help="also show the DMD on a ZeDMD (USB serial or Wi-Fi): classic 128x32 in COLOUR (#RRGGBB, "
                         "default the original orange). docs/hardware.md, ZeDMD")
+    p.add_argument("--dmd-out", choices=["auto", "pin2dmd", "zedmd"],
+                   help="the RGB DMD to use; auto asks the platform which one is plugged in (none: the screen only)")
     p.add_argument("--zedmd-python", action="store_true",
-                   help="drive the ZeDMD from MPF's Python platform instead of the native feeder (game/native/zedmd_feed)")
+                   help="drive the ZeDMD from MPF's Python platform instead of the native feeder (the platform's native/zedmd_feed)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
     p.add_argument("--scenario", help="play scenarios/NAME.txt or assets/rules/traces/NAME.txt (or a script file *.txt) in real time "
                                       "(smart_virtual)")
@@ -459,6 +450,13 @@ def main(argv=None):
                         "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
+    if args.dmd_out:
+        device = dmd_out.detect() if args.dmd_out == "auto" else args.dmd_out
+        if device == "pin2dmd" and not args.pin2dmd:
+            args.pin2dmd = "default"
+        elif device == "zedmd" and not args.zedmd:
+            args.zedmd = "default"
+        print("DMD output: " + (device or "none found, the screen only"), flush=True)
     if not args.render_thread and "--render-thread" not in args.godot_args:
         args.godot_args = engine_arg(args.godot_args, "--render-thread", "safe")
     text_ui = args.text_ui
