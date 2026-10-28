@@ -43,10 +43,10 @@ jobs:
       - name: Build the bundles (arm64 for Pi 4 and Jetson, x86_64 for a PC)
         run: |
           set -e
+          [ -d ../MPF-Godot-Packaging ] || git clone --depth 1 https://github.com/Ashram56/MPF-Godot-Packaging ../MPF-Godot-Packaging
           ARGS=""
           if [ -n "${{ inputs.version }}" ]; then ARGS="--version ${{ inputs.version }}"; fi
-          .venv/bin/python scripts/package/build_bundle.py --target arm64 --out dist $ARGS
-          .venv/bin/python scripts/package/build_bundle.py --target x86_64 --out dist $ARGS
+          .venv/bin/python scripts/package/build_bundle.py --target all --out dist $ARGS
           ls -l dist
 
       - name: Check the archives
