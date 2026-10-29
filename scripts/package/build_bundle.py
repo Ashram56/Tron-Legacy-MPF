@@ -74,8 +74,15 @@ def check_workspace():
 
 
 def generated():
-    """GENERATED that exists in the work tree."""
-    return [rel for rel in GENERATED if os.path.exists(os.path.join(ROOT, rel))]
+    """GENERATED that exists in the work tree; pup_media/<id> folder by folder, without the builder's scratch art folder."""
+    out = []
+    for rel in GENERATED:
+        full = os.path.join(ROOT, rel)
+        if rel.startswith("pup_media/") and os.path.isdir(full):
+            out += [rel + "/" + n for n in sorted(os.listdir(full)) if n != "dmd_art"]
+        elif os.path.exists(full):
+            out.append(rel)
+    return out
 
 
 def spec(template):

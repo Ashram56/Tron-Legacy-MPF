@@ -24,15 +24,16 @@ import pup_art  # noqa: E402
 
 DST = os.path.join(pup_art.art_dir(), "letters")      # with the pack (pup_media), linked into game/hd_art/letters
 CLU_DST = os.path.join(ROOT, "game", "hd_art", "letters")      # drawn, no pack: in the game itself
-np = None                    # numpy, loaded by make() (pup_art.use_numpy: a Python without it gets it with pip)
+np = None                    # numpy, loaded by make()
 
 
 def load_numpy():
     global np
     if np is None:
-        if not pup_art.use_numpy():
-            sys.exit("letter_art: numpy is needed")
-        import numpy
+        try:
+            import numpy
+        except ImportError:
+            sys.exit("letter_art: numpy is needed, a build tool: the platform's build_game_package.py installs it (--pup-zip)")
         np = numpy
 WORDS = (("ZUSE", "ZUSE"), ("TRON", "TRON"))
 MARGIN = 14          # pixels kept round the letter (its glow)

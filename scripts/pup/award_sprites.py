@@ -22,15 +22,16 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 import pup_art  # noqa: E402
 
-np = None                    # numpy, loaded when a picture is made (pup_art.use_numpy: a Python without it gets it with pip)
+np = None                    # numpy, loaded when a picture is made
 
 
 def load_numpy():
     global np
     if np is None:
-        if not pup_art.use_numpy():
-            sys.exit("award_sprites: numpy is needed")
-        import numpy
+        try:
+            import numpy
+        except ImportError:
+            sys.exit("award_sprites: numpy is needed, a build tool: the platform's build_game_package.py installs it (--pup-zip)")
         np = numpy
 SRC = os.path.join(ROOT, "game", "media", "dmd", "deff_105")
 DST = os.path.join(ROOT, "game", "hd_art", "deff_105")        # the owner's redrawn icons (tracked) and `import`
