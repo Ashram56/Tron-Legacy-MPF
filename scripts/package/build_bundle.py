@@ -46,6 +46,9 @@ ASSET_DIRS = ["assets/mpf_package/config", "assets/rom_data/io", "assets/rom_dat
 
 ASSET_GLOBS = [("assets/mpf_package/media/dmd", "timing.json")]
 
+# Made from the PuP Pack on the machine by its install (scripts/pup/pup_setup.py): never in a bundle, the pack is the author's
+PACK_MADE = {"dmd_clip"}
+
 NEVER = ["game/data", "game/audits", "game/logs", "game/monitor/logs", "game/monitor/settings.ini",
          "game/monitor/settings.ini.lock", "game/pup.local.cfg", "game/scorbit.local.cfg", "game/options.json",
          "game/.godot"]
@@ -71,6 +74,17 @@ def check_workspace():
         raise SystemExit("the workspace is not ready (run `python scripts/setup.py` first):\n  " + "\n  ".join(problems))
 
 
+def generated():
+    """GENERATED, with game/media as its folders except those the PuP install makes from the pack."""
+    out = []
+    for rel in GENERATED:
+        if rel == "game/media" and os.path.isdir(os.path.join(ROOT, rel)):
+            out += ["game/media/" + d for d in sorted(os.listdir(os.path.join(ROOT, rel))) if d not in PACK_MADE]
+        else:
+            out.append(rel)
+    return out
+
+
 def spec(template):
     """The bundle spec the platform's builder reads (mpf_godot/bundle.py). `template` is the .import text of an HD frame."""
     with open(os.path.join(HERE, "options.json"), encoding="utf-8") as f:
@@ -78,14 +92,15 @@ def spec(template):
     asset_globs = []
     for folder, name in ASSET_GLOBS:
         for d in sorted(os.listdir(os.path.join(ROOT, folder))) if os.path.isdir(os.path.join(ROOT, folder)) else ():
-            asset_globs.append("{}/{}/{}".format(folder, d, name))
+            if os.path.exists(os.path.join(ROOT, folder, d, name)):         # a folder of the assets without one (flow_attract_cycle)
+                asset_globs.append("{}/{}/{}".format(folder, d, name))
     return {
         "id": NAME,
         "name": "Tron Legacy (Stern 2011), MPF recreation",
         "game_dir": "game",
         "git_tracked": ["game"],
         "git_exclude": ["game/addons/"],
-        "copy": ["scripts/" + s for s in SCRIPTS] + GENERATED + ASSET_FILES + ASSET_DIRS + asset_globs,
+        "copy": ["scripts/" + s for s in SCRIPTS] + generated() + ASSET_FILES + ASSET_DIRS + asset_globs,
         "never": NEVER,
         "never_names": ["*.local.cfg", "machine_vars.yaml", "scorbit_device_key.txt"],
         "import_seed": [{"dir": "game/media/dmd_hd", "skip_prefixes": ["solid", "hollow"], "template": template}],

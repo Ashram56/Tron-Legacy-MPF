@@ -207,6 +207,17 @@ class TestBuilder(unittest.TestCase):
         json.dumps(sp)
 
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
+    def test_spec_lists_only_files_that_exist(self):
+        """The platform's builder stops on a listed file that is missing (flow_attract_cycle has no timing.json, 2026-10-29) and
+        the bundle never carries what the PuP install makes from the author's pack (game/media/dmd_clip)."""
+        sp = bb.spec("t")
+        for rel in sp["copy"]:
+            if rel.startswith(("assets/", "scripts/")):
+                self.assertTrue(os.path.exists(os.path.join(ROOT, rel)), rel)
+        self.assertFalse([r for r in sp["copy"] if "dmd_clip" in r and not r.startswith("scripts/")], sp["copy"])
+        self.assertNotIn("game/media", sp["copy"]) if os.path.isdir(os.path.join(ROOT, "game", "media")) else None
+
+    @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_asset_files_exist(self):
         for rel in bb.ASSET_FILES + bb.ASSET_DIRS:
             self.assertTrue(os.path.exists(os.path.join(ROOT, rel)), rel)
