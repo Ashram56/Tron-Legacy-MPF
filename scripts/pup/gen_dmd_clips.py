@@ -25,10 +25,11 @@ import toolchain as tc  # noqa: E402
 
 sys.path.insert(0, tc.GAME)
 from tron_pup import settings  # noqa: E402
+import pup_art  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
 PLAN = os.path.join(HERE, "dmd_clip_plan.json")
-OUT = os.path.join(tc.GAME, "media", "dmd_clip")
+OUT = os.path.join(pup_art.art_dir(), "dmd_clip")      # with the pack (pup_media), linked into game/media/dmd_clip
 SIZE = (1280, 320)
 FPS = 30
 

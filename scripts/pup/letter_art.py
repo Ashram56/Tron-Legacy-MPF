@@ -15,12 +15,25 @@ import subprocess
 import sys
 import tempfile
 
-import numpy as np
 from PIL import Image, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-DST = os.path.join(ROOT, "game", "hd_art", "letters")
+sys.path.insert(0, HERE)
+import pup_art  # noqa: E402
+
+DST = os.path.join(pup_art.art_dir(), "letters")      # with the pack (pup_media), linked into game/hd_art/letters
+CLU_DST = os.path.join(ROOT, "game", "hd_art", "letters")      # drawn, no pack: in the game itself
+np = None                    # numpy, loaded by make() (pup_art.use_numpy: a Python without it gets it with pip)
+
+
+def load_numpy():
+    global np
+    if np is None:
+        if not pup_art.use_numpy():
+            sys.exit("letter_art: numpy is needed")
+        import numpy
+        np = numpy
 WORDS = (("ZUSE", "ZUSE"), ("TRON", "TRON"))
 MARGIN = 14          # pixels kept round the letter (its glow)
 
@@ -53,7 +66,7 @@ def clu_letters():
         "U": [(0.15, 0.0), (0.15, 0.55)] + [(0.5 + 0.35 * math.cos(math.radians(a)), 0.55 + 0.35 * math.sin(math.radians(a)))
                                            for a in range(180, -1, -6)] + [(0.85, 0.55), (0.85, 0.0)],
     }
-    os.makedirs(DST, exist_ok=True)
+    os.makedirs(CLU_DST, exist_ok=True)
     pad = 0.14
 
     def stroke(points, width, colour):
@@ -71,11 +84,12 @@ def clu_letters():
         glow.putalpha(glow.getchannel("A").point(lambda v: int(v * 0.6)))
         img = Image.alpha_composite(glow, stroke(pts, 112, (255, 138, 0, 255)))
         img = Image.alpha_composite(img, stroke(pts, 76, (255, 238, 0, 255)))
-        img.resize((400, 400), Image.LANCZOS).save(os.path.join(DST, "CLU_%s_on.png" % letter))
+        img.resize((400, 400), Image.LANCZOS).save(os.path.join(CLU_DST, "CLU_%s_on.png" % letter))
 
 
 def make(pack, force=False):
     clu_letters()
+    load_numpy()
     sys.path.insert(0, HERE)
     try:
         from gen_dmd_clips import find_ffmpeg      # FFMPEG, the PATH, or imageio-ffmpeg in the venv (macOS has no ffmpeg of its own)
@@ -118,7 +132,7 @@ def make(pack, force=False):
                         canvas.paste(crop, ((width - crop.width) // 2, 0))
                         canvas.save(path)
                     made += 1
-    print("   letter art: %d letters -> game/hd_art/letters/" % made)
+    print("   letter art: %d letters -> %s/" % (made, os.path.relpath(DST, ROOT)))
     return 0
 
 

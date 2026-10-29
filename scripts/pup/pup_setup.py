@@ -23,6 +23,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 import fsutil  # noqa: E402
 import toolchain as tc  # noqa: E402
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pup_art  # noqa: E402
+
 sys.path.insert(0, tc.GAME)
 from tron_pup import settings  # noqa: E402
 
@@ -195,6 +198,7 @@ def setup(py=None, dry=False):
     pack = settings.pack_dir(cfg)
     if not dry:       # the CLU letters need no pack: made before anything here can stop early
         subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "letter_art.py"), "--clu"], cwd=tc.ROOT)
+        pup_art.link(tc.ROOT)
     if pack_zip():
         if pack_from_zip(pack_zip(), pack, dry):
             return 1
@@ -222,14 +226,9 @@ def setup(py=None, dry=False):
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
     say("   " + status()[1])
-    # the HD DMD's effects play the pack's clips behind the live text (scripts/pup/dmd_clip_plan.json): encoded before the Godot import
-    say("   encoding the clips of the HD DMD effects (game/media/dmd_clip/)")
-    subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_dmd_clips.py")], cwd=tc.ROOT)
-    # the mystery award reel's icons from the pack's clips and the topper icons (scripts/pup/award_sprites.py)
-    subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "award_sprites.py"), "clips", pack], cwd=tc.ROOT)
-    # the topper's letters for the ZUSE / TRON effects (scripts/pup/letter_art.py)
-    if subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "letter_art.py"), pack], cwd=tc.ROOT).returncode:
-        say("   the ZUSE / TRON letters could not be made (scripts/pup/letter_art.py above): the HD DMD shows the ROM's dots for them")
+    # the HD DMD's art from the pack: the clips behind the live text (scripts/pup/dmd_clip_plan.json), the ZUSE / TRON letters and award
+    # icons; made into pup_media/<id>/dmd_art, with the pack, and linked into the game (scripts/pup/pup_art.py)
+    pup_art.make(tc.ROOT, py)
     return code
 
 

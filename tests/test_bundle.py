@@ -181,8 +181,9 @@ class TestBuilder(unittest.TestCase):
         """The PuP install runs on the machine from the bundle: each script pup_setup.py launches is in the bundle (the HD DMD's
         clips, letters and award icons were left out once, and the pack then installed without them)."""
         import re
-        text = open(os.path.join(ROOT, "scripts", "pup", "pup_setup.py"), encoding="utf-8").read()
-        launched = set(re.findall(r'"scripts", "pup", "([a-z_]+\.py)"', text))
+        text = "".join(open(os.path.join(ROOT, "scripts", "pup", n), encoding="utf-8").read() for n in ("pup_setup.py", "pup_art.py"))
+        launched = set(re.findall(r'"scripts", "pup", "([a-z_]+\.py)"', text)) | set(re.findall(r'"([a-z_]+\.py)"\)', text))
+        launched -= {"pup_setup.py"}
         self.assertTrue(launched)
         for name in launched:
             self.assertIn("pup/" + name, bb.SCRIPTS)

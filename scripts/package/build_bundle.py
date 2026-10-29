@@ -31,7 +31,7 @@ ROOT = tc.ROOT
 NAME = "tron-legacy-mpf"
 
 SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py", "gmc_patch.py", "pup/__init__.py", "pup/pup_setup.py",
-           "pup/gen_pup.py", "pup/gen_dmd_clips.py", "pup/dmd_clip_plan.json", "pup/letter_art.py", "pup/award_sprites.py",
+           "pup/gen_pup.py", "pup/pup_art.py", "pup/gen_dmd_clips.py", "pup/dmd_clip_plan.json", "pup/letter_art.py", "pup/award_sprites.py",
            "package/__init__.py", "package/start.py", "package/bundle_options.py",
            "package/options.json", "package/board_profile.py", "package/profiles.json"]
 

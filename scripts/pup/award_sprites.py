@@ -15,13 +15,26 @@ make a transparent background can paint on black.
 import os
 import sys
 
-import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, HERE)
+import pup_art  # noqa: E402
+
+np = None                    # numpy, loaded when a picture is made (pup_art.use_numpy: a Python without it gets it with pip)
+
+
+def load_numpy():
+    global np
+    if np is None:
+        if not pup_art.use_numpy():
+            sys.exit("award_sprites: numpy is needed")
+        import numpy
+        np = numpy
 SRC = os.path.join(ROOT, "game", "media", "dmd", "deff_105")
-DST = os.path.join(ROOT, "game", "hd_art", "deff_105")
+DST = os.path.join(ROOT, "game", "hd_art", "deff_105")        # the owner's redrawn icons (tracked) and `import`
+MADE = os.path.join(pup_art.art_dir(), "deff_105")        # icons made from the pack's clips, linked beside them
 NAMES = ("500K", "ADV. GEM", "ADV. CLU", "ADV. ZUSE", "ADV. QUORRA", "ADV. DISC", "ADV. LIGHT CYCLE",
          "ADV. RECOGNIZER", "ADV. SEA OF SIMUL.", "MORE TIME", "LIGHT EXTRA BALL", "LIGHT SPECIAL")
 BLUE = (42, 108, 255)
@@ -36,6 +49,7 @@ picture. The icon is shown very small (about 29x22 millimetres) on a dark screen
 
 
 def export(out):
+    load_numpy()
     os.makedirs(out, exist_ok=True)
     lines = ["# Mystery award icons for Gemini", "",
              "One file per icon: `award_NN_<name>.png` (the ROM's 29x22 dots, 16x, on black, in Tron blue). For each one, send the file with the prompt below (change the name); ask for a 464x352 PNG on pure black. Save the results as `award_NN.png` (NN = 01..12) in one folder and run `python scripts/pup/award_sprites.py import THAT_FOLDER`.",
@@ -92,6 +106,7 @@ def fade_cut_edges(im, share=0.08):
 
 
 def import_dir(src):
+    load_numpy()
     os.makedirs(DST, exist_ok=True)
     n = 0
     for fn in sorted(os.listdir(src)):
@@ -143,10 +158,15 @@ def from_clips(pack, force=False):
     ffmpeg = os.environ.get("FFMPEG") or shutil.which("ffmpeg")
     if not ffmpeg:
         sys.exit("no ffmpeg (set FFMPEG)")
-    os.makedirs(DST, exist_ok=True)
-    icons = os.path.join(ROOT, "game", "media", "dmd_clip")
+    os.makedirs(MADE, exist_ok=True)
+    icons = os.path.join(pup_art.art_dir(), "dmd_clip")
+    todo = [i for i in sorted(CLIP_ART) if force or not any(os.path.exists(os.path.join(d, "award_%02d.png" % i)) for d in (DST, MADE))]
+    if not todo:
+        print("award icons: all there (redrawn by the owner or made before)")
+        return
+    load_numpy()
     for i, spec in sorted(CLIP_ART.items()):
-        if not force and os.path.exists(os.path.join(DST, "award_%02d.png" % i)):
+        if i not in todo:
             continue                 # a redrawn icon (import) or an earlier run stays
         if spec[0] == "icon":
             src = os.path.join(icons, "icon_%s.png" % spec[1])
@@ -165,8 +185,8 @@ def from_clips(pack, force=False):
                 subprocess.run([ffmpeg, "-v", "error", "-y", "-ss", str(spec[2]), "-i", os.path.join(pack, spec[1]), "-frames:v", "1",
                                 "-vf", "crop=%d:%d:%d:%d,scale=%d:%d:flags=lanczos" % (w, h, x, y, SIZE[0], SIZE[1]), png], check=True)
                 im = feather(Image.open(png).convert("RGB"))
-        im.save(os.path.join(DST, "award_%02d.png" % i))
-    print(len(CLIP_ART), "icons ->", DST)
+        im.save(os.path.join(MADE, "award_%02d.png" % i))
+    print(len(todo), "icons ->", MADE)
 
 
 if __name__ == "__main__":
