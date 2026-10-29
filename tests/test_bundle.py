@@ -148,11 +148,34 @@ class TestBuilder(unittest.TestCase):
     def test_scripts_exist_and_import_nothing_else(self):
         for rel in bb.SCRIPTS:
             self.assertTrue(os.path.exists(os.path.join(ROOT, "scripts", rel)), rel)
-        # run.py's imports, found by reading it: every module is in the list
-        src = open(os.path.join(ROOT, "scripts", "run.py"), encoding="utf-8").read()
-        for mod in re.findall(r"^import (\w+)  # noqa", src, flags=re.M) + re.findall(r"^from (\w+) import", src, flags=re.M):
-            if os.path.exists(os.path.join(ROOT, "scripts", mod + ".py")) or os.path.isdir(os.path.join(ROOT, "scripts", mod)):
-                self.assertTrue(any(s == mod + ".py" or s.startswith(mod + "/") for s in bb.SCRIPTS), mod)
+        # what the bundle's start script reaches, followed through every file it imports (not only run.py's own imports: a module
+        # imported by an imported module was missing once, 2026-10-29, and the service restarted every 10 s)
+        import ast
+        scripts = os.path.join(ROOT, "scripts")
+        listed = {s.split("/")[0][:-3] if s.endswith(".py") and "/" not in s else s.split("/")[0] for s in bb.SCRIPTS}
+        local = lambda mod: (os.path.exists(os.path.join(scripts, mod + ".py")) or os.path.isdir(os.path.join(scripts, mod)))  # noqa: E731
+        seen, queue, missing = set(), [os.path.join(scripts, "package", "start.py")], []
+        while queue:
+            path = queue.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            tree = ast.parse(open(path, encoding="utf-8").read())
+            names = []
+            for node in tree.body:                       # the statements that run on import (not functions: they are optional)
+                if isinstance(node, ast.Import):
+                    names += [a.name.split(".")[0] for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                    names.append(node.module.split(".")[0])
+            for mod in names:
+                if not local(mod):
+                    continue
+                if mod not in listed and mod != "package":
+                    missing.append(f"{os.path.relpath(path, scripts)} imports {mod}")
+                target = os.path.join(scripts, mod + ".py")
+                if os.path.exists(target):
+                    queue.append(target)
+        self.assertEqual(missing, [], "listed in SCRIPTS (scripts/package/build_bundle.py)")
 
     def test_a_bundle_is_never_stale(self):
         import toolchain as tc

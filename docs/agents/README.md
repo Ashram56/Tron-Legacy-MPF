@@ -140,6 +140,11 @@ and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publis
 
 ## F, packaging
 
+**Before building a bundle read the platform's "Known failures" table** ([platforms/game-bundles.md](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/game-bundles.md)):
+every row is a bundle that built fine and failed on a machine. The rule that bit Tron: every Python file the start chain reaches goes in
+`SCRIPTS` of `scripts/package/build_bundle.py` (`mpf_platform.py` was missing, 2026-10-29); `tests/test_bundle.py` now follows the imports
+of `start.py` through every file, and the platform's builder and installer refuse an archive that fails the same check.
+
 Built: `setup.py` and `run.py` on three OSes, the three installers with one-line install, the P-ROC build,
 Docker, CI on three OSes. Open:
 
