@@ -393,20 +393,23 @@ class TestAuditsAndAdjustments(ServiceCase):
         texts = [i["text"] for i in self.top.items()]
         self.assertEqual(texts.index("FEATURE ADJUSTMENTS") + 1, texts.index("DISPLAY ADJUSTMENTS"))
         self.goto("DISPLAY ADJUSTMENTS")
-        self.assertEqual(("DISPLAY ADJUSTMENTS", "01 TEXT GLOW", "80% (FACTORY)"), self.shown[-1])
+        self.assertEqual(("DISPLAY ADJUSTMENTS", "01 TEXT GLOW", "OFF (FACTORY)"), self.shown[-1])
         self.assertIn("(INSTALLED, FACTORY DEFAULT)", rom_draw.lines_of(self.svc.draw_items))
         self.press("select")
         self.press("plus")
-        self.assertEqual("> 90%", self.shown[-1][2])
-        self.assertEqual(90, var("dmd_text_glow"))                # previewed on the display
+        self.assertEqual("> 10%", self.shown[-1][2])
+        self.assertEqual(10, var("dmd_text_glow"))                # previewed on the display
         self.press("back")
-        self.assertEqual((80, -1), (os_.display_settings[1], var("dmd_text_glow")))
+        self.assertEqual((0, -1), (os_.display_settings[1], var("dmd_text_glow")))
         self.press("select")
         for _ in range(9):
             self.press("minus")
-        self.assertEqual("> OFF", self.shown[-1][2])             # stops at the bottom
+        self.assertEqual("> OFF (FACTORY)", self.shown[-1][2])           # stops at the bottom
+        for _ in range(5):
+            self.press("plus")
+        self.assertEqual("> 50%", self.shown[-1][2])
         self.press("select")
-        self.assertEqual((0, 0, 0), (os_.display_settings[1], var("dmd_text_glow"), var("dmd_text_glow_setting")))
+        self.assertEqual((50, 50, 50), (os_.display_settings[1], var("dmd_text_glow"), var("dmd_text_glow_setting")))
         self.assertTrue(self.machine.variables.machine_vars["dmd_text_glow_setting"]["persist"])
         self.press("plus")                                        # TEXT SIZE
         self.assertEqual(("DISPLAY ADJUSTMENTS", "02 TEXT SIZE", "85% (FACTORY)"), self.shown[-1])
@@ -431,7 +434,7 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.press("back")
         self.assertEqual(-1, var("dmd_text_size"))
         self.svc.factory_reset()
-        self.assertEqual((80, -1), (os_.display_settings[1], var("dmd_text_glow")))
+        self.assertEqual((0, -1), (os_.display_settings[1], var("dmd_text_glow")))
 
     def test_pup_dmd_size(self):
         """DISPLAY ADJUSTMENTS > PUP DMD SIZE: the PuP DMD window's DMD with the light cycles (factory: pup.cfg's

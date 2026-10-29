@@ -15,7 +15,8 @@
     python scripts/run.py --dmd-font orbitron      # hd text font: rajdhani (default), orbitron, godot, rom (ROM dots) or a .ttf
     python scripts/run.py --dmd-text-scale 0.85    # hd text size (1 = the ROM's capital height; default 0.85)
     python scripts/run.py --dmd-tint orange        # hd in the original orange (default: Tron blue)
-    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0.8; 0 = none)
+    python scripts/run.py --dmd-color off          # hd without the colour of the effects (default: on)
+    python scripts/run.py --dmd-text-color "#2a6cff" --dmd-text-glow 0.8   # hd text colour and glow (default 0 = none)
 
 Godot's log goes to game/logs/godot.log. MPF runs in this terminal; quitting it (Ctrl+C or Esc in its text UI)
 stops Godot and MPF Monitor too. On Linux without a display, Godot runs under Xvfb (xvfb-run).
@@ -214,18 +215,22 @@ def engine_arg(gargs, *args):
 
 
 def dmd_args(gargs, dmd=None, dots=None, size=None, text_color=None, text_glow=None, tint=None, font=None,
-             text_scale=None):
+             text_scale=None, color=None, score=None):
     """Godot args for the DMD mode (game/tools/dmd_mode.gd): --dmd=hd|classic, --dmd-dots=N, the window
     size (Godot's --resolution WxH), the HD colours (--dmd-tint=blue|orange, --dmd-text-color=#RRGGBB,
     --dmd-text-glow=X), the HD text font (--dmd-font=rajdhani|orbitron|godot|rom|FILE) and its size
-    (--dmd-text-scale=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, glow 0.8,
-    rajdhani, 0.85)."""
+    (--dmd-text-scale=X). None leaves the choice to TRON_DMD... / the project settings (hd, blue, glow 0,
+    rajdhani, 0.85). color: the effects' colours on or off (--dmd-color=on|off; default on, HD only)."""
     if dmd:
         gargs = user_arg(gargs, "--dmd=" + dmd)
+    if score:
+        gargs = user_arg(gargs, "--dmd-score=" + score)
     if font:
         gargs = user_arg(gargs, "--dmd-font=" + (os.path.abspath(font) if os.path.isfile(font) else font))
     if tint:
         gargs = user_arg(gargs, "--dmd-tint=" + tint)
+    if color:
+        gargs = user_arg(gargs, "--dmd-color=" + color)
     if dots is not None:
         gargs = user_arg(gargs, "--dmd-dots={}".format(dots))
     if size:
@@ -433,10 +438,16 @@ def main(argv=None):
     p.add_argument("--dmd-tint", choices=["blue", "orange"],
                    help="hd only: DMD colour, text and effects: blue (default, Tron blue #2a6cff) or orange (the "
                         "original DMD's). Also TRON_DMD_TINT")
+    p.add_argument("--dmd-color", choices=["on", "off"],
+                   help="hd only: the display effects in colour (on, default, when "
+                        "game/media/dmd_color was built by setup) or in the tint (off). Also "
+                        "TRON_DMD_COLOR")
     p.add_argument("--dmd-text-color", metavar="#RRGGBB",
                    help="hd only: text colour (default the tint's: #2a6cff). Also TRON_DMD_TEXT_COLOR")
+    p.add_argument("--dmd-score", choices=["plain", "outline", "white", "blue"],
+                   help="HD scores: a white outline round the text colour (default), white, or the text colour alone")
     p.add_argument("--dmd-text-glow", type=float, metavar="X",
-                   help="hd only: strength of the glow around the text (default 0.8, soft; 0 = none). Also "
+                   help="hd only: strength of the glow around the text (default 0 = none; 0.8 is soft). Also "
                         "TRON_DMD_TEXT_GLOW")
     p.add_argument("--dmd-font", metavar="NAME",
                    help="hd only: font of the DMD text: rajdhani (default, clean), orbitron (Tron style, wider), "
@@ -473,7 +484,7 @@ def main(argv=None):
                pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
-                                                     args.dmd_font, args.dmd_text_scale),
+                                                     args.dmd_font, args.dmd_text_scale, args.dmd_color, args.dmd_score),
                trace=args.trace and os.path.abspath(args.trace))
 
 

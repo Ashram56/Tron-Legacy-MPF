@@ -19,7 +19,7 @@
     {"id": "dmd.text_scale", "group": "display", "label": "Text size", "type": "number", "min": 0.5, "max": 1.1, "step": 0.05, "default": 0.85,
      "help": "HD only. 1 = capitals as tall as the ROM's. Above 1.1 stacked lines touch. The service menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS) sets it too, and what it saves wins.",
      "target": {"arg": "--dmd-text-scale"}, "restart": true},
-    {"id": "dmd.text_glow", "group": "display", "label": "Text glow", "type": "number", "min": 0, "max": 3, "step": 0.1, "default": 0.8,
+    {"id": "dmd.text_glow", "group": "display", "label": "Text glow", "type": "number", "min": 0, "max": 3, "step": 0.1, "default": 0,
      "help": "HD only. 0 = none. The service menu sets it too, and what it saves wins.",
      "target": {"arg": "--dmd-text-glow"}, "restart": true},
     {"id": "dmd.text_color", "group": "display", "label": "Text colour", "type": "color", "default": "#2a6cff",

@@ -28,7 +28,7 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | Game | Stern Tron Legacy LE, code v1.74; Pro v1.74 ported as a second model |
 | ROM | PinMAME sets `trn_174h` (LE 1.74), `trn_17402` (Pro 1.74); never committed |
 | VPX table | VPW Mod v1.1, in the project's files as `Tron Legacy (Stern 2011) VPW Mod v1.1.vpx` |
-| Repositories | asset repo [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption) (git submodule at `assets/`); game repo this one; colour work in the private repo `Ashram56/Tron-Legacy-MPF-Private` |
+| Repositories | asset repo [Tron-Legacy-LE-ROM-Decryption](https://github.com/Ashram56/Tron-Legacy-LE-ROM-Decryption) (git submodule at `assets/`); game repo this one; colour work that reads a third-party colourisation file in the private repo `Ashram56/Tron-Legacy-MPF-Private` |
 | Hardware | P-ROC on the SAM boards, Pro by default, LE selectable; VPX on Windows; Jetson cabinet with the PuP Pack (in this repository since 2026-10-10: [docs/pup/README.md](../pup/README.md); the pack itself from its author's zip or the private `pup_pack` submodule) |
 
 ## Where the Tron instance lives
@@ -91,8 +91,8 @@ Open:
 ## E, improvements
 
 Current defaults (`dmd_mode.gd` constants and `project.godot`): HD on, Tron blue text `#2a6cff`, glow
-`#22b8ff` at 0.8, font Rajdhani Bold, text scale 0.85. Back to the ROM: `--dmd classic`, `--dmd-font rom`,
-`--dmd-tint orange`, `--dmd-text-glow 0`. The operator can also set the text glow and size in the service
+`#22b8ff` (off by default since 2026-10-29: `--dmd-text-glow 0.8`), font Rajdhani Bold, text scale 0.85. Back to the ROM: `--dmd classic`, `--dmd-font rom`,
+`--dmd-tint orange`, `--dmd-color off`. The operator can also set the text glow and size in the service
 menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS, persisted; FACTORY returns to the options).
 
 Scorbit and Wi-Fi (2026-10-16, merged with PR #50 on 2026-10-18): UTILITIES > GO TO NETWORK MENU (nmcli or
@@ -108,7 +108,7 @@ PIN2DMD and ZeDMD (2026-10-24, branch claude/project-thread-31bkyc, PR #56; 2026
 (Godot add-on, MPF overlays, ZeDMD platform, native feeder, detection) is **MPF-Godot-Packaging's**, the same for every
 game ([platforms/dmd_devices.md](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md)); the game keeps `scripts/dmd_out.py`
 (installs it), `game/tools/dmd_out_loader.gd`, the classic-DMD rule in `dmd_mode.gd` and `run.py --pin2dmd|--zedmd|--dmd-out auto`
-([hardware.md](../hardware.md)). Monochrome in the public repo; colour work stays private. Open: a check on a real PIN2DMD
+([hardware.md](../hardware.md)). Open: a check on a real PIN2DMD
 and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publish (platform PR #13).
 
 ### Owner decisions (keep adding)
@@ -118,6 +118,8 @@ and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publis
 | 2026-10-04 | HD DMD in Tron blue, animations included; orange only as `--dmd-tint orange`. |
 | 2026-10-04 | **No colourisation on `main`**, no colour option left in the public repo; colour work lives in the private repo only. |
 | 2026-10-04 | Free play by default on the desktop (`--no-free-play` for coins). |
+| 2026-10-29 | Text glow off by default (it looked worse than planned); the soft glow stays one option away (`--dmd-text-glow 0.8`, service menu DISPLAY ADJUSTMENTS). |
+| 2026-10-29 | **HD colour is public** (supersedes 2026-10-04): the colour of the HD DMD comes from the monochrome frames alone (`scripts/mono_colour.py`, `scripts/dmd_color.py`) and the PuP clips, with no Serum or other colourisation file; docs/dmd_colour.md. Colour work that reads a colourisation file stays in the private repo. |
 | 2026-10-06 | Clean font for HD text; Orbitron + glow tried as default, then Rajdhani default with glow 0.8; text scale 0.85 (the clean fonts looked bigger than the ROM's and stacked lines touched). |
 | 2026-10-06 | Outlined ROM fonts sized and placed by their lit dots. |
 | 2026-10-07 | ZUSE/TRON target letters stay the ROM's pictures, upscaled: the clean-font versions looked worse. |

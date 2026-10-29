@@ -1,0 +1,86 @@
+{
+ "CluMode/CLUMode.mp4": {
+  "cy": 0.3
+ },
+ "GemMode/FollowGem.mp4": {
+  "cy": 0.32
+ },
+ "GemJackpot/GemJackpot1.mp4": {
+  "cx": 700,
+  "w": 900,
+  "cy": 0.4
+ },
+ "ZuseJackpot/ZuseJackpot3.mp4": {
+  "cy": 0.4
+ },
+ "QuorraMB/QuorraMB.mp4": {
+  "cy": 0.34
+ },
+ "DaftPunk/DaftPunk1.mp4": {
+  "cy": 0.42
+ },
+ "EndofLineMB/EOLMB.mp4": {
+  "cy": 0.47
+ },
+ "LightCycleJackpot/LightCycleJackpot5.mp4": {
+  "cy": 0.7
+ },
+ "SOSJackpot/SOSJackpot2.mp4": {
+  "cx": 880,
+  "w": 1100,
+  "cy": 0.38
+ },
+ "QuorraJackpot/QuorraJackpot2.mp4": {
+  "cy": 0.3
+ },
+ "DiscBattleJackpot/DiscWarsJackpot2.mp4": {
+  "cx": 1100,
+  "w": 1150,
+  "cy": 0.4
+ },
+ "DiscBattleJackpot/DiscWarsJackpot3.mp4": {
+  "cx": 973,
+  "w": 748,
+  "cy": 0.437
+ },
+ "ExtraBall/ExtraBall.mp4": {
+  "cx": 1300,
+  "w": 800,
+  "cy": 0.42
+ },
+ "GemJackpot/GemJackpot2.mp4": {
+  "cx": 973,
+  "w": 876,
+  "cy": 0.37
+ },
+ "GemJackpot/GemJackpot3.mp4": {
+  "cx": 973,
+  "w": 800,
+  "cy": 0.36
+ },
+ "DiscBattleMB/DiscWarsMB Default.mp4": {
+  "cx": 975,
+  "w": 1330,
+  "cy": 0.44
+ },
+ "LightCycleMB/Light Cycle MB Default.mp4": {
+  "cx": 975,
+  "w": 1330,
+  "cy": 0.44
+ },
+ "SeaofSimulation/Sea of Simulation Default.mp4": {
+  "cx": 975,
+  "w": 1330,
+  "cy": 0.44
+ },
+ "ZuseMode/Zuse Mode Default.mp4": {
+  "cx": 975,
+  "w": 1330,
+  "cy": 0.44
+ },
+ "QuorraJackpot/QuorraJackpot1.mp4": {
+  "cx": 850,
+  "w": 1060,
+  "cy": 0.4
+ }
+}

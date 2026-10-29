@@ -37,8 +37,23 @@ def ensure():
     if found:
         return found
     dest = os.path.join(os.path.dirname(tc.ROOT), "MPF-Godot-Packaging")
+    if os.path.isdir(dest) and os.listdir(dest):       # a folder of an earlier try that has no platform in it: git clone refuses it
+        if os.path.isdir(os.path.join(dest, ".git")):
+            print("   updating the incomplete platform checkout -> " + dest, flush=True)
+            subprocess.call(["git", "-C", dest, "pull", "--ff-only", "origin", "main"])
+        else:
+            aside = dest + ".old"
+            print("   {} is not the platform: moved to {}".format(dest, aside), flush=True)
+            if os.path.exists(aside):
+                import shutil
+                shutil.rmtree(aside, ignore_errors=True)
+            os.rename(dest, aside)
+    if os.path.isfile(os.path.join(dest, MARK)):
+        return dest
     print("   cloning the platform (MPF-Godot-Packaging) -> " + dest, flush=True)
-    if subprocess.call(["git", "clone", "--depth", "1", URL, dest]) != 0 or not os.path.isfile(os.path.join(dest, MARK)):
+    if os.path.isdir(dest) and not os.listdir(dest):
+        os.rmdir(dest)
+    if subprocess.call(["git", "clone", "--depth", "1", "-b", "main", URL, dest]) != 0 or not os.path.isfile(os.path.join(dest, MARK)):
         raise SystemExit("the platform (MPF-Godot-Packaging: GoZen, the DMD output) is missing and could not be "
                          "cloned: clone {} beside this repository or set MPF_GODOT_PACKAGING".format(URL))
     return dest

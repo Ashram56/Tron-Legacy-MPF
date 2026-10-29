@@ -570,6 +570,74 @@ def build_hd_frames(scale=None, deffs=None):
     return len(dmd_hd.upscale_files(jobs))
 
 
+def build_color_frames(deffs):
+    """game/media/dmd_color: the effects' pictures in colour at 2x, made from the monochrome frames alone
+    (scripts/dmd_color.py, scripts/mono_colour.py), and their colours told in each effect's data (effect.json) for
+    the HD mode's colour."""
+    import dmd_color
+    recorded = {info["slide"] for info in deffs.values() if info["source"] == "reference"}
+    dst = os.path.join(GAME, "media", "dmd_color")
+    info = dmd_color.build(os.path.join(GAME, "media", "dmd"), dst, dmd_color.COLOR_SCALE,
+                           os.path.join(ROOT, ".cache", "dmd_color"), recorded=recorded)
+    told = dmd_color.annotate(os.path.join(GAME, "media", "dmd"), dst, info)
+    for p in glob.glob(os.path.join(dst, "deff_*", "f*.png")):     # nearest filtering: the 2x dots stay crisp
+        with open(p + ".import", "w", encoding="utf-8", newline="\n") as f:
+            f.write(COLOR_FRAME_IMPORT)
+    return len(glob.glob(os.path.join(dst, "deff_*", "*.png"))), told
+
+
+COLOR_FRAME_IMPORT = """[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+
+[params]
+
+compress/mode=0
+mipmaps/generate=false
+"""
+
+
+ATTRACT_LOGO, ATTRACT_ANIM = 950, 951      # effects of the attract pages "logo" and "animation" (not ROM deffs: the pages draw bitmaps)
+LOGO_IMAGE, ANIM_IMAGES = 0x59f, range(0x5a0, 0x5c5)     # ROM images, rom_images_all.zip
+
+
+def build_attract_art():
+    """The attract display's Tron/Stern logo (ROM image 0x59f, 128x73, scrolled up the display, 2 ticks per line) and
+    animation (images 0x5a0-0x5c4, 87x32 right of the status panel, 5 ticks each, then held 62 ticks), as the effects
+    attract_logo and attract_anim (media/dmd/deff_950 and 951; tron/features/attract_pages.py shows them as its LOGO and ANIMATION pages)."""
+    import io
+    import zipfile
+    from PIL import Image
+    z = zipfile.ZipFile(os.path.join(PKG, "media", "rom_images_all.zip"))
+
+    def image(i):
+        return Image.open(io.BytesIO(z.read("%04d.png" % i))).convert("L").convert("RGBA")
+
+    tick_ms = 16.0
+    scene = ['[gd_scene format=3]', '', '[node name="attract" type="Control"]']
+    rect = {"type": "rect", "name": "Background", "x": 0, "y": 0, "w": 128, "h": 32, "level": 0, "color": [0.0, 0.0, 0.0]}
+    # logo: enters at the bottom, leaves at the top
+    name, rel = "attract_logo", "media/dmd/deff_{:03d}".format(ATTRACT_LOGO)
+    fsutil.clear_dir(os.path.join(GAME, rel))
+    logo = image(LOGO_IMAGE)
+    logo.save(os.path.join(GAME, rel, "f000.png"))
+    scroll = {"type": "scroll", "name": "Logo", "pic": "res://{}/f000.png".format(rel), "w": logo.width, "h": logo.height,
+              "from": 32, "to": -logo.height, "hd_pic": "res://hd_art/attract/stern_logo.png", "ms": (32 + logo.height) * 2 * tick_ms, "hold_ms": 3760.0 - (32 + logo.height) * 2 * tick_ms}
+    write_effect(name, rel, scene, [rect, scroll])
+    # animation
+    name, rel = "attract_anim", "media/dmd/deff_{:03d}".format(ATTRACT_ANIM)
+    fsutil.clear_dir(os.path.join(GAME, rel))
+    frames = []
+    for k, i in enumerate(ANIM_IMAGES):
+        img = image(i)
+        canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
+        canvas.paste(img, (128 - img.width, 0))
+        canvas.save(os.path.join(GAME, rel, "f{:03d}.png".format(k)))
+        frames.append(["res://{}/f{:03d}.png".format(rel, k), 5 * tick_ms + (62 * tick_ms if i == ANIM_IMAGES[-1] else 0)])
+    write_effect(name, rel, scene, [rect, {"type": "frames", "name": "Anim", "loop": False, "frames": frames}])
+
+
 def main():
     import gen_fonts
     only_data = "--only-data" in sys.argv
@@ -577,6 +645,8 @@ def main():
     if not only_data or not os.path.exists(os.path.join(GAME, "fonts", "fonts.json")):
         gen_fonts.build(hd=hd)
     data = {"pools": build_sounds(only_data), "deffs": build_deffs(only_data)}
+    if not only_data:
+        build_attract_art()
     if not hd and not only_data:                   # no HD media: the HD mode shows the classic DMD
         fsutil.remove_dir(os.path.join(GAME, "fonts", "hd"))
         fsutil.remove_dir(os.path.join(GAME, "media", "dmd_hd"))
@@ -584,6 +654,11 @@ def main():
         print("media: {} HD pictures in game/media/dmd_hd".format(build_hd_frames(deffs=data["deffs"])), flush=True)
     with open(os.path.join(GAME, "tron", "media_data.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, indent=0, sort_keys=True)
+    if hd and not only_data and "--no-color" not in sys.argv:
+        print("media: {} colour pictures in game/media/dmd_color, {} effects in colour".format(
+            *build_color_frames(data["deffs"])), flush=True)
+    elif not only_data:
+        fsutil.remove_dir(os.path.join(GAME, "media", "dmd_color"))
     print("media: {} sound pools, {} display effects".format(len(data["pools"]), len(data["deffs"])))
 
 

@@ -329,7 +329,14 @@ CAN_RENDER = (sys.platform.startswith("linux") and GENERATED and os.path.exists(
 
 @unittest.skipUnless(CAN_RENDER, "needs Linux with Xvfb or a display, Godot and the imported media")
 class TestGodotModes(unittest.TestCase):
-    """Renders slides with game/tools/slide_capture.tscn, as scripts/render_diff.py does."""
+    """Renders slides with game/tools/slide_capture.tscn, as scripts/render_diff.py does. The HD here is the plain
+    one: the colours (on by default when setup built them) are off (tests/test_dmd_color.py has them)."""
+
+    def setUp(self):
+        for name, value in (("TRON_DMD_COLOR", "off"), ("TRON_DMD_CLIPS", "0"), ("TRON_LETTER_ART", "0"), ("TRON_DMD_SCORE", "blue")):
+            old = os.environ.get(name)       # the plain HD: no PuP clips (random, in colour), scores in the text colour only
+            os.environ[name] = value
+            self.addCleanup(lambda n=name, o=old: os.environ.pop(n) if o is None else os.environ.__setitem__(n, o))
 
     def render(self, user_args=(), engine_args=(), env=None, machine_vars=None, slides=CLASSIC, reuse=False):
         out = tempfile.mkdtemp()
@@ -469,15 +476,15 @@ rom_flags = 2
             return img.convert("L").point(lambda p: 255 if p > 90 else 0).getbbox()
         hd = ["--resolution", "1280x320"]
         full = frame(self.render(["--dmd=hd", "--dmd-text-glow=0", "--dmd-text-scale=1"], hd, slides=["deff_025"]))
-        plain = frame(self.render(["--dmd=hd"], hd, slides=["deff_025"]))
-        got = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": 0, "dmd_text_size": 100},
+        plain = frame(self.render(["--dmd=hd", "--dmd-text-glow=0.8"], hd, slides=["deff_025"]))
+        got = frame(self.render(["--dmd=hd", "--dmd-text-glow=0.8"], hd, machine_vars={"dmd_text_glow": 0, "dmd_text_size": 100},
                                 slides=["deff_025"]))
         self.assertEqual(box(full), box(got))
         self.assertEqual(full.tobytes(), got.tobytes())
-        same = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": -1, "dmd_text_size": -1},
+        same = frame(self.render(["--dmd=hd", "--dmd-text-glow=0.8"], hd, machine_vars={"dmd_text_glow": -1, "dmd_text_size": -1},
                                  slides=["deff_025"]))
         self.assertEqual(plain.tobytes(), same.tobytes())
-        big_glow = frame(self.render(["--dmd=hd"], hd, machine_vars={"dmd_text_glow": 200}, slides=["deff_025"]))
+        big_glow = frame(self.render(["--dmd=hd", "--dmd-text-glow=0.8"], hd, machine_vars={"dmd_text_glow": 200}, slides=["deff_025"]))
         light = [sum(ImageStat.Stat(img.convert("L")).sum) for img in (got, plain, big_glow)]   # no glow, 80%, 200%
         self.assertTrue(light[0] < light[1] < light[2], light)
         self.assertEqual(CLASSIC, self.hashes(self.render(["--dmd=classic"], machine_vars={"dmd_text_glow": 300,
@@ -556,8 +563,8 @@ rom_flags = 2
         art, ap = strokes(os.path.join(out, "deff_046", "frame_00002.png"))
         lit = [ap[x, y] for x in range(0, art.width, 3) for y in range(0, art.height, 3) if sum(ap[x, y]) > 200]
         self.assertTrue(lit and all(r > b for r, g, b in lit))
-        # the default glow: blue-cyan light around the strokes
-        out = self.render(["--dmd=hd"], ["--resolution", "1280x320"])
+        # the glow (off by default): blue-cyan light around the strokes
+        out = self.render(["--dmd=hd", "--dmd-text-glow=0.8"], ["--resolution", "1280x320"])
         img, px = strokes(os.path.join(out, "deff_025", "frame_00000.png"))
         halo = [px[x, box[1] - 8] for x in range(box[0], box[2])]
         self.assertTrue(any(b > 30 and b > r for r, g, b in halo), halo[::40])

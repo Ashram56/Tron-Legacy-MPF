@@ -1,0 +1,2001 @@
+{
+ "effects": {
+  "100": {
+   "loop": false,
+   "ms": 1150,
+   "variants": [
+    {
+     "clip": "ZEN/ZEN.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 0.2875,
+     "lo": 0.0,
+     "seconds": 4.0
+    }
+   ]
+  },
+  "104": {
+   "loop": false,
+   "ms": 3230,
+   "variants": [
+    {
+     "clip": "Arcade/ArcadeMystery.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.2
+    }
+   ]
+  },
+  "108": {
+   "loop": false,
+   "ms": 1809,
+   "variants": [
+    {
+     "clip": "Recognizer/Recognizer1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.3
+    },
+    {
+     "clip": "Recognizer/Recognizer2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3618,
+     "lo": 0.0,
+     "seconds": 5.0
+    },
+    {
+     "clip": "Recognizer/Recognizer3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3289,
+     "lo": 0.0,
+     "seconds": 5.5
+    }
+   ]
+  },
+  "109": {
+   "loop": false,
+   "ms": 3580,
+   "variants": [
+    {
+     "clip": "DiscBattleReady/DiscWarsReady.mp4",
+     "crop": [
+      328,
+      372,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.3
+    }
+   ]
+  },
+  "111": {
+   "loop": false,
+   "ms": 4106,
+   "variants": [
+    {
+     "clip": "DiscBattle/DiscWars1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.9
+    },
+    {
+     "clip": "DiscBattle/DiscWars2.mp4",
+     "crop": [
+      328,
+      415,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.8
+    },
+    {
+     "clip": "DiscBattle/DiscWars3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.5
+    },
+    {
+     "clip": "DiscBattle/DiscWars4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.9
+    },
+    {
+     "clip": "DiscBattle/DiscWars5.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 8.8
+    },
+    {
+     "clip": "DiscBattle/DiscWars6.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 7.9
+    },
+    {
+     "clip": "DiscBattle/DiscWars7.mp4",
+     "crop": [
+      328,
+      210,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.9
+    }
+   ]
+  },
+  "112": {
+   "loop": false,
+   "ms": 3970,
+   "variants": [
+    {
+     "clip": "DoubleScore/DoubleScoring.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.7
+    },
+    {
+     "clip": "SuperPops/SuperPops.mp4",
+     "crop": [
+      328,
+      322,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.8
+    },
+    {
+     "clip": "SuperSpins/SuperSpins.mp4",
+     "crop": [
+      328,
+      268,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.6
+    }
+   ]
+  },
+  "113": {
+   "loop": false,
+   "ms": 6950,
+   "variants": [
+    {
+     "clip": "SeaofSimulation/SeaOfSimulation.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 16.6
+    }
+   ]
+  },
+  "114": {
+   "loop": true,
+   "ms": 12009,
+   "variants": [
+    {
+     "clip": "SeaofSimulation/Sea of Simulation Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.9036,
+     "lo": 0.0,
+     "ms": 15000,
+     "seconds": 16.6
+    },
+    {
+     "clip": "SeaofSimulation/SeaOfSimulation.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.9036,
+     "lo": 0.0,
+     "ms": 15000,
+     "seconds": 16.6
+    }
+   ]
+  },
+  "115": {
+   "loop": false,
+   "ms": 6379,
+   "variants": [
+    {
+     "clip": "SeaofSimulation/Sea of Simulation Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.3843,
+     "lo": 0.0,
+     "seconds": 16.6
+    },
+    {
+     "clip": "SeaofSimulation/SeaOfSimulation.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3843,
+     "lo": 0.0,
+     "seconds": 16.6
+    }
+   ]
+  },
+  "116": {
+   "loop": false,
+   "ms": 1589,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "117": {
+   "loop": false,
+   "ms": 1590,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3975,
+     "lo": 0.0,
+     "seconds": 4.0
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot3.mp4",
+     "crop": [
+      328,
+      277,
+      1291,
+      322
+     ],
+     "hi": 0.2304,
+     "lo": 0.0,
+     "seconds": 6.9
+    }
+   ]
+  },
+  "118": {
+   "loop": false,
+   "ms": 1589,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "119": {
+   "loop": false,
+   "ms": 1980,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "120": {
+   "loop": false,
+   "ms": 1590,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "121": {
+   "loop": false,
+   "ms": 1592,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "122": {
+   "loop": false,
+   "ms": 1590,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3975,
+     "lo": 0.0,
+     "seconds": 4.0
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot3.mp4",
+     "crop": [
+      328,
+      277,
+      1291,
+      322
+     ],
+     "hi": 0.2304,
+     "lo": 0.0,
+     "seconds": 6.9
+    }
+   ]
+  },
+  "123": {
+   "loop": false,
+   "ms": 1588,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.397,
+     "lo": 0.0,
+     "seconds": 4.0
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot3.mp4",
+     "crop": [
+      328,
+      277,
+      1291,
+      322
+     ],
+     "hi": 0.2301,
+     "lo": 0.0,
+     "seconds": 6.9
+    }
+   ]
+  },
+  "124": {
+   "loop": false,
+   "ms": 1589,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 0.54,
+     "lo": 0.455,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "125": {
+   "loop": true,
+   "ms": 10200,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 5370,
+     "seconds": 5.4
+    }
+   ]
+  },
+  "126": {
+   "loop": false,
+   "ms": 4129,
+   "variants": [
+    {
+     "clip": "SOSJackpot/SOSJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.0
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot2.mp4",
+     "crop": [
+      330,
+      272,
+      1100,
+      275
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 5370,
+     "seconds": 5.4
+    },
+    {
+     "clip": "SOSJackpot/SOSJackpot3.mp4",
+     "crop": [
+      328,
+      277,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.9
+    }
+   ]
+  },
+  "128": {
+   "loop": false,
+   "ms": 5470,
+   "variants": [
+    {
+     "clip": "LightCycleMB/LightCycleMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.4,
+     "lo": 0.03,
+     "seconds": 20.1
+    }
+   ]
+  },
+  "129": {
+   "loop": false,
+   "ms": 5510,
+   "variants": [
+    {
+     "clip": "LightCycleMB/LightCycleMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.95,
+     "lo": 0.45,
+     "seconds": 20.1
+    }
+   ]
+  },
+  "130": {
+   "loop": false,
+   "ms": 2164,
+   "variants": [
+    {
+     "clip": "Recognizer/Recognizer1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.3
+    },
+    {
+     "clip": "Recognizer/Recognizer2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.0
+    },
+    {
+     "clip": "Recognizer/Recognizer3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3935,
+     "lo": 0.0,
+     "seconds": 5.5
+    }
+   ]
+  },
+  "133": {
+   "loop": false,
+   "ms": 3108,
+   "variants": [
+    {
+     "clip": "ExtraBall/ExtraBall.mp4",
+     "crop": [
+      900,
+      353,
+      800,
+      200
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.9
+    }
+   ]
+  },
+  "139": {
+   "loop": false,
+   "ms": 1688,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 0.2059,
+     "lo": 0.0,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "140": {
+   "loop": false,
+   "ms": 5302,
+   "variants": [
+    {
+     "clip": "PortalMB/Portal.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 10.1
+    }
+   ]
+  },
+  "142": {
+   "loop": false,
+   "ms": 3405,
+   "variants": [
+    {
+     "clip": "Portal Jackpot/Portal Jackpot 1.mp4",
+     "crop": [
+      328,
+      321,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.1
+    },
+    {
+     "clip": "Portal Jackpot/Portal Jackpot 2.mp4",
+     "crop": [
+      328,
+      341,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.4
+    }
+   ]
+  },
+  "143": {
+   "loop": false,
+   "ms": 8937,
+   "variants": [
+    {
+     "clip": "PortalMB/Portal.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 10.1
+    }
+   ]
+  },
+  "38": {
+   "loop": false,
+   "ms": 6230,
+   "variants": [
+    {
+     "clip": "MatchEvent/MatchGameOver.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 9.2
+    }
+   ]
+  },
+  "46": {
+   "loop": false,
+   "ms": 4990,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "47": {
+   "loop": true,
+   "ms": 652,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.5,
+     "lo": 0.0,
+     "ms": 15000,
+     "seconds": 30.0
+    },
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 10000,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "48": {
+   "loop": false,
+   "ms": 2818,
+   "variants": [
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 5.9
+    },
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot2.mp4",
+     "crop": [
+      525,
+      288,
+      1150,
+      287
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.9
+    },
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot3.mp4",
+     "crop": [
+      599,
+      378,
+      748,
+      187
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.4
+    }
+   ]
+  },
+  "49": {
+   "loop": false,
+   "ms": 3306,
+   "variants": [
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 5.9
+    },
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot2.mp4",
+     "crop": [
+      525,
+      288,
+      1150,
+      287
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.9
+    },
+    {
+     "clip": "DiscBattleJackpot/DiscWarsJackpot3.mp4",
+     "crop": [
+      599,
+      378,
+      748,
+      187
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.4
+    }
+   ]
+  },
+  "51": {
+   "loop": false,
+   "ms": 3639,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.1213,
+     "lo": 0.0,
+     "seconds": 30.0
+    },
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3639,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "52": {
+   "loop": false,
+   "ms": 2730,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.091,
+     "lo": 0.0,
+     "seconds": 30.0
+    },
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.273,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "53": {
+   "loop": true,
+   "ms": 389,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.5,
+     "lo": 0.0,
+     "ms": 15000,
+     "seconds": 30.0
+    },
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 10000,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "54": {
+   "loop": false,
+   "ms": 2230,
+   "variants": [
+    {
+     "clip": "DiscBattleMB/DiscWarsMB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.0743,
+     "lo": 0.0,
+     "seconds": 30.0
+    },
+    {
+     "clip": "DiscBattleMB/DiscWarsMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.223,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "55": {
+   "loop": false,
+   "ms": 2177,
+   "variants": [
+    {
+     "clip": "DaftPunk/DaftPunk1.mp4",
+     "crop": [
+      328,
+      292,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.3
+    },
+    {
+     "clip": "DaftPunk/DaftPunk2.mp4",
+     "crop": [
+      328,
+      337,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 1.1
+    }
+   ]
+  },
+  "56": {
+   "loop": false,
+   "ms": 3920,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "57": {
+   "loop": true,
+   "ms": 2829,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 8200,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "58": {
+   "loop": false,
+   "ms": 2204,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 0.2688,
+     "lo": 0.0,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "59": {
+   "loop": false,
+   "ms": 2217,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 0.2704,
+     "lo": 0.0,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "60": {
+   "loop": false,
+   "ms": 2219,
+   "variants": [
+    {
+     "clip": "EndofLineMB/EOLMB.mp4",
+     "crop": [
+      344,
+      348,
+      1275,
+      318
+     ],
+     "hi": 0.2706,
+     "lo": 0.0,
+     "seconds": 8.2
+    }
+   ]
+  },
+  "64": {
+   "loop": false,
+   "ms": 3780,
+   "variants": [
+    {
+     "clip": "QuorraMB/QuorraMB.mp4",
+     "crop": [
+      328,
+      206,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.05,
+     "seconds": 10.1
+    }
+   ]
+  },
+  "65": {
+   "loop": true,
+   "ms": 12004,
+   "variants": [
+    {
+     "clip": "QuorraMB/QuorraMB.mp4",
+     "crop": [
+      328,
+      206,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.05,
+     "ms": 9595,
+     "seconds": 10.1
+    }
+   ]
+  },
+  "68": {
+   "loop": false,
+   "ms": 3840,
+   "variants": [
+    {
+     "clip": "QuorraJackpot/QuorraJackpot1.mp4",
+     "crop": [
+      320,
+      299,
+      1060,
+      265
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 3.4
+    },
+    {
+     "clip": "QuorraJackpot/QuorraJackpot2.mp4",
+     "crop": [
+      328,
+      163,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.2
+    },
+    {
+     "clip": "QuorraJackpot/QuorraJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.3
+    }
+   ]
+  },
+  "69": {
+   "loop": false,
+   "ms": 4374,
+   "variants": [
+    {
+     "clip": "QuorraJackpot/QuorraJackpot1.mp4",
+     "crop": [
+      320,
+      299,
+      1060,
+      265
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 3.4
+    },
+    {
+     "clip": "QuorraJackpot/QuorraJackpot2.mp4",
+     "crop": [
+      328,
+      163,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.2
+    },
+    {
+     "clip": "QuorraJackpot/QuorraJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.3
+    }
+   ]
+  },
+  "71": {
+   "loop": false,
+   "ms": 2090,
+   "variants": [
+    {
+     "clip": "CluMode/CLUMode.mp4",
+     "crop": [
+      328,
+      163,
+      1291,
+      322
+     ],
+     "hi": 0.0921,
+     "lo": 0.0,
+     "seconds": 22.7
+    }
+   ]
+  },
+  "73": {
+   "loop": false,
+   "ms": 2328,
+   "variants": [
+    {
+     "clip": "CluJackpot/CluJackpot1.mp4",
+     "crop": [
+      328,
+      220,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.7
+    },
+    {
+     "clip": "CluJackpot/CluJackpot2.mp4",
+     "crop": [
+      328,
+      240,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.9
+    },
+    {
+     "clip": "CluJackpot/CluJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.6
+    }
+   ]
+  },
+  "76": {
+   "loop": false,
+   "ms": 2530,
+   "variants": [
+    {
+     "clip": "GemMode/FollowGem.mp4",
+     "crop": [
+      328,
+      184,
+      1291,
+      322
+     ],
+     "hi": 0.1524,
+     "lo": 0.0,
+     "seconds": 16.6
+    }
+   ]
+  },
+  "78": {
+   "loop": false,
+   "ms": 2515,
+   "variants": [
+    {
+     "clip": "GemJackpot/GemJackpot1.mp4",
+     "crop": [
+      250,
+      319,
+      900,
+      225
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.1
+    },
+    {
+     "clip": "GemJackpot/GemJackpot2.mp4",
+     "crop": [
+      535,
+      290,
+      876,
+      219
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.9
+    },
+    {
+     "clip": "GemJackpot/GemJackpot3.mp4",
+     "crop": [
+      573,
+      288,
+      800,
+      200
+     ],
+     "hi": 0.3699,
+     "lo": 0.0,
+     "seconds": 6.8
+    }
+   ]
+  },
+  "83": {
+   "loop": false,
+   "ms": 1982,
+   "variants": [
+    {
+     "clip": "LightCycle/LightCycleFlare1.mp4",
+     "crop": [
+      328,
+      480,
+      1291,
+      322
+     ],
+     "hi": 0.3197,
+     "lo": 0.0,
+     "seconds": 6.2
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.1
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.2252,
+     "lo": 0.0,
+     "seconds": 8.8
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.2958,
+     "lo": 0.0,
+     "seconds": 6.7
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare5.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.2958,
+     "lo": 0.0,
+     "seconds": 6.7
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare6.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.374,
+     "lo": 0.0,
+     "seconds": 5.3
+    }
+   ]
+  },
+  "84": {
+   "loop": false,
+   "ms": 4010,
+   "variants": [
+    {
+     "clip": "LightCycleMBLit/LightCycleMBLit.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.9
+    }
+   ]
+  },
+  "85": {
+   "loop": false,
+   "ms": 5200,
+   "variants": [
+    {
+     "clip": "LightCycleMB/LightCycleMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.2587,
+     "lo": 0.0,
+     "seconds": 20.1
+    }
+   ]
+  },
+  "86": {
+   "loop": true,
+   "ms": 11360,
+   "variants": [
+    {
+     "clip": "LightCycleMB/Light Cycle MB Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.4983,
+     "lo": 0.0,
+     "ms": 14999,
+     "seconds": 30.1
+    },
+    {
+     "clip": "LightCycleMB/LightCycleMB.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.7463,
+     "lo": 0.0,
+     "ms": 15001,
+     "seconds": 20.1
+    }
+   ]
+  },
+  "87": {
+   "loop": false,
+   "ms": 2692,
+   "variants": [
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 3.4
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.1
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.7
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.9
+    }
+   ]
+  },
+  "88": {
+   "loop": false,
+   "ms": 2907,
+   "variants": [
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 3.4
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.1
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.7
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.9
+    }
+   ]
+  },
+  "89": {
+   "loop": false,
+   "ms": 2423,
+   "variants": [
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.26,
+     "seconds": 3.4
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.1
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.7
+    },
+    {
+     "clip": "LightCycleJackpot/LightCycleJackpot4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 4.9
+    }
+   ]
+  },
+  "90": {
+   "loop": false,
+   "ms": 3201,
+   "variants": [
+    {
+     "clip": "LightCycle/LightCycleFlare1.mp4",
+     "crop": [
+      328,
+      480,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.2
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare2.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.1
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 0.3637,
+     "lo": 0.0,
+     "seconds": 8.8
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare4.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.7
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare5.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.7
+    },
+    {
+     "clip": "LightCycle/LightCycleFlare6.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 5.3
+    }
+   ]
+  },
+  "95": {
+   "loop": true,
+   "ms": 2247,
+   "variants": [
+    {
+     "clip": "ZuseMode/ZuseMode.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "ms": 10000,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "951": {
+   "loop": false,
+   "ms": 3950,
+   "variants": [
+    {
+     "clip": "StartGameLogo/StartGameLogo.mp4",
+     "crop": [
+      0,
+      41,
+      1920,
+      480
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 6.55
+    }
+   ]
+  },
+  "96": {
+   "loop": false,
+   "ms": 1080,
+   "variants": [
+    {
+     "clip": "ZuseMode/Zuse Mode Default.mp4",
+     "crop": [
+      310,
+      309,
+      1330,
+      332
+     ],
+     "hi": 0.036,
+     "lo": 0.0,
+     "seconds": 30.0
+    },
+    {
+     "clip": "ZuseMode/ZuseMode.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 0.108,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  },
+  "97": {
+   "loop": false,
+   "ms": 1788,
+   "variants": [
+    {
+     "clip": "ZuseJackpot/ZuseJackpot1.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 2.9
+    },
+    {
+     "clip": "ZuseJackpot/ZuseJackpot2.mp4",
+     "crop": [
+      336,
+      292,
+      1283,
+      320
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 3.9
+    },
+    {
+     "clip": "ZuseJackpot/ZuseJackpot3.mp4",
+     "crop": [
+      328,
+      271,
+      1291,
+      322
+     ],
+     "hi": 1.0,
+     "lo": 0.0,
+     "seconds": 1.9
+    }
+   ]
+  },
+  "98": {
+   "loop": false,
+   "ms": 1530,
+   "variants": [
+    {
+     "clip": "ZuseMode/ZuseMode.mp4",
+     "crop": [
+      328,
+      195,
+      1291,
+      322
+     ],
+     "hi": 0.153,
+     "lo": 0.0,
+     "seconds": 10.0
+    }
+   ]
+  }
+ },
+ "icon_sources": {
+  "clu": {
+   "box": [
+    30,
+    10,
+    530,
+    552
+   ],
+   "clip": "CluModeInfo/CLU_Mode_Info.mp4",
+   "t": 3.0
+  },
+  "flynn": {
+   "box": [
+    235,
+    0,
+    705,
+    562
+   ],
+   "clip": "FindFlynnInfo/FindFlynnInfo.mp4",
+   "t": 1.5
+  },
+  "gem": {
+   "box": [
+    30,
+    10,
+    530,
+    552
+   ],
+   "clip": "GemModeInfo/Gem_Mode_Info.mp4",
+   "t": 3.0
+  },
+  "quorra": {
+   "box": [
+    30,
+    10,
+    530,
+    552
+   ],
+   "clip": "QuorraMBInfo/Quorra_MB_INFO.mp4",
+   "t": 3.0
+  },
+  "zuse": {
+   "box": [
+    30,
+    10,
+    530,
+    552
+   ],
+   "clip": "ZuseModeInfo/ZuseInfo.mp4",
+   "t": 3.0
+  }
+ },
+ "icons": {
+  "131": "clu",
+  "136": "flynn",
+  "137": "flynn",
+  "62": "quorra",
+  "63": "quorra",
+  "70": "quorra",
+  "74": "clu",
+  "75": "gem",
+  "79": "gem",
+  "99": "zuse"
+ }
+}

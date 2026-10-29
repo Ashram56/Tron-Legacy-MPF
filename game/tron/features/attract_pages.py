@@ -15,6 +15,7 @@ ORDER = 7
 PAGE_SECONDS = 2.016
 LOGO_SECONDS, ANIMATION_SECONDS = 3.76, 3.98
 PRIORITY = 2                     # just above deff 1 (priority 1)
+PAGE_SLIDES = {"LOGO": "attract_logo", "ANIMATION": "attract_anim"}     # the bitmaps of the ROM's logo and animation pages (scripts/gen_media.py build_attract_art)
 
 
 def page_layout(name, lines):
@@ -91,13 +92,21 @@ class AttractPages(Feature):
             self.handle = None
         if self.pages:
             self.pages = []
-            self.os.media.text_hide("text_page")
+            for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):
+                self.os.media.text_hide(slide)
 
     def show(self):
         name, lines, seconds = self.pages[self.index]
         lines = lines() if callable(lines) else lines
         self.machine.events.post("tron_attract_page", page=name, lines=lines)
-        self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines))
+        shown = PAGE_SLIDES.get(name, "text_page")
+        if shown == "text_page":
+            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines))
+        else:
+            self.os.media.text_show(shown, [], PRIORITY)
+        for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):
+            if slide != shown:
+                self.os.media.text_hide(slide)
         if self.handle:
             self.machine.clock.unschedule(self.handle)
         self.handle = self.machine.clock.schedule_once(lambda dt=None: self.step(1), seconds)

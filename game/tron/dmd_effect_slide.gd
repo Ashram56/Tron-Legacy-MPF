@@ -41,7 +41,7 @@ func _ready() -> void:
 		add_child(_scene)
 		return
 	var dmd = get_tree().root.get_node_or_null("DmdMode")
-	state = DmdEffect.State.new(DmdEffect.items_of(effect), dmd != null and dmd.hd)
+	state = DmdEffect.State.new(DmdEffect.items_of(effect), dmd != null and dmd.hd, effect_name)
 	if not state.hd:
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_to_group(preload("res://tron/dmd_screen.gd").GROUP)

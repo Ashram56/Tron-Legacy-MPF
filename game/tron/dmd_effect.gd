@@ -3,6 +3,7 @@ extends RefCounted
 ## write_effect()), its items in drawing order, as the effect's node scene (media/dmd/<name>/nodes.tscn) has its nodes:
 ##   {"type": "rect", "name", "x", "y", "w", "h", "level", "color"}      a filled rectangle (Background, Clear*, panel)
 ##   {"type": "frames", "name", "loop", "frames": [[picture, ms], ...]}  the effect's pictures, each shown for ms
+##   {"type": "scroll", "name", "pic", "w", "h", "from", "to", "ms", "hold_ms"}   a picture moving up the display (attract logo)
 ##   {"type": "letters", "sprites": [{"name", "pic", "x", "y", "level", "color", "letter"}], ...}   tron/letter_panel.gd
 ##   {"type": "arcade", "cabinets", "icons_a", "icons_b", "frame_ms"}    tron/arcade_reel.gd
 ##   {"type": "text", "name", "var", "font", "x", "y", "flags", ...}     a line of ROM text, tron/rom_text.gd's fields
@@ -10,6 +11,10 @@ extends RefCounted
 ## A picture is a res:// path: a picture of media/dmd/ is shown in HD as its twin of media/dmd_hd/ (tools/dmd_mode.gd);
 ## any other picture (redrawn art, a larger frame) is shown as it is, fitted to the 128x32 box. The data can be edited
 ## or replaced by hand: nothing else needs generating again.
+## Colour (HD with tools/dmd_mode.gd's colour on; scripts/dmd_color.py annotate()): the frames item's "color_frames"
+## (pictures of media/dmd_color/, frame for frame, drawn as they are), a text line's "color" and a rectangle's
+## "color_rgb" ("#rrggbb", in place of the text colour), a letter's "color_pic", the arcade reel's "color_cabinets",
+## "color_icons_a" and "color_icons_b". Recorded text lines take their colours from media/dmd_color/text_colors.json.
 ##
 ## One State per show of the effect (tron/dmd_effect_slide.gd): its time, the values MPF sent, the lines' text; build()
 ## turns it into a draw list for tron/dmd_screen.gd, the same pixels the node scene draws (tests/test_dmd_hd.py). The
@@ -25,8 +30,105 @@ const MEDIA := "res://media/dmd/"
 const MEDIA_HD := "res://media/dmd_hd/"
 const DMD_COLOR := Color(1, 0.45, 0.05, 1)
 const BOX := Rect2(0, 0, 128, 32)
+const NO_INK := Color(0, 0, 0, 0)        # an HD line in the text colour (else its own colour: the colourisation's)
 
 static var _data: Dictionary = {}       # effect.json path -> its items (parsed once)
+static var _clips = null                # media/dmd_clip/clips.json (scripts/pup/gen_dmd_clips.py), parsed once
+
+## The PuP clips on the DMD (HD): "clips" {effect: {"files": [...], "loop", "ms"}} are played behind the effect's text in place of
+## its pictures, one of the files at random per show; "icons" {effect: picture} are the topper's HD icon of a character that
+## glides into the hexagonal frame in place of the ROM's face. Off with TRON_DMD_CLIPS=0 or the project setting
+## tron/dmd/clips; nothing is drawn differently when the clips are not made (the pack is private) or GDE GoZen is not installed.
+const CLIP_DATA := "res://media/dmd_clip/clips.json"
+const CLIP_PLAYER := "res://addons/gde_gozen/video_playback.gd"
+const PANEL_SCORE_ZOOM := 1.25          # the status panel's small scores (P1-P4) are drawn this much larger in HD,
+const PANEL_SCORE_ROOM := 39            # but never wider than this many dots (the panel is 40 wide)
+const ICON_CENTRE_X := 58.0             # where the icon rests, in dots: left of the text, which is centred at x 100
+const CLIP_NO_TEXT := ["deff_104"]          # the clip says it (the ROM's "ARCADE IS LIT" would only repeat it)
+const ICON_TEXT_X := 100.0               # the text beside the icon is centred here
+const ICON_GLIDE_MS := 600.0            # the face slides in from the right in this time
+
+
+static func clips() -> Dictionary:
+	if _clips == null:
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(CLIP_DATA)) if FileAccess.file_exists(CLIP_DATA) else null
+		_clips = parsed if parsed is Dictionary else {}
+	return _clips
+
+
+## The redrawn mystery award icon (hd_art/deff_105/award_NN.png, scripts/pup/award_sprites.py), or null: the ROM's icon.
+static var _award_art := {}
+
+## The icon last drawn and when (ms): an icon effect that follows another with the same face right away does not glide
+## in again (the ROM replays the glide on each show; on the larger HD icon it read as a loop).
+static var _icon_seen := ["", -100000]
+
+## The clip last drawn: {"name", "path", "show", "t" (ms)}. An effect shown again right after itself (the ROM re-shows
+## it for each new counter value) goes on with the same video instead of starting it over.
+static var _clip_last := {"name": "", "path": "", "show": 0, "t": -100000}
+static var _show_seq := 0
+const CLIP_RESUME_MS := 700
+
+
+static func award_art(id: int) -> Texture2D:
+	if OS.get_environment("TRON_AWARD_ART").to_lower() in ["0", "off", "false"]:
+		return null
+	if not _award_art.has(id):
+		var path := "res://hd_art/deff_105/award_%02d.png" % id
+		var tex: Texture2D = null
+		if FileAccess.file_exists(path):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+			if img:
+				img.generate_mipmaps()
+				tex = ImageTexture.create_from_image(img)
+		_award_art[id] = tex
+	return _award_art[id]
+
+
+static var _hd_art := {}
+
+
+## A picture of game/hd_art (not in the import: loaded from the file), or null.
+static func hd_art(path: String) -> Texture2D:
+	if not _hd_art.has(path):
+		var tex: Texture2D = null
+		if FileAccess.file_exists(path):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+			if img:
+				img.generate_mipmaps()
+				tex = ImageTexture.create_from_image(img)
+		_hd_art[path] = tex
+	return _hd_art[path]
+
+
+static var _letter_art := {}
+
+
+## The topper's HD letter ("Z", on = collected: red, else blue) of scripts/pup/letter_art.py, or null.
+static func letter_art(letter: String, on: bool) -> Texture2D:
+	if OS.get_environment("TRON_LETTER_ART").to_lower() in ["0", "off", "false"]:
+		return null
+	var key := "%s_%s" % [letter, "on" if on else "off"]
+	if not _letter_art.has(key):
+		var path := "res://hd_art/letters/%s.png" % key
+		var tex: Texture2D = null
+		if FileAccess.file_exists(path):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+			if img:
+				img.generate_mipmaps()
+				tex = ImageTexture.create_from_image(img)
+		_letter_art[key] = tex
+		print("DMD: letter art %s: %s" % [key, "loaded" if tex else "missing at " + ProjectSettings.globalize_path(path)])
+	return _letter_art[key]
+
+
+static func clips_enabled() -> bool:
+	var env := OS.get_environment("TRON_DMD_CLIPS").to_lower()
+	if env in ["0", "off", "false"]:
+		return false
+	if env in ["1", "on", "true"]:
+		return true
+	return bool(ProjectSettings.get_setting("tron/dmd/clips", true))
 
 
 ## The items of an effect's data ([] when it cannot be read).
@@ -69,6 +171,8 @@ static func picture(path: String, hd: bool) -> Texture2D:
 class State extends RefCounted:
 	var items: Array
 	var hd := false
+	var color := false             # the colourisation's colours (HD, tools/dmd_mode.gd color)
+	var color_scale := 2.0         # media/dmd_color/ pictures are this many times the classic ones
 	var elapsed_ms := 0.0
 	var seeked := false
 	var values := {}               # every event arg received (the panel, letters and reel read them)
@@ -80,10 +184,19 @@ class State extends RefCounted:
 	var _durations := PackedFloat32Array()
 	var _total_ms := 0.0
 	var _frames_item := -1
+	var effect_name := ""          # deff_NNN, to find the effect's clips (tron/dmd_effect_slide.gd)
+	var clip_path := ""            # the PuP clip playing behind the text for this show (absolute path), "" for the ROM's pictures
+	var clip_loop := false
+	var icon_path := ""            # the character's HD icon replacing the ROM's face
+	var show := 0                  # counts the shows: a new one restarts the clip
+	var glide_done := false        # the same icon was on screen a moment ago: it stays in place
 
-	func _init(of: Array, hd_mode: bool) -> void:
+	func _init(of: Array, hd_mode: bool, name := "") -> void:
 		items = of
 		hd = hd_mode
+		effect_name = name
+		var dmd = DmdEffect._dmd()
+		color = hd and dmd != null and dmd.color
 		for i in items.size():
 			if items[i]["type"] == "frames":
 				_frames_item = i
@@ -96,6 +209,24 @@ class State extends RefCounted:
 	func reset() -> void:
 		elapsed_ms = 0.0
 		seeked = false
+		clip_path = ""
+		icon_path = ""
+		if hd and effect_name != "" and DmdEffect.clips_enabled() and ResourceLoader.exists(DmdEffect.CLIP_PLAYER):
+			var data := DmdEffect.clips()
+			var c: Dictionary = data.get("clips", {}).get(effect_name, {})
+			if c.get("files", []).size():
+				var last: Dictionary = DmdEffect._clip_last
+				if last["name"] == effect_name and Time.get_ticks_msec() - int(last["t"]) < DmdEffect.CLIP_RESUME_MS:
+					clip_path = last["path"]
+					show = int(last["show"])           # the same show: the video is not restarted
+				else:
+					clip_path = ProjectSettings.globalize_path(c["files"].pick_random())
+					DmdEffect._show_seq += 1
+					show = DmdEffect._show_seq
+				clip_loop = bool(c.get("loop", false))
+			icon_path = str(data.get("icons", {}).get(effect_name, ""))
+		glide_done = icon_path != "" and DmdEffect._icon_seen[0] == icon_path \
+			and Time.get_ticks_msec() - int(DmdEffect._icon_seen[1]) < 700
 		values = {}
 		received_ms = 0.0
 		texts = {}
@@ -183,23 +314,50 @@ class State extends RefCounted:
 					var c := Color(it["color"][0], it["color"][1], it["color"][2], 1)
 					var mod := Color.WHITE
 					var st: Dictionary = panel.get(it["name"], {})
+					if clip_path != "":
+						continue                         # the ROM's blocks: the clip is behind the text
 					if st.has("visible") and not st["visible"]:
 						continue
 					if st.has("rect"):
 						r = st["rect"]
 					if st.has("mod"):
 						mod = st["mod"]
-					if hd and it["name"] != "Background":
+					if color and it.has("color_rgb"):
+						c = Color(it["color_rgb"])
+					elif hd and it["name"] != "Background":
 						c = dmd.text_tint(c)
 					if r.size.x > 0 and r.size.y > 0:
 						out.append(["rect", r, c * mod])
 				"frames":
-					var f: Array = it["frames"][frame_index()] if it["frames"].size() else []
+					var k := frame_index()
+					var f: Array = it["frames"][k] if it["frames"].size() else []
+					if clip_path != "" or icon_path != "":
+						_clip_frame(out, f, dmd)
+						continue
+					if hd and effect_name == "deff_080" and _clu_letters(out):
+						continue
+					if color and f.size() and it.has("color_frames") and k < it["color_frames"].size():
+						var ctex := _picture(it["color_frames"][k])
+						if ctex:
+							out.append(["tex", ctex, BOX, Color.WHITE])
+							_frame_text(out, str(f[0]).trim_prefix(MEDIA), dmd, true)
+							continue
 					var tex := _picture(f[0]) if f.size() else null
 					if tex:
 						out.append(["tex", tex, BOX, dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR])
 						if hd and tex.resource_path.begins_with(MEDIA_HD):
 							_frame_text(out, tex.resource_path.trim_prefix(MEDIA_HD), dmd)
+				"scroll":
+					var art: Texture2D = DmdEffect.hd_art(str(it["hd_pic"])) if hd and it.has("hd_pic") else null
+					var pic := art if art else _picture(it["pic"])
+					if pic:
+						var h := float(it["h"])
+						if art:                       # the owner's coloured picture, as wide as the display
+							h = 128.0 * art.get_height() / art.get_width()
+						var u := clampf(elapsed_ms / float(it["ms"]), 0.0, 1.0)
+						var y := floorf(lerpf(float(it["from"]), -h, u))
+						out.append(["tex", pic, Rect2(0.0, y, float(it["w"]) if not art else 128.0, h),
+							Color.WHITE if art else (dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR)])
 				"letters":
 					_letters(out, it, dmd)
 				"arcade":
@@ -244,9 +402,23 @@ class State extends RefCounted:
 		var lay := _layout(i, it, st.get("rom_y", it["y"]))
 		if lay.is_empty() or lay["text"] == "":
 			return
+		if hd and clip_path != "" and it["name"] in ["P1", "P2", "P3", "P4"] and lay["text"] in ["0", "00"]:
+			return                      # an empty score drawn white over a clip: a stray "00"
+		var flags: int = it["flags"]
+		if hd and icon_path != "" and int(it["x"]) > 41:       # beside the icon the lines are centred, not against the right edge
+			flags = 2
+			lay["pos"].x = ICON_TEXT_X - float(lay["w"]) / 2.0
+		var xf := Transform2D(0.0, lay["pos"])
+		if hd and it["name"] in ["P1", "P2", "P3", "P4"] and flags & 4:
+			# the small scores of the status panel: a little larger than the ROM's, about the right edge and the baseline
+			var z := minf(PANEL_SCORE_ZOOM, float(PANEL_SCORE_ROOM) / maxf(float(lay["w"]), 1.0))
+			var anchor := Vector2(lay["pos"].x + float(lay["w"]), lay["pos"].y + float(lay["ascent"]) - 1.0)
+			xf = Transform2D(0.0, Vector2(z, z), 0.0, anchor + (lay["pos"] - anchor) * z)
 		if hd:
-			out.append(["htext", [lay["text"], lay["font"], lay["ascent"], lay["line_h"], lay["w"], it["flags"], 0, -1],
-				Transform2D(0.0, lay["pos"]), mod, Rect2()])
+			out.append(["htext", [lay["text"], lay["font"], lay["ascent"], lay["line_h"], lay["w"], flags, 0, -1],
+				xf, mod, Rect2(), Color(it["color"]) if color and it.has("color") else NO_INK,
+				(1 if effect_name == "deff_019" and it["name"] == "Line1" else (2 if it["name"] in ["P1", "P2", "P3", "P4", "Award"] else 0)),
+				clip_path != "" or icon_path != ""])
 		else:
 			var font := RomText.font_file(lay["font"])
 			out.append(["ctext", font, lay["text"], lay["pos"] + Vector2(0, font.get_ascent(lay["line_h"])),
@@ -297,6 +469,13 @@ class State extends RefCounted:
 
 	## The panel's changes to its named items: {name: {"visible", "mod", "rom_y", "rect"}}.
 	func _panel_state() -> Dictionary:
+		var out := _panel_state_rom()
+		if clip_path != "" or icon_path != "":      # no ROM dot left over the clip or the icon: the separator, the dashes, the bars
+			for n in ["Separator", "Dash0", "Dash1", "Dash2", "BarDs", "BarBumpers", "BarSpinners", "BarZfs", "BarClu", "BarGem"]:
+				out[n] = {"visible": false}
+		return out
+
+	func _panel_state_rom() -> Dictionary:
 		var panel := {}
 		for it in items:
 			if it["type"] == "panel":
@@ -323,7 +502,7 @@ class State extends RefCounted:
 		for p in range(1, 5):
 			var st := {"visible": p <= players and not (blank and p == current),
 				"rom_y": 21 if p == 2 and players == 2 else p * 8 - 3,
-				"mod": Color(1, 1, 1, 1) if p == current else Color(0.2, 0.2, 0.2, 1)}
+				"mod": Color(1, 1, 1, 1) if p == current else (Color(0.5, 0.5, 0.5, 1) if hd else Color(0.2, 0.2, 0.2, 1))}
 			if match_panel:
 				st["visible"] = p <= players
 				st["mod"] = Color(2 / 15.0, 2 / 15.0, 2 / 15.0, 1)
@@ -344,6 +523,21 @@ class State extends RefCounted:
 			var n := clampi(_int(b[1]), 0, 10)
 			out[b[0]] = {"rect": Rect2(40, b[2] - n, 1, n)}
 		return out
+
+	## The C, L, U of deff 80 (the CLU targets) redrawn smooth (scripts/pup/letter_art.py clu_letters): the ROM's blocks
+	## upscaled looked smeared. False when the pictures are not there.
+	func _clu_letters(out: Array) -> bool:
+		var arts: Array = []
+		for l in ["C", "L", "U"]:
+			var art := DmdEffect.letter_art("CLU_" + l, true)
+			if art == null:
+				return false
+			arts.append(art)
+		var cells := [47.0, 74.0, 101.0]         # the ROM letters: 20 dots wide, rows 6-25, 27 dots apart
+		for i in 3:
+			var m := 20.0 * 0.14 / (1.0 - 2.0 * 0.14)       # the picture has 14 % margin
+			out.append(["tex", arts[i], Rect2(cells[i] - m, 6.0 - m, 20.0 + 2 * m, 20.0 + 2 * m), Color.WHITE])
+		return true
 
 	# ------------------------------------------------------------------ letters (tron/letter_panel.gd)
 
@@ -367,19 +561,28 @@ class State extends RefCounted:
 				state = ""
 			if state != str(s["name"]).left(-1).to_lower():
 				continue
-			var tex := _picture(s["pic"])
+			var art: Texture2D = DmdEffect.letter_art(str(s["letter"]), state == "solid") if hd else null
+			if art:          # the topper's letter: red collected, blue still to get (dimmed), in the ROM's cell
+				var cell := Rect2(s["x"], s["y"] + 0.5, 21, 21)
+				var k := minf(cell.size.x / art.get_width(), cell.size.y / art.get_height())
+				var size := Vector2(art.get_width(), art.get_height()) * k
+				out.append(["tex", art, Rect2(cell.position + (cell.size - size) / 2, size),
+					Color.WHITE if state == "solid" else Color(0.7, 0.7, 0.7, 1)])
+				continue
+			var colored: bool = color and s.has("color_pic")
+			var tex := _picture(s["color_pic"] if colored else s["pic"])
 			if tex == null:
 				continue
 			var classic := Color(s["color"][0], s["color"][1], s["color"][2], 1)
 			var rect := Rect2(s["x"], s["y"], 0, 0)
-			var dots := Vector2i((tex.get_size() / (float(dmd.frame_scale) if hd and tex.resource_path.begins_with(
-				MEDIA_HD) else 1.0)).round())
+			var dots := Vector2i((tex.get_size() / (color_scale if colored else (float(dmd.frame_scale) if hd and
+				tex.resource_path.begins_with(MEDIA_HD) else 1.0))).round())
 			rect.size = Vector2(dots)
 			if not hd:
 				out.append(["tex", tex, rect, classic])
 				continue
 			var level: float = classic.r          # orange times the palette level: the level
-			out.append(["tex", tex, rect, dmd.text_tint(Color(level, 0, 0, 1))])
+			out.append(["tex", tex, rect, Color.WHITE if colored else dmd.text_tint(Color(level, 0, 0, 1))])
 			if float(st["glow"]) > 0.0:
 				LetterPanel.start_glow(tex)
 				var glow := LetterPanel.made_glow(tex)
@@ -397,32 +600,64 @@ class State extends RefCounted:
 		var state := ArcadeReel.reel_state(frame, _int("scroll", 0), _int("blink", 0), 82, 4)
 		var x: int = state[0]
 		var blink_step: int = state[1]
-		var color: Color = dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR
-		var icons_a: Array = it["icons_a"]
-		var icons_b: Array = it["icons_b"]
-		var cabinets: Array = it["cabinets"]
+		var tint: Color = dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR
+		var colored: bool = color and it.has("color_cabinets") and it.has("color_icons_a") and it.has("color_icons_b")
+		var k := color_scale if colored else 1.0
+		if colored:
+			tint = Color.WHITE
+		var icons_a: Array = it["color_icons_a"] if colored else it["icons_a"]
+		var icons_b: Array = it["color_icons_b"] if colored else it["icons_b"]
+		var cabinets: Array = it["color_cabinets"] if colored else it["cabinets"]
 		for i in 3:
 			var cab := _int("cab%d" % i, 0)
 			var id := _int("icon%d" % i, 0)
+			var art_shown := false
 			if id >= 1 and id <= icons_a.size() and id <= icons_b.size():
 				var bright := blink_step < 0 or (i == slot and blink_step % 2 == 0)
-				var icon := DmdEffect.picture(icons_a[id - 1] if bright else icons_b[id - 1], false)
-				if icon:
-					out.append(["tex", icon, Rect2(Vector2(x + 8, 5), icon.get_size()), color])
+				var art: Texture2D = DmdEffect.award_art(id) if hd else null
+				var icon := DmdEffect.picture(icons_a[id - 1] if bright else icons_b[id - 1], false) if art == null else null
+				if art:      # the redrawn icon, in its own colours, dimmed when the award is not blinking; no cabinet, so it fills the slot
+					art_shown = true
+					out.append(["tex", art, Rect2(Vector2(x + 3.0, 1.3), Vector2(39.0, 29.6)), Color.WHITE if bright else Color(0.4, 0.4, 0.4, 1)])
+				elif icon:
+					out.append(["tex", icon, Rect2(Vector2(x + 8, 5), icon.get_size() / k), tint])
 			var tex: Texture2D = DmdEffect.picture(cabinets[cab], false) if cab >= 0 and cab < cabinets.size() else null
 			if tex:
-				out.append(["tex", tex, Rect2(Vector2(x, 0), tex.get_size()), color])
-				x += tex.get_width() + 5
+				if not art_shown:
+					out.append(["tex", tex, Rect2(Vector2(x, 0), tex.get_size() / k), tint])
+				x += roundi(tex.get_width() / k) + 5
 			else:
 				x += 45 + 5
 
 	# ------------------------------------------------------------------ recorded text (tools/dmd_mode.gd FrameText)
 
-	func _frame_text(out: Array, key: String, dmd) -> void:
-		var color: Color = dmd.text_color
-		for r in dmd.frame_shapes().get(key, []):
+	## colored: over a colour picture, which keeps its rectangles; each line in its colour (text_colors.json).
+	## An effect whose pictures a PuP clip or the character's HD icon replace: the clip entry (tron/dmd_screen.gd plays it
+	## behind everything), or the icon gliding in, and the text lines the recorded frame carries (drawn in our font).
+	func _clip_frame(out: Array, f: Array, dmd) -> void:
+		if clip_path != "":
+			DmdEffect._clip_last = {"name": effect_name, "path": clip_path, "show": show, "t": Time.get_ticks_msec()}
+			out.append(["clip", clip_path, show, clip_loop])
+		else:
+			var tex := _picture(icon_path)
+			if tex:
+				var h := 32.0
+				var w := h * tex.get_width() / tex.get_height()
+				DmdEffect._icon_seen = [icon_path, Time.get_ticks_msec()]
+				var t := 1.0 if glide_done else clampf(elapsed_ms / DmdEffect.ICON_GLIDE_MS, 0.0, 1.0)
+				var ease := 1.0 - pow(1.0 - t, 3.0)
+				out.append(["tex", tex, Rect2(lerpf(132.0, DmdEffect.ICON_CENTRE_X - w / 2.0, ease), 0.0, w, h), Color.WHITE])
+		if f.size() and not (clip_path != "" and effect_name in DmdEffect.CLIP_NO_TEXT):
+			_frame_text(out, str(f[0]).trim_prefix(MEDIA), dmd, color, false, 41, ICON_TEXT_X if icon_path != "" else 0.0)
+
+	## min_x: recorded lines further left are the ROM's counters (the "00" of a jackpot value), not drawn over a clip.
+	## box_x: when set, the lines are centred on it (the text beside the icon) instead of the ROM's alignment.
+	func _frame_text(out: Array, key: String, dmd, colored := false, shapes := true, min_x := 0, box_x := 0.0) -> void:
+		var tcol: Color = dmd.text_color
+		var inks: Array = dmd.text_colors().get(key, []) if colored else []
+		for r in ([] if colored or not shapes else dmd.frame_shapes().get(key, [])):
 			var lv := float(r[4]) / 15.0
-			var c := Color(color.r * lv, color.g * lv, color.b * lv, 1)
+			var c := Color(tcol.r * lv, tcol.g * lv, tcol.b * lv, 1)
 			var box := Rect2(float(r[0]), float(r[1]), float(r[2]) - float(r[0]) + 1, float(r[3]) - float(r[1]) + 1)
 			if int(r[5]):
 				out.append(["rect", box, c])
@@ -432,9 +667,12 @@ class State extends RefCounted:
 				out.append(["rect", Rect2(box.position + Vector2(0, 1), Vector2(1, box.size.y - 2)), c])
 				out.append(["rect", Rect2(box.position + Vector2(box.size.x - 1, 1), Vector2(1, box.size.y - 2)), c])
 		var clean := not RomTextHd.clean().is_empty()
-		for l in dmd.frame_text().get(key, []):
+		var lines: Array = dmd.frame_text().get(key, [])
+		for li in lines.size():
+			var l: Array = lines[li]
+			var ink: Color = Color(str(inks[li])) if li < inks.size() and inks[li] != null else NO_INK
 			var m := RomText.font_metrics(int(l[1]))
-			if m.is_empty():
+			if m.is_empty() or int(l[2]) < min_x:
 				continue
 			var whole := str(l[0])
 			var from := int(l[6])
@@ -446,6 +684,9 @@ class State extends RefCounted:
 			var params: Array
 			if clean:          # aligned as the recorded line: against an edge of the DMD, else centred on it
 				var align := 4 if int(l[2]) + int(l[5]) >= 127 else (0 if int(l[2]) <= 1 else 2)
+				if box_x > 0.0:
+					align = 2
+					pos.x = box_x - float(l[5]) / 2.0
 				params = [whole, int(l[1]), ascent, ascent + int(m["descent"]), int(l[5]), align, from, n]
 			else:              # the ROM's dot font: the part shown, where the ROM draws it
 				var part := whole.substr(from, n)
@@ -457,6 +698,6 @@ class State extends RefCounted:
 				var left := float(l[9])
 				var mid := pos + Vector2(float(l[5]) / 2.0, ascent - int(m["cap"]) / 2.0)
 				pos = mid + (pos - mid) * z
-				out.append(["htext", params, Transform2D(0.0, Vector2(z, z), 0.0, pos), mod, Rect2(left, 0, 128 - left, 32)])
+				out.append(["htext", params, Transform2D(0.0, Vector2(z, z), 0.0, pos), mod, Rect2(left, 0, 128 - left, 32), ink])
 				continue
-			out.append(["htext", params, Transform2D(0.0, pos), mod, Rect2()])
+			out.append(["htext", params, Transform2D(0.0, pos), mod, Rect2(), ink, 0, clip_path != "" or icon_path != ""])
