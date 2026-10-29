@@ -38,3 +38,18 @@ game/addons/dmd_out/
 game/config/pin2dmd.yaml
 game/config/zedmd.yaml
 game/config/zedmd_feed.yaml
+game/hd_art/deff_105/*.png
+game/hd_art/letters/*.png
+# redrawn by the owner (committed): the others are made from the pack's clips at setup
+!game/hd_art/deff_105/award_01.png
+!game/hd_art/deff_105/award_10.png
+!game/hd_art/deff_105/award_12.png
+!game/hd_art/deff_105/award_09.png
+!game/hd_art/deff_105/award_02.png
+!game/hd_art/deff_105/award_03.png
+!game/hd_art/deff_105/award_04.png
+!game/hd_art/deff_105/award_05.png
+!game/hd_art/deff_105/award_07.png
+!game/hd_art/deff_105/award_08.png
+!game/hd_art/deff_105/award_11.png
+!game/hd_art/deff_105/award_06.png

@@ -193,6 +193,8 @@ def setup(py=None, dry=False):
     say("== PuP Pack (pup_pack submodule, videos converted for Godot into pup_media/)")
     cfg = settings.load()
     pack = settings.pack_dir(cfg)
+    if not dry:       # the CLU letters need no pack: made before anything here can stop early
+        subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "letter_art.py"), "--clu"], cwd=tc.ROOT)
     if pack_zip():
         if pack_from_zip(pack_zip(), pack, dry):
             return 1
@@ -220,6 +222,14 @@ def setup(py=None, dry=False):
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
     say("   " + status()[1])
+    # the HD DMD's effects play the pack's clips behind the live text (scripts/pup/dmd_clip_plan.json): encoded before the Godot import
+    say("   encoding the clips of the HD DMD effects (game/media/dmd_clip/)")
+    subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_dmd_clips.py")], cwd=tc.ROOT)
+    # the mystery award reel's icons from the pack's clips and the topper icons (scripts/pup/award_sprites.py)
+    subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "award_sprites.py"), "clips", pack], cwd=tc.ROOT)
+    # the topper's letters for the ZUSE / TRON effects (scripts/pup/letter_art.py)
+    if subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "letter_art.py"), pack], cwd=tc.ROOT).returncode:
+        say("   the ZUSE / TRON letters could not be made (scripts/pup/letter_art.py above): the HD DMD shows the ROM's dots for them")
     return code
 
 

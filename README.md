@@ -140,7 +140,8 @@ any layout.
 - `--dmd-font NAME`: the HD text font: `rajdhani` (default, clean), `orbitron` (Tron style, wider), `godot` (Godot's
   default font), a `.ttf`/`.otf` file, or `rom` (the ROM's own dot fonts, smoothed). `--dmd-text-scale X`: its
   size, 1 = the ROM's capital height (default 0.85).
-- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (0.8 by default; `--dmd-text-glow 0` turns it off).
+- `--dmd-text-color "#RRGGBB"`, `--dmd-text-glow X`: the HD text's colour and glow (off by default; `--dmd-text-glow 0.8` is the soft glow).
+- `--dmd-color off`: the HD DMD without the colour of its effects (on by default; [docs/dmd_colour.md](docs/dmd_colour.md)).
 
 [docs/development.md](docs/development.md#running) has the details of the HD DMD.
 

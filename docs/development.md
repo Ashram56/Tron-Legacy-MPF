@@ -157,13 +157,14 @@ pixels (what `scripts/render_diff.py` checks against the ROM captures). To go ba
 | `--dmd-font NAME` (or `TRON_DMD_FONT`, `tron/dmd/font`) | HD text font: `rajdhani` (default), `orbitron`, `godot` (Godot's default font), a `.ttf`/`.otf` file, or `rom` (the ROM's dot fonts traced to smooth outlines). Clean fonts keep the ROM layout: same lines and alignment, the ROM's capital height, squeezed to the ROM's text width when wider. Their signed distance fields are made once by setup (`game/tools/bake_fonts.gd`, about 2 minutes on a Jetson Xavier NX; `game/fonts_ttf/baked/`, git-ignored): made in the game instead, the first lines of text held it 20 s and more |
 | `--no-render-thread` (or `TRON_RENDER_THREAD=0`) | Godot draws on its main thread instead of its separate render thread (on by default, `game/project.godot`; docs/performance.md), should a GPU driver misbehave with it |
 | `--dmd-text-scale X` (or `TRON_DMD_TEXT_SCALE`, `tron/dmd/text_scale`) | size of the clean HD fonts: 1 = capitals as tall as the ROM's and lines no wider than the ROM's text; default 0.85; 0.5-1.5. Lines shrink about their middle |
+| `--dmd-color on\|off` (or `TRON_DMD_COLOR`, `tron/dmd/color`) | the HD DMD's effects in colour (default on when `game/media/dmd_color/` exists, which setup builds from the monochrome frames; `--no-color` skips it): coloured 2x frames, and the PuP clips behind the live text when the pack is installed. Off: the plain HD DMD. [dmd_colour.md](dmd_colour.md) |
 | `--dmd-text-color "#RRGGBB"` (or `TRON_DMD_TEXT_COLOR`, `tron/dmd/text_color`) | HD text colour (default the tint's, `#2a6cff`): ROM text, score display, service menu, ZUSE/TRON letters, attract pages |
-| `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0.8, a soft glow; 0 = none); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
+| `--dmd-text-glow X` (or `TRON_DMD_TEXT_GLOW`, `tron/dmd/text_glow`) | strength of the glow around HD text (default 0 = none; 0.8 is a soft glow); its colour: `TRON_DMD_TEXT_GLOW_COLOR` or `tron/dmd/text_glow_color` (default the tint's, `#22b8ff`) |
 
 The text glow and size can also be set from the service menu while the game runs: ADJUSTMENTS > DISPLAY
 ADJUSTMENTS, TEXT GLOW (OFF to 300%) and TEXT SIZE (50% to 110%). The text changes on the display as the value
 is edited; SELECT keeps it across power cycles, and then it replaces `--dmd-text-glow` / `--dmd-text-scale`.
-Setting it back to FACTORY (80%, 85%) or RESET FACTORY SETTINGS returns to the options above. The third item,
+Setting it back to FACTORY (OFF, 85%) or RESET FACTORY SETTINGS returns to the options above. The third item,
 PUP DMD SIZE, sizes the DMD in the PuP's DMD window: WITH LIGHT CYCLES (a smaller DMD, the light cycles round
 it) or FULL SIZE (a real DMD's 320x80 mm over the grid, no light cycles); its factory value is `game/pup.cfg`'s
 `[dmd] dmd_size` ([docs/pup/README.md](pup/README.md), "DMD size").

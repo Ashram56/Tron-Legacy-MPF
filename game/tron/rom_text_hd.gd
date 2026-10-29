@@ -18,6 +18,7 @@ const RomTextHd = preload("res://tron/rom_text_hd.gd")
 
 const HD_DIR := "res://fonts/hd/"
 const GROUP := "dmd_hd_text"     # every line, redrawn when the service menu changes the glow or size (restyle())
+const INK_GLOW := 0.5            # a line in its own colour glows half as much: white text would blur
 const CELL_PLANE := 0xE000
 const LEVEL_PLANE := 0xE000
 
@@ -36,6 +37,7 @@ const BAKED_DIR := "res://fonts_ttf/baked/"
 ## the black under clean text, in dots on each side: outlined ROM fonts, the others (instead of the ROM's cell)
 const OUTLINE_DOTS := 1.0
 const CELL_DOTS := 0.5
+const SCORE_EDGE_DOTS := 1.0          # the white edge of the scores (dmd_mode.gd score_style)
 
 static var _info: Dictionary = {}
 static var _fonts: Dictionary = {}
@@ -248,6 +250,9 @@ class Line extends RefCounted:
 	var flags := 0                   # 2 = centred, 4 = right aligned, else left (tron/rom_text.gd rom_flags)
 	var first := 0                   # clean fonts: only the characters first.. (count) of the line are drawn,
 	var count := -1                  # where they sit in the whole line (-1: to the end)
+	var tight := false               # over a PuP clip or an icon: the glow stays close to the strokes
+	var score := 0                   # 1: the big score, drawn with the style of dmd_mode.gd score_style (a white edge, or white); 2: the panel scores, no glow
+	var ink := Color(0, 0, 0, 0)     # its own colour (the colourisation's, tron/dmd_effect.gd), else the text colour
 
 	## As RomTextHd.set_line(); false when nothing changed.
 	func set_line(s: String, id: int, line_ascent: int, line_height: int, width := -1, align_flags := 0,
@@ -292,7 +297,7 @@ class Line extends RefCounted:
 			if flags & 2:
 				x = (box_width - w) / 2.0
 			elif flags & 4:
-				x = box_width - w
+				x = box_width - w - 1.5 * air
 		if first > 0:
 			x += font.get_string_size(text.left(first), HORIZONTAL_ALIGNMENT_LEFT, -1, CLEAN_SIZE).x * sx
 		return [font, Vector2(x, base - cap * (1.0 - s) / 2.0), sx, k]   # scaled about the capitals' middle
@@ -329,13 +334,13 @@ class Line extends RefCounted:
 	## The glow (to be added to what is under it).
 	func draw_glow(item: CanvasItem, xf := Transform2D.IDENTITY, mod := Color.WHITE) -> void:
 		var st := RomTextHd.style()
-		if text == "" or float(st["glow"]) <= 0.0:
+		if text == "" or float(st["glow"]) <= 0.0 or score == 2:
 			return
 		item.draw_set_transform_matrix(xf)
-		var g: Color = st["glow_color"] * float(st["glow"])
+		var g: Color = (ink * INK_GLOW if ink.a > 0.0 else st["glow_color"]) * float(st["glow"])
 		g.a = 1.0
 		if not RomTextHd.clean().is_empty():
-			for r in [2.0, 1.5, 1.1, 0.75, 0.4]:   # widening outlines, added: soft light around the strokes
+			for r in ([0.7, 0.35] if tight else [2.0, 1.5, 1.1, 0.75, 0.4]):   # widening outlines, added: soft light round the strokes (tight over a clip or an icon: wide it smeared over the picture)
 				_draw_clean(item, xf, Color(g.r * 0.3, g.g * 0.3, g.b * 0.3, 1) * mod, r)
 		else:
 			item.draw_string(RomTextHd.glow_font(font_id), Vector2(0, ascent), text, HORIZONTAL_ALIGNMENT_LEFT, -1,
@@ -347,10 +352,18 @@ class Line extends RefCounted:
 		if text == "":
 			return
 		item.draw_set_transform_matrix(xf)
-		var color: Color = RomTextHd.style()["color"]
+		var color: Color = ink if ink.a > 0.0 else RomTextHd.style()["color"]
 		var levels: Array = RomTextHd.info(font_id).get("levels", [15])
 		if not RomTextHd.clean().is_empty():
 			var top := float(levels.max()) / 15.0
+			if score == 1:
+				var how := str(RomTextHd.style().get("score", "plain"))
+				if how == "outline":      # the white edge first, the text colour over it
+					_draw_clean(item, xf, Color(1, 1, 1, 1) * mod, SCORE_EDGE_DOTS)
+				elif how == "white":
+					color = Color.WHITE
+			elif score == 2 and str(RomTextHd.style().get("score", "plain")) != "blue":
+				color = Color.WHITE       # the small scores of the panel: white, blue on black was hard to read
 			_draw_clean(item, xf, Color(color.r * top, color.g * top, color.b * top, 1) * mod, 0.0)
 		else:
 			var font := RomTextHd.vector_font(font_id)

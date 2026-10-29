@@ -262,3 +262,21 @@ autoload in `game/project.godot`, the `pup_pack` submodule in `.gitmodules`, one
   longer draws them (**check** in `docs/pup/captures.md`); fix those lines of `trigger_map.yaml`;
 - the media bridge (`game/tron/media_bridge.py`) renamed `sound`, `music_key` or its sound pools:
   `tests/test_pup.py` fails on the music hand-over (`game/tron_pup/mode.py`, `set_music_mute`).
+
+## DMD effects with PuP clips (HD DMD)
+
+In HD mode the video-like DMD effects play the PuP clip of the same sequence behind the live vector text, cropped to
+4:1, a random variant among the trigger's clips, stretched over the effect's length (or in real time for a long clip).
+The effects that show a character (Quorra, Clu, Gem, Zuse, Flynn) use the topper's HD icon, which glides in from the right.
+The plan (clip, window, crop per effect) is `scripts/pup/dmd_clip_plan.json`, made by `scripts/pup/dmd_clip_plan.py`
+(the review sheets: `scripts/pup/pup_dmd_compare.py`). `scripts/pup/gen_dmd_clips.py` encodes it from the pack into
+`game/media/dmd_clip/` (git-ignored; `setup.py` runs it before the Godot import; needs the pack and ffmpeg). Classic mode
+is unchanged; `TRON_DMD_CLIPS=0` turns the clips off. Real-time check: `game/tools/clip_capture.tscn`.
+
+Clips, round 2 (2026-10-28): the four "Default" backglass clips (two characters and the light well) are cropped on the
+characters (`pup_crop_overrides.json`); the pack's baked JACKPOT lettering is cropped away (DiscWarsJackpot3,
+GemJackpot2/3), the clip it covers entirely is left out (LightCycleJackpot5) and the title wipes at the start of three
+clips are skipped (`dmd_clip_plan.py` SKIP, START_AFTER); the ROM's "ARCADE IS LIT" is not drawn over its clip
+(`CLIP_NO_TEXT`); an icon effect that follows one with the same face within 0.7 s does not glide in again.
+Scores (HD): `--dmd-score plain|outline|white|blue` (default plain: the big score in the text colour, the small panel scores white; outline: a white edge round both; white: both white; blue: all in the text colour), `TRON_DMD_SCORE`.
+Mystery award icons: `python scripts/pup/award_sprites.py export|import` (`game/hd_art/README.md`).

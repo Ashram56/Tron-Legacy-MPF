@@ -246,10 +246,10 @@ class Audits:
 
 # The HD DMD's text glow and size (not in the ROM: docs/rom_differences.md), as percentages, and the PuP
 # DMD window's layout: {item: (name, stored machine var, live machine var, factory, min, max, step)}. The
-# factory values are tools/dmd_mode.gd's defaults (glow 0.8, text scale 0.85) and game/pup.cfg's
+# factory values are tools/dmd_mode.gd's defaults (glow 0, text scale 0.85) and game/pup.cfg's
 # [dmd] dmd_size ("cycles").
 DISPLAY_ITEMS = {
-    1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 80, 0, 300, 10),
+    1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 0, 0, 300, 10),
     2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 110, 5),
     3: ("PUP DMD SIZE", "pup_dmd_size_setting", "pup_dmd_size", 0, 0, 1, 1),
 }
