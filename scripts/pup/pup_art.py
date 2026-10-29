@@ -131,24 +131,13 @@ def make(root=ROOT, py=None):
 
 
 def ensure(root=ROOT):
-    """At a start: link the art; when a pack is installed and its art is missing, make it in the background (not twice at once)."""
+    """At a start: only link the art the pack install made (symlinks, instant). A start never makes anything (platforms/game-bundles.md
+    rule 2); a pack installed without its art is told to be installed again (the install makes the art)."""
     try:
         link(root)
-        if complete(root) or not pack_installed(root) or os.environ.get("TRON_PUP") in ("0", "false", "off"):
-            return
-        lock = os.path.join(art_dir(root), "making.lock")
-        try:
-            if os.path.exists(lock) and (os.path.getmtime(lock) > __import__("time").time() - 1800):
-                return
-            os.makedirs(os.path.dirname(lock), exist_ok=True)
-            open(lock, "w").close()
-        except OSError:
-            return
-        log = open(os.path.join(root, LOG), "a")
-        print("PuP art (DMD clips, ZUSE/TRON letters) is missing: making it in the background, log " + LOG
-              + "; restart the game when it is done", flush=True)
-        subprocess.Popen([sys.executable, os.path.abspath(__file__), "--make", "--unlock"], cwd=root, stdout=log, stderr=log,
-                         stdin=subprocess.DEVNULL, start_new_session=True)
+        if not complete(root) and pack_installed(root):
+            print("PuP art (DMD clips, ZUSE/TRON letters) is missing: install the PuP Pack again (scripts/pup/pup_setup.py --pup-zip ...)",
+                  flush=True)
     except Exception as e:        # never stop a game start for this
         print("PuP art: " + str(e), flush=True)
 
