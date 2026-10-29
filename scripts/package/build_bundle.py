@@ -38,7 +38,7 @@ SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py
 GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs", "game/tron/media_data.json",
              "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc",
              # made from the PuP Pack at the bundle's creation (--pup-zip), shipped as they are: nothing is made on the target
-             "game/hd_art/letters", "game/hd_art/deff_105"]
+             "game/hd_art/letters", "game/hd_art/deff_105", "pup_media/trn_174h"]
 
 ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
                "assets/mpf_package/service_menu.json", "assets/mpf_package/media/rom_images_all.zip"]
@@ -48,7 +48,7 @@ ASSET_DIRS = ["assets/mpf_package/config", "assets/rom_data/io", "assets/rom_dat
 
 ASSET_GLOBS = [("assets/mpf_package/media/dmd", "timing.json")]
 
-NEVER = ["game/data", "game/audits", "game/logs", "game/monitor/logs", "game/monitor/settings.ini",
+NEVER = ["pup_media/trn_174h/dmd_art", "game/data", "game/audits", "game/logs", "game/monitor/logs", "game/monitor/settings.ini",
          "game/monitor/settings.ini.lock", "game/pup.local.cfg", "game/scorbit.local.cfg", "game/options.json",
          "game/.godot"]
 
@@ -116,12 +116,13 @@ def spec(template):
         "options": {"schema": "scripts/package/options.json", "tool": "scripts/package/bundle_options.py",
                     "count": len(options["options"])},
         "pup": {
-            "installed_from": "the pre-processed pack archive made with this bundle (tron-legacy-mpf-pup-ready.zip); the author's raw "
-                             "zip is converted on the builder only (--pup-zip), never on the machine that runs the game",
-            "ready_only": True,
+            "installed_from": "the pack's own zip (VP Universe), never in this bundle: the page only unpacks it (extract_only). What the "
+                             "game derives from it (pup_media/trn_174h: manifest, still, converted files) is made on the builder (--pup-zip) "
+                             "and is in this bundle",
+            "extract_only": True,
             "install": "python3 scripts/pup/pup_setup.py --pup-zip ZIP_PATH_OR_URL",
             "status": "python3 scripts/pup/pup_setup.py --status",
-            "pack_dir": "pup_pack/trn_174h", "media_dir": "pup_media/trn_174h",
+            "pack_dir": "pup_pack/trn_174h",
             "needs_restart": True,
         },
         "extra": {"profiles": {"file": "scripts/package/profiles.json",
@@ -129,7 +130,7 @@ def spec(template):
                                "detect": "python3 scripts/package/board_profile.py detect",
                                "ids": [p["id"] for p in board_profile.load()]}},
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/options.json", "game/pup.local.cfg",
-                           "game/scorbit.local.cfg", "pup_pack", "pup_media"],
+                           "game/scorbit.local.cfg", "pup_pack"],
     }
 
 
@@ -150,26 +151,6 @@ def make_pup_art(args):
             raise SystemExit("the PuP art is incomplete: no " + rel)
 
 
-def pup_ready_zip(out):
-    """The installed pack and its converted media (pup_pack/<id>, pup_media/<id>) as one zip with pup_ready.json: the page of the platform
-    unpacks it without running anything (MPF-Godot-Packaging rule 12). The builder's scratch art folder is left out (it is in the bundle)."""
-    import zipfile
-    cfg = {"pack_dir": "pup_pack/trn_174h", "media_dir": "pup_media/trn_174h"}
-    path = os.path.join(out, NAME + "-pup-ready.zip")
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
-        z.writestr("pup_ready.json", json.dumps({"game": NAME, **cfg}, indent=1))
-        for rel in cfg.values():
-            for base, dirs, files in os.walk(os.path.join(ROOT, rel)):
-                dirs[:] = [d for d in dirs if d != "dmd_art"]
-                for f in files:
-                    if f.startswith("."):
-                        continue
-                    full = os.path.join(base, f)
-                    z.write(full, os.path.relpath(full, ROOT).replace(os.sep, "/"))
-    print("== pre-processed PuP Pack: {} ({} MB)".format(path, os.path.getsize(path) >> 20))
-    return path
-
-
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
@@ -185,8 +166,6 @@ def main(argv=None):
     check_workspace()
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
-    if not args.no_pup_art:
-        pup_ready_zip(out)
     template = os.path.join(out, "hd_frame.import.template")
     with open(template, "w", encoding="utf-8", newline="\n") as f:
         f.write(gen_media.HD_FRAME_IMPORT)
