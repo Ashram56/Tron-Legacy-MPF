@@ -116,7 +116,9 @@ def spec(template):
         "options": {"schema": "scripts/package/options.json", "tool": "scripts/package/bundle_options.py",
                     "count": len(options["options"])},
         "pup": {
-            "installed_from": "the pack's own zip (VP Universe), never in this bundle",
+            "installed_from": "the pre-processed pack archive made with this bundle (tron-legacy-mpf-pup-ready.zip); the author's raw "
+                             "zip is converted on the builder only (--pup-zip), never on the machine that runs the game",
+            "ready_only": True,
             "install": "python3 scripts/pup/pup_setup.py --pup-zip ZIP_PATH_OR_URL",
             "status": "python3 scripts/pup/pup_setup.py --status",
             "pack_dir": "pup_pack/trn_174h", "media_dir": "pup_media/trn_174h",
@@ -148,6 +150,26 @@ def make_pup_art(args):
             raise SystemExit("the PuP art is incomplete: no " + rel)
 
 
+def pup_ready_zip(out):
+    """The installed pack and its converted media (pup_pack/<id>, pup_media/<id>) as one zip with pup_ready.json: the page of the platform
+    unpacks it without running anything (MPF-Godot-Packaging rule 12). The builder's scratch art folder is left out (it is in the bundle)."""
+    import zipfile
+    cfg = {"pack_dir": "pup_pack/trn_174h", "media_dir": "pup_media/trn_174h"}
+    path = os.path.join(out, NAME + "-pup-ready.zip")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+        z.writestr("pup_ready.json", json.dumps({"game": NAME, **cfg}, indent=1))
+        for rel in cfg.values():
+            for base, dirs, files in os.walk(os.path.join(ROOT, rel)):
+                dirs[:] = [d for d in dirs if d != "dmd_art"]
+                for f in files:
+                    if f.startswith("."):
+                        continue
+                    full = os.path.join(base, f)
+                    z.write(full, os.path.relpath(full, ROOT).replace(os.sep, "/"))
+    print("== pre-processed PuP Pack: {} ({} MB)".format(path, os.path.getsize(path) >> 20))
+    return path
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
@@ -163,6 +185,8 @@ def main(argv=None):
     check_workspace()
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
+    if not args.no_pup_art:
+        pup_ready_zip(out)
     template = os.path.join(out, "hd_frame.import.template")
     with open(template, "w", encoding="utf-8", newline="\n") as f:
         f.write(gen_media.HD_FRAME_IMPORT)
