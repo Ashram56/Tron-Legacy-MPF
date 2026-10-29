@@ -29,7 +29,7 @@ videos for a slower PC. Without the converted media the PuP stays off and the ga
 private copy of the pack; the installers use it only with a token or git credentials that can read it). `TRON_PUP_ZIP=<zip or https URL>` in the environment of `setup.py` (or the installers'
 `--pup-zip` / `-PupZip`, or `python scripts/pup/pup_setup.py --pup-zip <zip>`) takes the pack from the zip its author
 publishes instead, so a player downloads it from the author, who gets the credit:
-`pup_setup.py` finds the folder holding `triggers.pup` in the zip (at any depth, e.g. `PUPVideos/trn_174h/`),
+(In a bundle nothing of this runs on the machine: the derived media ship in the bundle and the page only unpacks the zip, docs/bundle.md "The PuP Pack".) `pup_setup.py` finds the folder holding `triggers.pup` in the zip (at any depth, e.g. `PUPVideos/trn_174h/`),
 extracts it into `pup_pack/trn_174h/` and notes the zip's SHA-256 in `pup_pack/trn_174h/.pup_zip`, so the same zip
 is not extracted twice; the installers then don't ask for access to the pack's repository. A pack already
 checked out by the submodule is left alone (delete the folder to switch). A different release of the pack can
