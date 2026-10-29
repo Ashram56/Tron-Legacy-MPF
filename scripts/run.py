@@ -331,7 +331,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pup"))
     import pup_art
-    pup_art.ensure(tc.ROOT)             # the PuP art of the HD DMD (clips, letters): linked in, or made in the background when missing
+    pup_art.ensure(tc.ROOT)             # the PuP art of the HD DMD (clips, letters): linked in (the pack install makes it)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
         print("Generated media out of date ({}): generating and importing them again".format(stale), flush=True)
