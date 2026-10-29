@@ -36,7 +36,9 @@ SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py
            "package/options.json", "package/board_profile.py", "package/profiles.json"]
 
 GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs", "game/tron/media_data.json",
-             "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc"]
+             "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc",
+             # made from the PuP Pack at the bundle's creation (--pup-zip), shipped as they are: nothing is made on the target
+             "game/hd_art/letters", "game/hd_art/deff_105"]
 
 ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
                "assets/mpf_package/service_menu.json", "assets/mpf_package/media/rom_images_all.zip"]
@@ -45,9 +47,6 @@ ASSET_DIRS = ["assets/mpf_package/config", "assets/rom_data/io", "assets/rom_dat
               "assets/rom_data/deffs", "assets/io", "assets/callouts"]
 
 ASSET_GLOBS = [("assets/mpf_package/media/dmd", "timing.json")]
-
-# Made from the PuP Pack on the machine by its install (scripts/pup/pup_setup.py): never in a bundle, the pack is the author's
-PACK_MADE = {"dmd_clip"}
 
 NEVER = ["game/data", "game/audits", "game/logs", "game/monitor/logs", "game/monitor/settings.ini",
          "game/monitor/settings.ini.lock", "game/pup.local.cfg", "game/scorbit.local.cfg", "game/options.json",
@@ -75,14 +74,8 @@ def check_workspace():
 
 
 def generated():
-    """GENERATED, with game/media as its folders except those the PuP install makes from the pack."""
-    out = []
-    for rel in GENERATED:
-        if rel == "game/media" and os.path.isdir(os.path.join(ROOT, rel)):
-            out += ["game/media/" + d for d in sorted(os.listdir(os.path.join(ROOT, rel))) if d not in PACK_MADE]
-        else:
-            out.append(rel)
-    return out
+    """GENERATED that exists in the work tree."""
+    return [rel for rel in GENERATED if os.path.exists(os.path.join(ROOT, rel))]
 
 
 def spec(template):
@@ -138,14 +131,35 @@ def spec(template):
     }
 
 
+def make_pup_art(args):
+    """Install the pack on this builder and make the art, or stop: a bundle is never left to make it on the target."""
+    if args.no_pup_art:
+        return
+    zip_ = args.pup_zip or os.environ.get("MPF_BUNDLE_PUP_ZIP")
+    if not zip_:
+        raise SystemExit("give the PuP Pack's zip with --pup-zip ZIP (the art of the HD DMD is made from it here, never on the machine "
+                         "that runs the game), or --no-pup-art for a bundle without it")
+    env = dict(os.environ, TRON_PUP_ZIP=zip_)
+    for cmd in ([sys.executable, os.path.join(HERE, "..", "pup", "pup_setup.py")],):
+        if subprocess.run(cmd, cwd=ROOT, env=env).returncode:
+            raise SystemExit("the PuP Pack could not be installed and its art made (above)")
+    for rel in ("game/media/dmd_clip/clips.json", "game/hd_art/letters/Z_on.png", "game/hd_art/letters/N_on.png"):
+        if not os.path.exists(os.path.join(ROOT, rel)):
+            raise SystemExit("the PuP art is incomplete: no " + rel)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
                    help="arm64: Raspberry Pi 4 and Jetson (ETC2/ASTC textures); x86_64: a PC (S3TC/BPTC); all: both")
     p.add_argument("--version", help="default: the date and the short commit, 2026.10.24-ab12cd3")
     p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
+    p.add_argument("--pup-zip", help="the PuP Pack's zip (a path or URL): installed here and the HD DMD's art (clips, ZUSE/TRON letters, "
+                   "award icons) made from it, then shipped in the bundle. Nothing is made on the machine that runs the game")
+    p.add_argument("--no-pup-art", action="store_true", help="a bundle without that art (the HD DMD then shows the ROM's dot animations)")
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
     args = p.parse_args(argv)
+    make_pup_art(args)
     check_workspace()
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)

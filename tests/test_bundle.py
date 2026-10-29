@@ -210,13 +210,21 @@ class TestBuilder(unittest.TestCase):
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_spec_lists_only_files_that_exist(self):
         """The platform's builder stops on a listed file that is missing (flow_attract_cycle has no timing.json, 2026-10-29) and
-        the bundle never carries what the PuP install makes from the author's pack (game/media/dmd_clip)."""
+        the bundle carries the art made from the PuP Pack at its creation (nothing is made on the target), and no run of the game makes it."""
         sp = bb.spec("t")
         for rel in sp["copy"]:
             if rel.startswith(("assets/", "scripts/")):
                 self.assertTrue(os.path.exists(os.path.join(ROOT, rel)), rel)
-        self.assertFalse([r for r in sp["copy"] if "dmd_clip" in r and not r.startswith("scripts/")], sp["copy"])
-        self.assertNotIn("game/media", sp["copy"]) if os.path.isdir(os.path.join(ROOT, "game", "media")) else None
+        self.assertIn("game/hd_art/letters", bb.GENERATED)
+        self.assertIn("game/hd_art/deff_105", bb.GENERATED)
+
+    def test_nothing_is_made_on_the_target(self):
+        """run.py (every start) and a bundle's pup_setup make no art (platforms/game-bundles.md rule 2 and 12)."""
+        run = open(os.path.join(ROOT, "scripts", "run.py"), encoding="utf-8").read()
+        self.assertNotIn("pup_art", run)
+        setup = open(os.path.join(ROOT, "scripts", "pup", "pup_setup.py"), encoding="utf-8").read()
+        self.assertIn('os.path.exists(os.path.join(tc.ROOT, "bundle.json"))', setup)
+        self.assertNotIn("def ensure", open(os.path.join(ROOT, "scripts", "pup", "pup_art.py"), encoding="utf-8").read())
 
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_asset_files_exist(self):

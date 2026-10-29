@@ -196,9 +196,10 @@ def setup(py=None, dry=False):
     say("== PuP Pack (pup_pack submodule, videos converted for Godot into pup_media/)")
     cfg = settings.load()
     pack = settings.pack_dir(cfg)
-    if not dry:       # the CLU letters need no pack: made before anything here can stop early
+    # a bundle (bundle.json) has its art made already; nothing is made on the machine that runs it (scripts/pup/pup_art.py)
+    bundle = os.path.exists(os.path.join(tc.ROOT, "bundle.json"))
+    if not dry and not bundle:       # the CLU letters need no pack: made before anything here can stop early
         subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "letter_art.py"), "--clu"], cwd=tc.ROOT)
-        pup_art.link(tc.ROOT)
     if pack_zip():
         if pack_from_zip(pack_zip(), pack, dry):
             return 1
@@ -226,9 +227,9 @@ def setup(py=None, dry=False):
     code = subprocess.run([py, os.path.join(tc.ROOT, "scripts", "pup", "gen_pup.py")] + (["--native"] if native else []),
                           cwd=tc.ROOT).returncode
     say("   " + status()[1])
-    # the HD DMD's art from the pack: the clips behind the live text (scripts/pup/dmd_clip_plan.json), the ZUSE / TRON letters and award
-    # icons; made into pup_media/<id>/dmd_art, with the pack, and linked into the game (scripts/pup/pup_art.py)
-    pup_art.make(tc.ROOT, py)
+    # the HD DMD's art (clips, ZUSE / TRON letters, award icons): in a work tree, for the bundle to ship (scripts/pup/pup_art.py)
+    if not bundle:
+        pup_art.make(tc.ROOT, py)
     return code
 
 
