@@ -30,7 +30,7 @@ import bundle_options  # noqa: E402
 ROOT = tc.ROOT
 NAME = "tron-legacy-mpf"
 
-SCRIPTS = ["run.py", "dmd_out.py", "toolchain.py", "fsutil.py", "gmc_patch.py", "pup/__init__.py", "pup/pup_setup.py",
+SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py", "gmc_patch.py", "pup/__init__.py", "pup/pup_setup.py",
            "pup/gen_pup.py", "package/__init__.py", "package/start.py", "package/bundle_options.py",
            "package/options.json", "package/board_profile.py", "package/profiles.json"]
 

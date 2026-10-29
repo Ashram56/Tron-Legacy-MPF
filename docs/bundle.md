@@ -56,7 +56,7 @@ top folder, `tron-legacy-mpf/`. Sizes are the arm64 bundle, measured 2026-10-24 
 |---|---|---|
 | `bundle.json` | 2 KB | the manifest, below |
 | `SHA256SUMS` | 3 MB | hash of every other file: `sha256sum -c SHA256SUMS --quiet` |
-| `scripts/` | small | `run.py` (the game's runner), `toolchain.py`, `fsutil.py`, `gmc_patch.py`; `pup/` (`pup_setup.py` installs a pack, `gen_pup.py`); `package/` (`start.py`, `bundle_options.py`, `options.json`) |
+| `scripts/` | small | `run.py` (the game's runner), `dmd_out.py` and `mpf_platform.py` (the platform's DMD output, imported by `start.py`), `toolchain.py`, `fsutil.py`, `gmc_patch.py`; `pup/` (`pup_setup.py` installs a pack, `gen_pup.py`); `package/` (`start.py`, `bundle_options.py`, `options.json`) |
 | `game/` | 600 MB | the Godot project and the MPF machine folder (below) |
 | `game/.godot/` | about 100 MB | the Godot import for the target GPU: `imported/`, `global_script_class_cache.cfg`, `uid_cache.bin` |
 | `game/media/`, `game/sounds/` | 94 MB, 109 MB | generated DMD frames and effect timing, sounds |
