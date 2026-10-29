@@ -177,6 +177,17 @@ class TestBuilder(unittest.TestCase):
                     queue.append(target)
         self.assertEqual(missing, [], "listed in SCRIPTS (scripts/package/build_bundle.py)")
 
+    def test_pup_install_finds_every_script_it_launches(self):
+        """The PuP install runs on the machine from the bundle: each script pup_setup.py launches is in the bundle (the HD DMD's
+        clips, letters and award icons were left out once, and the pack then installed without them)."""
+        import re
+        text = open(os.path.join(ROOT, "scripts", "pup", "pup_setup.py"), encoding="utf-8").read()
+        launched = set(re.findall(r'"scripts", "pup", "([a-z_]+\.py)"', text))
+        self.assertTrue(launched)
+        for name in launched:
+            self.assertIn("pup/" + name, bb.SCRIPTS)
+        self.assertIn("pup/dmd_clip_plan.json", bb.SCRIPTS)      # read by gen_dmd_clips.py
+
     def test_a_bundle_is_never_stale(self):
         import toolchain as tc
         with tempfile.TemporaryDirectory() as d:
