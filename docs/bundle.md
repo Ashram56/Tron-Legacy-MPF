@@ -84,7 +84,7 @@ base system does not provide them.
 | `requires` | `python`, `python_packages`, `godot`, `mpf_gmc`, `programs`, and `env` (`GODOT`, `TRON_VENV` overrides) |
 | `run` | `start` (the command), `start_note`, `cwd` (relative to the bundle), `ports` (5050 Godot/GMC, 5051 MPF, localhost only) |
 | `options` | `schema` (path), `tool` (path), `count`: see Settings |
-| `pup` | `install` and `status` commands, `pack_dir`, `media_dir`, `needs_restart`; the pack is never in the bundle |
+| `pup` | `extract_only` (the page only unpacks the author's zip into `pack_dir`), `pack_dir`, `needs_restart`; the pack is never in the bundle, what the game derives from it (`pup_media`) is |
 | `keep_on_update` | paths to copy from the old install to a new one |
 | `sizes` | `stage_bytes` (unpacked), `textures` (count per import format) |
 
@@ -186,21 +186,28 @@ the game's own parsers read what the tool writes.
 
 ## The PuP Pack
 
-The pack is never in the bundle (its author's zip, from VP Universe, is the source). Installing it is one
-command, run in the bundle folder:
+Rule (MPF-Godot-Packaging `platforms/game-bundles.md`, rules 12 and 13): **everything extra made for the game goes in the
+bundle; nothing is made or processed on the machine that runs it** (a Raspberry Pi, a Jetson or a PC only start MPF and
+serve the settings page). The pack itself stays the author's untouched zip (VP Universe), never in the bundle: the
+settings page downloads or takes it and only unpacks it (`bundle.json` `pup.extract_only`) into `pup_pack/trn_174h`.
+
+What the game derives from the pack is made once, on the builder, and ships in the archive:
 
 ```sh
-python3 scripts/pup/pup_setup.py --pup-zip /path/or/https-URL/to/pack.zip
-python3 scripts/pup/pup_setup.py --status     # "PuP on: ..." or why not
+python3 common/games/build_game_package.py ../Tron-Legacy-MPF --target all --pup-zip /path/to/pack.zip   # MPF-Godot-Packaging
+python3 scripts/package/build_bundle.py --pup-zip /path/to/pack.zip                                       # the game's own builder
 ```
 
-It finds `triggers.pup` at any depth in the zip, extracts that folder to `pup_pack/trn_174h` (a second run with the
-same zip changes nothing), probes the videos with ffmpeg without converting them (GoZen plays the mp4s as they
-are), and makes the backglass still the service menu draws on. A bundle keeps its own add-on: `pup_setup` no longer
-tries to copy GoZen from a `pup_addons/` that a bundle does not have. The game picks the pack up on its next start.
+- `pup_media/trn_174h` (manifest, the backglass still the service menu draws on, converted files),
+- `game/media/dmd_clip` (the PuP clips behind the HD DMD effects), `game/hd_art/letters` and `game/hd_art/deff_105`
+  (ZUSE/TRON letters, award icons).
 
-**Checked:** the whole install with a stand-in pack (two small mp4s, one run, then a second that changed nothing).
-**Not checked:** the real pack (private, not readable in the session that built this; it is about 1 GB or more).
+The builder needs numpy (the platform installs it into the build venv: `toolchain.BUILD_REQUIREMENTS`). Without
+`--pup-zip` the build stops (`--no-pup-art` makes a bundle without them: the HD DMD then shows the ROM's dot
+animations). A new version brings its own `pup_media`; only `pup_pack` is carried over.
+
+**Checked:** a clean venv without numpy, the bundle installed, the author's zip assigned through the page's code,
+two starts: no generation or conversion in the logs, no file created, the PuP windows on, the HD DMD with the clips.
 
 ## Known limits
 
