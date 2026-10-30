@@ -20,6 +20,9 @@ extends MPFVariable
 @export var fit_fonts: PackedInt32Array = PackedInt32Array()
 @export var fit_ys: PackedInt32Array = PackedInt32Array()
 @export var fit_width: int = 0
+## score_min: fit_fonts picked by the number in the text instead of its width: the first entry whose minimum the
+## value reaches (the score-size table of deff 19, ROM 0x40d3484)
+@export var score_min: PackedInt32Array = PackedInt32Array()
 @export var alt_x: int = 0
 @export var alt_y: int = 0
 @export var alt_when_empty: String = ""
@@ -188,7 +191,10 @@ func _layout() -> void:
 		m = fm
 		shown = fs
 		y = fit_ys[i] if i < fit_ys.size() else rom_y
-		if rom_width(fm, fs) <= (hd_fit_width if hd_fit_width > 0 and hd() else fit_width):
+		if score_min.size() > i:
+			if int(text.replace(",", "")) >= score_min[i]:
+				break
+		elif rom_width(fm, fs) <= (hd_fit_width if hd_fit_width > 0 and hd() else fit_width):
 			break
 	if m.is_empty():
 		return

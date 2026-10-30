@@ -83,3 +83,8 @@ restart of the effect (an overlay over it) and used a 1562-tick period, so it sh
 `rot_ms` (time since power-up) and `score_display.gd` / `dmd_effect.gd` count from it. Same Serum frame found:
 tron_targets 83.1 -> 84.1 %, clu_hurryup 81.3 -> 85.9 %. The replay line comes about 1 s late
 (power-up epoch of the bridge versus the capture's).
+
+**Score font (deff 19).** The score's font and row now come from the ROM's score-size table (`assets/rom_data/deffs/README.md`:
+below 100,000 font 26, from 100,000 font 24, from 1,000,000 font 17, from 100,000,000 font 22) instead of a width guess, which chose
+too large a font for 7 to 9 digit scores (it ran to the edge of the picture). clu_hurryup 85.9 -> 86.0 %, tron_targets 84.1 %:
+the rest of the misses there are scenario divergence (other scores), not rendering.

@@ -339,11 +339,14 @@ of Serum). Godot's add-on sends the 128x32 frames to `dmd_serum` in place of the
 libserum identify each frame, colours it, runs the colour rotations on libserum's timer and pipes the RGB frames to the platform's
 feeder, which it starts itself, with no Python or MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file:
 **the player brings it (it is its author's; it is never in this repository or in git)**. A frame the file does not know stays in
-Tron blue (or the `--zedmd` colour). **Nothing is compiled on the machine that plays**: the bundle's build
-(`scripts/package/build_bundle.py`, `make_feeders`) builds `zedmd_feed` and `dmd_serum` for each CPU (x86_64, arm64) on the builder
-and ships them in `game/native/bin/<arch>/` (the other CPU with `zig cc -target`, from `zig` on the PATH or `pip install ziglang`: the arm64 cross build is checked, an ELF aarch64 for the Pi 4 and the Jetson, not run here; `--no-feeder` skips them); `scripts/dmd_out.py`
-only uses those. A development checkout (with a `.git`) builds them on first use (git, CMake, a C++ compiler;
-`game/native/dmd_serum/build.sh`). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
+Tron blue (or the `--zedmd` colour). **Nothing is compiled on the machine that plays**, and **libserum and the whole build pipeline are the platform's**
+(MPF-Godot-Packaging, the image generator: it builds libserum with its pinned dependencies and declares the build tools): the game
+holds only the colouriser's source. `game/native/dmd_serum/build.sh` compiles it against the libserum the platform provides
+(`LIBSERUM_DIR`: headers and `libserum.a` of the target CPU) and downloads nothing; the image generator builds `zedmd_feed` and
+`dmd_serum` for each CPU and puts them in `game/native/bin/<arch>/`, where `scripts/dmd_out.py` only uses them. The bundle's build
+(`make_feeders`) builds `zedmd_feed`, and `dmd_serum` only when `LIBSERUM_DIR` is set (the other CPU with `zig cc -target`; `--no-feeder`
+skips them). The arm64 programs were checked under `qemu-aarch64` with the colourisation file of the private tree: the same output as
+the x86_64 ones, not run on a Pi 4 or a Jetson. Checked with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
 libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:
 [dmd_conformance.md](dmd_conformance.md) says how close it is.
 

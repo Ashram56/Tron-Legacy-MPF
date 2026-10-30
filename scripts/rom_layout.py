@@ -220,10 +220,12 @@ FONT_TABLES = {"0x040d31bc": 2,     # deff 44 LEVEL %d COMPLETED
                "0x040d32c4": 39,    # deff 108 %u MORE / TO ACCESS
                "0x040d2900": 39,    # deff 112 SUPER / POPS / DOUBLE / SCORING / SPINNERS
                "0x040d2918": 10}    # deff 112 SPINNERS SCORE
-# The score display (deff 19) picks font and row from a table by score (RAM 0x370ac, not in the
-# package). Score 0 is font 26 on row 21 (reference capture); the smaller fonts for longer scores are
-# a guess: the first that fits the 87 dots right of the status panel, centred on the same middle row.
-SCORE_FIT = {"fit_fonts": [26, 23, 21, 19], "fit_ys": [21, 21, 18, 16], "fit_width": 87}
+# The score display (deff 19) picks font and row from the score-size table (RAM 0x370ac -> ROM 0x40d3484, records
+# {min score, font, y}; assets/rom_data/deffs/README.md): >= 100,000,000 font 22 row 18, >= 1,000,000 font 17 row 18,
+# >= 100,000 font 24 row 21, below font 26 row 21. fit_fonts lists them from the largest minimum down; score_min picks
+# by the value, not by the width.
+SCORE_FIT = {"fit_fonts": [22, 17, 24, 26], "fit_ys": [18, 18, 21, 21], "score_min": [100000000, 1000000, 100000, 0],
+             "fit_width": 87}
 FALLBACK_FONT = 12
 # Draw calls whose font or row come from ROM tables: values read off the reference capture.
 # deff 38 match: "MATCH" in the font of table 0x40d3ce0 (font 37 in the capture), right-aligned at
@@ -447,8 +449,8 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         if i in SCREENS.get(deff_id, {}):
             lay["screens"] = list(SCREENS[deff_id][i])
         if deff_id == 19 and "%" in line and "BALL" not in line:
-            lay.update(font=SCORE_FIT["fit_fonts"][0], x=84, flags=2, y=SCORE_FIT["fit_ys"][0],
-                       source="rom+table guess", **SCORE_FIT)
+            lay.update(font=SCORE_FIT["fit_fonts"][-1], x=84, flags=2, y=SCORE_FIT["fit_ys"][-1],
+                       source="rom+table", **SCORE_FIT)
         lays.append(lay)
     out, boxes = [None] * len(lines), []
     order = sorted(range(len(lines)), key=lambda k: (lays[k]["source"] == "fallback", k))

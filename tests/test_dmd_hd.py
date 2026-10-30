@@ -305,7 +305,7 @@ class TestRunSwitches(unittest.TestCase):
 # (phase10-docker 662f0a8; deff 46 re-taken at 38a1bf2, whose status panel changed): classic mode must keep
 # giving these. Times 0, 400 and 1600 ms.
 CLASSIC = {
-    "deff_019": ["4c202f8e88fbe459", "ceff80ed506ad992", "ceff80ed506ad992"],
+    "deff_019": ["a8d5226ce3a42a75", "991c937390a1dc22", "991c937390a1dc22"],
     "deff_025": ["d37ed2eab53a1001", "d37ed2eab53a1001", "d37ed2eab53a1001"],
     "deff_046": ["669370d0afb62c1d", "46317d7624939fbf", "3e055f3406cf6f2d"],
     "deff_091": ["5389647d8fd053ff", "5389647d8fd053ff", "0b25fcc7236c9b02"],

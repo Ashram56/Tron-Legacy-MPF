@@ -487,7 +487,11 @@ class State extends RefCounted:
 			m = fm
 			shown = fs
 			y = fit_ys[k] if k < fit_ys.size() else rom_y
-			if RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
+			var mins: Array = it.get("score_min", [])
+			if mins.size() > k:
+				if int(text.replace(",", "")) >= int(mins[k]):
+					break
+			elif RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
 				break
 		if m.is_empty():
 			return {}

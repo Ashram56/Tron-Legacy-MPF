@@ -98,10 +98,12 @@ def build_feeder(out, cc=None, cxx=None):
 
 
 def build_serum(out, cc=None, cxx=None):
-    """Build the game's Serum colouriser (game/native/dmd_serum: libserum linked in; git, CMake >= 3.25, a C++17 compiler) into
-    OUT on a build box. Returns True when built."""
-    return _build(["bash", os.path.join(tc.GAME, "native", "dmd_serum", "build.sh"), out,
-                   os.path.join(tc.GAME, "native", "serum_build", os.path.basename(os.path.dirname(out)))], out, cc, cxx)
+    """Build the game's Serum colouriser (game/native/dmd_serum) into OUT against the libserum the platform provides
+    (LIBSERUM_DIR: headers and libserum.a of the target CPU; the image generator's job, MPF-Godot-Packaging). Returns True when built;
+    False without LIBSERUM_DIR (the platform's build puts dmd_serum in game/native/bin/<arch>/)."""
+    if not os.environ.get("LIBSERUM_DIR"):
+        return False
+    return _build(["bash", os.path.join(tc.GAME, "native", "dmd_serum", "build.sh"), out], out, cc, cxx)
 
 
 def _tool(name, build, python=False):
