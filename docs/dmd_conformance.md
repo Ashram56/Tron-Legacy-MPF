@@ -59,3 +59,19 @@ Light Cycle intro (86), the Sea of Simulation stages (114), deff 83, the first a
 tree, so they are not in this repository; copies are in the project's files, `serum_zedmd/`): `dmd_serum_parity.py` (the
 tables above), `unk.py` (the game's unknown frames by effect, with a picture), `idk.py` (reference capture against the game's
 frame, per frame), `tfirst.py` (when an effect's text starts in the capture).
+
+## Third measure (2026-10-30, fixed clip seed, fresh NVRAM per run)
+
+The harness now seeds the random clips (`TRON_DMD_SEED=7`) and puts `game/data` aside for each run, so the scenarios no longer
+start from the previous run's audits.
+
+| | second | now |
+|---|---|---|
+| Same Serum frame found in the game's DMD | 70.0 % | 71.4 % |
+| Distinct frames of the game unknown to Serum | 14.9 % | 11.6 % (2291 of 19831) |
+| Coin page (10) | 0 of 95 | 95 of 95 |
+| Combos (138, " COMBO" after the name) | | 92 % |
+
+Added since: the credits screens (deffs 10, 15, 17) drawn live on the panel, named combos' " COMBO", the arm64 cross build of
+the two tools with zig. Still open: the score display (19) bottom line and font size by magnitude, Flynn 105 (random reel, every
+frame known to Serum), 86, 47, 114, 83, 79, the first attract pages, Portal 143's blink.
