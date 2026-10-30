@@ -49,9 +49,31 @@ const ICON_TEXT_X := 100.0               # the text beside the icon is centred h
 const ICON_GLIDE_MS := 600.0            # the face slides in from the right in this time
 
 
+## The folders of the platform's add-ons (MPF_ADDONS, ":"-separated): made once outside the build and copied into the bundle.
+static func addon_dirs() -> PackedStringArray:
+	var sep := ";" if OS.get_name() == "Windows" else ":"
+	return OS.get_environment("MPF_ADDONS").split(sep, false)
+
+
+## A file of an add-on (rel: "dmd_clip/clips.json"), as an absolute path, or "" when no add-on has it.
+static func addon_file(rel: String) -> String:
+	for d in addon_dirs():
+		var p := d.path_join(rel)
+		if FileAccess.file_exists(p):
+			return p
+	return ""
+
+
+## media/dmd_clip/clips.json of the add-on (its paths made absolute), else of the project (a development checkout).
 static func clips() -> Dictionary:
 	if _clips == null:
-		var parsed = JSON.parse_string(FileAccess.get_file_as_string(CLIP_DATA)) if FileAccess.file_exists(CLIP_DATA) else null
+		var parsed = null
+		var from_addon := addon_file("dmd_clip/clips.json")
+		if from_addon != "":
+			var text := FileAccess.get_file_as_string(from_addon).replace("res://media/dmd_clip/", from_addon.get_base_dir() + "/")
+			parsed = JSON.parse_string(text)
+		elif FileAccess.file_exists(CLIP_DATA):
+			parsed = JSON.parse_string(FileAccess.get_file_as_string(CLIP_DATA))
 		_clips = parsed if parsed is Dictionary else {}
 	return _clips
 
@@ -110,7 +132,9 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 		return null
 	var key := "%s_%s" % [letter, "on" if on else "off"]
 	if not _letter_art.has(key):
-		var path := "res://hd_art/letters/%s.png" % key
+		var path := addon_file("hd_art/letters/%s.png" % key)
+		if path == "":
+			path = "res://hd_art/letters/%s.png" % key
 		var tex: Texture2D = null
 		if FileAccess.file_exists(path):
 			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
@@ -184,6 +208,9 @@ static func _dmd() -> Node:
 
 ## The picture drawn for a picture path: in HD its media/dmd_hd/ twin when there is one.
 static func picture(path: String, hd: bool) -> Texture2D:
+	if path.is_absolute_path() and not path.begins_with("res://"):       # a file of an add-on: not in the import
+		var img := Image.load_from_file(path) if FileAccess.file_exists(path) else null
+		return ImageTexture.create_from_image(img) if img else null
 	if hd and path.begins_with(MEDIA):
 		var big := MEDIA_HD + path.trim_prefix(MEDIA)
 		if ResourceLoader.exists(big):

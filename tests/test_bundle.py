@@ -146,48 +146,33 @@ class TestOptions(unittest.TestCase):
 class TestBuilder(unittest.TestCase):
 
     def test_scripts_exist_and_import_nothing_else(self):
-        for rel in bb.SCRIPTS:
-            self.assertTrue(os.path.exists(os.path.join(ROOT, "scripts", rel)), rel)
-        # what the bundle's start script reaches, followed through every file it imports (not only run.py's own imports: a module
-        # imported by an imported module was missing once, 2026-10-29, and the service restarted every 10 s)
+        """Format 2: the platform launches the game, so no start script is in the bundle; the few scripts the game's Python
+        reads (mpf_platform.py for the remote topper) and everything they import are listed."""
         import ast
         scripts = os.path.join(ROOT, "scripts")
-        listed = {s.split("/")[0][:-3] if s.endswith(".py") and "/" not in s else s.split("/")[0] for s in bb.SCRIPTS}
-        local = lambda mod: (os.path.exists(os.path.join(scripts, mod + ".py")) or os.path.isdir(os.path.join(scripts, mod)))  # noqa: E731
-        seen, queue, missing = set(), [os.path.join(scripts, "package", "start.py")], []
+        for rel in bb.SCRIPTS:
+            self.assertTrue(os.path.exists(os.path.join(scripts, rel)), rel)
+        listed = {s[:-3] for s in bb.SCRIPTS if s.endswith(".py") and "/" not in s}
+        local = lambda mod: os.path.exists(os.path.join(scripts, mod + ".py"))  # noqa: E731
+        seen, queue, missing = set(), [os.path.join(scripts, "mpf_platform.py")], []
         while queue:
             path = queue.pop()
             if path in seen:
                 continue
             seen.add(path)
             tree = ast.parse(open(path, encoding="utf-8").read())
-            names = []
-            for node in tree.body:                       # the statements that run on import (not functions: they are optional)
+            for node in tree.body:
+                names = []
                 if isinstance(node, ast.Import):
-                    names += [a.name.split(".")[0] for a in node.names]
+                    names = [a.name.split(".")[0] for a in node.names]
                 elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-                    names.append(node.module.split(".")[0])
-            for mod in names:
-                if not local(mod):
-                    continue
-                if mod not in listed and mod != "package":
-                    missing.append(f"{os.path.relpath(path, scripts)} imports {mod}")
-                target = os.path.join(scripts, mod + ".py")
-                if os.path.exists(target):
-                    queue.append(target)
+                    names = [node.module.split(".")[0]]
+                for mod in names:
+                    if local(mod):
+                        if mod not in listed:
+                            missing.append(f"{os.path.relpath(path, scripts)} imports {mod}")
+                        queue.append(os.path.join(scripts, mod + ".py"))
         self.assertEqual(missing, [], "listed in SCRIPTS (scripts/package/build_bundle.py)")
-
-    def test_pup_install_finds_every_script_it_launches(self):
-        """The PuP install runs on the machine from the bundle: each script pup_setup.py launches is in the bundle (the HD DMD's
-        clips, letters and award icons were left out once, and the pack then installed without them)."""
-        import re
-        text = "".join(open(os.path.join(ROOT, "scripts", "pup", n), encoding="utf-8").read() for n in ("pup_setup.py", "pup_art.py"))
-        launched = set(re.findall(r'"scripts", "pup", "([a-z_]+\.py)"', text)) | set(re.findall(r'"([a-z_]+\.py)"\)', text))
-        launched -= {"pup_setup.py"}
-        self.assertTrue(launched)
-        for name in launched:
-            self.assertIn("pup/" + name, bb.SCRIPTS)
-        self.assertIn("pup/dmd_clip_plan.json", bb.SCRIPTS)      # read by gen_dmd_clips.py
 
     def test_a_bundle_is_never_stale(self):
         import toolchain as tc
@@ -197,26 +182,48 @@ class TestBuilder(unittest.TestCase):
             self.assertIsNone(tc.media_stale(d))
 
     def test_spec(self):
-        """What the platform's builder (MPF-Godot-Packaging mpf_godot/bundle.py) is given."""
+        """What the platform's builder (MPF-Godot-Packaging mpf_godot/bundle.py) is given: format 2, facts only."""
         sp = bb.spec("t")
-        self.assertEqual(sp["platform_addons"], ["gde_gozen"])
-        self.assertEqual(sp["git_exclude"], ["game/addons/"])        # no binary add-on from the game's tree
-        self.assertEqual(sp["run"]["start"], "python3 scripts/package/start.py")
+        self.assertEqual(sp["format"], 2)
+        for key in ("run", "options", "extra", "precheck"):
+            self.assertNotIn(key, sp)
+        self.assertEqual(sp["platform_addons"], ["gde_gozen", "dmd_out"])
+        self.assertIn("game/native/", sp["git_exclude"])             # the Serum colouriser is the platform's
+        self.assertIn("game/addons/", sp["git_exclude"])             # no binary add-on from the game's tree
         self.assertNotIn("pytest", " ".join(sp["requires"]["python_packages"]))
-        self.assertEqual(sp["options"]["count"], len(bo.load_schema()["options"]))
         self.assertIn("*.local.cfg", sp["never_names"])
+        self.assertEqual(sp["addons"][0]["dir"], bb.ADDON)
+        self.assertEqual(sp["pup"], {"rom": "trn_174h", "manifest": bb.MANIFEST})
         json.dumps(sp)
+
+    def test_settings_schema_follows_the_contract(self):
+        import sys
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "MPF-Godot-Packaging", "common", "netconfig"))
+        try:
+            import mpf_contract as K
+        except ImportError:
+            self.skipTest("needs MPF-Godot-Packaging beside this repository")
+        with open(os.path.join(ROOT, "scripts", "package", "settings.json"), encoding="utf-8") as f:
+            schema = json.load(f)
+        sp = bb.spec("t")
+        for o in schema["options"]:
+            self.assertEqual(sum(k in o["target"] for k in K.TARGETS), 1, o["id"])
+        hw = [o for o in schema["options"] if o["target"].get("hardware")][0]
+        self.assertEqual(sorted(hw["choices"]), sorted(sp["mpf"]["hardware"]))
+        for sets in sp["mpf"]["hardware"].values():
+            for c in sets:
+                self.assertTrue(os.path.exists(os.path.join(ROOT, "game", "config", c + ".yaml")), c)
+        for board in sp["profiles"].values():
+            self.assertEqual(set(board), {"limits", "defaults"})
 
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_spec_lists_only_files_that_exist(self):
-        """The platform's builder stops on a listed file that is missing (flow_attract_cycle has no timing.json, 2026-10-29) and
-        the bundle carries the art made from the PuP Pack at its creation (nothing is made on the target), and no run of the game makes it."""
+        """The platform's builder stops on a listed file that is missing (flow_attract_cycle has no timing.json, 2026-10-29)."""
         sp = bb.spec("t")
         for rel in sp["copy"]:
             if rel.startswith(("assets/", "scripts/")):
                 self.assertTrue(os.path.exists(os.path.join(ROOT, rel)), rel)
-        self.assertIn("game/hd_art/letters", bb.GENERATED)
-        self.assertIn("game/hd_art/deff_105", bb.GENERATED)
+        self.assertNotIn("game/media/dmd_clip", sp["copy"])      # an add-on (addons/pup_art), copied from setup's output
 
     def test_nothing_is_made_on_the_target(self):
         """run.py (every start) and a bundle's pup_setup make no art (platforms/game-bundles.md rule 2 and 12)."""

@@ -54,3 +54,8 @@ game/hd_art/letters/*.png
 !game/hd_art/deff_105/award_11.png
 !game/hd_art/deff_105/award_06.png
 game/native/serum_build/
+
+# bundle staging (scripts/package/build_bundle.py): the PuP manifest and the pup_art add-on, copied from what setup made
+/addons/
+/pup/
+/dist/
