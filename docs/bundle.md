@@ -1,5 +1,19 @@
 # The prebuilt bundle: the game with nothing left to build
 
+> **Format 2 (2026-10-30).** `scripts/package/build_bundle.py` now writes a format 2 bundle (MPF-Godot-Packaging PR #39,
+> `platforms/game-bundle-format2.md`): files and facts only, the platform launches the game, and everything below about
+> `start.py`, `options.json`, the board profile commands and `pup_setup.py` on the target is history (format 1).
+> What a bundle holds now: the game, the add-on `addons/pup_art` (HD clips, letters, service still: made once by
+> `scripts/setup.py` from the PuP Pack and copied here as they are), `pup/manifest.json` (the list of the pack's files), the
+> settings schema `scripts/package/settings.json` (each setting a Godot argument, an ini key or the hardware set) and the board
+> profile as data. The platform gives the game `MPF_PUP_PACK` (the author's zip unpacked as it is, played in place),
+> `MPF_ADDONS`, `MPF_DMD_OUTPUT` and the DMD output arguments; the dot colouration of a PIN2DMD or ZeDMD (Serum, libserum,
+> `dmd_bridge`) is the platform's, so `game/native/` is not in the bundle. Build: set up the workspace with the PuP Pack
+> (`git submodule update --init pup_pack`, or `scripts/pup/pup_setup.py --pup-zip`), then `build_bundle.py --target all`.
+> Not carried over: the Raspberry Pi 4 profile's backglass window keys and its conditional Godot arguments (`--render-thread
+> separate` with the EGL patch, `GOZEN_HWDEC`): the contract has no way to express them yet.
+
+
 `scripts/package/build_bundle.py` (Tron's part) and the platform's builder (MPF-Godot-Packaging `python -m mpf_godot bundle`, `platforms/game-bundles.md`) make one archive of the game as it runs: the generated MPF config, sounds,
 DMD frames, slides, fonts, the baked HD fonts and the Godot import, so a machine that has MPF and Godot only
 unpacks it. No setup run, no media generation, no import (measured on a 4-core PC: 4 to 8 minutes, of which

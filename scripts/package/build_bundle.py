@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build the prebuilt game bundle (docs/bundle.md): the game as it runs, with nothing left to generate or import.
+"""Build the prebuilt game bundle in format 2 (MPF-Godot-Packaging platforms/game-bundle-format2.md): files and facts only, the
+platform launches the game. The bundle holds the game as it runs (generated config, media, sounds, Godot import), the add-on
+"pup_art" (HD clips, letters, service still: made once by scripts/pup/pup_setup.py from the PuP Pack, copied here as they are),
+the PuP manifest (the list of the pack's files; the pack itself is the author's zip, assigned on the platform's page), the
+settings schema and the board profiles as data. No binary, no Serum or ZeDMD program (the platform's), no start script.
 
     python scripts/package/build_bundle.py --target all          # universal: arm64 + x86_64 textures, no binary
     python scripts/package/build_bundle.py --target x86_64       # a PC only
@@ -25,23 +29,20 @@ sys.path.insert(0, os.path.dirname(HERE))   # scripts/
 import gen_media  # noqa: E402  (HD_FRAME_IMPORT only)
 import toolchain as tc  # noqa: E402
 sys.path.insert(0, HERE)
-import board_profile  # noqa: E402
-import bundle_options  # noqa: E402
 
 ROOT = tc.ROOT
 NAME = "tron-legacy-mpf"
 
-SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py", "gmc_patch.py", "pup/__init__.py", "pup/pup_setup.py",
-           "pup/gen_pup.py", "pup/pup_art.py", "pup/gen_dmd_clips.py", "pup/dmd_clip_plan.json", "pup/letter_art.py", "pup/award_sprites.py",
-           "package/__init__.py", "package/start.py", "package/bundle_options.py",
-           "package/options.json", "package/board_profile.py", "package/profiles.json"]
+# the few scripts the game's Python reads at run time (the remote topper finds the platform through mpf_platform.py)
+SCRIPTS = ["mpf_platform.py", "toolchain.py", "fsutil.py"]
 
-GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs", "game/tron/media_data.json",
-             "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc",
-             # made from the PuP Pack at the bundle's creation (--pup-zip), shipped as they are: nothing is made on the target
-             "game/hd_art/letters", "game/hd_art/deff_105", "pup_media/trn_174h",
-             # the ZeDMD feeder and the game's Serum colouriser, built here per CPU (make_feeders): nothing is compiled on the target
-             "game/native/bin/arm64", "game/native/bin/x86_64"]
+# generated once by scripts/setup.py (media, sounds, fonts) and shipped as they are; game/media minus dmd_clip (an add-on)
+GENERATED = ["game/config/rom", "game/sounds", "game/slides/deffs", "game/tron/media_data.json",
+             "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc"]
+MEDIA_NOT_COPIED = {"dmd_clip"}
+
+ADDON = "addons/pup_art"                 # in the work tree and in the bundle
+MANIFEST = "pup/manifest.json"
 
 ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
                "assets/mpf_package/service_menu.json", "assets/mpf_package/media/rom_images_all.zip"]
@@ -77,118 +78,81 @@ def check_workspace():
 
 
 def generated():
-    """GENERATED that exists in the work tree; pup_media/<id> folder by folder, without the builder's scratch art folder."""
-    out = []
-    for rel in GENERATED:
-        full = os.path.join(ROOT, rel)
-        if rel.startswith("pup_media/") and os.path.isdir(full):
-            out += [rel + "/" + n for n in sorted(os.listdir(full)) if n != "dmd_art"]
-        elif os.path.exists(full):
-            out.append(rel)
+    """GENERATED that exists in the work tree, plus game/media folder by folder (dmd_clip is an add-on, not copied here)."""
+    out = [rel for rel in GENERATED if os.path.exists(os.path.join(ROOT, rel))]
+    media = os.path.join(ROOT, "game", "media")
+    if os.path.isdir(media):
+        out += ["game/media/" + n for n in sorted(os.listdir(media)) if n not in MEDIA_NOT_COPIED]
     return out
 
 
+def stage_pup_files():
+    """Copies, never generates: the PuP manifest (scripts/pup/gen_pup.py wrote it when the pack was installed on this
+    builder) to pup/manifest.json, and the add-on folder from the files that setup made once from the pack. Returns what is missing."""
+    missing = []
+    src = os.path.join(ROOT, "pup_media", "trn_174h", "manifest.json")
+    if os.path.exists(src):
+        os.makedirs(os.path.join(ROOT, "pup"), exist_ok=True)
+        shutil.copy2(src, os.path.join(ROOT, MANIFEST))
+    else:
+        missing.append("pup_media/trn_174h/manifest.json (install the PuP Pack with scripts/pup/pup_setup.py)")
+    addon = os.path.join(ROOT, ADDON)
+    shutil.rmtree(addon, ignore_errors=True)
+    for from_rel, to_rel in (("game/media/dmd_clip", "dmd_clip"), ("game/hd_art/letters", "hd_art/letters"),
+                             ("pup_media/trn_174h/service", "service")):
+        full = os.path.join(ROOT, from_rel)
+        if os.path.isdir(full):
+            shutil.copytree(full, os.path.join(addon, to_rel), ignore=shutil.ignore_patterns("*.import"))
+        else:
+            missing.append(from_rel)
+    return missing
+
+
 def spec(template):
-    """The bundle spec the platform's builder reads (mpf_godot/bundle.py). `template` is the .import text of an HD frame."""
-    with open(os.path.join(HERE, "options.json"), encoding="utf-8") as f:
-        options = json.load(f)
+    """The format 2 spec the platform's builder reads (mpf_godot/bundle.py): files and facts, no command."""
+    with open(os.path.join(HERE, "profiles.json"), encoding="utf-8") as f:
+        old = json.load(f)
+    profiles = {}
+    for pr in old["profiles"]:
+        if pr["id"] != "rpi4":
+            continue
+        limits = {k: v["choices"] for k, v in pr["limits"].items()}
+        limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
+        defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
+        defaults["pup.dmd.window"] = "overlay"
+        profiles["rpi4"] = {"limits": limits, "defaults": defaults}
     asset_globs = []
     for folder, name in ASSET_GLOBS:
         for d in sorted(os.listdir(os.path.join(ROOT, folder))) if os.path.isdir(os.path.join(ROOT, folder)) else ():
             if os.path.exists(os.path.join(ROOT, folder, d, name)):         # a folder of the assets without one (flow_attract_cycle)
                 asset_globs.append("{}/{}/{}".format(folder, d, name))
     return {
+        "format": 2,
         "id": NAME,
         "name": "Tron Legacy (Stern 2011), MPF recreation",
         "game_dir": "game",
         "git_tracked": ["game"],
-        "git_exclude": ["game/addons/"],
-        "copy": ["scripts/" + s for s in SCRIPTS] + generated() + ASSET_FILES + ASSET_DIRS + asset_globs,
+        "git_exclude": ["game/addons/", "game/native/"],        # add-ons and the Serum colouriser are the platform's
+        "copy": ["scripts/" + s for s in SCRIPTS] + generated() + ASSET_FILES + ASSET_DIRS + asset_globs
+                + ["scripts/package/settings.json", MANIFEST, ADDON],
         "never": NEVER,
         "never_names": ["*.local.cfg", "machine_vars.yaml", "scorbit_device_key.txt"],
         "import_seed": [{"dir": "game/media/dmd_hd", "skip_prefixes": ["solid", "hollow"], "template": template}],
-        "platform_addons": ["gde_gozen"],
+        "platform_addons": ["gde_gozen", "dmd_out"],            # the game ships its own patched GMC (rule 4)
         "source_commits": {"assets_commit": "HEAD:assets"},
-        "requires": {
-            "python": ">=3.10",
-            "python_packages": [r for r in tc.REQUIREMENTS if not r.startswith("pytest")],
-            "mpf_gmc": tc.GMC_VERSION + " (patched copy included)",
-            "programs": ["ffmpeg (PuP install: reads the pack's videos)", "xvfb-run (only without a screen)"],
-            "env": {"GODOT": "path of the Godot executable (default tools/godot/ in the bundle)",
-                    "TRON_VENV": "folder of the Python venv with MPF (default .venv in the bundle)"},
-        },
-        "run": {
-            "start": "python3 scripts/package/start.py",
-            "start_note": "adds the saved options (game/options.json) to scripts/run.py; any run.py flag can follow",
-            "cwd": ".",
-            "ports": {"5050": "Godot (GMC), localhost only", "5051": "MPF, localhost only (MPF Monitor)"},
-        },
-        "options": {"schema": "scripts/package/options.json", "tool": "scripts/package/bundle_options.py",
-                    "count": len(options["options"])},
-        "pup": {
-            "installed_from": "the pack's own zip (VP Universe), never in this bundle: the page only unpacks it (extract_only). What the "
-                             "game derives from it (pup_media/trn_174h: manifest, still, converted files) is made on the builder (--pup-zip) "
-                             "and is in this bundle",
-            "extract_only": True,
-            "install": "python3 scripts/pup/pup_setup.py --pup-zip ZIP_PATH_OR_URL",
-            "status": "python3 scripts/pup/pup_setup.py --status",
-            "pack_dir": "pup_pack/trn_174h",
-            "needs_restart": True,
-        },
-        "extra": {"profiles": {"file": "scripts/package/profiles.json",
-                               "apply": "python3 scripts/package/board_profile.py apply",
-                               "detect": "python3 scripts/package/board_profile.py detect",
-                               "ids": [p["id"] for p in board_profile.load()]}},
-        "keep_on_update": ["game/data", "game/audits", "game/logs", "game/options.json", "game/pup.local.cfg",
-                           "game/scorbit.local.cfg", "pup_pack"],
+        "requires": {"python": ">=3.10",
+                     "python_packages": [r for r in tc.REQUIREMENTS if not r.startswith("pytest")]},
+        "mpf": {"configs": ["config"],
+                "hardware": {"virtual": ["hw_virtual", "free_play"], "virtual_coins": ["hw_virtual"],
+                             "virtual_le": ["hw_virtual_le", "free_play"], "proc": ["hw_proc"], "proc_le": ["hw_proc_le"],
+                             "proc_fiber": ["hw_proc", "fiber_optics"]}},
+        "dmd": {"rom": "trn_174h", "size": "128x32"},
+        "pup": {"rom": "trn_174h", "manifest": MANIFEST},
+        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.mode", "when": "hd"}],
+        "settings": {"schema": "scripts/package/settings.json"},
+        "profiles": profiles,
+        "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],
     }
-
-
-def make_pup_art(args):
-    """Install the pack on this builder and make the art, or stop: a bundle is never left to make it on the target."""
-    if args.no_pup_art:
-        return
-    zip_ = args.pup_zip or os.environ.get("MPF_BUNDLE_PUP_ZIP")
-    if not zip_:
-        raise SystemExit("give the PuP Pack's zip with --pup-zip ZIP (the art of the HD DMD is made from it here, never on the machine "
-                         "that runs the game), or --no-pup-art for a bundle without it")
-    env = dict(os.environ, TRON_PUP_ZIP=zip_)
-    for cmd in ([sys.executable, os.path.join(HERE, "..", "pup", "pup_setup.py")],):
-        if subprocess.run(cmd, cwd=ROOT, env=env).returncode:
-            raise SystemExit("the PuP Pack could not be installed and its art made (above)")
-    for rel in ("game/media/dmd_clip/clips.json", "game/hd_art/letters/Z_on.png", "game/hd_art/letters/N_on.png"):
-        if not os.path.exists(os.path.join(ROOT, rel)):
-            raise SystemExit("the PuP art is incomplete: no " + rel)
-
-
-ZIG_TARGETS = {"arm64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}
-
-
-def make_feeders(args):
-    """The ZeDMD programs for each target CPU, into game/native/bin/<arch>/, so the bundle carries them: the player's machine
-    never compiles. zedmd_feed is the platform's plain feeder; dmd_serum is the game's own Serum colouriser (game/native/dmd_serum); libserum
-    and its build are the platform's (the image generator, MPF-Godot-Packaging), so dmd_serum is built here only when LIBSERUM_DIR
-    points at the libserum it provides, else the generator puts it in place. The host's CPU builds with the system compiler, the other with zig (`zig cc -target ...`); a CPU that
-    cannot be built is reported (no ZeDMD output there)."""
-    if args.no_feeder:
-        return
-    import dmd_out
-    want = ["arm64", "x86_64"] if args.target == "all" else [args.target]
-    for arch in want:
-        for name, build in (("zedmd_feed", dmd_out.build_feeder), ("dmd_serum", dmd_out.build_serum)):
-            out = os.path.join(tc.GAME, "native", "bin", arch, name)
-            if os.path.exists(out):
-                continue
-            if dmd_out.arch() == arch:
-                ok = build(out)
-            elif dmd_out.zig():
-                t = ZIG_TARGETS[arch]
-                z = " ".join(dmd_out.zig())
-                ok = build(out, cc=z + " cc -target " + t, cxx=z + " c++ -target " + t)
-            else:
-                ok = False
-            print("{} for {}: {}".format(name, arch, "built" if ok else "NOT built (needs zig, or `pip install ziglang`, for another CPU than this one's, "
-                  "the MPF-Godot-Packaging checkout, and for dmd_serum the platform's LIBSERUM_DIR): the platform's image generator provides it, or this bundle has no Serum colour there"), flush=True)
 
 
 def main(argv=None):
@@ -197,15 +161,12 @@ def main(argv=None):
                    help="arm64: Raspberry Pi 4 and Jetson (ETC2/ASTC textures); x86_64: a PC (S3TC/BPTC); all: both")
     p.add_argument("--version", help="default: the date and the short commit, 2026.10.24-ab12cd3")
     p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
-    p.add_argument("--pup-zip", help="the PuP Pack's zip (a path or URL): installed here and the HD DMD's art (clips, ZUSE/TRON letters, "
-                   "award icons) made from it, then shipped in the bundle. Nothing is made on the machine that runs the game")
-    p.add_argument("--no-pup-art", action="store_true", help="a bundle without that art (the HD DMD then shows the ROM's dot animations)")
-    p.add_argument("--no-feeder", action="store_true", help="no prebuilt ZeDMD programs in the bundle")
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
     args = p.parse_args(argv)
-    make_pup_art(args)
-    make_feeders(args)
     check_workspace()
+    missing = stage_pup_files()
+    if missing:
+        print("warning: no PuP add-on part for: " + ", ".join(missing), flush=True)
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     template = os.path.join(out, "hd_frame.import.template")

@@ -20,6 +20,7 @@ const PupScreen := preload("res://pup/pup_screen.gd")
 const LightCycles := preload("res://pup/lightcycles.gd")
 const NEON_SHADER := preload("res://pup/neon_frame.gdshader")
 const ServiceBackglass := preload("res://pup/service_backglass.gd")
+const DmdEffect := preload("res://tron/dmd_effect.gd")
 
 var cfg := ConfigFile.new()
 var enabled := false
@@ -72,7 +73,16 @@ func _ready() -> void:
 	var root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
 	pack_dir = root.path_join(setting("pup", "pack_dir", "pup_pack/trn_174h"))
 	media_dir = root.path_join(setting("pup", "media_dir", "pup_media/trn_174h"))
-	if not _load_media():
+	# the platform's pack (MPF_PUP_PACK: the author's zip unpacked as it is): played in place, the bundle only holds the manifest
+	var platform_pack := OS.get_environment("MPF_PUP_PACK")
+	var manifest_file := media_dir.path_join("manifest.json")
+	if platform_pack != "":
+		pack_dir = platform_pack
+		manifest_file = root.path_join("pup/manifest.json")
+	elif FileAccess.file_exists(root.path_join("pup/manifest.json")) and not FileAccess.file_exists(manifest_file):
+		push_warning("PuP: this bundle has no PuP Pack assigned (MPF_PUP_PACK): PuP off")
+		return
+	if not _load_media(manifest_file):
 		return
 	# a cabinet shows no mouse pointer: "auto" hides it when the backglass covers the monitor (a windowed desktop
 	# test keeps it)
@@ -87,11 +97,19 @@ func _ready() -> void:
 func _load_config() -> bool:
 	for path in CONFIG_FILES:
 		if FileAccess.file_exists(path):
-			var part := ConfigFile.new()
-			if part.load(path) == OK:
-				for section in part.get_sections():
-					for key in part.get_section_keys(section):
-						cfg.set_value(section, key, part.get_value(section, key))
+			# JSON values; a bare word (the platform writes a setting's value as it is: split, not "split") is a string
+			var section := ""
+			for raw in FileAccess.get_file_as_string(path).split("\n"):
+				var line := raw.strip_edges()
+				if line == "" or line.begins_with(";") or line.begins_with("#"):
+					continue
+				if line.begins_with("[") and line.ends_with("]"):
+					section = line.substr(1, line.length() - 2).strip_edges()
+				elif section != "" and line.contains("="):
+					var key := line.get_slice("=", 0).strip_edges()
+					var text := line.substr(line.find("=") + 1).strip_edges()
+					var value = JSON.parse_string(text)
+					cfg.set_value(section, key, value if (value != null or text == "null") else text.trim_prefix("\"").trim_suffix("\""))
 	if OS.get_environment("TRON_PUP").to_lower() in ["0", "false", "no", "off"]:
 		return false
 	return bool(setting("pup", "enabled", false))
@@ -108,10 +126,9 @@ func setting(section: String, key: String, default = null):
 	return cfg.get_value(section, key, default)
 
 
-func _load_media() -> bool:
-	var path := media_dir.path_join("manifest.json")
+func _load_media(path: String) -> bool:
 	if not FileAccess.file_exists(path):
-		push_warning("PuP: no converted media at %s (run scripts/pup/gen_pup.py): PuP off" % media_dir)
+		push_warning("PuP: no manifest at %s (run scripts/pup/gen_pup.py in a checkout): PuP off" % path)
 		return false
 	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if typeof(data) != TYPE_DICTIONARY:
@@ -120,6 +137,9 @@ func _load_media() -> bool:
 	manifest = data.get("files", {})
 	if data.get("still") is String:
 		still_path = media_dir.path_join(data["still"])
+		var addon_still := DmdEffect.addon_file(data["still"])        # the add-on's still (made once, outside the build)
+		if addon_still != "":
+			still_path = addon_still
 	for key in manifest.keys():
 		var folder: String = key.get_base_dir().to_lower()
 		if not folders.has(folder):
@@ -548,8 +568,10 @@ func _make_dmd_window() -> void:
 ## "overlay" (the owner's choice on the Raspberry Pi 4, 2026-10-25).
 func dmd_window_mode() -> String:
 	var mode := str(setting("dmd", "window", "window")).to_lower()
+	if OS.get_environment("MPF_DMD_OUTPUT") in ["pin2dmd", "zedmd"]:      # the platform sends the DMD to a panel: none on screen
+		return "external"
 	if mode == "auto":
-		return "external" if OS.get_environment("TRON_DMD_PANEL") != "" else "overlay"
+		return "overlay"
 	return {"true": "window", "false": "external", "none": "external", "backglass": "overlay"}.get(mode, mode)
 
 
@@ -738,6 +760,8 @@ func pick(playlist: String, file: String) -> String:
 ## Where a pack file plays from: the pack's own video with GoZen, else the converted copy.
 func media_path(key: String) -> String:
 	var entry: Dictionary = manifest[key]
+	if OS.get_environment("MPF_PUP_PACK") != "":      # the platform's pack is read in place: music and pictures too
+		return pack_dir.path_join(key)
 	if gozen and entry.has("w") and key.get_extension().to_lower() in ["mp4", "m4v", "mov"]:
 		return pack_dir.path_join(key)
 	if not entry.has("out"):
