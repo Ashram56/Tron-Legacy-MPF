@@ -30,3 +30,32 @@ line; most of the missing frames are the ROM's animated transitions between text
 Portal, Sea of Simulation, the Flynn's Arcade awards), where the game shows the final text over a static picture. A frame
 the game draws that no Serum frame matches is shown plain. Closing these is a list of effects to rebuild one by one from the
 ROM's frames: use the measure above as the work list.
+
+## Second measure (2026-10-30, after the first rendering fixes)
+
+| | first | now |
+|---|---|---|
+| Same Serum frame found in the game's DMD | 11456 of 17119 (66.9 %) | 11987 of 17119 (70.0 %) |
+| Distinct frames of the game unknown to Serum | about 28 % | 2963 of 19891 (14.9 %) |
+| Quorra / Light Cycle / Portal multiball (unknown game frames) | 568 / 820 / 379 | 167 / 193 / 229 |
+
+What changed: the jackpot effects (deffs 48, 49, 68, 69, 87-89, 143) draw the clip bare and bring the text at the ROM's time
+(the last sound call of the effect, `timing.json`), with the picture dimmed to level 1 under the text where the ROM does so
+(`DIM_AFTER_MS`); Quorra's deff 65 shows level 1 as 0 (`LEVEL_MAP`); the attract pages get the version screen at power-up and the
+status panel (line at x 40, points "00"). Checked in isolation (`render_diff.py` and a Serum identification of the reference
+capture and the game's frame): 48, 49, 65, 68, 69, 87-89 now have every frame known to Serum (before: 17 of 66, 0, 0, 57 of 100,
+63 of 108, 0, 0, 30 of 53).
+
+**The "same Serum frame" figure under-counts the effects with random clips.** The ROM picks one of 3 to 12 film clips at random
+for 19 effects (`assets/mpf_package/config/dmd_variants.yaml`), the game now does the same (`variants`, rom_differences.md),
+but two runs rarely pick the same clip: the figure for Disc Multiball (27 %) cannot rise above the chance of the same clip.
+For those effects the figure to watch is the share of the game's frames **unknown** to Serum (the frame must be one the file
+colours), which falls from 913 to 525 of 2091 for Disc Multiball.
+
+Still open (the work list, by weight): the score display deff 19 with the progress overlays (deffs 108 and 111 over it: 9349
+distinct frames, 6912 found), the Flynn's Arcade awards (105: 62 of 400), the coin page (10: 0 of 95; the credit digits), the
+Light Cycle intro (86), the Sea of Simulation stages (114), deff 83, the first attract pages (1), Portal's super jackpot blink
+(143), the Recognizer and Disc Battle scenario (28 %). Tools used here (they need the Serum identification of the private
+tree, so they are not in this repository; copies are in the project's files, `serum_zedmd/`): `dmd_serum_parity.py` (the
+tables above), `unk.py` (the game's unknown frames by effect, with a picture), `idk.py` (reference capture against the game's
+frame, per frame), `tfirst.py` (when an effect's text starts in the capture).

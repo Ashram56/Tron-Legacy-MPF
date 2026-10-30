@@ -309,7 +309,7 @@ CLASSIC = {
     "deff_025": ["d37ed2eab53a1001", "d37ed2eab53a1001", "d37ed2eab53a1001"],
     "deff_046": ["669370d0afb62c1d", "46317d7624939fbf", "3e055f3406cf6f2d"],
     "deff_091": ["5389647d8fd053ff", "5389647d8fd053ff", "0b25fcc7236c9b02"],
-    "deff_143": ["6507f3260bdb28ac", "c3c251af5390289d", "2b45f48506dd629c"],
+    "deff_143": ["a8cdc462789d632b", "ce3cd39632026274", "3cf39d00f100eeae"],
 }
 KWARGS = {"deff_019": {"line0": "BALL 1", "line1": "1,234,560", "credits": "FREE PLAY",
                        "replay": "REPLAY AT 20,000,000", "p1": "1,234,560", "p2": "870,050", "p3": "", "p4": "",
