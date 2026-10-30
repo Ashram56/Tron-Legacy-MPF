@@ -235,6 +235,10 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                             "hide_after_frame": 30, "step_frames": 2,
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
+             # deff 48 (0x01008950) Disc Multiball jackpot: the clip plays bare, the text comes at 1410 ms with the sound
+             # 0x05b (1420 ms), the points blinking on 4 ticks off 4 (PinMAME capture)
+             48: {"DISC MULTIBALL": {"show_after_ms": 1410}, "JACKPOT": {"show_after_ms": 1410},
+                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4}},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
              40: {"YOU'RE UP": {"blink_ticks": 6}},
              # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
@@ -300,6 +304,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
                    "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
+# Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
+# (deff 48: the last clip frame, silhouetted, under the text at 1410 ms)
+DIM_AFTER_MS = {48: 1410}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
 # screen. Lines of different screens may overlap; the rules pass `screen`.

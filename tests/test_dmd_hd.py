@@ -6,6 +6,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -187,7 +188,8 @@ class TestHdMedia(unittest.TestCase):
     def test_every_picture_has_an_hd_twin(self):
         from PIL import Image
         scale = json.load(open(os.path.join(GAME, "media", "dmd_hd", "scale.json")))["scale"]
-        pictures = glob.glob(os.path.join(GAME, "media", "dmd", "deff_*", "*.png"))
+        pictures = [p for p in glob.glob(os.path.join(GAME, "media", "dmd", "deff_*", "*.png"))
+                    if not re.fullmatch(r"v\d{3}\.png", os.path.basename(p))]     # the film clips' variants have none: the PuP clips play
         self.assertGreater(len(pictures), 1000)
         for src in pictures:
             rel = os.path.relpath(src, os.path.join(GAME, "media", "dmd"))

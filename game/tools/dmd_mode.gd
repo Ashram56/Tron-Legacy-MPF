@@ -384,6 +384,8 @@ func _data_pictures(effect_path: String) -> Array[String]:
 		match it["type"]:
 			"frames":
 				pics = it["color_frames"] if color and it.has("color_frames") else it["frames"].map(func(f): return f[0])
+				for clip in it.get("variants", []):
+					pics = pics + clip.map(func(f): return f[0])
 			"letters":
 				pics = it["sprites"].map(func(sp): return sp["color_pic"] if color and sp.has("color_pic") else sp["pic"])
 		for p in pics:

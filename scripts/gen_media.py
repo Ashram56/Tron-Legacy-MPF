@@ -149,6 +149,25 @@ def gif_frames(path):
     return out
 
 
+def dim_after(frames, at_ms):
+    """The frames with every lit dot at level 1 from at_ms on (the ROM's palette change under the text): the frame running
+    at that time is split in two."""
+    from PIL import Image
+    out, t = [], 0
+    for img, ms in frames:
+        end = t + ms
+        if end <= at_ms:
+            out.append((img, ms))
+        else:
+            if t < at_ms:
+                out.append((img, at_ms - t))
+            grey = img.convert("L").point(lambda v: 17 if v else 0)
+            dim = Image.merge("RGBA", (grey, grey, grey, Image.new("L", img.size, 255)))
+            out.append((dim, end - max(t, at_ms)))
+        t = end
+    return out
+
+
 def png_frames(folder):
     from PIL import Image
     timing = json.load(open(os.path.join(folder, "timing.json"), encoding="utf-8"))
@@ -388,7 +407,7 @@ def loop_period(frames):
 SHARED = {}
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False):
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=()):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -434,8 +453,25 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
         parts += score_display_nodes(deff_id == 19, panel == "match")
     items = [rect_item("Background", 0, 0, 128, 32, 0)]
     if frames:
-        items.append({"type": "frames", "name": "Anim", "loop": bool(loop),
-                      "frames": [[files[k], round(ms, 1)] for k, ms in order]})
+        item = {"type": "frames", "name": "Anim", "loop": bool(loop),
+                "frames": [[files[k], round(ms, 1)] for k, ms in order]}
+        if variants:                    # the ROM's random choice among film clips (dmd_variants.yaml): one list of frames each
+            clips, pics = [], {}
+            for clip in variants:
+                row = []
+                for img, ms in clip:
+                    digest = hashlib.md5(img.tobytes()).hexdigest()
+                    if digest in files:                 # a picture the effect has already
+                        row.append([files[digest], ms])
+                        continue
+                    if digest not in pics:
+                        fname = "v{:03d}.png".format(len(pics))
+                        img.save(os.path.join(GAME, folder_rel, fname))
+                        pics[digest] = "res://{}/{}".format(folder_rel, fname)
+                    row.append([pics[digest], ms])
+                clips.append(row)
+            item["variants"] = clips
+        items.append(item)
     items += [rect_item("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0) for k, (x0, y0, x1, y1) in enumerate(fills)]
     if letter_item:
         items.append(letter_item)
@@ -502,11 +538,22 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        if source == "graphics" and deff_id in rom_layout.DIM_AFTER_MS:
+            frames = dim_after(frames, rom_layout.DIM_AFTER_MS[deff_id])
         if loop and source == "graphics":       # loop whole bitmap cycles only
             period = loop_period(frames)
             frames = frames[:period] if period else frames
+        variants = []
+        if source == "graphics":
+            for gif in sorted(glob.glob(os.path.join(folder, "variants", "v*.gif"))):
+                clip = gif_frames(gif)
+                if panel:                       # the effect's own frames leave the status panel to the score display
+                    from PIL import ImageDraw
+                    for img, _ in clip:
+                        ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
+                variants.append(clip)
         write_slide(deff_id, frames, layouts, loop, rel, panel,
-                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference")
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants)
     return out
 
 
@@ -550,6 +597,8 @@ def build_hd_frames(scale=None, deffs=None):
         os.makedirs(out, exist_ok=True)
         for src in sorted(glob.glob(os.path.join(folder, "*.png"))):
             name = os.path.basename(src)
+            if name[0] == "v" and name[1:4].isdigit():    # the film clips' variants (write_slide): the HD effects play the PuP clips
+                continue
             kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
             found, boxes, cleared = texts.get(src, ([], [], None))
             key = os.path.basename(folder) + "/" + name
