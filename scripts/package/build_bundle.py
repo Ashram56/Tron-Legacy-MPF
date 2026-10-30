@@ -180,12 +180,13 @@ def make_feeders(args):
                 continue
             if dmd_out.arch() == arch:
                 ok = build(out)
-            elif shutil.which("zig"):
+            elif dmd_out.zig():
                 t = ZIG_TARGETS[arch]
-                ok = build(out, cc="zig cc -target " + t, cxx="zig c++ -target " + t)
+                z = " ".join(dmd_out.zig())
+                ok = build(out, cc=z + " cc -target " + t, cxx=z + " c++ -target " + t)
             else:
                 ok = False
-            print("{} for {}: {}".format(name, arch, "built" if ok else "NOT built (needs zig for another CPU than this one's, "
+            print("{} for {}: {}".format(name, arch, "built" if ok else "NOT built (needs zig, or `pip install ziglang`, for another CPU than this one's, "
                   "git, CMake and the MPF-Godot-Packaging checkout): this bundle has no ZeDMD output there"), flush=True)
 
 

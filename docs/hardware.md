@@ -341,7 +341,7 @@ feeder, which it starts itself, with no Python or MPF on the way. `DIR/trn_174h/
 **the player brings it (it is its author's; it is never in this repository or in git)**. A frame the file does not know stays in
 Tron blue (or the `--zedmd` colour). **Nothing is compiled on the machine that plays**: the bundle's build
 (`scripts/package/build_bundle.py`, `make_feeders`) builds `zedmd_feed` and `dmd_serum` for each CPU (x86_64, arm64) on the builder
-and ships them in `game/native/bin/<arch>/` (the other CPU with `zig cc -target`; `--no-feeder` skips them); `scripts/dmd_out.py`
+and ships them in `game/native/bin/<arch>/` (the other CPU with `zig cc -target`, from `zig` on the PATH or `pip install ziglang`: the arm64 cross build is checked, an ELF aarch64 for the Pi 4 and the Jetson, not run here; `--no-feeder` skips them); `scripts/dmd_out.py`
 only uses those. A development checkout (with a `.git`) builds them on first use (git, CMake, a C++ compiler;
 `game/native/dmd_serum/build.sh`). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
 libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:

@@ -63,6 +63,18 @@ def prebuilt(name):
     return None
 
 
+def zig():
+    """The zig command (cross builds for the other CPU): `zig` on the PATH, else the ziglang Python package, else None."""
+    import shutil
+    if shutil.which("zig"):
+        return ["zig"]
+    try:
+        import ziglang  # noqa: F401
+    except ImportError:
+        return None
+    return [sys.executable, "-m", "ziglang"]
+
+
 def _build(cmd, out, cc, cxx):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     env = dict(os.environ)
@@ -74,16 +86,22 @@ def _build(cmd, out, cc, cxx):
 
 
 def build_feeder(out, cc=None, cxx=None):
-    """Build the platform's plain ZeDMD feeder (native/zedmd_feed, C, libc only) into OUT on a build box. cc / cxx: another
+    """Build the platform's plain ZeDMD feeder (native/zedmd_feed/zedmd_feed.c: C, libc only) into OUT on a build box. cc: another
     target, e.g. "zig cc -target aarch64-linux-gnu". Returns True when built."""
-    return _build(["bash", os.path.join(need_platform(), "native", "zedmd_feed", "build.sh"), out], out, cc, cxx)
+    import shlex
+    src = os.path.join(need_platform(), "native", "zedmd_feed", "zedmd_feed.c")
+    if not os.path.exists(src):
+        return False
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    cmd = shlex.split(cc or os.environ.get("CC", "cc")) + ["-O2", "-Wall", "-o", out, src]
+    return subprocess.call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
 
 
 def build_serum(out, cc=None, cxx=None):
     """Build the game's Serum colouriser (game/native/dmd_serum: libserum linked in; git, CMake >= 3.25, a C++17 compiler) into
     OUT on a build box. Returns True when built."""
     return _build(["bash", os.path.join(tc.GAME, "native", "dmd_serum", "build.sh"), out,
-                   os.path.join(tc.GAME, "native", "serum_build")], out, cc, cxx)
+                   os.path.join(tc.GAME, "native", "serum_build", os.path.basename(os.path.dirname(out)))], out, cc, cxx)
 
 
 def _tool(name, build, python=False):
