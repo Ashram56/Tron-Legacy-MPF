@@ -16,6 +16,7 @@ Needs a workspace that scripts/setup.py has finished. No ROM, no PuP Pack, no cr
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -38,7 +39,9 @@ SCRIPTS = ["run.py", "dmd_out.py", "mpf_platform.py", "toolchain.py", "fsutil.py
 GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs", "game/tron/media_data.json",
              "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc",
              # made from the PuP Pack at the bundle's creation (--pup-zip), shipped as they are: nothing is made on the target
-             "game/hd_art/letters", "game/hd_art/deff_105", "pup_media/trn_174h"]
+             "game/hd_art/letters", "game/hd_art/deff_105", "pup_media/trn_174h",
+             # the ZeDMD feeder with libserum linked in, built here per CPU (make_feeders): nothing is compiled on the target
+             "game/native/bin/arm64", "game/native/bin/x86_64"]
 
 ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
                "assets/mpf_package/service_menu.json", "assets/mpf_package/media/rom_images_all.zip"]
@@ -158,6 +161,32 @@ def make_pup_art(args):
             raise SystemExit("the PuP art is incomplete: no " + rel)
 
 
+ZIG_TARGETS = {"arm64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}
+
+
+def make_feeders(args):
+    """The ZeDMD feeder with libserum (the platform's native/zedmd_feed/build.sh --serum) for each target CPU, into
+    game/native/bin/<arch>/, so the bundle carries it: the player's machine never compiles. The host's CPU builds with the
+    system compiler, the other with zig (`zig cc -target ...`); a CPU that cannot be built is reported (no ZeDMD colour there)."""
+    if args.no_feeder:
+        return
+    import dmd_out
+    want = ["arm64", "x86_64"] if args.target == "all" else [args.target]
+    for arch in want:
+        out = os.path.join(tc.GAME, "native", "bin", arch, "zedmd_feed_serum")
+        if os.path.exists(out):
+            continue
+        if dmd_out.arch() == arch:
+            ok = dmd_out.build_feeder(out, serum=True)
+        elif shutil.which("zig"):
+            t = ZIG_TARGETS[arch]
+            ok = dmd_out.build_feeder(out, serum=True, cc="zig cc -target " + t, cxx="zig c++ -target " + t)
+        else:
+            ok = False
+        print("ZeDMD feeder for {}: {}".format(arch, "built" if ok else "NOT built (needs zig for another CPU than this one's, "
+              "git, CMake and the MPF-Godot-Packaging checkout): this bundle has no ZeDMD colour on it"), flush=True)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
@@ -167,9 +196,11 @@ def main(argv=None):
     p.add_argument("--pup-zip", help="the PuP Pack's zip (a path or URL): installed here and the HD DMD's art (clips, ZUSE/TRON letters, "
                    "award icons) made from it, then shipped in the bundle. Nothing is made on the machine that runs the game")
     p.add_argument("--no-pup-art", action="store_true", help="a bundle without that art (the HD DMD then shows the ROM's dot animations)")
+    p.add_argument("--no-feeder", action="store_true", help="no prebuilt ZeDMD feeder in the bundle")
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
     args = p.parse_args(argv)
     make_pup_art(args)
+    make_feeders(args)
     check_workspace()
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)

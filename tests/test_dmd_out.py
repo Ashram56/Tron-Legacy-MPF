@@ -56,5 +56,26 @@ class TestDmdOut(unittest.TestCase):
         self.assertEqual("--zedmd-shades", shades)
         self.assertEqual("--zedmd-feed-args=--shades|--serum|/x/altcolor|--rom|trn_174h|--color|2a6cff", feed)
 
+    def test_a_bundle_never_compiles_the_feeder(self):
+        """Without a .git folder (a bundle) the feeder is only the one built offline for this CPU; a development checkout builds."""
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as root:
+            game = os.path.join(root, "game")
+            with mock.patch.object(dmd_out.tc, "ROOT", root), mock.patch.object(dmd_out.tc, "GAME", game), \
+                    mock.patch.object(dmd_out, "build_feeder") as build:
+                self.assertIsNone(dmd_out.prebuilt(True))
+                self.assertIsNone(dmd_out.feeder(False, True))
+                build.assert_not_called()                      # no .git: nothing is built here
+                exe = os.path.join(game, "native", "bin", dmd_out.arch(), "zedmd_feed_serum")
+                os.makedirs(os.path.dirname(exe))
+                open(exe, "w").close()
+                self.assertEqual(exe, dmd_out.prebuilt(True))
+                self.assertEqual(exe, dmd_out.prebuilt(False))     # the one with libserum also runs without it
+                os.makedirs(os.path.join(root, ".git"))
+                os.remove(exe)
+                dmd_out.feeder(False, True)
+                build.assert_called_once()                     # a development checkout builds on first use
+
 if __name__ == "__main__":
     unittest.main()

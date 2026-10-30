@@ -8,6 +8,7 @@ native feeder. This file only finds that checkout and puts them where the game r
 MPF-Godot-Packaging: $MPF_GODOT_PACKAGING (or $MPF_PLATFORM_DIR on a machine installed by the setup page), else a folder beside this repository (MPF-Godot-Packaging, MPF-Godot).
 """
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -47,29 +48,54 @@ def detect():
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def arch():
+    """The CPU the bundle's prebuilt feeder folder is named after: x86_64 or arm64."""
+    m = platform.machine().lower()
+    return "arm64" if m in ("aarch64", "arm64") else "x86_64"
+
+
+def prebuilt(serum=False):
+    """The feeder built offline for this CPU (game/native/bin/<arch>/, put there by the bundle's build: nothing is compiled on
+    the machine that runs the game), or the one built here in a development checkout; None when there is none."""
+    names = ["zedmd_feed_serum"] + ([] if serum else ["zedmd_feed"])     # the one with libserum also runs without it
+    for folder in (os.path.join(tc.GAME, "native", "bin", arch()), os.path.join(tc.GAME, "native", "bin")):
+        for name in names:
+            if os.path.isfile(os.path.join(folder, name)):
+                return os.path.join(folder, name)
+    return None
+
+
+def build_feeder(out, serum=False, cc=None, cxx=None):
+    """Build the platform's feeder into OUT on a build box (the bundle's build, or a development checkout): the plain one with
+    the C compiler, with serum libserum linked in (git, CMake, a C++ compiler; native/zedmd_feed/build.sh --serum). cc / cxx:
+    another target, e.g. "zig cc -target aarch64-linux-gnu". Returns True when built."""
+    src_dir = os.path.join(need_platform(), "native", "zedmd_feed")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    env = dict(os.environ)
+    if cc:
+        env["CC"] = cc
+    if cxx:
+        env["CXX"] = cxx
+    cmd = ["bash", os.path.join(src_dir, "build.sh"), out] + (["--serum", os.path.join(tc.GAME, "native", "serum_build")] if serum else [])
+    if not os.path.exists(os.path.join(src_dir, "build.sh")):
+        return False
+    return subprocess.call(cmd, env=env, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
+
+
 def feeder(python=False, serum=False):
-    """Path of the platform's native ZeDMD feeder, built on first use, or None when it cannot be had or finds no ZeDMD
-    (--probe): MPF then drives the ZeDMD through the platform's Python one. serum: the feeder with libserum linked in
-    (the platform's native/zedmd_feed/build.sh --serum: git, CMake and a C++ compiler on this build box; the source is
-    cloned into game/native/serum_build). Windows has no native feeder."""
+    """Path of the native ZeDMD feeder, or None when it cannot be had or finds no ZeDMD (--probe): MPF then drives the ZeDMD
+    through the platform's Python one. The feeder is built offline (the bundle's build, scripts/package/build_bundle.py, puts
+    one per CPU in game/native/bin/<arch>/); nothing is compiled on the machine that runs a bundle. Only a development checkout
+    (a .git folder) builds it on first use. Windows has no native feeder."""
     if python or os.name == "nt":
         return None
-    src_dir = os.path.join(need_platform(), "native", "zedmd_feed")
-    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed" + ("_serum" if serum else ""))
-    newest = max(os.path.getmtime(os.path.join(src_dir, f)) for f in os.listdir(src_dir))
-    if not os.path.exists(exe) or os.path.getmtime(exe) < newest:
-        os.makedirs(os.path.dirname(exe), exist_ok=True)
-        if serum:
-            if not os.path.exists(os.path.join(src_dir, "build.sh")):
-                return None
-            cmd = ["bash", os.path.join(src_dir, "build.sh"), exe, "--serum", os.path.join(tc.GAME, "native", "serum_build")]
-        else:
-            cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
-            if not cc:
-                return None
-            cmd = [cc, "-O2", "-o", exe, os.path.join(src_dir, "zedmd_feed.c")]
-        if subprocess.call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) != 0:
+    exe = prebuilt(serum)
+    if exe is None and os.path.exists(os.path.join(tc.ROOT, ".git")):
+        exe = os.path.join(tc.GAME, "native", "bin", arch(), "zedmd_feed" + ("_serum" if serum else ""))
+        if not build_feeder(exe, serum):
             return None
+    if exe is None or not os.path.isfile(exe):
+        return None
     return exe if subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
 
 

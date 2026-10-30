@@ -338,9 +338,10 @@ native feeder (`zedmd_feed --shades --serum`): Godot sends the exact 128x32 shad
 identifies each frame, colours it, runs the colour rotations on libserum's timer and sends it to the ZeDMD, with no Python or
 MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file: **the player brings it (it is its author's; it is
 never in this repository or in git)**. A frame the file does not know stays in Tron blue (or the `--zedmd` colour).
-`scripts/dmd_out.py` builds the feeder with libserum on first use (git, CMake, a C++ compiler; Linux and macOS; never on a
-Raspberry Pi: build on a PC and copy the binary: the platform's `native/zedmd_feed/build.sh --serum` with `CC`/`CXX` for
-another target). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
+**Nothing is compiled on the machine that plays**: the bundle's build (`scripts/package/build_bundle.py`, `make_feeders`) builds the
+feeder with libserum for each CPU (x86_64, arm64) on the builder and ships it in `game/native/bin/<arch>/zedmd_feed_serum`
+(the other CPU with `zig cc -target`; `--no-feeder` skips it); `scripts/dmd_out.py` only uses that one. A development checkout
+(with a `.git`) builds it on first use (git, CMake, a C++ compiler; the platform's `native/zedmd_feed/build.sh --serum`). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
 libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:
 [dmd_conformance.md](dmd_conformance.md) says how close it is.
 
