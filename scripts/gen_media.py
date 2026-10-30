@@ -556,6 +556,15 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        if source == "graphics" and deff_id in rom_layout.CLEAR_AT_MS:
+            from PIL import Image
+            at, kept, t = rom_layout.CLEAR_AT_MS[deff_id], [], 0
+            for img, ms in frames:
+                if t >= at:
+                    break
+                kept.append((img, min(ms, at - t)))
+                t += ms
+            frames = kept + [(Image.new("RGBA", (128, 32)), 100000)]
         if source == "graphics" and deff_id in rom_layout.LEVEL_MAP:
             frames = [(remap_levels(img, rom_layout.LEVEL_MAP[deff_id]), ms) for img, ms in frames]
         if source == "graphics" and deff_id in rom_layout.DIM_AFTER_MS:

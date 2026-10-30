@@ -253,6 +253,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              68: {"JACKPOT": {"show_after_ms": 1806}, "%,02lu": {"show_after_ms": 1806, "blink_ticks": 4}},
              69: {"SUPER JACKPOT": {"show_after_ms": 2199}, "SUPER": {"show_after_ms": 2199},
                   "JACKPOT": {"show_after_ms": 2199}, "%,02lu": {"show_after_ms": 2199, "blink_ticks": 4}},
+             # deff 73 (Clu's award): the clip plays bare, the points come with its last frames (PinMAME capture: text on from about
+             # 512 ms, blinking on 48 ms, off 48: fitted on the capture)
+             73: {"%,02lu": {"show_after_ms": 512, "blink_ms": 48}},
              # deff 143 (Portal's super jackpot): the clip plays bare, the text comes at 4100 ms (PinMAME capture), the points drawn
              # black on the dimmed picture on alternate steps
              143: {"SUPER": {"show_after_ms": 4100}, "JACKPOT": {"show_after_ms": 4100},
@@ -327,6 +330,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
                    "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
+# Effects whose picture is cleared at this time, the points staying on black (PinMAME capture; deff 73: the last frame, 1740 ms in
+# timing.json because it runs to the end of the capture, is on for one frame time)
+CLEAR_AT_MS = {73: 600}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
 LEVEL_MAP = {65: {1: 0}}
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
