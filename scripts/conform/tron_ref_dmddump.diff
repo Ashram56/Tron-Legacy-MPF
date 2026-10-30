@@ -1,0 +1,21 @@
+--- /home/user/ashram56/tron-legacy-le-rom-decryption/rules/tools/trace/tron_ref.cpp	2026-10-30 10:32:55.167669937 +0000
++++ tron_ref.cpp	2026-10-30 11:29:07.902971283 +0000
+@@ -106,7 +106,17 @@
+ static std::atomic<int> keys[256];
+ int PINMAMECALLBACK IsKeyPressed(PINMAME_KEYCODE k, void*) { return (int)k < 256 ? keys[(int)k].load() : 0; }
+ void PINMAMECALLBACK OnDisplayAvailable(int, int, PinmameDisplayLayout*, void*) {}
+-void PINMAMECALLBACK OnDisplayUpdated(int, void*, PinmameDisplayLayout*, void*) {}
++static FILE* dmdlog = NULL; static std::vector<unsigned char> dmdlast;
++void PINMAMECALLBACK OnDisplayUpdated(int, void* d, PinmameDisplayLayout* l, void*) {
++  // DMD frame dump (TRON_DMDLOG=file): per change [double t][int w][int h][int depth][w*h bytes as handed]
++  if (!d || !l || l->type != PINMAME_DISPLAY_TYPE_DMD) return;
++  if (!dmdlog) { const char* f = getenv("TRON_DMDLOG"); if (!f) return; dmdlog = fopen(f, "wb"); if (!dmdlog) return; }
++  size_t n = (size_t)l->width * l->height;
++  if (dmdlast.size() == n && !memcmp(dmdlast.data(), d, n)) return;
++  dmdlast.assign((unsigned char*)d, (unsigned char*)d + n);
++  double t = PinmameEmuTime(); int hdr[3] = { l->width, l->height, l->depth };
++  fwrite(&t, 8, 1, dmdlog); fwrite(hdr, 4, 3, dmdlog); fwrite(d, 1, n, dmdlog); fflush(dmdlog);
++}
+ void PINMAMECALLBACK OnState(int, void*) {}
+ void PINMAMECALLBACK OnLog(PINMAME_LOG_LEVEL l, const char* f, va_list a, void*) { if (l == PINMAME_LOG_LEVEL_ERROR) { vfprintf(stderr, f, a); fprintf(stderr, "\n"); } }
+ static int sol[64];
