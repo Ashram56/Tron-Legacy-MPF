@@ -256,6 +256,12 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # deff 73 (Clu's award): the clip plays bare, the points come with its last frames (PinMAME capture: text on from about
              # 512 ms, blinking on 48 ms, off 48: fitted on the capture)
              73: {"%,02lu": {"show_after_ms": 512, "blink_ms": 48}},
+             # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
+             111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
+                   "DISC MULTIBALL": {"show_after_ms": 1960}},
+             # deff 142 (Portal shot): the clip plays bare, then the picture dims and the points blink on it from 1680 ms (PinMAME
+             # capture; on 48 ms, black 48 ms)
+             142: {"%,02lu": {"show_after_ms": 1680, "blink_ms": 48, "blink_dark": True}},
              # deff 143 (Portal's super jackpot): the clip plays bare, the text comes at 4100 ms (PinMAME capture), the points drawn
              # black on the dimmed picture on alternate steps
              143: {"SUPER": {"show_after_ms": 4100}, "JACKPOT": {"show_after_ms": 4100},
@@ -333,12 +339,16 @@ GRAPHICS_END = {38: 64}
 # Effects whose picture is cleared at this time, the points staying on black (PinMAME capture; deff 73: the last frame, 1740 ms in
 # timing.json because it runs to the end of the capture, is on for one frame time)
 CLEAR_AT_MS = {73: 600}
+# Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
+# through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
+OPEN_WHITE = {108}
+TEXT_UNDER_CLIP = {108}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
 LEVEL_MAP = {65: {1: 0}}
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
 # (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
 # graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
-DIM_AFTER_MS = {48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
+DIM_AFTER_MS = {142: 1680, 111: 1960, 48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
 # screen. Lines of different screens may overlap; the rules pass `screen`.

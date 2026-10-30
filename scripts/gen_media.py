@@ -423,6 +423,29 @@ def loop_period(frames):
 SHARED = {}
 
 
+def open_white(img):
+    """The frame with its full-white (level 15) areas that reach the picture's edge made transparent: the extraction filled the
+    area outside the clip's shape with white where the ROM draws nothing (the text of the effect shows there)."""
+    import numpy as np
+    a = np.array(img.convert("RGBA"))
+    white = (a[:, :, 0] == 255) & (a[:, :, 3] == 255)
+    reach = np.zeros_like(white)
+    stack = [(y, x) for y in range(white.shape[0]) for x in range(white.shape[1])
+             if (y in (0, white.shape[0] - 1) or x in (0, white.shape[1] - 1)) and white[y, x]]
+    while stack:
+        y, x = stack.pop()
+        if reach[y, x]:
+            continue
+        reach[y, x] = True
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < white.shape[0] and 0 <= nx < white.shape[1] and white[ny, nx] and not reach[ny, nx]:
+                stack.append((ny, nx))
+    a[reach] = (0, 0, 0, 0)
+    from PIL import Image
+    return Image.fromarray(a, "RGBA")
+
+
 def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=()):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
@@ -455,16 +478,21 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
               'offset_right = 128.0', 'offset_bottom = 32.0', 'script = ExtResource("slide")', '',
               '[node name="Background" type="ColorRect" parent="."]', 'layout_mode = 0',
               'offset_right = 128.0', 'offset_bottom = 32.0', 'color = Color(0, 0, 0, 1)']
-    if frames:
-        parts += ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
-                  'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
-                  'autoplay = "default"', 'centered = false']
+    anim_node = ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
+                 'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
+                 'autoplay = "default"', 'centered = false']
+    import rom_layout
+    under = deff_id in rom_layout.TEXT_UNDER_CLIP
+    if frames and not under:
+        parts += anim_node
     for k, (x0, y0, x1, y1) in enumerate(fills):     # black boxes the ROM clears over the bitmap
         parts += rect_node("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0)
     parts += letter_nodes_
     for i, lay in enumerate(layouts):
         if lay:
             parts += text_node(i, lay)
+    if frames and under:            # the ROM draws this bitmap after its text
+        parts += anim_node
     if panel:
         parts += score_display_nodes(deff_id == 19, panel == "match")
     items = [rect_item("Background", 0, 0, 128, 32, 0)]
@@ -487,13 +515,16 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
                     row.append([pics[digest], ms])
                 clips.append(row)
             item["variants"] = clips
-        items.append(item)
+        if not under:
+            items.append(item)
     items += [rect_item("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0) for k, (x0, y0, x1, y1) in enumerate(fills)]
     if letter_item:
         items.append(letter_item)
     for i, lay in enumerate(layouts):
         if lay:
             items += text_items(i, lay)
+    if frames and under:
+        items.append(item)
     if panel:
         items += score_display_items(deff_id == 19, panel == "match")
     write_effect(name, folder_rel, parts, items)
@@ -556,6 +587,8 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        if source == "graphics" and deff_id in rom_layout.OPEN_WHITE:
+            frames = [(open_white(img), ms) for img, ms in frames]
         if source == "graphics" and deff_id in rom_layout.CLEAR_AT_MS:
             from PIL import Image
             at, kept, t = rom_layout.CLEAR_AT_MS[deff_id], [], 0
