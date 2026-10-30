@@ -1,7 +1,8 @@
 """The pages of the attract display, deff 1 [0x01034364] (attract_and_service.md 5.1), shown as text on the
 generic slide game/slides/text_page.tscn above deff 1. The pages log no rules events.
 
-Order, one page every 2.016 s (126 ticks at 16.0 ms): GAME OVER (first pass only), the credit text
+Order, one page every 2.016 s (126 ticks at 16.0 ms): the version screen at power-up (deff 5: TRON L.E. / U.S.A. / V1.74 /
+ENGLISH, PinMAME capture), GAME OVER (first pass only), the credit text
 (FUN_00004ff4), the last game's score of each of its players, the high-score table entries (0x01000564,
 GRAND CHAMPION and HIGH SCORE #1-#4, while adj 48 allows high scores), the Tron logo (3.76 s), the
 animation (3.98 s), the Stern web address, the operator's custom message (adj 2 CUSTOM MESSAGE = ON and a message
@@ -14,6 +15,7 @@ from tron.features import Feature
 ORDER = 7
 PAGE_SECONDS = 2.016
 LOGO_SECONDS, ANIMATION_SECONDS = 3.76, 3.98
+VERSION_DEFF = 5                 # the boot version screen (a recorded frame, media/dmd/deff_005_boot_version)
 PRIORITY = 2                     # just above deff 1 (priority 1)
 PAGE_SLIDES = {"LOGO": "attract_logo", "ANIMATION": "attract_anim"}     # the bitmaps of the ROM's logo and animation pages (scripts/gen_media.py build_attract_art)
 
@@ -38,6 +40,7 @@ class AttractPages(Feature):
         self.handle = None
         self.pages = []
         self.index = 0
+        self.boot = False                       # the next first pass is the power-up's: the version screen comes first
         self.last_scores = []
         ev = self.machine.events
         ev.add_handler("game_starting", self.stop, priority=2000)
@@ -51,6 +54,7 @@ class AttractPages(Feature):
     def _power_up(self, **kwargs):
         """Power-up: deff 1 with the attract feature (attract.BOOT_SECONDS)."""
         from tron.features.attract import BOOT_SECONDS   # noqa: E402
+        self.boot = True
         self.machine.clock.schedule_once(lambda dt=None: None if self.os.game else self.attract_start(),
                                          BOOT_SECONDS)
 
@@ -59,7 +63,9 @@ class AttractPages(Feature):
 
     def page_list(self, first_pass):
         os_ = self.os
-        pages = [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
+        pages = [("VERSION", [], PAGE_SECONDS)] if self.boot and first_pass else []
+        self.boot = False
+        pages += [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
         pages.append(("CREDITS", lambda: [os_.credit_model.text()], PAGE_SECONDS))
         if self.last_scores:
             for n, score in enumerate(self.last_scores, 1):
@@ -94,14 +100,22 @@ class AttractPages(Feature):
             self.pages = []
             for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):
                 self.os.media.text_hide(slide)
+            self.os.media.deff_stop(VERSION_DEFF)
 
     def show(self):
         name, lines, seconds = self.pages[self.index]
         lines = lines() if callable(lines) else lines
         self.machine.events.post("tron_attract_page", page=name, lines=lines)
         shown = PAGE_SLIDES.get(name, "text_page")
-        if shown == "text_page":
-            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines))
+        if name == "VERSION":
+            self.os.media.deff_start(VERSION_DEFF, PRIORITY)
+            shown = None
+        else:
+            self.os.media.deff_stop(VERSION_DEFF)
+        if shown is None:
+            pass
+        elif shown == "text_page":
+            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), p1="00")
         else:
             self.os.media.text_show(shown, [], PRIORITY)
         for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):

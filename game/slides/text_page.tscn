@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]
 [ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]
+[ext_resource type="Script" path="res://tron/dmd_mode_only.gd" id="mode_only"]
 
 [node name="text_page" type="Control"]
 layout_mode = 3
@@ -10,11 +11,51 @@ offset_right = 128.0
 offset_bottom = 32.0
 script = ExtResource("slide")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="BackgroundHd" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 128.0
+offset_bottom = 32.0
+script = ExtResource("mode_only")
+only_classic = false
+
+[node name="Background" type="ColorRect" parent="BackgroundHd"]
 layout_mode = 0
 offset_right = 128.0
 offset_bottom = 32.0
 color = Color(0, 0, 0, 1)
+
+[node name="Classic" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 128.0
+offset_bottom = 32.0
+script = ExtResource("mode_only")
+
+[node name="BackgroundRight" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 41.0
+offset_right = 128.0
+offset_bottom = 32.0
+color = Color(0, 0, 0, 1)
+
+[node name="PanelLine" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 40.0
+offset_right = 41.0
+offset_bottom = 32.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="P1" type="Label" parent="Classic"]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "p1"
+rom_font = 0
+rom_x = 38
+rom_y = 5
+rom_flags = 4
 
 [node name="OneLine" type="Label" parent="."]
 layout_mode = 0
