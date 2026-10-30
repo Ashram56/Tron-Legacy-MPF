@@ -29,7 +29,7 @@ SPEC = re.compile(r"%(P\d/[^%]*%|[-+ #0,]*\d*l?[dus])")
 # deffs 68 / 69 (0x0101e320 / 0x0101e654): the points on the row of the screen shown (`screen` = the double arg).
 # deff 78 (0x0101476c): "%d FOLLOWING%P1//S/%" the award count (task + 0x34), then the points (+ 0x30).
 # deff 140 (0x0102faec): the Sea of Simulation bonus (task + 0x34), not the start total.
-TEXT_ARGS = {43: ("hits_left", "points", "score"), 55: ("more",), 62: ("left",),
+TEXT_ARGS = {10: ("credits", "prompt"), 15: ("credits", "prompt"), 17: ("credits", "prompt"), 43: ("hits_left", "points", "score"), 55: ("more",), 62: ("left",),
              68: ("points", "points"), 69: ("points", "points"), 78: ("followings", "value"), 138: ("count", "points", "named", "jackpot"), 140: ("sos_bonus",)}
 
 
@@ -257,7 +257,8 @@ class MediaBridge:
                "award_age": int((now - shown) / TICK) if shown is not None else 99,
                "blink_age": int((now - blink) / TICK) if blink is not None else 999}
         for p in range(1, 5):
-            out["p%d" % p] = format_rom_text("%,02lu", [players[p - 1].score]) if p <= len(players) else ""
+            out["p%d" % p] = format_rom_text("%,02lu", [players[p - 1].score]) if p <= len(players) else (
+                "00" if p == 1 and not players else "")        # no game: P1's 00, as the ROM's panel shows
         feats = self.os.features_by_name if hasattr(self.os, "features") else {}
         targets = feats.get("tron_targets")
         for bit, key in ((1, "bar_ds"), (2, "bar_bumpers"), (4, "bar_spinners")):

@@ -255,6 +255,11 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # black on the dimmed picture on alternate steps
              143: {"SUPER": {"show_after_ms": 4100}, "JACKPOT": {"show_after_ms": 4100},
                    "%,02lu": {"show_after_ms": 4100, "blink_ticks": 4, "blink_dark": True}},
+             # deffs 10, 15, 17 (the credits screens): the credit text on the upper row, the prompt on the lower one blinking
+             # 15 ticks on, 15 off from the start (PinMAME capture, rows 5-12 and 18-25 of the right part)
+             **{d: {"%s": {"font": 10, "x": 84, "y": 12, "flags": 2, "source": "capture"},
+                    "%-s": {"font": 10, "x": 84, "y": 25, "flags": 2, "source": "capture", "blink_ticks": 15}}
+                for d in (10, 15, 17)},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
              40: {"YOU'RE UP": {"blink_ticks": 6}},
              # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)

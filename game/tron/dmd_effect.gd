@@ -125,6 +125,22 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 ## The ROM picks one of several film clips at random for some effects (assets/mpf_package/config/dmd_variants.yaml: the Disc
 ## Multiball and Light Cycle jackpots, Quorra's, the Sea of Simulation stages ...); the effect's "variants" hold them. Off for
 ## the render checks (tools/slide_capture.gd), which compare the one clip the reference capture shows.
+static var _variant_rng: RandomNumberGenerator = null
+
+
+## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
+## conformance checks repeat a scenario and get the same clips).
+static func pick_variant(n: int) -> int:
+	if _variant_rng == null:
+		_variant_rng = RandomNumberGenerator.new()
+		var seed_text := OS.get_environment("TRON_DMD_SEED")
+		if seed_text != "":
+			_variant_rng.seed = int(seed_text)
+		else:
+			_variant_rng.randomize()
+	return _variant_rng.randi() % n
+
+
 static func variants_enabled() -> bool:
 	return bool(ProjectSettings.get_setting("tron/dmd/variants", true))
 
@@ -299,7 +315,7 @@ class State extends RefCounted:
 			return
 		var vs: Array = items[_frames_item].get("variants", [])
 		if vs.size() and DmdEffect.variants_enabled():
-			_variant = randi() % vs.size()
+			_variant = DmdEffect.pick_variant(vs.size())
 		for f in _frames():
 			_durations.append(float(f[1]))
 			_total_ms += float(f[1])

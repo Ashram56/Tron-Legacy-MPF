@@ -888,7 +888,7 @@ class TronOS(CustomCode):
             return True
         self.machine.events.post("tron_start_refused")    # event 0x2d
         if not self.display.running(15):
-            self.deff_start(15, credits=self.credit_model.text())
+            self.deff_start(15, credits=self.credit_model.text(), prompt=self.credit_model.prompt())
         return False
 
     def _player_add_request(self, **kwargs):

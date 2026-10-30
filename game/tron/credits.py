@@ -86,7 +86,7 @@ class Credits:
                 os_.sound(0x0f1)                   # event 0x19 (credit added) handler
                 os_.flag_set(47)
             self.save()
-            os_.deff_start(10, credits=self.text())
+            os_.deff_start(10, credits=self.text(), prompt=self.prompt())
         if not credited:
             os_.sound(0x0f0)                       # event 0x1a (coin without a credit) handler
 
@@ -125,7 +125,7 @@ class Credits:
         CREDITS when it was added, deff 17."""
         if self.add(1):
             self.os.audit(SERVICE_CREDITS_AUDIT)
-        self.os.deff_start(17, credits=self.text())
+        self.os.deff_start(17, credits=self.text(), prompt=self.prompt())
 
     def reset(self):
         """RESET CREDITS (FUN_00004e88): no credits, unit counter -1."""
@@ -156,6 +156,10 @@ class Credits:
             if a % d == 0 and b % d == 0:
                 a, b = a // d, b // d
         return a, b
+
+    def prompt(self):
+        """The credits screens' second line (deffs 10, 15, 17): PRESS START once a game can start, else INSERT COINS."""
+        return "PRESS START" if self.free_play() or self.credits else "INSERT COINS"
 
     def text(self):
         """FUN_00004ff4: the credit text of the attract page and of deffs 10, 15 and 17."""

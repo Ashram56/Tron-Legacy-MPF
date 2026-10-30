@@ -38,7 +38,7 @@ PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
-TEXT_ONLY = {19, 25, 26, 33, 38, 40}
+TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
 CAPTURE_PANEL_KEPT = {85, 112}
@@ -78,7 +78,9 @@ ARCADE_FRAME_MS = 3 * 16.26          # a reel frame is 3 ROM ticks (os_layer.TIC
 # 0x65e + 2k (item / "BONUS") and the points paid; the stage deffs 116-124 (FUN_01027374 /
 # FUN_01027478): the points.
 # deffs 55, 60: every screen's lines (rom_layout.SCREENS); deff 60 prints the points on either screen's row.
-ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
+# the credits screens (effects 10, 15, 17: the credit text, then PRESS START or INSERT COINS; "%-s" tells the two apart)
+CREDITS_TEXT = "%s / %-s"
+ROM_TEXT = {10: CREDITS_TEXT, 15: CREDITS_TEXT, 17: CREDITS_TEXT, 114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             55: "MULTIBALL + E.B. / ARE LIT / EXTRA BALL / IS LIT / %u MORE TO / LIGHT MULTIBALL / LIGHT EX. BALL"
                 " / LIGHT M.B. + E.B. / MULTIBALL / IS LIT",
             60: "%,02lu / BALL ADDED / %,02lu / %u MORE FOR / ADD-A-BALL",
@@ -526,6 +528,8 @@ def build_deffs(only_data):
         # a capture shows the status panel of the moment it was recorded (score 00): the live panel is drawn
         # over its columns 0-40 instead, except where the effect itself covers them (deffs 85, 112)
         panel = panels.get(deff_id) if source != "reference" or deff_id not in CAPTURE_PANEL_KEPT else None
+        if deff_id in (10, 15, 17):             # the capture of the credits screens shows the panel's line and P1's "00" (PinMAME)
+            panel = "status"
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else [])
