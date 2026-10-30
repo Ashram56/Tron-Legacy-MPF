@@ -323,17 +323,17 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))
     if pin2dmd or zedmd:                # the platform's add-on and overlays (scripts/dmd_out.py), classic 128x32
         dmd_env = dmd_out.prepare("zedmd" if zedmd else "pin2dmd")
-    feed = dmd_out.feeder(zedmd_python, bool(zedmd_serum)) if zedmd else None
-    if zedmd_serum and zedmd and not feed:
-        raise SystemExit("--zedmd-serum needs the native feeder built with libserum (git, CMake, a C++ compiler; Linux or "
-                         "macOS) and a ZeDMD answering: see docs/hardware.md, \"Serum on a ZeDMD\"")
+    feed = dmd_out.feeder(zedmd_python) if zedmd else None
+    serum = dmd_out.serum_filter() if zedmd_serum and feed else None
+    if zedmd_serum and zedmd and not serum:
+        raise SystemExit("--zedmd-serum needs the game's Serum colouriser (game/native/dmd_serum: git, CMake, a C++ compiler; "
+                         "Linux or macOS, built with the bundle) and a ZeDMD answering: see docs/hardware.md, \"Serum on a ZeDMD\"")
     if zedmd:                           # the same frames: to the native feeder, else through MPF's platform
         gargs = user_arg(gargs, "--zedmd" + ("=" + zedmd if zedmd != "default" else ""))
         if feed:
-            gargs = user_arg(gargs, "--zedmd-feed=" + feed)
-            if zedmd_serum:             # the feeder gets shades and colours them with libserum
-                for a in dmd_out.serum_args(zedmd_serum, zedmd if zedmd != "default" else "2a6cff"):
-                    gargs = user_arg(gargs, a)
+            gargs = user_arg(gargs, "--zedmd-feed=" + (serum or feed))
+            if serum:                   # the game's colouriser sits in front of the feeder and colours with libserum
+                dmd_env.update(dmd_out.serum_env(zedmd_serum, feed, zedmd if zedmd != "default" else "2a6cff"))
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects

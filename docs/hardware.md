@@ -333,15 +333,17 @@ together are not supported). A machine installed by the setup page picks the dev
 
 ### Serum colour on a ZeDMD
 
-`--zedmd-serum DIR` colours the DMD with [libserum](https://github.com/PPUC/libserum) (GPL v2) linked into the platform's
-native feeder (`zedmd_feed --shades --serum`): Godot sends the exact 128x32 shades (0-15) of the classic DMD, the feeder
-identifies each frame, colours it, runs the colour rotations on libserum's timer and sends it to the ZeDMD, with no Python or
-MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file: **the player brings it (it is its author's; it is
-never in this repository or in git)**. A frame the file does not know stays in Tron blue (or the `--zedmd` colour).
-**Nothing is compiled on the machine that plays**: the bundle's build (`scripts/package/build_bundle.py`, `make_feeders`) builds the
-feeder with libserum for each CPU (x86_64, arm64) on the builder and ships it in `game/native/bin/<arch>/zedmd_feed_serum`
-(the other CPU with `zig cc -target`; `--no-feeder` skips it); `scripts/dmd_out.py` only uses that one. A development checkout
-(with a `.git`) builds it on first use (git, CMake, a C++ compiler; the platform's `native/zedmd_feed/build.sh --serum`). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
+`--zedmd-serum DIR` colours the DMD with [libserum](https://github.com/PPUC/libserum) (GPL v2) in the game's own
+`game/native/dmd_serum` (the DMD is part of the game; the platform's `zedmd_feed` stays the plain RGB feeder and knows nothing
+of Serum). Godot's add-on sends the 128x32 frames to `dmd_serum` in place of the feeder; it recovers the ROM's shades (0-15), lets
+libserum identify each frame, colours it, runs the colour rotations on libserum's timer and pipes the RGB frames to the platform's
+feeder, which it starts itself, with no Python or MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file:
+**the player brings it (it is its author's; it is never in this repository or in git)**. A frame the file does not know stays in
+Tron blue (or the `--zedmd` colour). **Nothing is compiled on the machine that plays**: the bundle's build
+(`scripts/package/build_bundle.py`, `make_feeders`) builds `zedmd_feed` and `dmd_serum` for each CPU (x86_64, arm64) on the builder
+and ships them in `game/native/bin/<arch>/` (the other CPU with `zig cc -target`; `--no-feeder` skips them); `scripts/dmd_out.py`
+only uses those. A development checkout (with a `.git`) builds them on first use (git, CMake, a C++ compiler;
+`game/native/dmd_serum/build.sh`). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
 libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:
 [dmd_conformance.md](dmd_conformance.md) says how close it is.
 
