@@ -325,10 +325,24 @@ python scripts/run.py --pin2dmd                # the original orange; add --hw p
 python scripts/run.py --pin2dmd '#2a6cff'      # Tron blue (the public game is always monochrome)
 python scripts/run.py --zedmd                  # native feeder when a ZeDMD answers, else MPF's Python platform
 python scripts/run.py --dmd-out auto           # the platform looks: PIN2DMD, ZeDMD or neither (the screen only)
+python scripts/run.py --zedmd --zedmd-serum ~/altcolor   # the ZeDMD in colour with Serum (below)
 ```
 
 On a P-ROC machine (`--hw proc`) the RGB DMD replaces the original DMD (the P-ROC's DMD connector is left alone; both
 together are not supported). A machine installed by the setup page picks the device by itself with `[dmd] window = auto`.
+
+### Serum colour on a ZeDMD
+
+`--zedmd-serum DIR` colours the DMD with [libserum](https://github.com/PPUC/libserum) (GPL v2) linked into the platform's
+native feeder (`zedmd_feed --shades --serum`): Godot sends the exact 128x32 shades (0-15) of the classic DMD, the feeder
+identifies each frame, colours it, runs the colour rotations on libserum's timer and sends it to the ZeDMD, with no Python or
+MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file: **the player brings it (it is its author's; it is
+never in this repository or in git)**. A frame the file does not know stays in Tron blue (or the `--zedmd` colour).
+`scripts/dmd_out.py` builds the feeder with libserum on first use (git, CMake, a C++ compiler; Linux and macOS; never on a
+Raspberry Pi: build on a PC and copy the binary: the platform's `native/zedmd_feed/build.sh --serum` with `CC`/`CXX` for
+another target). Checked here with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
+libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:
+[dmd_conformance.md](dmd_conformance.md) says how close it is.
 
 **Not tried on a real PIN2DMD or ZeDMD**: the protocols follow libdmdutil's and libzedmd's source and are tested against
 fake devices in the platform's repository. To check: the PIN2DMD's colour order (`pin2dmd: panel: rbg` swaps green and

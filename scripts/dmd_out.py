@@ -17,6 +17,7 @@ sys.path.insert(0, HERE)
 import toolchain as tc  # noqa: E402
 import mpf_platform  # noqa: E402
 
+ROM = "trn_174h"            # the PinMAME set a Serum colourisation is named after
 OVERLAYS = {"pin2dmd": "pin2dmd.yaml", "zedmd": "zedmd.yaml", "feed": "zedmd_feed.yaml"}
 
 
@@ -46,21 +47,37 @@ def detect():
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def feeder(python=False):
-    """Path of the platform's native ZeDMD feeder, built with the C compiler on first use, or None when it cannot be
-    had or finds no ZeDMD (--probe): MPF then drives the ZeDMD through the platform's Python one."""
+def feeder(python=False, serum=False):
+    """Path of the platform's native ZeDMD feeder, built on first use, or None when it cannot be had or finds no ZeDMD
+    (--probe): MPF then drives the ZeDMD through the platform's Python one. serum: the feeder with libserum linked in
+    (the platform's native/zedmd_feed/build.sh --serum: git, CMake and a C++ compiler on this build box; the source is
+    cloned into game/native/serum_build). Windows has no native feeder."""
     if python or os.name == "nt":
         return None
-    src = os.path.join(need_platform(), "native", "zedmd_feed", "zedmd_feed.c")
-    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed")
-    if not os.path.exists(exe) or os.path.getmtime(exe) < os.path.getmtime(src):
-        cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
-        if not cc:
-            return None
+    src_dir = os.path.join(need_platform(), "native", "zedmd_feed")
+    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed" + ("_serum" if serum else ""))
+    newest = max(os.path.getmtime(os.path.join(src_dir, f)) for f in os.listdir(src_dir))
+    if not os.path.exists(exe) or os.path.getmtime(exe) < newest:
         os.makedirs(os.path.dirname(exe), exist_ok=True)
-        if subprocess.call([cc, "-O2", "-o", exe, src], stderr=subprocess.DEVNULL) != 0:
+        if serum:
+            if not os.path.exists(os.path.join(src_dir, "build.sh")):
+                return None
+            cmd = ["bash", os.path.join(src_dir, "build.sh"), exe, "--serum", os.path.join(tc.GAME, "native", "serum_build")]
+        else:
+            cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
+            if not cc:
+                return None
+            cmd = [cc, "-O2", "-o", exe, os.path.join(src_dir, "zedmd_feed.c")]
+        if subprocess.call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) != 0:
             return None
     return exe if subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
+
+
+def serum_args(altcolor, colour="2a6cff"):
+    """The feeder's arguments (and Godot's, for the add-on) to colour the DMD with Serum from ALTCOLOR/trn_174h/trn_174h.cROMc:
+    the feeder gets shades, not RGB; a frame the file does not know stays in COLOUR (Tron blue)."""
+    return "--zedmd-feed-args=" + "|".join(["--shades", "--serum", os.path.abspath(altcolor), "--rom", ROM, "--color",
+                                            colour.lstrip("#")]), "--zedmd-shades"
 
 
 def prepare(device, game=None):

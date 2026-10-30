@@ -50,5 +50,11 @@ class TestDmdOut(unittest.TestCase):
         self.assertEqual(dmd_out.detect(), "")
 
 
+    def test_serum_args(self):
+        """--zedmd-serum: the feeder gets shades, the colourisation's folder and ROM name, and Tron blue for unknown frames."""
+        feed, shades = dmd_out.serum_args("/x/altcolor", "#2a6cff")
+        self.assertEqual("--zedmd-shades", shades)
+        self.assertEqual("--zedmd-feed-args=--shades|--serum|/x/altcolor|--rom|trn_174h|--color|2a6cff", feed)
+
 if __name__ == "__main__":
     unittest.main()

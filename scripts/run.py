@@ -311,7 +311,7 @@ def scenario_path(name):
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
-        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False):
+        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False, zedmd_serum=None):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -323,11 +323,17 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
         gargs = user_arg(gargs, "--pin2dmd" + ("=" + pin2dmd if pin2dmd != "default" else ""))
     if pin2dmd or zedmd:                # the platform's add-on and overlays (scripts/dmd_out.py), classic 128x32
         dmd_env = dmd_out.prepare("zedmd" if zedmd else "pin2dmd")
-    feed = dmd_out.feeder(zedmd_python) if zedmd else None
+    feed = dmd_out.feeder(zedmd_python, bool(zedmd_serum)) if zedmd else None
+    if zedmd_serum and zedmd and not feed:
+        raise SystemExit("--zedmd-serum needs the native feeder built with libserum (git, CMake, a C++ compiler; Linux or "
+                         "macOS) and a ZeDMD answering: see docs/hardware.md, \"Serum on a ZeDMD\"")
     if zedmd:                           # the same frames: to the native feeder, else through MPF's platform
         gargs = user_arg(gargs, "--zedmd" + ("=" + zedmd if zedmd != "default" else ""))
         if feed:
             gargs = user_arg(gargs, "--zedmd-feed=" + feed)
+            if zedmd_serum:             # the feeder gets shades and colours them with libserum
+                for a in dmd_out.serum_args(zedmd_serum, zedmd if zedmd != "default" else "2a6cff"):
+                    gargs = user_arg(gargs, a)
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
@@ -414,6 +420,10 @@ def main(argv=None):
                         "default the original orange). docs/hardware.md, ZeDMD")
     p.add_argument("--dmd-out", choices=["auto", "pin2dmd", "zedmd"],
                    help="the RGB DMD to use; auto asks the platform which one is plugged in (none: the screen only)")
+    p.add_argument("--zedmd-serum", metavar="DIR",
+                   help="with --zedmd: colour the DMD with Serum (libserum linked into the native feeder) from the colourisation "
+                        "DIR/trn_174h/trn_174h.cROMc, which the player brings (never part of this repository); a frame it does not "
+                        "know stays in the --zedmd colour (default Tron blue)")
     p.add_argument("--zedmd-python", action="store_true",
                    help="drive the ZeDMD from MPF's Python platform instead of the native feeder (the platform's native/zedmd_feed)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
@@ -481,7 +491,7 @@ def main(argv=None):
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, machine=args.machine, fiber_optics=args.fiber_optics, monitor=args.monitor,
-               pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
+               pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, zedmd_serum=args.zedmd_serum, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
                                                      args.dmd_font, args.dmd_text_scale, args.dmd_color, args.dmd_score),
