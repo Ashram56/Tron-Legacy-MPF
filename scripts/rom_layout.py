@@ -339,6 +339,10 @@ GRAPHICS_END = {38: 64}
 # Effects whose picture is cleared at this time, the points staying on black (PinMAME capture; deff 73: the last frame, 1740 ms in
 # timing.json because it runs to the end of the capture, is on for one frame time)
 CLEAR_AT_MS = {73: 600}
+# Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
+# through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
+OPEN_WHITE = {108}
+TEXT_UNDER_CLIP = {108}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
 LEVEL_MAP = {65: {1: 0}}
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
