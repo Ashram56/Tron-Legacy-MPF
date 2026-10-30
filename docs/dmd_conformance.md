@@ -75,3 +75,11 @@ start from the previous run's audits.
 Added since: the credits screens (deffs 10, 15, 17) drawn live on the panel, named combos' " COMBO", the arm64 cross build of
 the two tools with zig. Still open: the score display (19) bottom line and font size by magnitude, Flynn 105 (random reel, every
 frame known to Serum), 86, 47, 114, 83, 79, the first attract pages, Portal 143's blink.
+
+**Score display bottom line (deff 19), 2026-10-30.** The ROM rotates BALL/CREDITS and the replay level on the machine's clock
+from power-up, in a cycle of 1718 ticks (156 BALL/CREDITS, 312 replay, 1250 BALL/CREDITS; measured on the reference captures:
+the replay line starts at 29.2 s, 55.7 s and 108.3 s after power-up, a 26.5 s period). The game restarted the rotation with every
+restart of the effect (an overlay over it) and used a 1562-tick period, so it showed the replay line too often. Now the bridge sends
+`rot_ms` (time since power-up) and `score_display.gd` / `dmd_effect.gd` count from it. Same Serum frame found:
+tron_targets 83.1 -> 84.1 %, clu_hurryup 81.3 -> 85.9 %. The replay line comes about 1 s late
+(power-up epoch of the bridge versus the capture's).

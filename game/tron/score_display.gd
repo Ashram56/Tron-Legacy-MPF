@@ -88,14 +88,13 @@ func _node(n: String) -> CanvasItem:
 
 ## Ticks of the bottom-line rotation: false while BALL n / credits show, true while the replay line shows.
 static func replay_phase(ticks: int) -> bool:
-	if ticks < 156:
-		return false
-	var t := (ticks - 156) % (312 + 1250)
-	return t < 312
+	var t := ticks % (156 + 312 + 1250)
+	return t >= 156 and t < 156 + 312
 
 
 func _apply() -> void:
-	var ticks := int(_elapsed_ms / TICK_MS)
+	# the bottom line rotates on the game's clock, not the effect's: an overlay restarting deff 19 does not restart it
+	var ticks := int((_int("rot_ms") + _elapsed_ms - _received_ms) / TICK_MS) if _values.has("rot_ms") else int(_elapsed_ms / TICK_MS)
 	var since := int((_elapsed_ms - _received_ms) / TICK_MS)
 	var players := maxi(_int("players", 1), 1)
 	var current := _int("player", 1)

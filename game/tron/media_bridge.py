@@ -81,6 +81,7 @@ class MediaBridge:
         self.service_shown = False
         self.counters = {}
         self.last_scores = {}
+        self.rot_epoch = self.machine.clock.get_time()    # the bottom line's rotation counts from power-up, not from the game
         self.award = (0, None, None)               # last points, shown since, blink counter since
         self.bar_max = {}
         self._refresh = None
@@ -250,7 +251,8 @@ class MediaBridge:
                 age = (now - shown) / TICK if shown is not None else 99
                 self.award = (value, shown, now) if age < 16 and delta < value else (delta, now, now)
         value, shown, blink = self.award
-        out = {"players": max(len(players), 1), "player": current or 1,
+        out = {"rot_ms": int((now - self.rot_epoch) * 1000),
+               "players": max(len(players), 1), "player": current or 1,
                "valid": bool(getattr(self.os, "ball_validated", False)) or not game,
                "credits": self.credits_text(), "replay": self.replay_text() if game else "",
                "award": format_rom_text("%,02lu", [value]) if value else "",

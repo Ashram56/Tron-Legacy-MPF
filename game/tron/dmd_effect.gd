@@ -525,6 +525,8 @@ class State extends RefCounted:
 			return {}
 		var out := {}
 		var ticks := int(elapsed_ms / ScoreDisplay.TICK_MS)
+		if values.has("rot_ms"):                  # the rotation runs on the machine's clock, not the effect's
+			ticks = int((_int("rot_ms") + elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var since := int((elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var players := maxi(_int("players", 1), 1)
 		var current := _int("player", 1)
