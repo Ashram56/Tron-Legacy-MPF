@@ -239,6 +239,13 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # 0x05b (1420 ms), the points blinking on 4 ticks off 4 (PinMAME capture)
              48: {"DISC MULTIBALL": {"show_after_ms": 1410}, "JACKPOT": {"show_after_ms": 1410},
                   "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4}},
+             # deffs 49, 87-89 (the other jackpot clips): the same, at DIM_AFTER_MS
+             49: {"DISC MULTIBALL": {"show_after_ms": 1865}, "JACKPOT": {"show_after_ms": 1865},
+                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4}},
+             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4}},
+             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4}},
+             89: {"DOUBLE": {"show_after_ms": 983}, "SUPER JACKPOT": {"show_after_ms": 983},
+                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4}},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
              40: {"YOU'RE UP": {"blink_ticks": 6}},
              # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
@@ -305,8 +312,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                    "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
-# (deff 48: the last clip frame, silhouetted, under the text at 1410 ms)
-DIM_AFTER_MS = {48: 1410}
+# (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
+# graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
+DIM_AFTER_MS = {48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
 # screen. Lines of different screens may overlap; the rules pass `screen`.
