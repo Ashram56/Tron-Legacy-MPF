@@ -149,6 +149,18 @@ def gif_frames(path):
     return out
 
 
+def remap_levels(img, mapping):
+    """The picture with the DMD levels (0-15) of `mapping` replaced: {from: to}."""
+    from PIL import Image
+    table = list(range(256))
+    for lv, to in mapping.items():
+        for v in range(lv * 17 - 8, lv * 17 + 9):
+            if 0 <= v < 256:
+                table[v] = to * 17
+    r, g, b, a = img.split()
+    return Image.merge("RGBA", (r.point(table), g.point(table), b.point(table), a))
+
+
 def dim_after(frames, at_ms):
     """The frames with every lit dot at level 1 from at_ms on (the ROM's palette change under the text): the frame running
     at that time is split in two."""
@@ -538,6 +550,8 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        if source == "graphics" and deff_id in rom_layout.LEVEL_MAP:
+            frames = [(remap_levels(img, rom_layout.LEVEL_MAP[deff_id]), ms) for img, ms in frames]
         if source == "graphics" and deff_id in rom_layout.DIM_AFTER_MS:
             frames = dim_after(frames, rom_layout.DIM_AFTER_MS[deff_id])
         if loop and source == "graphics":       # loop whole bitmap cycles only

@@ -311,6 +311,8 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
                    "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
+# Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
+LEVEL_MAP = {65: {1: 0}}
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
 # (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
 # graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
