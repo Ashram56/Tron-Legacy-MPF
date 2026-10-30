@@ -246,6 +246,15 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4}},
              89: {"DOUBLE": {"show_after_ms": 983}, "SUPER JACKPOT": {"show_after_ms": 983},
                   "%,02lu": {"show_after_ms": 983, "blink_ticks": 4}},
+             # deffs 68, 69 (Quorra's jackpots): the clip plays bare, the text of the screen the capture shows comes at the last
+             # sound call (timing.json), the points blinking like the other jackpots
+             68: {"JACKPOT": {"show_after_ms": 1806}, "%,02lu": {"show_after_ms": 1806, "blink_ticks": 4}},
+             69: {"SUPER JACKPOT": {"show_after_ms": 2199}, "SUPER": {"show_after_ms": 2199},
+                  "JACKPOT": {"show_after_ms": 2199}, "%,02lu": {"show_after_ms": 2199, "blink_ticks": 4}},
+             # deff 143 (Portal's super jackpot): the clip plays bare, the text comes at 4100 ms (PinMAME capture), the points drawn
+             # black on the dimmed picture on alternate steps
+             143: {"SUPER": {"show_after_ms": 4100}, "JACKPOT": {"show_after_ms": 4100},
+                   "%,02lu": {"show_after_ms": 4100, "blink_ticks": 4, "blink_dark": True}},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
              40: {"YOU'RE UP": {"blink_ticks": 6}},
              # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
