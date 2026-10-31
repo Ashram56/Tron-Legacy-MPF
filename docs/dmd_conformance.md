@@ -128,3 +128,10 @@ forced to the same draw: PinMAME's tracer returns 0 from the ROM's `random_below
 Light Cycle jackpots (87, 88, 89) are not random in the ROM: the clip follows the ROM's `lc_clip_level` and the n-th Jackpot of the level
 (`JACKPOT_CLIPS` in `features/light_cycle.py`, variants `level_L_N.gif`); the game now passes it as the `clip` argument. Alone: 87 26/27, 88 31/32,
 89 21/22 known frames. Next by weight: 86, 141, 105 (Flynn), 114, 106, 47.
+
+Re-measured after the jackpot clips (20 scenarios, equal draw): same Serum frame found 80.9 % of 16665 known frames, 570 of 19156 game frames
+unknown to Serum. Weakest scenarios: Sea of Simulation 44 %, Portal Multiball 55 %, Light Cycle Multiball 67 %, Disc Multiball 71 %.
+Effects 86 and 141 are exact alone (86: 16/16 known frames); what is left in the scenarios is drift, not rendering: for example in
+light_cycle_multiball the capture shows 155,130 where the game shows 157,630 (a 2,500 point scoring or timing difference earlier in the
+scenario), so every frame with a score differs. Next: trace such score differences scenario by scenario (rules, not display), then 105, 114,
+106, 47.
