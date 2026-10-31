@@ -113,3 +113,18 @@ shows a different award, stage or number than the values the measure feeds in.
 Still open: the score display's overlays timing against the ROM's (108/111 start at other moments), the first attract pages (the reference
 capture of the attract has no event log, so it cannot be paired effect by effect), Light Cycle intro (86), 47, the ZUSE letters of 93/94
 (drawn from sprites, not in the isolated capture).
+
+## Fifth measure (2026-10-31, equal draw)
+
+The ROM's film clips are random; the game's are too, but not the same draws. To compare the rules rather than the dice, both sides are
+forced to the same draw: PinMAME's tracer returns 0 from the ROM's `random_below` / `random_percent` (`TRON_RNG_ZERO=1`, the hook in
+`scripts/conform/tron_ref_dmddump.diff`, rebuilt with `build_tron_ref.sh`), and the game takes its first variant (`TRON_DMD_SEED=first`).
+
+| | fourth (random draw) | fifth (equal draw) |
+|---|---|---|
+| Same Serum frame found in the game's DMD | 71.8 % | 80.2 % |
+| Distinct frames of the game unknown to Serum | 3.5 % | 550 of 19318 |
+
+Light Cycle jackpots (87, 88, 89) are not random in the ROM: the clip follows the ROM's `lc_clip_level` and the n-th Jackpot of the level
+(`JACKPOT_CLIPS` in `features/light_cycle.py`, variants `level_L_N.gif`); the game now passes it as the `clip` argument. Alone: 87 26/27, 88 31/32,
+89 21/22 known frames. Next by weight: 86, 141, 105 (Flynn), 114, 106, 47.

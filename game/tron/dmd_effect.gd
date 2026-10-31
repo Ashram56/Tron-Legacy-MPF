@@ -129,8 +129,11 @@ static var _variant_rng: RandomNumberGenerator = null
 
 
 ## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
-## conformance checks repeat a scenario and get the same clips).
+## conformance checks repeat a scenario and get the same clips), or always the first clip when TRON_DMD_SEED is "first" (the
+## reference run of PinMAME with TRON_RNG_ZERO makes the ROM pick its first entry too: same clip on both sides).
 static func pick_variant(n: int) -> int:
+	if OS.get_environment("TRON_DMD_SEED") == "first":
+		return 0
 	if _variant_rng == null:
 		_variant_rng = RandomNumberGenerator.new()
 		var seed_text := OS.get_environment("TRON_DMD_SEED")
@@ -273,6 +276,8 @@ class State extends RefCounted:
 	func update(settings: Dictionary, kwargs: Dictionary) -> void:
 		for k in kwargs:
 			values[k] = kwargs[k]
+		if kwargs.has("clip"):                    # the rules name the clip (Light Cycle jackpots, by level): not a random pick
+			_set_variant(int(kwargs["clip"]))
 		received_ms = elapsed_ms
 		for i in items.size():
 			var it: Dictionary = items[i]
@@ -306,6 +311,19 @@ class State extends RefCounted:
 	func _frames() -> Array:
 		var it: Dictionary = items[_frames_item]
 		return it["variants"][_variant] if _variant >= 0 else it["frames"]
+
+	func _set_variant(k: int) -> void:
+		if _frames_item < 0 or not DmdEffect.variants_enabled():
+			return
+		var vs: Array = items[_frames_item].get("variants", [])
+		if k < 0 or k >= vs.size():
+			return
+		_variant = k
+		_durations = PackedFloat32Array()
+		_total_ms = 0.0
+		for f in _frames():
+			_durations.append(float(f[1]))
+			_total_ms += float(f[1])
 
 	func _pick_variant() -> void:
 		_durations = PackedFloat32Array()

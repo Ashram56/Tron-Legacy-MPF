@@ -566,7 +566,8 @@ def build_deffs(only_data):
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else [])
-                + (ARCADE_ARGS if source == "arcade" else []),
+                + (ARCADE_ARGS if source == "arcade" else [])
+                + (["clip"] if deff_id in (87, 88, 89) else []),
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
@@ -607,7 +608,8 @@ def build_deffs(only_data):
             frames = frames[:period] if period else frames
         variants = []
         if source == "graphics":
-            for gif in sorted(glob.glob(os.path.join(folder, "variants", "v*.gif"))):
+            clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
+            for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
                 clip = gif_frames(gif)
                 if panel:                       # the effect's own frames leave the status panel to the score display
                     from PIL import ImageDraw

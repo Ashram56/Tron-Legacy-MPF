@@ -1,6 +1,22 @@
---- /home/user/ashram56/tron-legacy-le-rom-decryption/rules/tools/trace/tron_ref.cpp	2026-10-30 10:32:55.167669937 +0000
-+++ tron_ref.cpp	2026-10-30 11:29:07.902971283 +0000
-@@ -106,7 +106,17 @@
+--- /home/user/tron-legacy-mpf/assets/rules/tools/trace/tron_ref.cpp	2026-10-30 10:33:53.117687613 +0000
++++ /tmp/claude-0/-home-user/9023a2ce-85c4-5e7d-b70e-44d9e7256b0e/scratchpad/tron_ref.cpp	2026-10-31 07:33:24.725664405 +0000
+@@ -87,6 +87,15 @@
+   case 0x282e0: { static unsigned lastId = 0; static double lastT = -1; double t = PinmameEmuTime();
+     if ((r[0] & 0xffff) != lastId || t - lastT > 1.0) emit("\"ev\":\"deff_stop\",\"id\":%u,\"caller\":\"0x%x\"", r[0] & 0xffff, r[14]);
+     lastId = r[0] & 0xffff; lastT = t; break; }
++  case 0xc6d0: case 0xc704: {   // return of random_below / random_percent: TRON_RNG_ZERO=1 makes every display effect's draw pick entry 0
++    // (0x%x = call site + 4 of the effects' RNG sites, assets/rom_data/deffs/random_parts.csv), so a run can be compared to the game's with the same clip
++    static const unsigned sites[] = { 0x102cf58, 0x1008978, 0x1008c74, 0x101e384, 0x101e6bc, 0x1019f58, 0x101ab18, 0x1032938, 0x1032944,
++      0x1032958, 0x1032d5c, 0x100e904, 0x100e920, 0x100ea24, 0x10209dc, 0x1021be8, 0x1027488, 0x1027384 };
++    static int on = getenv("TRON_RNG_ZERO") != NULL;
++    if (!on) break;
++    unsigned caller = r32(r[13] + 4);
++    for (unsigned a : sites) if (a == caller) { r[0] = 0; break; }
++    break; }
+   case 0x2c744: { unsigned tk = r32(RAM_TASK_CUR); unsigned d = tk ? r16(tk+0x24) : 0;
+     emit("\"ev\":\"sound\",\"call\":\"0x%03x\",\"in_deff\":%u,\"caller\":\"0x%x\"", r[0] & 0xffff, d, r[14]); break; }
+   case 0x87ac: emit("\"ev\":\"leff_start\",\"id\":%u,\"caller\":\"0x%x\"", r[0] & 0xffff, r[14]); break;
+@@ -106,7 +115,17 @@
  static std::atomic<int> keys[256];
  int PINMAMECALLBACK IsKeyPressed(PINMAME_KEYCODE k, void*) { return (int)k < 256 ? keys[(int)k].load() : 0; }
  void PINMAMECALLBACK OnDisplayAvailable(int, int, PinmameDisplayLayout*, void*) {}
