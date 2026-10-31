@@ -154,3 +154,9 @@ less than 0.2 s apart sorted by id) for diagnosis; the headline figure uses the 
 Tenth measure (full, 20 scenarios, equal draw, all fixes above): **85.0 %** of 16669 known frames found, 632 of 18942 game frames unknown to
 Serum. Disc Multiball 86 %, Recognizer 87 %, Light Cycle MB 72 %, Sea of Simulation 72 %, Portal 64 %, Flynn's Arcade 74 %; Bonus fell from
 94 % to 80 % (to check: its points blink).
+
+Open (found 2026-10-31): in `switches_and_shots` the game and the ROM score the same points, but the Disc access counter differs ("3 MORE" in the
+ROM, "4 MORE" in the game): the first hit on the Recognizer bank counts double when the moving target is lit, and the moving target's
+phase (task 0x7d, 93 ticks per step) differs after the first minute of the ball (lamps 51-53, `docs` trace: the ROM's pattern is not periodic
+there, the game's is). Frames of every effect that shows a counter then differ; this is a rules timing gap, not a display one. Clip variants of
+deffs 108 and 116-124 now use the capture's frame period (32 ms and 49 ms), not the gifs' 40-52 ms.

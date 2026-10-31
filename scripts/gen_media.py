@@ -614,6 +614,11 @@ def build_deffs(only_data):
             clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
             for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
                 clip = gif_frames(gif)
+                if deff_id == 108 or 116 <= deff_id <= 124:
+                    # the ROM draws every picture of these clips for the same time, the capture's frame period (the gifs carry 40 ms
+                    # defaults or a mean over a measured run)
+                    period = sorted(ms for _, ms in frames[:30])[len(frames[:30]) // 2]
+                    clip = [(img, period) for img, _ in clip]
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
                 if deff_id in rom_layout.DIM_AFTER_MS:         # the variants dim like the effect's own frames
@@ -627,6 +632,8 @@ def build_deffs(only_data):
         alt_gif = os.path.join(folder, "variants", "alt_v00.gif")
         if source == "graphics" and variants and os.path.exists(alt_gif) and 116 <= deff_id <= 124:
             alt_clip = gif_frames(alt_gif)
+            period = sorted(ms for _, ms in frames[:30])[len(frames[:30]) // 2]
+            alt_clip = [(img, period) for img, _ in alt_clip]
             if panel:
                 from PIL import ImageDraw
                 for img, _ in alt_clip:
