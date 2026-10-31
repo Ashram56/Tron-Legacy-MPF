@@ -140,3 +140,8 @@ Seventh measure (same day): the ROM's weighted bags (`bag_weighted_pick`, e.g. t
 `TRON_RNG_ZERO=1` now forces them to their first entry too (hook in `tron_ref_dmddump.diff`), and the game's `os_.pick` takes the lowest draw
 under `TRON_DMD_SEED=first`. Result: **81.8 %** of 16669 known frames found (Flynn's Arcade 105: 60 -> 208 of 288), 575 of 19339 game frames
 unknown to Serum; Bonus 94 %, Quorra 88 %, Clu 91 %. Weakest: Sea of Simulation 48 %, Portal 58 %, Light Cycle MB 65 %, Disc MB 70 %.
+
+Eighth measure: Sea of Simulation's stage-completing shot (deffs 116-124, task+0x34 set) plays the fixed clip of FUN_01027478, not one of the two
+random ones: Sea 48 % -> 74 %, total **82.9 %**. The conformance pairing now gives a window to the effect that caused a Sea of Simulation status
+(deff 114) restart, not to the restart. Deff 108 variants leave the open white area undrawn too and "N MORE" blinks 2 frames on, 2 off
+(FUN_01020388). Deff 115's points blink on the clip's frame period (48.5 ms); a one-frame clip offset remains.

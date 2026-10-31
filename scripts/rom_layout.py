@@ -256,6 +256,8 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # deff 73 (Clu's award): the clip plays bare, the points come with its last frames (PinMAME capture: text on from about
              # 512 ms, blinking on 48 ms, off 48: fitted on the capture)
              73: {"%,02lu": {"show_after_ms": 512, "blink_ms": 48}},
+             # FUN_01020388: "%u MORE" is hidden (palette to black) while bit 1 of the frame number is set: 2 frames shown, 2 hidden (3 ticks each)
+             108: {"%u MORE": {"blink_ms": 97, "blink_dark": True}},
              # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
              111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
                    "DISC MULTIBALL": {"show_after_ms": 1960}},
@@ -294,7 +296,7 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                            "hide_after_ms": round(24 * TICK_MS)}},
              # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
              # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
-             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)},
+             **{d: {"%,02lu": {"blink_ms": 48.5, "blink_dark": True}} for d in range(115, 125)},
              # deff 138 (0x01003c30): the combo count "%u" right-aligned at x 0x53, row 0x13, in font 0x2a on
              # frames where !(frame & 2), else in the outlined font 0x2b (frames of 3 ticks): two labels that
              # blink in turn

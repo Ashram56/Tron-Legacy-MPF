@@ -614,6 +614,8 @@ def build_deffs(only_data):
             clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
             for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
                 clip = gif_frames(gif)
+                if deff_id in rom_layout.OPEN_WHITE:
+                    clip = [(open_white(img), ms) for img, ms in clip]
                 if panel:                       # the effect's own frames leave the status panel to the score display
                     from PIL import ImageDraw
                     for img, _ in clip:
