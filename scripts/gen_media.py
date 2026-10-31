@@ -446,7 +446,7 @@ def open_white(img):
     return Image.fromarray(a, "RGBA")
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=()):
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=(), alt_clip=None):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -501,7 +501,7 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
                 "frames": [[files[k], round(ms, 1)] for k, ms in order]}
         if variants:                    # the ROM's random choice among film clips (dmd_variants.yaml): one list of frames each
             clips, pics = [], {}
-            for clip in variants:
+            for clip in list(variants) + ([alt_clip] if alt_clip else []):
                 row = []
                 for img, ms in clip:
                     digest = hashlib.md5(img.tobytes()).hexdigest()
@@ -515,6 +515,8 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
                     row.append([pics[digest], ms])
                 clips.append(row)
             item["variants"] = clips
+            if alt_clip:                # the clip of the stage-completing shot (FUN_01027478, deffs 116-124): the rules ask for it with done
+                item["alt"] = len(clips) - 1
         if not under:
             items.append(item)
     items += [rect_item("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0) for k, (x0, y0, x1, y1) in enumerate(fills)]
@@ -567,7 +569,8 @@ def build_deffs(only_data):
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else [])
                 + (ARCADE_ARGS if source == "arcade" else [])
-                + (["clip"] if deff_id in (87, 88, 89) else []),
+                + (["clip"] if deff_id in (87, 88, 89) else [])
+                + (["done"] if 116 <= deff_id <= 124 else []),
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
@@ -616,8 +619,16 @@ def build_deffs(only_data):
                     for img, _ in clip:
                         ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
                 variants.append(clip)
+        alt_clip = None
+        alt_gif = os.path.join(folder, "variants", "alt_v00.gif")
+        if source == "graphics" and variants and os.path.exists(alt_gif) and 116 <= deff_id <= 124:
+            alt_clip = gif_frames(alt_gif)
+            if panel:
+                from PIL import ImageDraw
+                for img, _ in alt_clip:
+                    ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
         write_slide(deff_id, frames, layouts, loop, rel, panel,
-                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants)
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants, alt_clip)
     return out
 
 

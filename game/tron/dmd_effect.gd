@@ -278,6 +278,8 @@ class State extends RefCounted:
 			values[k] = kwargs[k]
 		if kwargs.has("clip"):                    # the rules name the clip (Light Cycle jackpots, by level): not a random pick
 			_set_variant(int(kwargs["clip"]))
+		elif kwargs.get("done", false) and _frames_item >= 0 and items[_frames_item].has("alt"):
+			_set_variant(int(items[_frames_item]["alt"]))     # the stage-completing shot plays its own clip (FUN_01027478)
 		received_ms = elapsed_ms
 		for i in items.size():
 			var it: Dictionary = items[i]
@@ -333,7 +335,7 @@ class State extends RefCounted:
 			return
 		var vs: Array = items[_frames_item].get("variants", [])
 		if vs.size() and DmdEffect.variants_enabled():
-			_variant = DmdEffect.pick_variant(vs.size())
+			_variant = DmdEffect.pick_variant(vs.size() - (1 if items[_frames_item].has("alt") else 0))
 		for f in _frames():
 			_durations.append(float(f[1]))
 			_total_ms += float(f[1])

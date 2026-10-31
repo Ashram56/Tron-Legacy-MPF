@@ -24,6 +24,10 @@ def starts(p, key):
     for l in open(p):
         e = json.loads(l)
         if e["ev"] == "deff_start" and key in e:
+            # deff 114 (Sea of Simulation status) is restarted by the rules refresh right after the effect that caused it: that effect
+            # owns the window (its clip and values), the restart is the background
+            if out and e["id"] == 114 and out[-1][0] != 114 and e[key] - out[-1][1] < 0.2:
+                continue
             out.append((e["id"], e[key]))
     return out
 
