@@ -88,3 +88,28 @@ tron_targets 83.1 -> 84.1 %, clu_hurryup 81.3 -> 85.9 %. The replay line comes a
 below 100,000 font 26, from 100,000 font 24, from 1,000,000 font 17, from 100,000,000 font 22) instead of a width guess, which chose
 too large a font for 7 to 9 digit scores (it ran to the edge of the picture). clu_hurryup 85.9 -> 86.0 %, tron_targets 84.1 %:
 the rest of the misses there are scenario divergence (other scores), not rendering.
+
+## Fourth measure (2026-10-31, 21 scenarios, fixed clip seed, fresh NVRAM)
+
+| | third | now |
+|---|---|---|
+| Same Serum frame found in the game's DMD (PinMAME's 17119 known frames) | 71.4 % | 71.8 % |
+| Distinct frames of the game unknown to Serum | 11.6 % | 3.5 % (690 of 19752) |
+| Effects measured alone against their PinMAME capture (distinct Serum frames of the capture also drawn by the game) | 82.5 % | about 93 % |
+
+Rendering fixes of this round: the points of deff 73 at the end of its clip, blinking at the capture's rate (48 ms on, 48 ms off, fitted
+on the capture), then the picture cleared; deffs 111 and 142 draw their text when the clip ends (142 also dims the picture and blinks the
+points black on it); deffs 108, 83, 78, 97, 140 and 143 draw the clip **over** their text (`TEXT_UNDER_CLIP`: the ROM draws the bitmap after
+its text), and 108 leaves the clip's open white area undrawn (`OPEN_WHITE`); the score display's bottom line and font (above).
+
+**What the first figure cannot reach.** It asks for the same clip frame at the same effect, and two things make that impossible without
+the ROM's own random numbers: the ROM picks the film clips of 19 effects at random (the game picks too, but not the same ones: the jackpot
+of Light Cycle Multiball played a different variant, same effect), and the scenarios drift from the ROM's (other scores, other stages, other
+timing, so other values on the same effect). The Serum file colours **every** variant and every value, so a ZeDMD shows the right colour
+either way; for colour the figure that counts is the share of the game's frames **unknown** to Serum (3.5 %), which stay in Tron blue.
+Measured alone, Flynn's awards (105), the Sea of Simulation values (115) and the Portal progress effects still differ only where the capture
+shows a different award, stage or number than the values the measure feeds in.
+
+Still open: the score display's overlays timing against the ROM's (108/111 start at other moments), the first attract pages (the reference
+capture of the attract has no event log, so it cannot be paired effect by effect), Light Cycle intro (86), 47, the ZUSE letters of 93/94
+(drawn from sprites, not in the isolated capture).
