@@ -18,7 +18,6 @@ sys.path.insert(0, HERE)
 import toolchain as tc  # noqa: E402
 import mpf_platform  # noqa: E402
 
-ROM = "trn_174h"            # the PinMAME set a Serum colourisation is named after
 OVERLAYS = {"pin2dmd": "pin2dmd.yaml", "zedmd": "zedmd.yaml", "feed": "zedmd_feed.yaml"}
 
 
@@ -97,15 +96,6 @@ def build_feeder(out, cc=None, cxx=None):
     return subprocess.call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
 
 
-def build_serum(out, cc=None, cxx=None):
-    """Build the game's Serum colouriser (game/native/dmd_serum) into OUT against the libserum the platform provides
-    (LIBSERUM_DIR: headers and libserum.a of the target CPU; the image generator's job, MPF-Godot-Packaging). Returns True when built;
-    False without LIBSERUM_DIR (the platform's build puts dmd_serum in game/native/bin/<arch>/)."""
-    if not os.environ.get("LIBSERUM_DIR"):
-        return False
-    return _build(["bash", os.path.join(tc.GAME, "native", "dmd_serum", "build.sh"), out], out, cc, cxx)
-
-
 def _tool(name, build, python=False):
     """Path of a native tool of the DMD output, or None when it cannot be had. Built offline (the bundle's build,
     scripts/package/build_bundle.py, puts one per CPU in game/native/bin/<arch>/); only a development checkout (a .git folder)
@@ -126,18 +116,6 @@ def feeder(python=False):
     exe = _tool("zedmd_feed", build_feeder, python)
     return exe if exe and subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
 
-
-def serum_filter():
-    """Path of the game's Serum colouriser (it starts the feeder itself), or None when it cannot be had."""
-    return _tool("dmd_serum", build_serum)
-
-
-def serum_env(altcolor, feed, colour="2a6cff"):
-    """The environment the colouriser reads (Godot's add-on cannot pass it arguments): colour the DMD with Serum from
-    ALTCOLOR/trn_174h/trn_174h.cROMc and pipe the colours to FEED, the plain feeder; a frame the file does not know stays in
-    COLOUR (Tron blue)."""
-    return {"DMD_SERUM_ARGS": "|".join(["--serum", os.path.abspath(altcolor), "--rom", ROM, "--color", colour.lstrip("#"),
-                                         "--feeder", feed])}
 
 
 def prepare(device, game=None):

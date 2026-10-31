@@ -40,7 +40,7 @@ GENERATED = ["game/config/rom", "game/sounds", "game/media", "game/slides/deffs"
              "game/fonts", "game/fonts_ttf/baked", "game/addons/mpf-gmc",
              # made from the PuP Pack at the bundle's creation (--pup-zip), shipped as they are: nothing is made on the target
              "game/hd_art/letters", "game/hd_art/deff_105", "pup_media/trn_174h",
-             # the ZeDMD feeder and the game's Serum colouriser, built here per CPU (make_feeders): nothing is compiled on the target
+             # the ZeDMD feeder, built here per CPU (make_feeders): nothing is compiled on the target
              "game/native/bin/arm64", "game/native/bin/x86_64"]
 
 ASSET_FILES = ["assets/mpf_package/event_map.csv", "assets/mpf_package/lamp_effects.csv",
@@ -165,17 +165,16 @@ ZIG_TARGETS = {"arm64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}
 
 
 def make_feeders(args):
-    """The ZeDMD programs for each target CPU, into game/native/bin/<arch>/, so the bundle carries them: the player's machine
-    never compiles. zedmd_feed is the platform's plain feeder; dmd_serum is the game's own Serum colouriser (game/native/dmd_serum); libserum
-    and its build are the platform's (the image generator, MPF-Godot-Packaging), so dmd_serum is built here only when LIBSERUM_DIR
-    points at the libserum it provides, else the generator puts it in place. The host's CPU builds with the system compiler, the other with zig (`zig cc -target ...`); a CPU that
-    cannot be built is reported (no ZeDMD output there)."""
+    """The ZeDMD feeder for each target CPU, into game/native/bin/<arch>/, so the bundle carries it: the player's machine never
+    compiles. zedmd_feed is the platform's plain feeder. The host's CPU builds with the system compiler, the other with zig
+    (`zig cc -target ...`); a CPU that cannot be built is reported (no ZeDMD output there). The dot colourisation (Serum) is not the
+    game's: it is handled apart from the game (MPF-Godot-Packaging)."""
     if args.no_feeder:
         return
     import dmd_out
     want = ["arm64", "x86_64"] if args.target == "all" else [args.target]
     for arch in want:
-        for name, build in (("zedmd_feed", dmd_out.build_feeder), ("dmd_serum", dmd_out.build_serum)):
+        for name, build in (("zedmd_feed", dmd_out.build_feeder),):
             out = os.path.join(tc.GAME, "native", "bin", arch, name)
             if os.path.exists(out):
                 continue
@@ -188,7 +187,7 @@ def make_feeders(args):
             else:
                 ok = False
             print("{} for {}: {}".format(name, arch, "built" if ok else "NOT built (needs zig, or `pip install ziglang`, for another CPU than this one's, "
-                  "the MPF-Godot-Packaging checkout, and for dmd_serum the platform's LIBSERUM_DIR): the platform's image generator provides it, or this bundle has no Serum colour there"), flush=True)
+                  "the MPF-Godot-Packaging checkout): this bundle has no ZeDMD output there"), flush=True)
 
 
 def main(argv=None):

@@ -325,30 +325,18 @@ python scripts/run.py --pin2dmd                # the original orange; add --hw p
 python scripts/run.py --pin2dmd '#2a6cff'      # Tron blue (the public game is always monochrome)
 python scripts/run.py --zedmd                  # native feeder when a ZeDMD answers, else MPF's Python platform
 python scripts/run.py --dmd-out auto           # the platform looks: PIN2DMD, ZeDMD or neither (the screen only)
-python scripts/run.py --zedmd --zedmd-serum ~/altcolor   # the ZeDMD in colour with Serum (below)
 ```
 
 On a P-ROC machine (`--hw proc`) the RGB DMD replaces the original DMD (the P-ROC's DMD connector is left alone; both
 together are not supported). A machine installed by the setup page picks the device by itself with `[dmd] window = auto`.
 
-### Serum colour on a ZeDMD
+### Dot colourisation (Serum)
 
-`--zedmd-serum DIR` colours the DMD with [libserum](https://github.com/PPUC/libserum) (GPL v2) in the game's own
-`game/native/dmd_serum` (the DMD is part of the game; the platform's `zedmd_feed` stays the plain RGB feeder and knows nothing
-of Serum). Godot's add-on sends the 128x32 frames to `dmd_serum` in place of the feeder; it recovers the ROM's shades (0-15), lets
-libserum identify each frame, colours it, runs the colour rotations on libserum's timer and pipes the RGB frames to the platform's
-feeder, which it starts itself, with no Python or MPF on the way. `DIR/trn_174h/trn_174h.cROMc` is the colourisation file:
-**the player brings it (it is its author's; it is never in this repository or in git)**. A frame the file does not know stays in
-Tron blue (or the `--zedmd` colour). **Nothing is compiled on the machine that plays**, and **libserum and the whole build pipeline are the platform's**
-(MPF-Godot-Packaging, the image generator: it builds libserum with its pinned dependencies and declares the build tools): the game
-holds only the colouriser's source. `game/native/dmd_serum/build.sh` compiles it against the libserum the platform provides
-(`LIBSERUM_DIR`: headers and `libserum.a` of the target CPU) and downloads nothing; the image generator builds `zedmd_feed` and
-`dmd_serum` for each CPU and puts them in `game/native/bin/<arch>/`, where `scripts/dmd_out.py` only uses them. The bundle's build
-(`make_feeders`) builds `zedmd_feed`, and `dmd_serum` only when `LIBSERUM_DIR` is set (the other CPU with `zig cc -target`; `--no-feeder`
-skips them). The arm64 programs were checked under `qemu-aarch64` with the colourisation file of the private tree: the same output as
-the x86_64 ones, not run on a Pi 4 or a Jetson. Checked with a fake ZeDMD: Godot + the game's scenario `game_flow` -> feeder -> frames in colour.
-libserum finds a frame by the dots its comparison masks keep, so the game's DMD must draw the ROM's dots:
-[dmd_conformance.md](dmd_conformance.md) says how close it is.
+The colourisation of the dot DMD (128x32 or 256x64) with a Serum file is **not part of the game**: it is handled apart, by the platform
+(MPF-Godot-Packaging, which also owns libserum and the build tools), and the player brings the colourisation file, which is never in this
+repository. The game only provides its DMD output: the classic 128x32 picture in the ROM's 16 shades to the add-on (`--zedmd`,
+`--pin2dmd`) and, for the HD LCD, its own colour (docs/dmd_colour.md). A colouriser finds a frame by the dots its comparison masks keep,
+so the game's DMD must draw the ROM's dots: [dmd_conformance.md](dmd_conformance.md) measures how close it is to PinMAME's output.
 
 **Not tried on a real PIN2DMD or ZeDMD**: the protocols follow libdmdutil's and libzedmd's source and are tested against
 fake devices in the platform's repository. To check: the PIN2DMD's colour order (`pin2dmd: panel: rbg` swaps green and
