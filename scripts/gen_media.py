@@ -220,7 +220,7 @@ def text_node(i, lay, name=None, var=None):
                 'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
     if lay.get("screens"):
         out.append('screens = PackedInt32Array({})'.format(", ".join(map(str, lay["screens"]))))
-    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms",
+    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms", "blink_frames", "cycle_ms", "cycle_on_ms",
                 "cycle_offset_ms"):
         if lay.get(key):
             out.append('{} = {}'.format(key, lay[key]))
@@ -234,7 +234,7 @@ def text_node(i, lay, name=None, var=None):
 # the root script of an effect's node scene (media/dmd/<name>/nodes.tscn), shown inside its GMC slide
 NODES_SLIDE = "res://addons/mpf-gmc/classes/mpf_slide.gd"
 TEXT_KEYS = ("fit_fonts", "fit_ys", "fit_width", "score_min", "alt_x", "alt_y", "alt_when_empty", "screens", "show_after_ms",
-             "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms", "cycle_offset_ms", "blink_dark",
+             "hide_after_ms", "step_ms", "blink_ms", "blink_frames", "cycle_ms", "cycle_on_ms", "cycle_offset_ms", "blink_dark",
              "level_steps")
 
 

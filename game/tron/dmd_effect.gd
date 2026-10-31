@@ -431,7 +431,7 @@ class State extends RefCounted:
 
 	func _timed(it: Dictionary) -> bool:
 		return it.get("show_after_ms", 0) or it.get("hide_after_ms", 0) or it.get("blink_ms", 0) \
-			or it.get("cycle_ms", 0) or it.get("level_steps", []).size()
+			or it.get("blink_frames", 0) or it.get("cycle_ms", 0) or it.get("level_steps", []).size()
 
 	func _text(out: Array, i: int, it: Dictionary, st: Dictionary) -> void:
 		var visible: bool = screen_on[i]
@@ -443,6 +443,9 @@ class State extends RefCounted:
 			var cycle: int = it.get("cycle_ms", 0)
 			var blink_dark: bool = it.get("blink_dark", false)
 			var blink_on := blink == 0 or int((elapsed_ms - show_after) / blink) % 2 == 0
+			var blink_frames: int = it.get("blink_frames", 0)
+			if blink_frames > 0 and _frames_item >= 0:      # toggles with the clip's pictures, like the ROM's loop (one draw per frame)
+				blink_on = (frame_index() / blink_frames) % 2 == 0
 			var cycle_on: bool = cycle == 0 or fposmod(elapsed_ms - it.get("cycle_offset_ms", 0), cycle) \
 				< it.get("cycle_on_ms", 0)
 			visible = screen_on[i] and cycle_on and elapsed_ms >= show_after \
