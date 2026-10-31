@@ -336,7 +336,8 @@ class TronOS(CustomCode):
         total = sum(weights)
         if total <= 0:
             return None
-        r = self.random.randrange(total)
+        # conformance runs (TRON_DMD_SEED=first, with the reference's TRON_RNG_ZERO=1): the draw is the lowest one, like the ROM's
+        r = 0 if os.environ.get("TRON_DMD_SEED") == "first" else self.random.randrange(total)
         for i, w in enumerate(weights):
             if r < w:
                 return i

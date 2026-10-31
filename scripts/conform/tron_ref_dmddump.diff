@@ -12,6 +12,7 @@
 +    if (!on) break;
 +    unsigned caller = r32(r[13] + 4);
 +    for (unsigned a : sites) if (a == caller) { r[0] = 0; break; }
++    if (caller >= 0xc708 && caller < 0xc828) r[0] = 0;   // bag_weighted_pick: every weighted bag (Flynn's Arcade award...) takes its first entry
 +    break; }
    case 0x2c744: { unsigned tk = r32(RAM_TASK_CUR); unsigned d = tk ? r16(tk+0x24) : 0;
      emit("\"ev\":\"sound\",\"call\":\"0x%03x\",\"in_deff\":%u,\"caller\":\"0x%x\"", r[0] & 0xffff, d, r[14]); break; }

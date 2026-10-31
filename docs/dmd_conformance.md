@@ -135,3 +135,8 @@ Effects 86 and 141 are exact alone (86: 16/16 known frames); what is left in the
 light_cycle_multiball the capture shows 155,130 where the game shows 157,630 (a 2,500 point scoring or timing difference earlier in the
 scenario), so every frame with a score differs. Next: trace such score differences scenario by scenario (rules, not display), then 105, 114,
 106, 47.
+
+Seventh measure (same day): the ROM's weighted bags (`bag_weighted_pick`, e.g. the Flynn's Arcade award) were still drawn at random in PinMAME;
+`TRON_RNG_ZERO=1` now forces them to their first entry too (hook in `tron_ref_dmddump.diff`), and the game's `os_.pick` takes the lowest draw
+under `TRON_DMD_SEED=first`. Result: **81.8 %** of 16669 known frames found (Flynn's Arcade 105: 60 -> 208 of 288), 575 of 19339 game frames
+unknown to Serum; Bonus 94 %, Quorra 88 %, Clu 91 %. Weakest: Sea of Simulation 48 %, Portal 58 %, Light Cycle MB 65 %, Disc MB 70 %.
