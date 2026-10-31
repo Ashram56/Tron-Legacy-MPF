@@ -150,3 +150,7 @@ Ninth measure: the film clips (variants) of the effects that dim under their tex
 (`DIM_AFTER_MS`); Light Cycle Multiball 65 % -> 73 %, total **83.6 %**. The points of 115-124 blink with the clip's pictures (`blink_frames`),
 144 and the End of Line jackpots (58-60) blink every ROM frame (3 / 6 ticks), shown first. `DMD_SORT=1` gives a per-effect pairing (starts
 less than 0.2 s apart sorted by id) for diagnosis; the headline figure uses the traces' order.
+
+Tenth measure (full, 20 scenarios, equal draw, all fixes above): **85.0 %** of 16669 known frames found, 632 of 18942 game frames unknown to
+Serum. Disc Multiball 86 %, Recognizer 87 %, Light Cycle MB 72 %, Sea of Simulation 72 %, Portal 64 %, Flynn's Arcade 74 %; Bonus fell from
+94 % to 80 % (to check: its points blink).
