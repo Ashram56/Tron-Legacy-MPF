@@ -122,6 +122,32 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 	return _letter_art[key]
 
 
+## The ROM picks one of several film clips at random for some effects (assets/mpf_package/config/dmd_variants.yaml: the Disc
+## Multiball and Light Cycle jackpots, Quorra's, the Sea of Simulation stages ...); the effect's "variants" hold them. Off for
+## the render checks (tools/slide_capture.gd), which compare the one clip the reference capture shows.
+static var _variant_rng: RandomNumberGenerator = null
+
+
+## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
+## conformance checks repeat a scenario and get the same clips), or always the first clip when TRON_DMD_SEED is "first" (the
+## reference run of PinMAME with TRON_RNG_ZERO makes the ROM pick its first entry too: same clip on both sides).
+static func pick_variant(n: int) -> int:
+	if OS.get_environment("TRON_DMD_SEED") == "first":
+		return 0
+	if _variant_rng == null:
+		_variant_rng = RandomNumberGenerator.new()
+		var seed_text := OS.get_environment("TRON_DMD_SEED")
+		if seed_text != "":
+			_variant_rng.seed = int(seed_text)
+		else:
+			_variant_rng.randomize()
+	return _variant_rng.randi() % n
+
+
+static func variants_enabled() -> bool:
+	return bool(ProjectSettings.get_setting("tron/dmd/variants", true))
+
+
 static func clips_enabled() -> bool:
 	var env := OS.get_environment("TRON_DMD_CLIPS").to_lower()
 	if env in ["0", "off", "false"]:
@@ -184,6 +210,7 @@ class State extends RefCounted:
 	var _durations := PackedFloat32Array()
 	var _total_ms := 0.0
 	var _frames_item := -1
+	var _variant := -1             # the clip picked for this show (item "variants"), -1: the effect's own frames
 	var effect_name := ""          # deff_NNN, to find the effect's clips (tron/dmd_effect_slide.gd)
 	var clip_path := ""            # the PuP clip playing behind the text for this show (absolute path), "" for the ROM's pictures
 	var clip_loop := false
@@ -200,15 +227,13 @@ class State extends RefCounted:
 		for i in items.size():
 			if items[i]["type"] == "frames":
 				_frames_item = i
-				for f in items[i]["frames"]:
-					_durations.append(float(f[1]))
-					_total_ms += float(f[1])
 		reset()
 
 	## Back to the start of a show: time 0, no values, no text (as a node scene just built).
 	func reset() -> void:
 		elapsed_ms = 0.0
 		seeked = false
+		_pick_variant()
 		clip_path = ""
 		icon_path = ""
 		if hd and effect_name != "" and DmdEffect.clips_enabled() and ResourceLoader.exists(DmdEffect.CLIP_PLAYER):
@@ -251,6 +276,8 @@ class State extends RefCounted:
 	func update(settings: Dictionary, kwargs: Dictionary) -> void:
 		for k in kwargs:
 			values[k] = kwargs[k]
+		if kwargs.has("clip"):                    # the rules name the clip (Light Cycle jackpots, by level): not a random pick
+			_set_variant(int(kwargs["clip"]))
 		received_ms = elapsed_ms
 		for i in items.size():
 			var it: Dictionary = items[i]
@@ -279,6 +306,37 @@ class State extends RefCounted:
 	func _int(key: String, default := 0) -> int:
 		var v = values.get(key, default)
 		return int(v) if v != null and str(v) != "" else default
+
+	## The frames of this show: the effect's own, or the clip picked at random among its variants.
+	func _frames() -> Array:
+		var it: Dictionary = items[_frames_item]
+		return it["variants"][_variant] if _variant >= 0 else it["frames"]
+
+	func _set_variant(k: int) -> void:
+		if _frames_item < 0 or not DmdEffect.variants_enabled():
+			return
+		var vs: Array = items[_frames_item].get("variants", [])
+		if k < 0 or k >= vs.size():
+			return
+		_variant = k
+		_durations = PackedFloat32Array()
+		_total_ms = 0.0
+		for f in _frames():
+			_durations.append(float(f[1]))
+			_total_ms += float(f[1])
+
+	func _pick_variant() -> void:
+		_durations = PackedFloat32Array()
+		_total_ms = 0.0
+		_variant = -1
+		if _frames_item < 0:
+			return
+		var vs: Array = items[_frames_item].get("variants", [])
+		if vs.size() and DmdEffect.variants_enabled():
+			_variant = DmdEffect.pick_variant(vs.size())
+		for f in _frames():
+			_durations.append(float(f[1]))
+			_total_ms += float(f[1])
 
 	## The frame shown at the current time (AnimatedSprite2D's timing: each picture for its ms; a loop starts over).
 	func frame_index() -> int:
@@ -330,13 +388,14 @@ class State extends RefCounted:
 						out.append(["rect", r, c * mod])
 				"frames":
 					var k := frame_index()
-					var f: Array = it["frames"][k] if it["frames"].size() else []
+					var all := _frames()
+					var f: Array = all[k] if all.size() else []
 					if clip_path != "" or icon_path != "":
 						_clip_frame(out, f, dmd)
 						continue
 					if hd and effect_name == "deff_080" and _clu_letters(out):
 						continue
-					if color and f.size() and it.has("color_frames") and k < it["color_frames"].size():
+					if color and _variant < 0 and f.size() and it.has("color_frames") and k < it["color_frames"].size():
 						var ctex := _picture(it["color_frames"][k])
 						if ctex:
 							out.append(["tex", ctex, BOX, Color.WHITE])
@@ -446,7 +505,11 @@ class State extends RefCounted:
 			m = fm
 			shown = fs
 			y = fit_ys[k] if k < fit_ys.size() else rom_y
-			if RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
+			var mins: Array = it.get("score_min", [])
+			if mins.size() > k:
+				if int(text.replace(",", "")) >= int(mins[k]):
+					break
+			elif RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
 				break
 		if m.is_empty():
 			return {}
@@ -484,6 +547,8 @@ class State extends RefCounted:
 			return {}
 		var out := {}
 		var ticks := int(elapsed_ms / ScoreDisplay.TICK_MS)
+		if values.has("rot_ms"):                  # the rotation runs on the machine's clock, not the effect's
+			ticks = int((_int("rot_ms") + elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var since := int((elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var players := maxi(_int("players", 1), 1)
 		var current := _int("player", 1)

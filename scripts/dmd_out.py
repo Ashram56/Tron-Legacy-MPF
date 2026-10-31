@@ -8,6 +8,7 @@ native feeder. This file only finds that checkout and puts them where the game r
 MPF-Godot-Packaging: $MPF_GODOT_PACKAGING (or $MPF_PLATFORM_DIR on a machine installed by the setup page), else a folder beside this repository (MPF-Godot-Packaging, MPF-Godot).
 """
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -46,21 +47,75 @@ def detect():
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def feeder(python=False):
-    """Path of the platform's native ZeDMD feeder, built with the C compiler on first use, or None when it cannot be
-    had or finds no ZeDMD (--probe): MPF then drives the ZeDMD through the platform's Python one."""
+def arch():
+    """The CPU the bundle's prebuilt feeder folder is named after: x86_64 or arm64."""
+    m = platform.machine().lower()
+    return "arm64" if m in ("aarch64", "arm64") else "x86_64"
+
+
+def prebuilt(name):
+    """A native program built offline for this CPU (game/native/bin/<arch>/, put there by the bundle's build: nothing is compiled
+    on the machine that runs the game), or the one built here in a development checkout; None when there is none."""
+    for folder in (os.path.join(tc.GAME, "native", "bin", arch()), os.path.join(tc.GAME, "native", "bin")):
+        if os.path.isfile(os.path.join(folder, name)):
+            return os.path.join(folder, name)
+    return None
+
+
+def zig():
+    """The zig command (cross builds for the other CPU): `zig` on the PATH, else the ziglang Python package, else None."""
+    import shutil
+    if shutil.which("zig"):
+        return ["zig"]
+    try:
+        import ziglang  # noqa: F401
+    except ImportError:
+        return None
+    return [sys.executable, "-m", "ziglang"]
+
+
+def _build(cmd, out, cc, cxx):
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    env = dict(os.environ)
+    if cc:
+        env["CC"] = cc
+    if cxx:
+        env["CXX"] = cxx
+    return os.path.exists(cmd[1]) and subprocess.call(cmd, env=env, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
+
+
+def build_feeder(out, cc=None, cxx=None):
+    """Build the platform's plain ZeDMD feeder (native/zedmd_feed/zedmd_feed.c: C, libc only) into OUT on a build box. cc: another
+    target, e.g. "zig cc -target aarch64-linux-gnu". Returns True when built."""
+    import shlex
+    src = os.path.join(need_platform(), "native", "zedmd_feed", "zedmd_feed.c")
+    if not os.path.exists(src):
+        return False
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    cmd = shlex.split(cc or os.environ.get("CC", "cc")) + ["-O2", "-Wall", "-o", out, src]
+    return subprocess.call(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
+
+
+def _tool(name, build, python=False):
+    """Path of a native tool of the DMD output, or None when it cannot be had. Built offline (the bundle's build,
+    scripts/package/build_bundle.py, puts one per CPU in game/native/bin/<arch>/); only a development checkout (a .git folder)
+    builds it on first use. Windows has none."""
     if python or os.name == "nt":
         return None
-    src = os.path.join(need_platform(), "native", "zedmd_feed", "zedmd_feed.c")
-    exe = os.path.join(tc.GAME, "native", "bin", "zedmd_feed")
-    if not os.path.exists(exe) or os.path.getmtime(exe) < os.path.getmtime(src):
-        cc = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
-        if not cc:
+    exe = prebuilt(name)
+    if exe is None and os.path.exists(os.path.join(tc.ROOT, ".git")):
+        exe = os.path.join(tc.GAME, "native", "bin", arch(), name)
+        if not build(exe):
             return None
-        os.makedirs(os.path.dirname(exe), exist_ok=True)
-        if subprocess.call([cc, "-O2", "-o", exe, src], stderr=subprocess.DEVNULL) != 0:
-            return None
-    return exe if subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
+    return exe if exe and os.path.isfile(exe) else None
+
+
+def feeder(python=False):
+    """Path of the platform's native ZeDMD feeder, or None when it cannot be had or finds no ZeDMD (--probe): MPF then drives
+    the ZeDMD through the platform's Python one."""
+    exe = _tool("zedmd_feed", build_feeder, python)
+    return exe if exe and subprocess.call([exe, "--probe"], stderr=subprocess.DEVNULL, timeout=20) == 0 else None
+
 
 
 def prepare(device, game=None):

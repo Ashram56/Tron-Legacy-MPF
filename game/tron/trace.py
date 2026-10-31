@@ -4,6 +4,7 @@ See assets/rules/tools/trace/README.md ("Trace format"). Times are seconds of ma
 harness writes a "ready" event when the scenario starts, and trace_compare.py aligns on it.
 """
 import json
+import time
 import os
 
 
@@ -13,11 +14,14 @@ class Trace:
         self.machine = machine
         self.path = path or os.environ.get("TRON_TRACE")
         self._file = open(self.path, "w", encoding="utf-8") if self.path else None
+        self._wall = bool(os.environ.get("TRON_TRACE_WALL"))
         self.events = []        # kept in memory for tests
 
     def log(self, ev, **fields):
         rec = {"t": round(self.machine.clock.get_time(), 4), "ev": ev}
         rec.update(fields)
+        if self._wall:
+            rec["wall"] = time.time()    # harness: aligns the trace with the Godot DMD dump (game/tools/dmd_dump.gd)
         self.events.append(rec)
         if self._file:
             self._file.write(json.dumps(rec) + "\n")

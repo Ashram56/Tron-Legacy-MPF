@@ -157,7 +157,7 @@ class Combos(Feature):
             named = self._match() if self._append(mask) else None
             value = pd.combo_base + max(self.count - 2, 0) * STEP_VALUE
             points = os_.score_add(value)
-            os_.deff_start(138, points=points, named=named and named[0], count=self.count,
+            os_.deff_start(138, points=points, named=named and named[0] + " COMBO", count=self.count,
                            total=pd.combo_total,       # the deff shows the jackpot after the add below
                            jackpot=pd.eol_combo_jackpot + (named[2] if named else 0))
             os_.audit(0x7a)

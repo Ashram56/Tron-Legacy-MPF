@@ -1,5 +1,6 @@
 """scripts/dmd_out.py: the RGB DMD output is the platform's (MPF-Godot-Packaging); this game only installs it."""
 import os
+import subprocess
 import shutil
 import sys
 import tempfile
@@ -48,6 +49,28 @@ class TestDmdOut(unittest.TestCase):
             dmd_out.prepare("pin2dmd", self.game)
         self.assertIn("MPF-Godot-Packaging", str(e.exception))
         self.assertEqual(dmd_out.detect(), "")
+
+
+    def test_a_bundle_never_compiles_the_tools(self):
+        """Without a .git folder (a bundle) the tools are only the ones built offline for this CPU; a development checkout builds."""
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as root:
+            game = os.path.join(root, "game")
+            with mock.patch.object(dmd_out.tc, "ROOT", root), mock.patch.object(dmd_out.tc, "GAME", game), \
+                    mock.patch.object(dmd_out, "build_feeder") as build:
+                self.assertIsNone(dmd_out.prebuilt("zedmd_feed"))
+                self.assertIsNone(dmd_out._tool("zedmd_feed", build))
+                build.assert_not_called()                      # no .git: nothing is built here
+                exe = os.path.join(game, "native", "bin", dmd_out.arch(), "zedmd_feed")
+                os.makedirs(os.path.dirname(exe))
+                open(exe, "w").close()
+                self.assertEqual(exe, dmd_out.prebuilt("zedmd_feed"))
+                self.assertEqual(exe, dmd_out._tool("zedmd_feed", build))
+                os.makedirs(os.path.join(root, ".git"))
+                os.remove(exe)
+                dmd_out._tool("zedmd_feed", build)
+                build.assert_called_once()                     # a development checkout builds on first use
 
 
 if __name__ == "__main__":

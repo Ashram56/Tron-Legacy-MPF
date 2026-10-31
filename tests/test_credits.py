@@ -386,9 +386,9 @@ class TestAttractPages(HsCase):
         pages = self.events("tron_attract_page")
         self.advance_time_and_run(12)
         names = [p["page"] for p in pages]
-        self.assertEqual(["GAME OVER", "CREDITS", "REPLAY", "GRAND CHAMPION", "HIGH SCORE #1"], names[:5])
-        self.assertEqual(["GRAND CHAMPION", "G S", "75,000,000"], pages[3]["lines"])
-        self.assertEqual(["FREE PLAY"], pages[1]["lines"])
+        self.assertEqual(["VERSION", "GAME OVER", "CREDITS", "REPLAY", "GRAND CHAMPION", "HIGH SCORE #1"], names[:6])
+        self.assertEqual(["GRAND CHAMPION", "G S", "75,000,000"], pages[4]["lines"])
+        self.assertEqual(["FREE PLAY"], pages[2]["lines"])
         self.machine.variables.set_machine_var("custom_message_text", "HELLO")
         self.advance_time_and_run(46)
         names = [p["page"] for p in pages]
