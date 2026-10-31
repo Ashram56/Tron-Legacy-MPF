@@ -616,6 +616,8 @@ def build_deffs(only_data):
                 clip = gif_frames(gif)
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
+                if deff_id in rom_layout.DIM_AFTER_MS:         # the variants dim like the effect's own frames
+                    clip = dim_after(clip, rom_layout.DIM_AFTER_MS[deff_id])
                 if panel:                       # the effect's own frames leave the status panel to the score display
                     from PIL import ImageDraw
                     for img, _ in clip:

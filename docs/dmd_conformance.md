@@ -145,3 +145,8 @@ Eighth measure: Sea of Simulation's stage-completing shot (deffs 116-124, task+0
 random ones: Sea 48 % -> 74 %, total **82.9 %**. The conformance pairing now gives a window to the effect that caused a Sea of Simulation status
 (deff 114) restart, not to the restart. Deff 108 variants leave the open white area undrawn too and "N MORE" blinks 2 frames on, 2 off
 (FUN_01020388). Deff 115's points blink on the clip's frame period (48.5 ms); a one-frame clip offset remains.
+
+Ninth measure: the film clips (variants) of the effects that dim under their text (87-89, 142, 111, 48, 49) dim like the effect's own frames
+(`DIM_AFTER_MS`); Light Cycle Multiball 65 % -> 73 %, total **83.6 %**. The points of 115-124 blink with the clip's pictures (`blink_frames`),
+144 and the End of Line jackpots (58-60) blink every ROM frame (3 / 6 ticks), shown first. `DMD_SORT=1` gives a per-effect pairing (starts
+less than 0.2 s apart sorted by id) for diagnosis; the headline figure uses the traces' order.
