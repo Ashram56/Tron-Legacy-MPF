@@ -172,7 +172,8 @@ class TestDmdNeverEmpty(unittest.TestCase):
     """During a game a display effect is always on the DMD. In play the score display (deff 19) comes back
     whenever no other deff runs (the deff rules [0x000198a8] re-assert the background deff as an effect
     ends; traces/flynns_arcade.jsonl 19.36 s), and between effects the DMD keeps its last frame: GMC's base
-    slide (attract.tscn, below every deff) never shows. Each reference scenario is sampled every 50 ms for
+    slide (attract.tscn, below every deff) never shows. From the ball end to the next ball start the rules do not
+    run (the bonus's last frame stays until deff 104 and 19 of the ball start). Each reference scenario is sampled every 50 ms for
     an empty slide stack during a game, and for no running deff in play."""
 
     SAMPLE = 0.05
@@ -200,7 +201,7 @@ class TestDmdNeverEmpty(unittest.TestCase):
                         game = bridge.machine.game
                         if game is not None and game.player and not shown:
                             empty.append(round(os_.now, 2))
-                        if game is not None and os_.in_play and os_.display.fg is None and os_.display.bg is None:
+                        if game is not None and os_.in_play and not os_.display.held and os_.display.fg is None and os_.display.bg is None:
                             idle.append(round(os_.now, 2))
                     bridge.machine.clock.schedule_interval(sample, self.SAMPLE)
                 test = scenario.ScenarioRun()

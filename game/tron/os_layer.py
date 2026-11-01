@@ -1011,8 +1011,10 @@ class TronOS(CustomCode):
             self.deff_start(26, player=self.player_num)   # speech 0x11b comes with the deff
             self.leff_start(16)
         self.deff_start(19)
+        self.display.held = False
         self.ball_validated = False
         self.music(self.base_music())
+        self.display.rules_refresh(ball_start=True)  # the deff rules after the ball start (ROM caller 0x19944)
         self.hook("ball_start_media")                # leffs/tube shows the features start with the ball
         self.deff_stop(27)                           # instant info off
         if self._new_game:
