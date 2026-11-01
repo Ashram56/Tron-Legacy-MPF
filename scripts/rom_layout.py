@@ -355,9 +355,9 @@ LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
 # (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
 # graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
-# Effects whose film clip the ROM picks at random and whose text loop starts when the clip ends (deff_048 0x01008920: the clip
+# Effects whose film clip the ROM picks (at random, or by the Light Cycle level: 87-89, table 0x040d3084) and whose text loop starts when the clip ends (deff_048 0x01008920: the clip
 # function of table 0x040d2804 returns its last bitmap, drawn dimmed under the text): each clip dims and shows its text at its own end
-CLIP_END_TEXT = {48, 49}
+CLIP_END_TEXT = {48, 49, 87, 88, 89}
 DIM_AFTER_MS = {142: 1680, 111: 1960, 48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
