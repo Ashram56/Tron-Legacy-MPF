@@ -269,11 +269,11 @@ class Display:
         arcade_end = self.arcade_held
         self._end_fg()
         # the deff rules restart a mode's background deff when the effect in front of it ends
-        # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end), unless the rules started it again behind that
-        # effect already: it was waiting and now shows, with no new start (FUN_000198a8 starts a deff only when it does not
-        # run; traces/zuse_fast_scoring.jsonl: 96 then 95 at once, nothing as 96 ends)
+        # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end; quorra_multiball.jsonl 41.51 s: 65 as 68 ends), except
+        # Zuse's status, which the rules started again behind the target hit and which shows again with no new start
+        # (traces/zuse_fast_scoring.jsonl: 96 then 95 at once, nothing as 96 ends)
         if self.mode_bg():
-            if self.bg != self.mode_bg():
+            if not (self.mode_bg() == 95 and self.bg == 95):
                 self.start(self.mode_bg(), refresh=False)
             self.os.request_refresh()              # the same rules pass restarts the mode's tube show
         elif arcade_end:
