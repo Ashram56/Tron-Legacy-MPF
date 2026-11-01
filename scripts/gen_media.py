@@ -640,7 +640,7 @@ def build_deffs(only_data):
                 return Image.open(os.path.join(lib, base, "frames", "%03d.png" % (k % 3))).convert("RGBA")
             right = []
             for j, (_, ms) in enumerate(frames[:27]):
-                canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
+                canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 0))    # see-through, like the capture's frames: the text shows under the bike
                 sprite = bike("anim_052_img3944", j)
                 canvas.paste(sprite, (-73 + 8 * j, 0), sprite)
                 right.append((canvas, ms))
