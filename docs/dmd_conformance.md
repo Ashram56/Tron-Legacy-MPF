@@ -191,3 +191,10 @@ Deff 112 (TRON timed award, 0x0100d108) played its capture (SUPER SPINNERS, with
 the TRON outline at level 1 (palette slot 15 -> 1), the award's two words (DOUBLE SCORING, SUPER POPS or SUPER SPINNERS, `screen` from the
 rules) lit 2 frames of 4, then from 1410 ms the second screen (ALL SCORES DOUBLED, POPS SCORE 3X, SPINNERS SCORE 3X: title at level 4, value
 held then blinking every 50 ms), with the live status panel; times read off the capture. Zen rollover 89 % -> 93 %, Tron targets 84 % -> 96 %.
+
+Deff 83's right-to-left variant was drawn on an opaque canvas that hid the text under it: now transparent (Find Flynn 85 % -> 98 %). The
+ticks since the last points (DAT_021117f4) start over at ball start (event 0x13, FUN_01023858), as in the ROM.
+
+Thirteenth measure (full, 20 scenarios, equal draw): **92.2 %** of 16669 known frames found (score display 95 %; skill shots 100 %, combos
+99 %, Find Flynn, Flynn's Arcade and game flow 98 %). Weakest: Sea of Simulation 73 % (deff 19 paired at the VUK where the ROM runs rule task
+0xa9 with no effect start), Portal 80 % (deff 141), disc multiball and Recognizer 87 %. Left by weight: 19, 47, 86, 141, 106, 115, 73, 25.
