@@ -759,6 +759,7 @@ class TronOS(CustomCode):
         if not self._score_pending:
             self.machine.clock.schedule_once(self._score_flush, 0)
         self._score_pending[self.player_num] = self._score_pending.get(self.player_num, 0) + points
+        getattr(self.media, "score_added", lambda *a: None)(self.player_num, points, player.score)   # event 0x4d
         self.replay_check(self.player_num, player.score)
 
     # ------------------------------------------------------------------ replay (game_flow.md 5.5)

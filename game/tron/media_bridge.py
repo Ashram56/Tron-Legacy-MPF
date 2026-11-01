@@ -99,8 +99,8 @@ class MediaBridge:
         self.shown = set()                         # deff and text slides playing now
         self.kept = None                           # the last one, stopped but left up until the next plays
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
-        # last points: each score change on its own (FUN_010238ac), not the sum of the changes between two updates
-        self.machine.events.add_handler("player_score", self._on_score)
+        # last points: each score_add on its own (FUN_010238ac on event 0x4d, posted by every score_add: os_layer calls
+        # score_added), not the sum of one task run's adds (a jackpot and its switch's 10,000 showed 510,000 for 500,000)
         self.machine.events.add_handler("ball_started", self._ball_start, priority=1000)
 
     # ------------------------------------------------------------------ transport
@@ -254,12 +254,12 @@ class MediaBridge:
         only 63 ticks later), no last points."""
         self.award = (0, None, self.machine.clock.get_time())
 
-    def _on_score(self, value=0, prior_value=0, change=0, player_num=None, **kwargs):
+    def score_added(self, player_num, change, value):
         """FUN_010238ac, called with each score added: within 16 ticks of the last points shown, smaller points
         only restart the counter; otherwise they become the last points shown."""
-        if player_num is None or player_num != self.os.player_num or not change or change < 0:
-            return
         self.last_scores[player_num] = value
+        if player_num != self.os.player_num or change <= 0:
+            return
         now = self.machine.clock.get_time()
         shown_value, shown, _ = self.award
         age = (now - shown) / TICK if shown is not None else 99
