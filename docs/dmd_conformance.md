@@ -183,3 +183,11 @@ text blinking every 3-tick frame, lit first (palette 0x40); COMPLETE ALL SHOTS h
 Bottom-line rotation of the score display: deff_019 counts its own ticks (156 BALL / credits, 312 REPLAY AT, 1250 BALL / credits), so the
 rotation starts over each time the score display gets the display again (an effect in front ends, or deff 19 starts with nothing in front),
 not from power-up (`MediaBridge.score_display_shown`, called by `display.py`). Zen rollover 76 % -> 89 %, Combos 82 % -> 90 %.
+
+Twelfth measure (full, 20 scenarios, equal draw, with the bottom-line rotation): **89.6 %** of 16669 known frames found (score display 91 %;
+skill shots 100 %, Flynn's Arcade 99 %, game flow 98 %). Weakest: Sea of Simulation 74 %, Portal 79 %, Tron targets 84 %, Find Flynn 85 %.
+
+Deff 112 (TRON timed award, 0x0100d108) played its capture (SUPER SPINNERS, with the panel of the recording) for every award. It is now drawn:
+the TRON outline at level 1 (palette slot 15 -> 1), the award's two words (DOUBLE SCORING, SUPER POPS or SUPER SPINNERS, `screen` from the
+rules) lit 2 frames of 4, then from 1410 ms the second screen (ALL SCORES DOUBLED, POPS SCORE 3X, SPINNERS SCORE 3X: title at level 4, value
+held then blinking every 50 ms), with the live status panel; times read off the capture. Zen rollover 89 % -> 93 %, Tron targets 84 % -> 96 %.

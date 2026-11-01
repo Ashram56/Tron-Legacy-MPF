@@ -344,13 +344,13 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
 GRAPHICS_END = {38: 64}
 # Effects whose picture is cleared at this time, the points staying on black (PinMAME capture; deff 73: the last frame, 1740 ms in
 # timing.json because it runs to the end of the capture, is on for one frame time)
-CLEAR_AT_MS = {73: 600}
+CLEAR_AT_MS = {73: 600, 112: 1410}
 # Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
 # through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
 OPEN_WHITE = {108}
 TEXT_UNDER_CLIP = {108, 83, 78, 97, 143}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
-LEVEL_MAP = {65: {1: 0}}
+LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette slot 15 -> 1 (deff_112_super)
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
 # (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
 # graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
@@ -507,3 +507,15 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             boxes.append(box + (call, screens, cycle))
             out[i] = lay
     return out
+
+# deff 112 (0x0100d108) TRON timed award, by the award (task+0x30: 1 DOUBLE SCORING, 2 SUPER POPS, 4 SUPER SPINNERS; the rules pass
+# screen 0, 1, 2): the TRON outline with the award's two words lit on frames 2-3 of every 4 (24 frames of 4 ticks), then the
+# second screen (FUN_0100cab4 / cccc / cee8): its title at level 4 (palette slot 15 -> 4), its value held 12 + 3 ticks, then
+# shown on even frames of 3 ticks (43 frames)
+_P112 = 1410        # 24 frames of 4 ticks, measured on the capture (its ticks run a little short)
+SCREENS[112] = {0: (1,), 1: (1,), 2: (0,), 3: (0,), 4: (2,), 5: (2,), 6: (0,), 7: (0,), 8: (1,), 9: (1,), 10: (2,), 11: (2,)}
+OVERRIDES[112] = {**{t: {"show_after_ms": 140, "blink_ms": 127, "hide_after_ms": _P112}
+                     for t in ("SUPER", "POPS", "DOUBLE", "SCORING", "SPINNERS")},
+                  **{t: {"show_after_ms": _P112, "level_steps": [4], "step_ms": 10 ** 6}
+                     for t in ("ALL SCORES", "POPS SCORE", "SPINNERS SCORE")},
+                  **{t: {"show_after_ms": _P112, "blink_ms": 50, "blink_after_ms": 1640} for t in ("DOUBLED", "3X")}}

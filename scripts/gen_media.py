@@ -38,10 +38,10 @@ PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
-TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40}
+TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
-CAPTURE_PANEL_KEPT = {85, 112}
+CAPTURE_PANEL_KEPT = {85}
 PANEL_WIDTH = 41
 TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
 # Effects that draw the four letters of a target bank, one bitmap per letter and state

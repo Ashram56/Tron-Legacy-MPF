@@ -219,7 +219,7 @@ class TronTargets(Feature):
         self._timer_start(award)
         os_.sound(call)
         os_.score_add(22000)
-        os_.deff_start(112, award=award)
+        os_.deff_start(112, award=award, screen={1: 0, 2: 1, 4: 2}.get(award, 0))
         pd.tron_running |= award
         os_.hook("item_light", TRON_ITEM)
         pd.tron_started_set |= award
