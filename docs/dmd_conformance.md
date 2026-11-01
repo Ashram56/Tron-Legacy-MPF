@@ -179,3 +179,7 @@ Eleventh measure (full, 20 scenarios, equal draw; score roll, deff 83 direction,
 change): **86.3 %** of 16669 known frames found. Flynn's Arcade 75 % -> 84 % (deff 105: 287 of 288), Light Cycle MB 82 %. The roll's phase still
 differs from the ROM's on the score display. Deff 140 (Portal intro) after its animation: the last picture at level 1 (palette 0x30) and the
 text blinking every 3-tick frame, lit first (palette 0x40); COMPLETE ALL SHOTS holds about 370 ms first (`blink_after_ms`): Portal 73 % -> 77 %.
+
+Bottom-line rotation of the score display: deff_019 counts its own ticks (156 BALL / credits, 312 REPLAY AT, 1250 BALL / credits), so the
+rotation starts over each time the score display gets the display again (an effect in front ends, or deff 19 starts with nothing in front),
+not from power-up (`MediaBridge.score_display_shown`, called by `display.py`). Zen rollover 76 % -> 89 %, Combos 82 % -> 90 %.

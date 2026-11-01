@@ -96,6 +96,8 @@ class Display:
             else:
                 os_.trace.log("deff_start", id=deff_id)
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+            if deff_id == 19 and self.fg is None:
+                getattr(os_.media, "score_display_shown", lambda: None)()    # shown at once: deff_019's task starts now
             os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
             if deff_id == 19:
                 os_.tube_start(10)
@@ -256,6 +258,8 @@ class Display:
                     self.os.tubes.stop(tube)
         self.fg = None
         self.arcade_held = False
+        if self.bg == 19 and not stopped:
+            getattr(self.os.media, "score_display_shown", lambda: None)()    # the effect in front ends: deff_019's task runs from here
 
     def _ended(self, deff_id):
         self.fg_handle = None

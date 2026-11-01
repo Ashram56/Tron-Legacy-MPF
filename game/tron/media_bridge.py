@@ -81,7 +81,9 @@ class MediaBridge:
         self.service_shown = False
         self.counters = {}
         self.last_scores = {}
-        self.rot_epoch = self.machine.clock.get_time()    # the bottom line's rotation counts from power-up, not from the game
+        # the bottom line's rotation: deff_019's own counters (0x9c, 0x138, 0x4e2 ticks), so it starts over whenever the
+        # score display gets the display again (score_display_shown)
+        self.rot_epoch = self.machine.clock.get_time()
         self.award = (0, None, None)               # last points, shown since, blink counter since
         self.bar_max = {}
         self._refresh = None
@@ -204,6 +206,12 @@ class MediaBridge:
         self._send("slides_play", {slide: {"action": "remove", "key": slide, "expire": None}}, need_data=False)
 
     # ------------------------------------------------------------------ score display (deff 19)
+
+    def score_display_shown(self):
+        """deff_019's task (re)starts: its bottom-line counters start over (BALL / credits first)."""
+        self.rot_epoch = self.machine.clock.get_time()
+        if 19 in self.active:
+            self.score_changed()
 
     def credits_text(self):
         """FUN_00004ff4: "FREE PLAY", "CREDITS n", "CREDITS a/b" (coins toward the next credit) or
