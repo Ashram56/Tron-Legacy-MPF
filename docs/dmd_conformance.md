@@ -166,3 +166,5 @@ targets) when the lit target's bit is set in the per-player disabled-switch mask
 whose stuck/ignore bits or hit counter 0x02110108[sw] say so). The game's `recognizer.py` states that no target is ever disabled; the ROM trace
 of switches_and_shots (lamps 51-53 after the first minute) is not periodic, which fits a disabled target. Not modelled yet.
 Measure noise: a scenario moves by up to 8 points between two identical runs (timing), and 120 fps instead of 30 gives the same total (85.0 %).
+
+Deff 140 (Portal start) draws its Sea of Simulation bonus text (screen 1) OVER the clip, so it leaves `TEXT_UNDER_CLIP`: Portal 63 % -> 72 %, total **85.5 %**.
