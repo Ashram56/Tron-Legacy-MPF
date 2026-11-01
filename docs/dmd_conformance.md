@@ -220,3 +220,12 @@ Multiball clip ends at 600 ms).
 Fifteenth measure (full, 20 scenarios, equal draw): **93.9 %** of 16667 known frames found. Bonus 94 %, Portal 91 %, Disc
 Multiball 91 %, Find Flynn 99 %. Weakest: Sea of Simulation 85 %, Recognizer 87 %. Left by weight: 19, 106, 77, 95, 86, 115, 72,
 141, 1, 73.
+
+Deff 108 (N MORE TO ACCESS DISC): `blink_frames` in OVERRIDES never reached the effect data (keys ending in "_frames" were
+taken for frame times; deffs 115-124 lost theirs too); "%u MORE" is lit on frames 0-1 of every 4 and hidden, not black, on the
+others; the Recognizer clip runs 3 ticks a picture (FUN_01024378(3)), not the capture's 33 ms; and it is drawn over the status
+panel (bitmap_draw_masked from x 0, `rom_layout.CLIP_OVER_PANEL`). Recognizer and disc battle 87 % -> 91 %.
+
+Sixteenth measure (full, 20 scenarios, equal draw): **94.4 %** of 16667 known frames found (score display 97 %). Disc
+Multiball 94 %. Weakest: Sea of Simulation 86 % (deff 115: 1 of 74, its background picture one column off), Portal 91 %,
+Recognizer 91 %. Left by weight: 19, 95, 77, 106, 86, 115, 141, 1, 73, 72.
