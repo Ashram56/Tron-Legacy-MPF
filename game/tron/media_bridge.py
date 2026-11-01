@@ -99,6 +99,7 @@ class MediaBridge:
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
         # last points: each score change on its own (FUN_010238ac), not the sum of the changes between two updates
         self.machine.events.add_handler("player_score", self._on_score)
+        self.machine.events.add_handler("ball_started", self._ball_start, priority=1000)
 
     # ------------------------------------------------------------------ transport
 
@@ -245,6 +246,11 @@ class MediaBridge:
         top = max(self.bar_max.get(key, 0) if seconds else 0, start, seconds)
         self.bar_max[key] = top
         return seconds * 10 // top if top else 0
+
+    def _ball_start(self, **kwargs):
+        """FUN_01023858 on the ball start event (0x13): the ticks since the last points start at 0 (the score blinks
+        only 63 ticks later), no last points."""
+        self.award = (0, None, self.machine.clock.get_time())
 
     def _on_score(self, value=0, prior_value=0, change=0, player_num=None, **kwargs):
         """FUN_010238ac, called with each score added: within 16 ticks of the last points shown, smaller points
