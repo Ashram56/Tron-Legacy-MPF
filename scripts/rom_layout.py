@@ -264,6 +264,10 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # deff 108 (FUN_01020388 ...): "%u MORE" lit on frames 0-1 of every 4 (3-tick frames, frame & 2 picks the black palette:
              # nothing drawn, the clip's picture shows where the text was), with the clip's pictures
              108: {"%u MORE": {"blink_frames": 2}},
+             # deff 097 (Zuse ALL TARGETS, 0x...): one of 2 clips (table 0x040d6fd4), then ALL / TARGETS and the value over its last
+             # picture dimmed, the value lit and black on alternate 3-tick frames (CLIP_END_TEXT moves the times with the clip)
+             97: {"ALL": {"show_after_ms": 640}, "TARGETS": {"show_after_ms": 640},
+                  "%,02lu": {"show_after_ms": 640, "blink_ms": 49, "blink_dark": True}},
              # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
              111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
                    "DISC MULTIBALL": {"show_after_ms": 1960}},
@@ -351,7 +355,7 @@ CLEAR_AT_MS = {73: 600, 112: 1410}
 # Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
 # through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
 OPEN_WHITE = {108}
-TEXT_UNDER_CLIP = {108, 83, 78, 97}
+TEXT_UNDER_CLIP = {108, 83, 78}
 # ... and whose bitmap the ROM draws over the status panel too (deff 108: bitmap_draw_masked from x 0 after the panel; the Recognizer
 # crosses the scores)
 CLIP_OVER_PANEL = {108}
@@ -362,8 +366,8 @@ LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette
 # graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
 # Effects whose film clip the ROM picks (at random, or by the Light Cycle level: 87-89, table 0x040d3084) and whose text loop starts when the clip ends (deff_048 0x01008920: the clip
 # function of table 0x040d2804 returns its last bitmap, drawn dimmed under the text): each clip dims and shows its text at its own end
-CLIP_END_TEXT = {48, 49, 87, 88, 89}
-DIM_AFTER_MS = {142: 1680, 111: 1960, 48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
+CLIP_END_TEXT = {48, 49, 87, 88, 89, 97}
+DIM_AFTER_MS = {97: 640, 142: 1680, 111: 1960, 48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
 # screen. Lines of different screens may overlap; the rules pass `screen`.
