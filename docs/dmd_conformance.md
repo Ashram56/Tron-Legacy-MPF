@@ -229,3 +229,9 @@ panel (bitmap_draw_masked from x 0, `rom_layout.CLIP_OVER_PANEL`). Recognizer an
 Sixteenth measure (full, 20 scenarios, equal draw): **94.4 %** of 16667 known frames found (score display 97 %). Disc
 Multiball 94 %. Weakest: Sea of Simulation 86 % (deff 115: 1 of 74, its background picture one column off), Portal 91 %,
 Recognizer 91 %. Left by weight: 19, 95, 77, 106, 86, 115, 141, 1, 73, 72.
+
+Seventeenth and eighteenth measures. Zuse does not restart its background (deff 95) at the end of deff 96 (observed). That
+rule was first applied to every mode's background, and Portal and Quorra fell (17th measure: 93.9 %). The ROM restarts
+Quorra's 65 at the end of 68 (41.51 s), so the rule is now limited to Zuse's 95. Eighteenth measure (full, 20 scenarios,
+equal draw): **94.6 %** of 16667 known frames found (score display 97 %, Zuse 98 %, Quorra 93 %, Portal 91 %). Weakest:
+Sea of Simulation 86 % (deff 115), Portal 91 %, Recognizer 91 %. Left by weight: 19, 77, 86, 106, 141, 72, 115, 1, 73, 65.
