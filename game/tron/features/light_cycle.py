@@ -156,7 +156,7 @@ class LightCycle(Feature):
         made = popcount(pd.lc_collected)
         if made < needed:
             if not quiet:
-                self.os.deff_start(83, more=needed - made, mask=mask)
+                self.os.deff_start(83, more=needed - made, mask=mask, clip=0 if mask & 7 == 0 else 1)   # the bike crosses right to left, or the other way
         elif self.os.hook("vuk_lit_add", VUK_BIT):
             pd.lc_remaining, pd.lc_collected = ALL_SHOTS, 0
             if not quiet:

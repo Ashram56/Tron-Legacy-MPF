@@ -569,7 +569,7 @@ def build_deffs(only_data):
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else [])
                 + (ARCADE_ARGS if source == "arcade" else [])
-                + (["clip"] if deff_id in (87, 88, 89) else [])
+                + (["clip"] if deff_id in (83, 87, 88, 89) else [])
                 + (["done"] if 116 <= deff_id <= 124 else []),
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
@@ -628,6 +628,20 @@ def build_deffs(only_data):
                     for img, _ in clip:
                         ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
                 variants.append(clip)
+        if deff_id == 83 and source == "graphics":
+            # deff_083_more [0x01018ba0]: the bike crosses the screen 8 dots per frame, right to left with bitmaps 3941-3943 when
+            # (task+0x34 & 7) == 0, else left to right with 3944-3946; the capture shows the first, the second is drawn from the library
+            from PIL import Image
+            lib = os.path.join(ROOT, "assets", "mpf_package", "media", "dmd_library")
+            def bike(base, k):
+                return Image.open(os.path.join(lib, base, "frames", "%03d.png" % (k % 3))).convert("RGBA")
+            right = []
+            for j, (_, ms) in enumerate(frames[:27]):
+                canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
+                sprite = bike("anim_052_img3944", j)
+                canvas.paste(sprite, (-73 + 8 * j, 0), sprite)
+                right.append((canvas, ms))
+            variants = [list(frames[:27]), right]
         alt_clip = None
         alt_gif = os.path.join(folder, "variants", "alt_v00.gif")
         if source == "graphics" and variants and os.path.exists(alt_gif) and 116 <= deff_id <= 124:
