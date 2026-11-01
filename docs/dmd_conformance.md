@@ -160,3 +160,9 @@ ROM, "4 MORE" in the game): the first hit on the Recognizer bank counts double w
 phase (task 0x7d, 93 ticks per step) differs after the first minute of the ball (lamps 51-53, `docs` trace: the ROM's pattern is not periodic
 there, the game's is). Frames of every effect that shows a counter then differ; this is a rules timing gap, not a display one. Clip variants of
 deffs 108 and 116-124 now use the capture's frame period (32 ms and 49 ms), not the gifs' 40-52 ms.
+
+Lead for the Recognizer phase gap: the ROM's moving-target task 0x7d (`task_7d_moving_lit_target`, 0x01020034) leaves a step early (and skips
+targets) when the lit target's bit is set in the per-player disabled-switch mask (0x021117b7, built from `sw_is_disabled` 0x0000e098: a switch
+whose stuck/ignore bits or hit counter 0x02110108[sw] say so). The game's `recognizer.py` states that no target is ever disabled; the ROM trace
+of switches_and_shots (lamps 51-53 after the first minute) is not periodic, which fits a disabled target. Not modelled yet.
+Measure noise: a scenario moves by up to 8 points between two identical runs (timing), and 120 fps instead of 30 gives the same total (85.0 %).
