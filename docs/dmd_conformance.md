@@ -209,3 +209,14 @@ Fourteenth measure (full, 20 scenarios, equal draw): **93.2 %** of 16667 known f
 End of ball bonus (deff 25): the game showed TOTAL BONUS for the whole count. It now draws the ROM's screens (0x01000e7c): BONUS / base,
 a screen per item, SEA OF SIMULATION and PORTAL line (name, +value, running total), each multiplier step (%dX, total x n), then TOTAL BONUS
 (`rom_layout.SCREENS[25]`, values live from `features/bonus.py`). Bonus scenario 89 % -> 94 %, every frame of deff 25 found.
+
+Last points (FUN_010238ac on event 0x4d, posted by every score_add): one value per add, not one task run's sum (a jackpot
+with its switch's 10,000 showed 510,000 for 500,000). Portal's super jackpot (deff 143): the text over the picture at 4240 ms
+(the clip hid it). Jackpots with a picked clip (deffs 48, 49 at random; 87-89 by the Light Cycle level): the ROM's clip function
+returns its last bitmap and the text loop starts then, so each clip dims and shows its text at its own end
+(`rom_layout.CLIP_END_TEXT`, effect.json `variant_shift`); the game waited the captured clip's 1410 ms (the first Disc
+Multiball clip ends at 600 ms).
+
+Fifteenth measure (full, 20 scenarios, equal draw): **93.9 %** of 16667 known frames found. Bonus 94 %, Portal 91 %, Disc
+Multiball 91 %, Find Flynn 99 %. Weakest: Sea of Simulation 85 %, Recognizer 87 %. Left by weight: 19, 106, 77, 95, 86, 115, 72,
+141, 1, 73.
