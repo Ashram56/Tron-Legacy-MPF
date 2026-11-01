@@ -198,3 +198,14 @@ ticks since the last points (DAT_021117f4) start over at ball start (event 0x13,
 Thirteenth measure (full, 20 scenarios, equal draw): **92.2 %** of 16669 known frames found (score display 95 %; skill shots 100 %, combos
 99 %, Find Flynn, Flynn's Arcade and game flow 98 %). Weakest: Sea of Simulation 73 % (deff 19 paired at the VUK where the ROM runs rule task
 0xa9 with no effect start), Portal 80 % (deff 141), disc multiball and Recognizer 87 %. Left by weight: 19, 47, 86, 141, 106, 115, 73, 25.
+
+Deff rules at the ball start: every reference trace starts deff 104 (FLYNN'S ARCADE IS LIT, 0x100de10), then 19 (0x2074c), then 19 again
+(the rules, 0x19944). The game started 19 first (a rules refresh between game start and ball start) and restarted 19 on every music change;
+FUN_000198a8 starts the rule's deff only when it is not running. From the ball end to the ball start the rules now wait (`display.held`).
+Sea of Simulation 73 % -> 84 %.
+
+Fourteenth measure (full, 20 scenarios, equal draw): **93.2 %** of 16667 known frames found (score display 96 %; Portal 88 %, Sea 84 %).
+
+End of ball bonus (deff 25): the game showed TOTAL BONUS for the whole count. It now draws the ROM's screens (0x01000e7c): BONUS / base,
+a screen per item, SEA OF SIMULATION and PORTAL line (name, +value, running total), each multiplier step (%dX, total x n), then TOTAL BONUS
+(`rom_layout.SCREENS[25]`, values live from `features/bonus.py`). Bonus scenario 89 % -> 94 %, every frame of deff 25 found.
