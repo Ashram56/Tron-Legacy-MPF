@@ -92,6 +92,35 @@ static func replay_phase(ticks: int) -> bool:
 	return t >= 156 and t < 156 + 312
 
 
+## The current score as a number ("1,234,560" -> 1234560; 0 when empty).
+static func score_of(text: String) -> int:
+	var digits := ""
+	for ch in text:
+		if ch >= "0" and ch <= "9":
+			digits += ch
+	return int(digits) if digits != "" else 0
+
+
+## The ROM's score roll while the playfield is valid (FUN_01023940 for the score, deff_draw_status_panel 0x010230ec
+## for the panel): DAT_021117f4 counts the ticks since the last points; in every period of 62 + 4H ticks (H the band
+## of the score-size table at ROM 0x40d3484: rows 4-20 from 1,000,000, else 2-23) past tick 62, the score's band
+## (x 41-127) is blanked from the top down one row every 2 ticks, then shown again from the top; the current player's
+## panel score (6 rows from panel_y0, x 0-39) the same in 6 + 6 steps. Returns [score rect, panel rect] to blank,
+## or [] outside the roll.
+static func roll(age: int, score: int, panel_y0: int) -> Array:
+	var y0 := 4 if score >= 1000000 else 2
+	var y1 := 20 if score >= 1000000 else 23
+	var h := y1 - y0
+	var u := age % (4 * h + 62)
+	if u < 63:
+		return []
+	var k := (u - 62) >> 1
+	var big := Rect2(41, y0, 87, k + 1) if k < h else Rect2(41, y0 + k - h + 1, 87, y1 - (y0 + k - h))
+	var s := (u - 62) * 12 / (4 * h)
+	var pan := Rect2(0, panel_y0, 40, s + 1) if s < 6 else Rect2(0, panel_y0 + s - 5, 40, 11 - s)
+	return [big, pan]
+
+
 func _apply() -> void:
 	# the bottom line rotates on the game's clock, not the effect's: an overlay restarting deff 19 does not restart it
 	var ticks := int((_int("rot_ms") + _elapsed_ms - _received_ms) / TICK_MS) if _values.has("rot_ms") else int(_elapsed_ms / TICK_MS)
@@ -112,6 +141,16 @@ func _apply() -> void:
 	var blank := not bool(_values.get("valid", true)) and blink_age >= 63 and (blink_age - 62) % 14 <= 6
 	if score_lines and _node("Line1"):
 		_node("Line1").visible = not blank
+	var roll_rects := roll(blink_age, score_of(str(_values.get("p%d" % current, ""))),
+		(21 if current == 2 and players == 2 else current * 8 - 3) - 4) if bool(_values.get("valid", true)) else []
+	for m in [["RollBig", 0, score_lines], ["RollPanel", 1, not match_panel]]:
+		var mask := _node(m[0]) as ColorRect
+		if mask:
+			mask.visible = m[2] and roll_rects.size() > 0
+			if mask.visible:
+				var r: Rect2 = roll_rects[m[1]]
+				mask.position = r.position
+				mask.size = r.size
 	# player scores in the panel: current player full, the others dim (level 3)
 	for p in range(1, 5):
 		var node := _node("P%d" % p)

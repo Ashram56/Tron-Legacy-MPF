@@ -168,3 +168,9 @@ of switches_and_shots (lamps 51-53 after the first minute) is not periodic, whic
 Measure noise: a scenario moves by up to 8 points between two identical runs (timing), and 120 fps instead of 30 gives the same total (85.0 %).
 
 Deff 140 (Portal start) draws its Sea of Simulation bonus text (screen 1) OVER the clip, so it leaves `TEXT_UNDER_CLIP`: Portal 63 % -> 72 %, total **85.5 %**.
+
+Score roll (2026-11-01): while the playfield is valid, the ROM rolls the current score once 62 ticks have passed without points, and again
+every 62 + 4H ticks (FUN_01023940; H from the score-size table at ROM 0x40d3484: band rows 4-20 from 1,000,000, else 2-23): the band is
+blanked from the top one row every 2 ticks, then shown again from the top; the current player's score in the status panel does the same in
+6 + 6 steps (deff_draw_status_panel). The game had a still score; `score_display.gd` `roll()` now does it for deff 19 and every effect with
+the panel. Deff 83 ("N MORE TO LIGHT") now crosses in the ROM's direction (two clip variants chosen by the mask): no known frame of 83 missed.

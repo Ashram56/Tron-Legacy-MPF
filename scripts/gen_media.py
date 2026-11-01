@@ -288,6 +288,8 @@ def score_display_nodes(score_lines=True, match=False):
         out += rect_node(name, x, 31, 0, 1, 15)
     for name in ("BarZfs", "BarClu", "BarGem"):
         out += rect_node(name, 40, 0, 1, 0, 15)
+    for name in ("RollBig", "RollPanel"):          # the score roll's blanked rows (score_display.gd roll())
+        out += rect_node(name, 0, 0, 0, 0, 0) + ['visible = false']
     out += ['', '[node name="ScoreDisplay" type="Node" parent="."]', 'script = ExtResource("score")']
     if score_lines:
         out.append('score_lines = true')
@@ -308,6 +310,7 @@ def score_display_items(score_lines=True, match=False):
         out += [rect_item("Dash%d" % k, x, 31, 10, 1, 1), rect_item(name, x, 31, 0, 1, 15)]
     for name in ("BarZfs", "BarClu", "BarGem"):
         out.append(rect_item(name, 40, 0, 1, 0, 15))
+    out += [rect_item("RollBig", 0, 0, 0, 0, 0), rect_item("RollPanel", 0, 0, 0, 0, 0)]
     return out + [{"type": "panel", "score_lines": score_lines, "match": match}]
 
 

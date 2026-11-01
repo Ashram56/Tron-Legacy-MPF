@@ -384,7 +384,7 @@ class State extends RefCounted:
 						mod = st["mod"]
 					if color and it.has("color_rgb"):
 						c = Color(it["color_rgb"])
-					elif hd and it["name"] != "Background":
+					elif hd and it["name"] != "Background" and not str(it["name"]).begins_with("Roll"):
 						c = dmd.text_tint(c)
 					if r.size.x > 0 and r.size.y > 0:
 						out.append(["rect", r, c * mod])
@@ -569,6 +569,10 @@ class State extends RefCounted:
 		var blank := not bool(values.get("valid", true)) and blink_age >= 63 and (blink_age - 62) % 14 <= 6
 		if score_lines:
 			out["Line1"] = {"visible": not blank}
+		var roll := ScoreDisplay.roll(blink_age, ScoreDisplay.score_of(str(values.get("p%d" % current, ""))),
+			(21 if current == 2 and players == 2 else current * 8 - 3) - 4) if bool(values.get("valid", true)) else []
+		out["RollBig"] = {"visible": score_lines and roll.size() > 0, "rect": roll[0] if roll.size() else Rect2()}
+		out["RollPanel"] = {"visible": roll.size() > 0 and not match_panel, "rect": roll[1] if roll.size() else Rect2()}
 		for p in range(1, 5):
 			var st := {"visible": p <= players and not (blank and p == current),
 				"rom_y": 21 if p == 2 and players == 2 else p * 8 - 3,
