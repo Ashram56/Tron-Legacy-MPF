@@ -235,3 +235,10 @@ rule was first applied to every mode's background, and Portal and Quorra fell (1
 Quorra's 65 at the end of 68 (41.51 s), so the rule is now limited to Zuse's 95. Eighteenth measure (full, 20 scenarios,
 equal draw): **94.6 %** of 16667 known frames found (score display 97 %, Zuse 98 %, Quorra 93 %, Portal 91 %). Weakest:
 Sea of Simulation 86 % (deff 115), Portal 91 %, Recognizer 91 %. Left by weight: 19, 77, 86, 106, 141, 72, 115, 1, 73, 65.
+
+Nineteenth measure. The fonts now take their spacing and each glyph's x offset from the ROM's font table (asset repo
+`rom_data/fonts.json`) instead of rules read off captures. The outlined fonts also draw the comma one dot left, and fonts
+25 and 27 have the table's spacing. Deff 115 goes from 1 to 74 of 74 frames (its outlined value's border erased one
+column of the picture). Full measure (20 scenarios, equal draw): **95.7 %** of 16667 known frames found (Portal 98 %, Sea
+96 %, bonus 99 %, deff 141 97 %, deff 72 96 %). Left by weight: 19 (250), 86 (69), 77 (58), 1 (57), 73 (54), 106 (53),
+65 (40), 47 (35), 95 (34).
