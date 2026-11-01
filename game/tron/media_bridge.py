@@ -95,6 +95,8 @@ class MediaBridge:
         self.shown = set()                         # deff and text slides playing now
         self.kept = None                           # the last one, stopped but left up until the next plays
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
+        # last points: each score change on its own (FUN_010238ac), not the sum of the changes between two updates
+        self.machine.events.add_handler("player_score", self._on_score)
 
     # ------------------------------------------------------------------ transport
 
@@ -235,6 +237,17 @@ class MediaBridge:
         top = max(self.bar_max.get(key, 0) if seconds else 0, start, seconds)
         self.bar_max[key] = top
         return seconds * 10 // top if top else 0
+
+    def _on_score(self, value=0, prior_value=0, change=0, player_num=None, **kwargs):
+        """FUN_010238ac, called with each score added: within 16 ticks of the last points shown, smaller points
+        only restart the counter; otherwise they become the last points shown."""
+        if player_num is None or player_num != self.os.player_num or not change or change < 0:
+            return
+        self.last_scores[player_num] = value
+        now = self.machine.clock.get_time()
+        shown_value, shown, _ = self.award
+        age = (now - shown) / TICK if shown is not None else 99
+        self.award = (shown_value, shown, now) if age < 16 and change < shown_value else (change, now, now)
 
     def score_display_args(self):
         """Event args of deff 19 beyond line0/line1, for tron/score_display.gd."""
