@@ -268,10 +268,11 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # deff 142 (Portal shot): the clip plays bare, then the picture dims and the points blink on it from 1680 ms (PinMAME
              # capture; on 48 ms, black 48 ms)
              142: {"%,02lu": {"show_after_ms": 1680, "blink_ms": 48, "blink_dark": True}},
-             # deff 143 (Portal's super jackpot): the clip plays bare, the text comes at 4100 ms (PinMAME capture), the points drawn
-             # black on the dimmed picture on alternate steps
-             143: {"SUPER": {"show_after_ms": 4100}, "JACKPOT": {"show_after_ms": 4100},
-                   "%,02lu": {"show_after_ms": 4100, "blink_ticks": 4, "blink_dark": True}},
+             # deff 143 (Portal's super jackpot): the clip plays bare, the text comes over the picture at 4240 ms from the start
+             # (portal_multiball reference run; the capture's 4100 ms counted from its first frame), the points lit and drawn
+             # black on alternate 3-tick frames
+             143: {"SUPER": {"show_after_ms": 4240}, "JACKPOT": {"show_after_ms": 4240},
+                   "%,02lu": {"show_after_ms": 4240, "blink_ms": 49, "blink_dark": True}},
              # deffs 10, 15, 17 (the credits screens): the credit text on the upper row, the prompt on the lower one blinking
              # 15 ticks on, 15 off from the start (PinMAME capture, rows 5-12 and 18-25 of the right part)
              **{d: {"%s": {"font": 10, "x": 84, "y": 12, "flags": 2, "source": "capture"},
@@ -348,7 +349,7 @@ CLEAR_AT_MS = {73: 600, 112: 1410}
 # Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
 # through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
 OPEN_WHITE = {108}
-TEXT_UNDER_CLIP = {108, 83, 78, 97, 143}
+TEXT_UNDER_CLIP = {108, 83, 78, 97}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
 LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette slot 15 -> 1 (deff_112_super)
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
