@@ -442,7 +442,8 @@ class State extends RefCounted:
 			var blink: int = it.get("blink_ms", 0)
 			var cycle: int = it.get("cycle_ms", 0)
 			var blink_dark: bool = it.get("blink_dark", false)
-			var blink_on := blink == 0 or int((elapsed_ms - show_after) / blink) % 2 == 0
+			var blink_from: int = maxi(it.get("blink_after_ms", 0), show_after)
+			var blink_on := blink == 0 or elapsed_ms < blink_from or int((elapsed_ms - blink_from) / blink) % 2 == 0
 			var blink_frames: int = it.get("blink_frames", 0)
 			if blink_frames > 0 and _frames_item >= 0:      # toggles with the clip's pictures, like the ROM's loop (one draw per frame)
 				blink_on = (frame_index() / blink_frames) % 2 == 0

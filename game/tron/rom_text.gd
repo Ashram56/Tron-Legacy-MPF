@@ -31,6 +31,8 @@ extends MPFVariable
 @export var level_steps: PackedInt32Array = PackedInt32Array()
 @export var step_ms: int = 0
 @export var blink_ms: int = 0
+## blink_after_ms: the blink starts there (the line shows steadily from show_after_ms until then); 0 = at show_after_ms
+@export var blink_after_ms: int = 0
 ## blink_dark: the off phase of blink_ms draws the glyphs black over the picture instead of hiding them
 ## (the ROM prints with a palette mapping the font's colours to 0: deffs 116-124)
 @export var blink_dark := false
@@ -143,7 +145,8 @@ func _process(delta: float) -> void:
 func _apply_time() -> void:
 	if not _timed():
 		return
-	var blink_on := blink_ms == 0 or int((_elapsed_ms - show_after_ms) / blink_ms) % 2 == 0
+	var blink_from := maxi(blink_after_ms, show_after_ms)
+	var blink_on := blink_ms == 0 or _elapsed_ms < blink_from or int((_elapsed_ms - blink_from) / blink_ms) % 2 == 0
 	var cycle_on := cycle_ms == 0 or fposmod(_elapsed_ms - cycle_offset_ms, cycle_ms) < cycle_on_ms
 	visible = _screen_on and cycle_on and _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
 		and (blink_on or blink_dark)

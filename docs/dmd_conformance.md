@@ -174,3 +174,8 @@ every 62 + 4H ticks (FUN_01023940; H from the score-size table at ROM 0x40d3484:
 blanked from the top one row every 2 ticks, then shown again from the top; the current player's score in the status panel does the same in
 6 + 6 steps (deff_draw_status_panel). The game had a still score; `score_display.gd` `roll()` now does it for deff 19 and every effect with
 the panel. Deff 83 ("N MORE TO LIGHT") now crosses in the ROM's direction (two clip variants chosen by the mask): no known frame of 83 missed.
+
+Eleventh measure (full, 20 scenarios, equal draw; score roll, deff 83 direction, Flynn's Arcade reel at equal draw, last points per score
+change): **86.3 %** of 16669 known frames found. Flynn's Arcade 75 % -> 84 % (deff 105: 287 of 288), Light Cycle MB 82 %. The roll's phase still
+differs from the ROM's on the score display. Deff 140 (Portal intro) after its animation: the last picture at level 1 (palette 0x30) and the
+text blinking every 3-tick frame, lit first (palette 0x40); COMPLETE ALL SHOTS holds about 370 ms first (`blink_after_ms`): Portal 73 % -> 77 %.

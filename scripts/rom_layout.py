@@ -405,11 +405,17 @@ def frame_ms(deff_id, k):
 # deff 140 (0x0102faec): the animation's 67 frames (2 ticks) with the bonus lines, then PORTAL / MULTIBALL
 # (font 0x27) for 21 frames of 3 ticks, then COMPLETE ALL SHOTS / FOR / SUPER JACKPOT to the end
 _P140 = frame_ms(140, 67)
+# Past the animation its last picture stays at level 1 (palette 0x30 of the deff) and the text blinks every 3-tick frame,
+# lit first (palette 0x40 on odd frames: the glyphs vanish); COMPLETE ALL SHOTS holds its first frame (FUN_00027acc(1),
+# about 370 ms in the capture) before it blinks.
+_B140 = round(3 * TICK_MS)
 OVERRIDES[140] = {**{t: {"hide_after_frame": 67} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
-                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS)}
-                     for t in ("PORTAL", "MULTIBALL")},
-                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS)} for t in ("COMPLETE ALL SHOTS", "FOR",
-                                                                                 "SUPER JACKPOT")}}
+                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140,
+                         "blink_dark": True} for t in ("PORTAL", "MULTIBALL")},
+                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140, "blink_dark": True,
+                         "blink_after_ms": _P140 + round(63 * TICK_MS) + 370}
+                     for t in ("COMPLETE ALL SHOTS", "FOR", "SUPER JACKPOT")}}
+DIM_AFTER_MS[140] = _P140
 SAMPLE = {"%,02lu": "1,234,560", "%luK": "100K"}
 
 
