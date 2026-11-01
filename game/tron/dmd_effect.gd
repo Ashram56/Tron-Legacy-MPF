@@ -211,6 +211,7 @@ class State extends RefCounted:
 	var _total_ms := 0.0
 	var _frames_item := -1
 	var _variant := -1             # the clip picked for this show (item "variants"), -1: the effect's own frames
+	var _shift_ms := 0.0           # the picked clip ends this much later than the effect's own (item "variant_shift"): its text too
 	var effect_name := ""          # deff_NNN, to find the effect's clips (tron/dmd_effect_slide.gd)
 	var clip_path := ""            # the PuP clip playing behind the text for this show (absolute path), "" for the ROM's pictures
 	var clip_loop := false
@@ -312,6 +313,8 @@ class State extends RefCounted:
 	## The frames of this show: the effect's own, or the clip picked at random among its variants.
 	func _frames() -> Array:
 		var it: Dictionary = items[_frames_item]
+		var shifts: Array = it.get("variant_shift", [])
+		_shift_ms = float(shifts[_variant]) if _variant >= 0 and _variant < shifts.size() else 0.0
 		return it["variants"][_variant] if _variant >= 0 else it["frames"]
 
 	func _set_variant(k: int) -> void:
@@ -437,26 +440,27 @@ class State extends RefCounted:
 		var visible: bool = screen_on[i]
 		var mod := Color.WHITE
 		if _timed(it):                                    # rom_text.gd _apply_time()
+			var te: float = elapsed_ms - _shift_ms          # the text follows the picked clip's end (deffs 48, 49)
 			var show_after: int = it.get("show_after_ms", 0)
 			var hide_after: int = it.get("hide_after_ms", 0)
 			var blink: int = it.get("blink_ms", 0)
 			var cycle: int = it.get("cycle_ms", 0)
 			var blink_dark: bool = it.get("blink_dark", false)
 			var blink_from: int = maxi(it.get("blink_after_ms", 0), show_after)
-			var blink_on := blink == 0 or elapsed_ms < blink_from or int((elapsed_ms - blink_from) / blink) % 2 == 0
+			var blink_on := blink == 0 or te < blink_from or int((te - blink_from) / blink) % 2 == 0
 			var blink_frames: int = it.get("blink_frames", 0)
 			if blink_frames > 0 and _frames_item >= 0:      # toggles with the clip's pictures, like the ROM's loop (one draw per frame)
 				blink_on = (frame_index() / blink_frames) % 2 == 0
-			var cycle_on: bool = cycle == 0 or fposmod(elapsed_ms - it.get("cycle_offset_ms", 0), cycle) \
+			var cycle_on: bool = cycle == 0 or fposmod(te - it.get("cycle_offset_ms", 0), cycle) \
 				< it.get("cycle_on_ms", 0)
-			visible = screen_on[i] and cycle_on and elapsed_ms >= show_after \
-				and (hide_after == 0 or elapsed_ms < hide_after) and (blink_on or blink_dark)
+			visible = screen_on[i] and cycle_on and te >= show_after \
+				and (hide_after == 0 or te < hide_after) and (blink_on or blink_dark)
 			if blink_dark:
 				mod = Color(1, 1, 1, 1) if blink_on else Color(0, 0, 0, 1)
 			var steps: Array = it.get("level_steps", [])
 			var step: int = it.get("step_ms", 0)
 			if steps.size() and step > 0:
-				var level: float = steps[mini(int(elapsed_ms / step), steps.size() - 1)] / 15.0
+				var level: float = steps[mini(int(te / step), steps.size() - 1)] / 15.0
 				mod = Color(level, level, level, 1)
 		if st.has("visible"):
 			visible = st["visible"]

@@ -452,7 +452,8 @@ def open_white(img):
     return Image.fromarray(a, "RGBA")
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=(), alt_clip=None):
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=(), alt_clip=None,
+                variant_shift=()):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -521,6 +522,8 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
                     row.append([pics[digest], ms])
                 clips.append(row)
             item["variants"] = clips
+            if variant_shift:            # each clip's end minus the effect's own (rom_layout.CLIP_END_TEXT): its text moves with it
+                item["variant_shift"] = list(variant_shift)
             if alt_clip:                # the clip of the stage-completing shot (FUN_01027478, deffs 116-124): the rules ask for it with done
                 item["alt"] = len(clips) - 1
         if not under:
@@ -615,7 +618,7 @@ def build_deffs(only_data):
         if loop and source == "graphics":       # loop whole bitmap cycles only
             period = loop_period(frames)
             frames = frames[:period] if period else frames
-        variants = []
+        variants, shifts = [], []
         if source == "graphics":
             clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
             for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
@@ -627,7 +630,11 @@ def build_deffs(only_data):
                     clip = [(img, period) for img, _ in clip]
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
-                if deff_id in rom_layout.DIM_AFTER_MS:         # the variants dim like the effect's own frames
+                if deff_id in rom_layout.CLIP_END_TEXT:        # dims at its own end, the text follows (variant_shift)
+                    end = sum(ms for _, ms in clip[:-1])
+                    clip = dim_after(clip, end)
+                    shifts.append(end - rom_layout.DIM_AFTER_MS[deff_id])
+                elif deff_id in rom_layout.DIM_AFTER_MS:       # the variants dim like the effect's own frames
                     clip = dim_after(clip, rom_layout.DIM_AFTER_MS[deff_id])
                 if panel:                       # the effect's own frames leave the status panel to the score display
                     from PIL import ImageDraw
@@ -659,7 +666,8 @@ def build_deffs(only_data):
                 for img, _ in alt_clip:
                     ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
         write_slide(deff_id, frames, layouts, loop, rel, panel,
-                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants, alt_clip)
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants, alt_clip,
+                    shifts)
     return out
 
 
