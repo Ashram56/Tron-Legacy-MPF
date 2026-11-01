@@ -101,6 +101,9 @@ ROM_TEXT = {10: CREDITS_TEXT, 15: CREDITS_TEXT, 17: CREDITS_TEXT, 114: "SEA OF /
             # deff 141 (0x0102ffa0): each pm_phase's lines, with SUPER= (0x6bd / 0x6c0, picked into msg_id)
             141: "PORTAL MULTIBALL / NEXT SHOT=%,02lu / SUPER=%,02lu / SUPER JACKPOT LIT / SHOOT DISC"
                  " / SUPER=%,02lu / ALL SHOTS=%,02lu",
+            # deff 25 (0x01000e7c / 0x01000d78): the base line, each item / SEA OF SIMULATION / PORTAL line (name, "+value",
+            # running total), each multiplier step ("%dX", total x n), then TOTAL BONUS (rom_layout.SCREENS)
+            25: "BONUS / %,02lu / %s / +%,02lu / %,02lu / %dX / %,02lu / TOTAL BONUS / %,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
 
 

@@ -29,8 +29,10 @@ SPEC = re.compile(r"%(P\d/[^%]*%|[-+ #0,]*\d*l?[dus])")
 # deffs 68 / 69 (0x0101e320 / 0x0101e654): the points on the row of the screen shown (`screen` = the double arg).
 # deff 78 (0x0101476c): "%d FOLLOWING%P1//S/%" the award count (task + 0x34), then the points (+ 0x30).
 # deff 140 (0x0102faec): the Sea of Simulation bonus (task + 0x34), not the start total.
+# deff 25 (0x01000e7c): the bonus line on screen (tron/features/bonus.py, live values).
 TEXT_ARGS = {10: ("credits", "prompt"), 15: ("credits", "prompt"), 17: ("credits", "prompt"), 43: ("hits_left", "points", "score"), 55: ("more",), 62: ("left",),
-             68: ("points", "points"), 69: ("points", "points"), 78: ("followings", "value"), 138: ("count", "points", "named", "jackpot"), 140: ("sos_bonus",)}
+             68: ("points", "points"), 69: ("points", "points"), 78: ("followings", "value"), 138: ("count", "points", "named", "jackpot"), 140: ("sos_bonus",),
+             25: ("base", "name", "value", "sum", "mult", "mult_total", "total")}
 
 
 def format_rom_text(line, args):

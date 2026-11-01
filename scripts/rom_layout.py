@@ -508,6 +508,13 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             out[i] = lay
     return out
 
+# deff 25 (end of ball bonus, 0x01000e7c): screen 0 BONUS / base, 1 an item, SEA OF SIMULATION or PORTAL line (name at 84,8 font 2,
+# FUN_01015f40 or msg 0x610 / 0x612), 2 a multiplier step, 3 TOTAL BONUS (0x01000d78)
+SCREENS[25] = {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (1,), 5: (2,), 6: (2,), 7: (3,), 8: (3,)}
+# (the code's calls list only the total screen's: the other lines are placed from text_draws.csv)
+OVERRIDES[25] = {t: {"font": f, "x": 84, "y": y, "flags": 2, "source": "rom"}
+                 for t, f, y in (("BONUS", 15, 13), ("%s", 2, 8), ("+%,02lu", 2, 14), ("%dX", 12, 12))}
+
 # deff 112 (0x0100d108) TRON timed award, by the award (task+0x30: 1 DOUBLE SCORING, 2 SUPER POPS, 4 SUPER SPINNERS; the rules pass
 # screen 0, 1, 2): the TRON outline with the award's two words lit on frames 2-3 of every 4 (24 frames of 4 ticks), then the
 # second screen (FUN_0100cab4 / cccc / cee8): its title at level 4 (palette slot 15 -> 4), its value held 12 + 3 ticks, then
