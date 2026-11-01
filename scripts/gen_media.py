@@ -534,10 +534,12 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
     for i, lay in enumerate(layouts):
         if lay:
             items += text_items(i, lay)
-    if frames and under:
+    if frames and under and deff_id not in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
     if panel:
         items += score_display_items(deff_id == 19, panel == "match")
+    if frames and under and deff_id in rom_layout.CLIP_OVER_PANEL:
+        items.append(item)
     write_effect(name, folder_rel, parts, items)
     return name
 
@@ -627,6 +629,8 @@ def build_deffs(only_data):
                     # the ROM draws every picture of these clips for the same time, the capture's frame period (the gifs carry 40 ms
                     # defaults or a mean over a measured run)
                     period = sorted(ms for _, ms in frames[:30])[len(frames[:30]) // 2]
+                    if deff_id == 108:     # FUN_01020388 ...: FUN_01024378(3), 3 ticks a picture (the capture ran at 33 ms)
+                        period = 49        # 3 ticks of the reference runs (16.26 ms, os_layer.TICK)
                     clip = [(img, period) for img, _ in clip]
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
@@ -636,7 +640,7 @@ def build_deffs(only_data):
                     shifts.append(end - rom_layout.DIM_AFTER_MS[deff_id])
                 elif deff_id in rom_layout.DIM_AFTER_MS:       # the variants dim like the effect's own frames
                     clip = dim_after(clip, rom_layout.DIM_AFTER_MS[deff_id])
-                if panel:                       # the effect's own frames leave the status panel to the score display
+                if panel and deff_id not in rom_layout.CLIP_OVER_PANEL:   # the effect's own frames leave the status panel to the score display
                     from PIL import ImageDraw
                     for img, _ in clip:
                         ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))

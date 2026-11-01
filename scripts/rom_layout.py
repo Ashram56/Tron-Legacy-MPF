@@ -261,7 +261,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              **{d: {"%,02lu": {"blink_ms": 97, "blink_dark": True}} for d in (58, 59, 60)},
              # deff 144 (deff_144_portal_bonus_award): the points alternate shown / hidden every 3-tick frame, shown first (41 frames)
              144: {"%,02lu": {"blink_ms": 48.5, "blink_dark": True}},
-             108: {"%u MORE": {"blink_ms": 97, "blink_dark": True}},
+             # deff 108 (FUN_01020388 ...): "%u MORE" lit on frames 0-1 of every 4 (3-tick frames, frame & 2 picks the black palette:
+             # nothing drawn, the clip's picture shows where the text was), with the clip's pictures
+             108: {"%u MORE": {"blink_frames": 2}},
              # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
              111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
                    "DISC MULTIBALL": {"show_after_ms": 1960}},
@@ -350,6 +352,9 @@ CLEAR_AT_MS = {73: 600, 112: 1410}
 # through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
 OPEN_WHITE = {108}
 TEXT_UNDER_CLIP = {108, 83, 78, 97}
+# ... and whose bitmap the ROM draws over the status panel too (deff 108: bitmap_draw_masked from x 0 after the panel; the Recognizer
+# crosses the scores)
+CLIP_OVER_PANEL = {108}
 # Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
 LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette slot 15 -> 1 (deff_112_super)
 # Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
@@ -469,6 +474,8 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             lay.update({k: v for k, v in over.items() if not k.endswith(("_frame", "_frames", "_ticks"))})
             if "blink_ticks" in over:
                 lay["blink_ms"] = round(over["blink_ticks"] * TICK_MS)
+            if "blink_frames" in over:               # a count of the clip's pictures (the "_frames" keys above are frame times)
+                lay["blink_frames"] = over["blink_frames"]
             if "show_after_frame" in over:
                 lay["show_after_ms"] = frame_ms(deff_id, over["show_after_frame"])
             if "hide_after_frame" in over:
