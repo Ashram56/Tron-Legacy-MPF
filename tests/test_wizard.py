@@ -31,6 +31,9 @@ class TestSeaOfSimulation(WizardTestCase):
         super().setUp()
         self.started = []
         self.machine.events.add_handler("tron_deff_125", lambda **kwargs: self.started.append(125))
+        self.asked = []                  # every deff_start call, whether or not the display gives it the screen
+        start = self.tron.deff_start
+        self.tron.deff_start = lambda deff_id, **kw: (self.asked.append(deff_id), start(deff_id, **kw))[1]
         self.machine.events.add_handler("tron_deff_115", lambda **kwargs: self.started.append(115))
         self.machine.events.add_handler("tron_sound_112", lambda **kwargs: self.started.append(0x112))
 
@@ -76,7 +79,9 @@ class TestSeaOfSimulation(WizardTestCase):
         self.advance_time_and_run(0.1)
         self.assertTrue(self.tron.flag(0x36))
         self.assertFalse(self.tron.flag(0x34))
-        self.assertIn(125, self.started)
+        self.advance_time_and_run(10)                             # task 0x56: TOTAL (deff 125 never plays in 1.74)
+        self.assertIn(126, self.asked)
+        self.assertNotIn(125, self.asked)
         self.assertTrue(self.h("items_all_collected"))
 
     def test_clu_helmets_spot_and_last_stage_skipped(self):
@@ -244,10 +249,11 @@ class TestSeaOfSimulationLadder(WizardTestCase):
         stage_points = 200000 + 4 * 400000 + 500000 + 3 * 700000 + 4 * 900000
         self.assertEqual(1000000 + sum((k + 1) * 1000000 for k in collected) + stage_points, sos.total)
         # speech 0x111 (its samples in turn) as each stage completed by its shots ends its deff; the last
-        # one's deff 124 gives way to deff 125 (SEA OF SIMULATION COMPLETED) first
-        self.assertEqual([0, 1, 2, 3], [a for c, a in self.sounds if c == 0x111])
-        self.assertEqual([(0x111, k) for k in range(4)], [p for p in self.played if p[0] == 0x111])
-        self.assertIn(125, self.deffs)
+        # one's deff 124 plays its speech too (PinMAME: 0x111 2.06 s after the stage, then 0x115 with deff 126
+        # TOTAL; deff 125 never plays in 1.74)
+        self.assertEqual([0, 1, 2, 3, 4], [a for c, a in self.sounds if c == 0x111])
+        self.assertEqual([(0x111, k) for k in range(5)], [p for p in self.played if p[0] == 0x111])
+        self.assertNotIn(125, self.deffs)
 
         self.vuk(wait=5)                             # all items collected: the Portal starts
         self.assertTrue(self.h("portal_running"))
