@@ -65,6 +65,9 @@ class TestSeaOfSimulation(WizardTestCase):
         self.assertFalse(self.h("simulation_shot", 19))
         self.h("simulation_shot", 18)
         self.h("simulation_shot", 15)
+        self.assertEqual(6, sos.stage)                            # the chain adds the other three (table 0x040d3748)
+        for shot in (17, 16, 14):
+            self.h("simulation_shot", shot)
         self.assertEqual(7, sos.stage)
         for _ in range(5):
             self.h("simulation_shot", 13)
@@ -233,7 +236,9 @@ class TestSeaOfSimulationLadder(WizardTestCase):
         self.shoot("s_left_spinner", wait=14)        # left inner loop; DISC skipped
         self.assertEqual(6, sos.stage)
         self.assertEqual("LIGHT CYCLES", sos.stage_text()["item"])
-        self.shoot("s_right_orbit", "s_r_ramp_exit", "s_l_ramp_exit", wait=14)   # RECOGNIZER skipped
+        self.shoot("s_right_orbit", "s_r_ramp_exit", "s_l_ramp_exit", wait=2)
+        self.assertEqual(6, sos.stage)               # the chained right inner loop, left spinner, left orbit follow
+        self.shoot("s_right_inner_loop", "s_left_spinner", "s_left_orbit", wait=14)   # RECOGNIZER skipped
         self.assertEqual(8, sos.stage)
         self.assertEqual("TRON TARGETS", sos.stage_text()["item"])
         self.shoot("s_tron_t", "s_tron_r", "s_tron_o", "s_tron_n", wait=6)
@@ -246,7 +251,7 @@ class TestSeaOfSimulationLadder(WizardTestCase):
         self.assertEqual([(0x109, k) for k in collected], [s for s in self.sounds if s[0] == 0x109])
         self.assertEqual([(0x109, k) for k in collected], [p for p in self.played if p[0] == 0x109])
         self.assertEqual([1] * 4, [sos.skip_paid[k] for k in collected])
-        stage_points = 200000 + 4 * 400000 + 500000 + 3 * 700000 + 4 * 900000
+        stage_points = 200000 + 4 * 400000 + 500000 + 6 * 700000 + 4 * 900000
         self.assertEqual(1000000 + sum((k + 1) * 1000000 for k in collected) + stage_points, sos.total)
         # speech 0x111 (its samples in turn) as each stage completed by its shots ends its deff; the last
         # one's deff 124 plays its speech too (PinMAME: 0x111 2.06 s after the stage, then 0x115 with deff 126

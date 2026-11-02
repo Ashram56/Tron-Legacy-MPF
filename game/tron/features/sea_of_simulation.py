@@ -42,6 +42,9 @@ STAGES = (
     (13,),
     (2, 3, 4, 5),
 )
+# Stage 6: the shots a made shot adds (chain table 0x040d3748; ids 14 left orbit, 15 left ramp, 16 left inner loop,
+# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (PinMAME: six deff 122)
+LIGHT_CYCLE_CHAIN = {15: (14, 16), 16: (17, 18), 19: (17, 18)}
 # The stage's messages (stage table + 0x18 and + 0x19), drawn by deff 114 under SEA OF SIMULATION
 STAGE_TEXT = ("FLYNNS ARCADE", "GEM", "CLU HELMETS", "ZUSE TARGETS", "QUORRA", "DISCS", "LIGHT CYCLES",
               "RECOGNIZER", "TRON TARGETS")
@@ -276,7 +279,8 @@ class SeaOfSimulation(Feature):
             return False
         if k == 6:                                   # shots made stay excluded (chain table 0x040d3748)
             self.lc_made |= bit
-            self.needed &= ~self.lc_made
+            self.needed &= ~bit
+            self.needed |= bits(LIGHT_CYCLE_CHAIN.get(shot, ())) & ~self.lc_made
         elif k == 7:                                 # six recognizer hits, each one paid
             self.rec_hits = min(self.rec_hits + 1, RECOGNIZER_HITS)
             if self.rec_hits >= RECOGNIZER_HITS:
