@@ -179,6 +179,48 @@ fit_ys = PackedInt32Array(29, 29)
 fit_width = 87
 screens = PackedInt32Array(3)
 
+[node name="SmallThree0" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 0
+rom_x = 84
+hd_x = 64
+hd_fit_width = 120
+rom_y = 8
+rom_flags = 2
+screens = PackedInt32Array(5)
+
+[node name="SmallThree1" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line1"
+rom_font = 0
+rom_x = 84
+hd_x = 64
+hd_fit_width = 120
+rom_y = 17
+rom_flags = 2
+screens = PackedInt32Array(5)
+
+[node name="SmallThree2" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line2"
+rom_font = 0
+rom_x = 84
+hd_x = 64
+hd_fit_width = 120
+rom_y = 26
+rom_flags = 2
+screens = PackedInt32Array(5)
+
 [node name="InitialsTitle" type="Label" parent="."]
 layout_mode = 0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)

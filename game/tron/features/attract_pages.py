@@ -28,6 +28,8 @@ def page_layout(name, lines):
     and the web address use the layout of their line count (not in the capture)."""
     if name == "CREDITS":
         return 0
+    if name == "URL":
+        return 5                    # three lines in the 5-dot font, 9 dots apart (PinMAME)
     return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)
 
 
