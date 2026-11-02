@@ -39,6 +39,12 @@ offset_right = 128.0
 offset_bottom = 32.0
 color = Color(0, 0, 0, 1)
 
+[node name="BackgroundLeft" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 32.0
+color = Color(0, 0, 0, 1)
+
 [node name="PanelLine" type="ColorRect" parent="Classic"]
 layout_mode = 0
 offset_left = 40.0

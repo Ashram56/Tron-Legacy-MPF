@@ -27,7 +27,7 @@ def page_layout(name, lines):
     too wide in font 6 (GRAND CHAMPION / initials / score). The last-game scores, the clock, the custom message
     and the web address use the layout of their line count (not in the capture)."""
     if name == "CREDITS":
-        return 1
+        return 0
     return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)
 
 
