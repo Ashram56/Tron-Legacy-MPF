@@ -3,7 +3,7 @@
 
     python scripts/package/build_bundle.py --target all          # universal: arm64 + x86_64 textures, no binary
     python scripts/package/build_bundle.py --target x86_64       # a PC only
-    python scripts/package/build_bundle.py --version 2026.10.24 --out /some/folder
+    python scripts/package/build_bundle.py --version 1.1.0 --label serum-zedmd --out /some/folder
 
 The builder is the platform's, the same for every game: `python -m mpf_godot bundle` in MPF-Godot-Packaging
 (set MPF_GODOT_PACKAGING to its checkout; default: a folder beside this repository). This file is what is Tron's:
@@ -162,7 +162,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--target", choices=["arm64", "x86_64", "all"], default="all",
                    help="arm64: Raspberry Pi 4 and Jetson (ETC2/ASTC textures); x86_64: a PC (S3TC/BPTC); all: both")
-    p.add_argument("--version", help="default: the date and the short commit, 2026.10.24-ab12cd3")
+    p.add_argument("--version", help="the number, like 1.1.0 (default: scripts/package/VERSION: raise it for each bundle handed out)")
+    p.add_argument("--label", help="what this build holds, lowercase words joined by '-': base, hd-colour, serum-zedmd "
+                   "(the archive is tron-legacy-mpf-<version>-<label>-linux-<target>.tar.xz; the commit is only in bundle.json)")
     p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
     p.add_argument("--pup-zip", help="the PuP Pack's zip (a path or URL): installed here and the HD DMD's art (clips, ZUSE/TRON letters, "
                    "award icons) made from it, then shipped in the bundle. Nothing is made on the machine that runs the game")
@@ -180,8 +182,10 @@ def main(argv=None):
     with open(spec_path, "w", encoding="utf-8") as f:
         json.dump(spec(os.path.relpath(template, ROOT)), f, indent=2)
     cmd = [sys.executable, "-m", "mpf_godot", "bundle", spec_path, "--target", args.target, "--out", out]
-    if args.version:
-        cmd += ["--version", args.version]
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"), encoding="utf-8") as f:
+        cmd += ["--version", args.version or f.read().strip()]
+    if args.label:
+        cmd += ["--label", args.label]
     if args.no_archive:
         cmd.append("--no-archive")
     env = dict(os.environ, PYTHONPATH=platform_dir(), GODOT=os.environ.get("GODOT") or tc.godot_path())
