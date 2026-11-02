@@ -221,6 +221,34 @@ rom_y = 26
 rom_flags = 2
 screens = PackedInt32Array(5)
 
+[node name="SmallTwo0" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line0"
+rom_font = 2
+rom_x = 84
+hd_x = 64
+hd_fit_width = 120
+rom_y = 12
+rom_flags = 2
+screens = PackedInt32Array(6)
+
+[node name="SmallTwo1" type="Label" parent="."]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "line1"
+rom_font = 2
+rom_x = 84
+hd_x = 64
+hd_fit_width = 120
+rom_y = 23
+rom_flags = 2
+screens = PackedInt32Array(6)
+
 [node name="InitialsTitle" type="Label" parent="."]
 layout_mode = 0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)

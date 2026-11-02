@@ -30,6 +30,8 @@ def page_layout(name, lines):
         return 0
     if name == "URL":
         return 5                    # three lines in the 5-dot font, 9 dots apart (PinMAME)
+    if name == "DEFAULT MESSAGE":
+        return 6                    # the factory custom message, two lines in the 5-dot font 2 (PinMAME)
     return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)
 
 
@@ -83,6 +85,8 @@ class AttractPages(Feature):
         text = self.machine.variables.get_machine_var("custom_message_text")
         if os_.adj[2] == 1 and text:                   # adj 2 CUSTOM MESSAGE ON with a message [0x010002dc]
             pages.append(("CUSTOM MESSAGE", [text], PAGE_SECONDS))
+        elif os_.adj[2] == 1:                          # ON with no message set: the factory message (PinMAME attract, 27 s)
+            pages.append(("DEFAULT MESSAGE", ["PARTICIPATE IN", "LOCAL TOURNAMENTS!"], PAGE_SECONDS))
         from tron.service import clock_now, clock_text   # noqa: E402
         day, clock = clock_text(self.machine, clock_now(self.machine), os_.adj[3])
         pages.append(("CLOCK", [day, clock], PAGE_SECONDS))
