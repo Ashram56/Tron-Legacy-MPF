@@ -242,3 +242,9 @@ Nineteenth measure. The fonts now take their spacing and each glyph's x offset f
 column of the picture). Full measure (20 scenarios, equal draw): **95.7 %** of 16667 known frames found (Portal 98 %, Sea
 96 %, bonus 99 %, deff 141 97 %, deff 72 96 %). Left by weight: 19 (250), 86 (69), 77 (58), 1 (57), 73 (54), 106 (53),
 65 (40), 47 (35), 95 (34).
+
+**Attract animation page (2026-11-02).** PinMAME draws the status panel (P1's "00" and the separator column x 40, level 15) left of the
+animation (images 0x5a0-0x5c4); the game drew the animation alone, so every frame of the page (about 30 of 298 in an 85 s attract, the
+"Tron Legacy" logo animation) was unknown to Serum and shown in Tron blue. `build_attract_art` now draws them into each frame: unknown
+frames of the 85 s attract run 99 -> 10 (PinMAME: 0). A game's last scores are not drawn on this page (the page is not given the
+panel's live scores). Found by comparing the game's frames with their nearest PinMAME frame: 56 pixels apart, always the same ones.

@@ -800,6 +800,17 @@ def build_attract_art():
         img = image(i)
         canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
         canvas.paste(img, (128 - img.width, 0))
+        # the ROM draws the status panel left of the animation (PinMAME's attract capture, constant on all its frames): P1's "00"
+        # (two 3x5 zeros at x 32 and 36, row 1) and the separator column x 40, at level 15; without them every frame of the page is
+        # one that Serum does not know. A game's last scores are not drawn here (the panel's live scores are not given to this page).
+        px = canvas.load()
+        for y in range(32):
+            px[40, y] = (255, 255, 255, 255)
+        for x0 in (32, 36):
+            for y in range(1, 6):
+                for x in range(x0, x0 + 3):
+                    if not (x == x0 + 1 and 1 < y < 5):
+                        px[x, y] = (255, 255, 255, 255)
         canvas.save(os.path.join(GAME, rel, "f{:03d}.png".format(k)))
         frames.append(["res://{}/f{:03d}.png".format(rel, k), 5 * tick_ms + (62 * tick_ms if i == ANIM_IMAGES[-1] else 0)])
     write_effect(name, rel, scene, [rect, {"type": "frames", "name": "Anim", "loop": False, "frames": frames}])
