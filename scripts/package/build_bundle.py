@@ -86,25 +86,15 @@ def generated():
     return out
 
 
-def stage_pup_files():
-    """Copies, never generates: the PuP manifest (scripts/pup/gen_pup.py wrote it when the pack was installed on this
-    builder) to pup/manifest.json, and the add-on folder from the files that setup made once from the pack. Returns what is missing."""
+def check_pup_files():
+    """The build copies and generates nothing: the PuP manifest and the add-on are committed in this repository (made once, by the
+    creator, with scripts/pup/make_addon.py). Returns what is missing, so the build can stop."""
     missing = []
-    src = os.path.join(ROOT, "pup_media", "trn_174h", "manifest.json")
-    if os.path.exists(src):
-        os.makedirs(os.path.join(ROOT, "pup"), exist_ok=True)
-        shutil.copy2(src, os.path.join(ROOT, MANIFEST))
-    else:
-        missing.append("pup_media/trn_174h/manifest.json (install the PuP Pack with scripts/pup/pup_setup.py)")
-    addon = os.path.join(ROOT, ADDON)
-    shutil.rmtree(addon, ignore_errors=True)
-    for from_rel, to_rel in (("game/media/dmd_clip", "dmd_clip"), ("game/hd_art/letters", "hd_art/letters"),
-                             ("pup_media/trn_174h/service", "service")):
-        full = os.path.join(ROOT, from_rel)
-        if os.path.isdir(full):
-            shutil.copytree(full, os.path.join(addon, to_rel), ignore=shutil.ignore_patterns("*.import"))
-        else:
-            missing.append(from_rel)
+    if not os.path.isfile(os.path.join(ROOT, MANIFEST)):
+        missing.append(MANIFEST)
+    for rel in ("dmd_clip/clips.json", "hd_art/letters/Z_on.png", "hd_art/letters/N_on.png", "service/backglass_still.png"):
+        if not os.path.isfile(os.path.join(ROOT, ADDON, rel)):
+            missing.append(ADDON + "/" + rel)
     return missing
 
 
@@ -164,9 +154,10 @@ def main(argv=None):
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
     args = p.parse_args(argv)
     check_workspace()
-    missing = stage_pup_files()
+    missing = check_pup_files()
     if missing:
-        print("warning: no PuP add-on part for: " + ", ".join(missing), flush=True)
+        raise SystemExit("the source package is incomplete (the manifest and the add-on are committed, made once by "
+                         "scripts/pup/make_addon.py): missing " + ", ".join(missing))
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     template = os.path.join(out, "hd_frame.import.template")

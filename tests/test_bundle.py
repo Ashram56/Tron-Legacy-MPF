@@ -363,3 +363,12 @@ class TestDmdPanel(unittest.TestCase):
         self.assertEqual(os.environ["TRON_DMD_PANEL"], "zedmd")
         self.assertEqual(out, ["--hw", "proc", "--zedmd", "--", "--max-fps", "30"])
         self.assertEqual(start.add_run_flag(["--zedmd", "--", "--x"], "--zedmd"), ["--zedmd", "--", "--x"])
+
+
+def test_source_package_holds_the_pup_manifest_and_the_addon():
+    """The build generates and copies nothing from the PuP Pack: the manifest and the add-on are committed in the repository."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_bundle", os.path.join(os.path.dirname(__file__), "..", "scripts", "package", "build_bundle.py"))
+    bb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bb)
+    assert bb.check_pup_files() == []

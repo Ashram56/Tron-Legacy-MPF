@@ -4,7 +4,7 @@
 > `platforms/game-bundle-format2.md`): files and facts only, the platform launches the game, and everything below about
 > `start.py`, `options.json`, the board profile commands and `pup_setup.py` on the target is history (format 1).
 > What a bundle holds now: the game, the add-on `addons/pup_art` (HD clips, letters, service still: made once by
-> `scripts/setup.py` from the PuP Pack and copied here as they are), `pup/manifest.json` (the list of the pack's files), the
+> `scripts/pup/make_addon.py` from the PuP Pack and **committed in this repository**, the build only checks and copies them), `pup/manifest.json` (the list of the pack's files, committed too: the source package holds everything but the PuP Pack), the
 > settings schema `scripts/package/settings.json` (each setting a Godot argument, an ini key or the hardware set) and the board
 > profile as data. The platform gives the game `MPF_PUP_PACK` (the author's zip unpacked as it is, played in place),
 > `MPF_ADDONS`, `MPF_DMD_OUTPUT` and the DMD output arguments; the dot colouration of a PIN2DMD or ZeDMD (Serum, libserum,
