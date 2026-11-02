@@ -26,8 +26,18 @@ func _on_seed(message = null) -> void:
 	print("tron_seed ", s)
 
 
+func _dmd_is_the_window() -> bool:
+	## The classic DMD IS the root viewport when a PIN2DMD, a ZeDMD, the P-ROC DMD or a frame dump reads it (dmd_mode.gd): a clock
+	## drawn over it would be sent to the DMD, and Serum would not know those frames (blue).
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--pin2dmd") or a.begins_with("--zedmd") or a == "--proc-dmd" or a.begins_with("--dmd-dump=") \
+				or a == "--dmd=classic":
+			return true
+	return OS.get_environment("TRON_DMD") == "classic"
+
+
 func _on_replay(_message = null) -> void:
-	if _label != null:
+	if _label != null or _dmd_is_the_window():
 		return
 	_layer = CanvasLayer.new()
 	_layer.layer = 200
