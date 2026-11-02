@@ -366,6 +366,20 @@ class MediaBridge:
         self.machine.bcp.interface.bcp_trigger_client(client=client, name="service_backglass",
                                                       state=json.dumps(state, separators=(",", ":")))
 
+    def send_seed(self, seed):
+        """The game's random seed for Godot's own draws (clip variants, PuP picks): tools/replay_overlay.gd."""
+        if not self.connected(need_data=False):
+            return
+        client = self.machine.bcp.transport.get_named_client("local_display")
+        self.machine.bcp.interface.bcp_trigger_client(client=client, name="tron_seed", seed=int(seed))
+
+    def send_replay_clock(self):
+        """Starts the replay clock overlay (mm:ss.s) in Godot."""
+        if not self.connected(need_data=False):
+            return
+        client = self.machine.bcp.transport.get_named_client("local_display")
+        self.machine.bcp.interface.bcp_trigger_client(client=client, name="tron_replay")
+
     def confirm_show(self, draw):
         """The end-the-game question before the service menu opens in a game (tron/os_layer.py, not in the
         ROM), above every deff."""

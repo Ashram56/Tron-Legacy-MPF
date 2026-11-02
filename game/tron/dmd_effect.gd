@@ -144,6 +144,23 @@ static func pick_variant(n: int) -> int:
 	return _variant_rng.randi() % n
 
 
+## Seeds the picks with the game's seed (tools/replay_overlay.gd, sent by MPF at each game start): the same seed gives the same
+## clip variants and clip files. TRON_DMD_SEED stays stronger (the conformance checks).
+static func seed_game(seed_value: int) -> void:
+	if OS.get_environment("TRON_DMD_SEED") != "":
+		return
+	if _variant_rng == null:
+		_variant_rng = RandomNumberGenerator.new()
+	_variant_rng.seed = seed_value
+	seed(seed_value)
+
+
+static func pick_file(files: Array):
+	if OS.get_environment("TRON_DMD_SEED") == "" and _variant_rng != null:
+		return files[_variant_rng.randi() % files.size()]
+	return files.pick_random()
+
+
 static func variants_enabled() -> bool:
 	return bool(ProjectSettings.get_setting("tron/dmd/variants", true))
 
@@ -246,7 +263,7 @@ class State extends RefCounted:
 					clip_path = last["path"]
 					show = int(last["show"])           # the same show: the video is not restarted
 				else:
-					clip_path = ProjectSettings.globalize_path(c["files"].pick_random())
+					clip_path = ProjectSettings.globalize_path(DmdEffect.pick_file(c["files"]))
 					DmdEffect._show_seq += 1
 					show = DmdEffect._show_seq
 				clip_loop = bool(c.get("loop", false))

@@ -255,6 +255,8 @@ class TronOS(CustomCode):
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
         self.features = load_features(self)
+        from tron.recording import Session
+        self.session = Session(self)
         if os.environ.get("TRON_LIVE_SCENARIO"):
             from tron.live_scenario import LiveScenario  # noqa: E402
             self.live = LiveScenario(self, os.environ["TRON_LIVE_SCENARIO"])
@@ -966,6 +968,7 @@ class TronOS(CustomCode):
 
     def _game_starting(self, queue=None, **kwargs):
         self.state = 0
+        self.session.game_seed()                     # per-game seed when recording/replaying (tron/recording.py)
         self.players = [PlayerData() for _ in range(4)]
         self.eb_lit = [0] * 4
         self.eb_collected = [0] * 4
