@@ -51,12 +51,6 @@ class TestDmdOut(unittest.TestCase):
         self.assertEqual(dmd_out.detect(), "")
 
 
-    def test_serum_env(self):
-        """--zedmd-serum: the colouriser gets the colourisation's folder, the ROM name, Tron blue for unknown frames and the plain
-        feeder to pipe to, in the environment (the add-on cannot pass it arguments)."""
-        env = dmd_out.serum_env("/x/altcolor", "/y/zedmd_feed", "#2a6cff")
-        self.assertEqual({"DMD_SERUM_ARGS": "--serum|/x/altcolor|--rom|trn_174h|--color|2a6cff|--feeder|/y/zedmd_feed"}, env)
-
     def test_a_bundle_never_compiles_the_tools(self):
         """Without a .git folder (a bundle) the tools are only the ones built offline for this CPU; a development checkout builds."""
         import tempfile
@@ -64,32 +58,19 @@ class TestDmdOut(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             game = os.path.join(root, "game")
             with mock.patch.object(dmd_out.tc, "ROOT", root), mock.patch.object(dmd_out.tc, "GAME", game), \
-                    mock.patch.object(dmd_out, "build_serum") as build:
-                self.assertIsNone(dmd_out.prebuilt("dmd_serum"))
-                self.assertIsNone(dmd_out.serum_filter())
+                    mock.patch.object(dmd_out, "build_feeder") as build:
+                self.assertIsNone(dmd_out.prebuilt("zedmd_feed"))
+                self.assertIsNone(dmd_out._tool("zedmd_feed", build))
                 build.assert_not_called()                      # no .git: nothing is built here
-                exe = os.path.join(game, "native", "bin", dmd_out.arch(), "dmd_serum")
+                exe = os.path.join(game, "native", "bin", dmd_out.arch(), "zedmd_feed")
                 os.makedirs(os.path.dirname(exe))
                 open(exe, "w").close()
-                self.assertEqual(exe, dmd_out.prebuilt("dmd_serum"))
-                self.assertEqual(exe, dmd_out.serum_filter())
+                self.assertEqual(exe, dmd_out.prebuilt("zedmd_feed"))
+                self.assertEqual(exe, dmd_out._tool("zedmd_feed", build))
                 os.makedirs(os.path.join(root, ".git"))
                 os.remove(exe)
-                dmd_out.serum_filter()
+                dmd_out._tool("zedmd_feed", build)
                 build.assert_called_once()                     # a development checkout builds on first use
-
-    def test_the_colouriser_probes_the_feeder_and_needs_its_file(self):
-        """dmd_serum (built by the bundle's build or by hand) returns the feeder's --probe code, and refuses a missing .cROMc."""
-        import tempfile
-        exe = dmd_out.prebuilt("dmd_serum")
-        if not exe:
-            self.skipTest("dmd_serum is not built (game/native/dmd_serum/build.sh OUT)")
-        probe = subprocess.run([exe, "--serum", "x", "--rom", "y", "--feeder", "/bin/false", "--probe"], capture_output=True)
-        self.assertEqual(1, probe.returncode)
-        with tempfile.TemporaryDirectory() as empty:
-            run = subprocess.run([exe, "--serum", empty, "--rom", "trn_174h", "--feeder", "/bin/cat"], input=b"", capture_output=True)
-            self.assertEqual(1, run.returncode)
-            self.assertIn(b"not loaded", run.stderr)
 
 
 if __name__ == "__main__":

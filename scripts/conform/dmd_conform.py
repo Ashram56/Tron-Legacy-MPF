@@ -7,7 +7,7 @@ REF: tron_ref (TRON_DMDLOG=...); GODOT: run with TRON_TRACE_WALL=1 and --dmd-dum
 Windows start at paired deff_start events (same id, in order); frames are sampled every STEP seconds; a sample matches
 when the shade arrays are equal within +-SHIFT samples. Prints per deff id: samples, % exact, mean % dots, worst sample.
 """
-import argparse, collections, json, struct
+import argparse, collections, json, os, struct
 import numpy as np
 
 
@@ -24,8 +24,23 @@ def starts(p, key):
     for l in open(p):
         e = json.loads(l)
         if e["ev"] == "deff_start" and key in e:
+            # deff 114 (Sea of Simulation status) is restarted by the rules refresh right after the effect that caused it: that effect
+            # owns the window (its clip and values), the restart is the background
+            if out and e["id"] == 114 and out[-1][0] != 114 and e[key] - out[-1][1] < 0.2:
+                continue
             out.append((e["id"], e[key]))
-    return out
+    # starts less than 0.2 s apart are one event (a rules refresh restarts the status effect around the one that caused it) and the two
+    # sides do not agree on their order: sort each cluster by effect id so both pair the same way
+    if not os.environ.get("DMD_SORT"):      # headline measure: the order as the traces give it; DMD_SORT=1 for the per-effect diagnostic
+        return out
+    res, i = [], 0
+    while i < len(out):
+        j = i + 1
+        while j < len(out) and out[j][1] - out[j - 1][1] < 0.2:
+            j += 1
+        res += sorted(out[i:j], key=lambda x: (x[0], x[1]))
+        i = j
+    return res
 
 
 def pair(a, b):

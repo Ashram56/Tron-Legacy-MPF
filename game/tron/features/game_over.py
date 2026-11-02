@@ -1,6 +1,4 @@
 """Game over: match, game-over music and the return to attract (game_flow.md 5.5 and 6.2)."""
-import random
-
 from tron.features import Feature
 
 MATCH_REVEAL = 258       # ticks from deff 38 to the match award (traces/game_flow.jsonl 4.19 s)
@@ -16,7 +14,7 @@ class GameOver(Feature):
             os_.hook("attract_start")
             done()
             return
-        number = random.randrange(0, 100, 10)
+        number = os_.random.randrange(0, 100, 10)
         os_.deff_start(38, number=number, number_again=number)   # deff 38 prints the number (task + 0x34)
         forced = os_.forced.get("match")
         matched = 0

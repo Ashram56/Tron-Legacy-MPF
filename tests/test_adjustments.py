@@ -248,7 +248,7 @@ class TestGameFlowAdjustments(AdjCase):
 
     def _match(self, number=50):
         game_over = self.tron.features_by_name["match"]
-        with mock.patch("tron.features.game_over.random.randrange", return_value=number):
+        with mock.patch.object(self.tron.random, "randrange", return_value=number):
             game_over.run(lambda: None)
         self.advance_time_and_run(5)
 

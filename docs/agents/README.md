@@ -108,9 +108,7 @@ PIN2DMD and ZeDMD (2026-10-24, branch claude/project-thread-31bkyc, PR #56; 2026
 (Godot add-on, MPF overlays, ZeDMD platform, native feeder, detection) is **MPF-Godot-Packaging's**, the same for every
 game ([platforms/dmd_devices.md](https://github.com/Ashram56/MPF-Godot-Packaging/blob/main/platforms/dmd_devices.md)); the game keeps `scripts/dmd_out.py`
 (installs it), `game/tools/dmd_out_loader.gd`, the classic-DMD rule in `dmd_mode.gd` and `run.py --pin2dmd|--zedmd|--dmd-out auto`
-([hardware.md](../hardware.md)). Serum colour on a ZeDMD (2026-10-30, PR #69): the game's own `game/native/dmd_serum` (libserum, GPL v2) in front of the platform's plain
-`zedmd_feed`: Vincent's rule, the DMD is part of the game, so the colourisation is the game's, not the platform's; the player brings the
-`.cROMc`, the bundle builds both tools per CPU ([docs/hardware.md](../hardware.md)). The DMD's conformance with PinMAME, measured per
+([hardware.md](../hardware.md)). Dot colourisation (Serum, 128x32 or 256x64; 2026-10-31, Vincent): **not the game's**, it is handled apart by the platform (MPF-Godot-Packaging, with libserum and the build tools); the HD LCD colour stays in the game; the game provides its DMD output ([docs/hardware.md](../hardware.md)). The DMD's conformance with PinMAME, measured per
 effect, is [docs/dmd_conformance.md](../dmd_conformance.md) (the work list; the ROM's random film clips are reproduced). Open: a check on a real PIN2DMD
 and ZeDMD (colour order, firmware); the 256x64 and HD pictures a game can publish (platform PR #13).
 

@@ -62,7 +62,7 @@ EXTRA = {19: {"credits": "CREDITS 1/3", "replay": "REPLAY AT " + format_rom_text
 # its blink phase comes from a counter outside the effect, so it is read off each capture (panel_phase).
 # The screen the capture shows of an effect with several (rom_layout.SCREENS): deff 55 "0 MORE TO" alone,
 # deff 60 points / BALL ADDED, deff 80 0 MORE / TO LIGHT HURRY-UP
-SCREEN = {55: 6, 60: 0, 80: 0, 47: 0, 65: 0, 141: 0, 68: 1, 69: 1}
+SCREEN = {55: 6, 60: 0, 80: 0, 47: 0, 65: 0, 141: 0, 68: 1, 69: 1, 112: 2}   # 112: the capture is SUPER SPINNERS
 PANEL = {"p1": "00", "p2": "", "p3": "", "p4": "", "players": 1, "player": 1, "valid": False,
          "award": "", "award_age": 99}
 DYNAMIC = [19, 25, 26, 133, 38, 40]

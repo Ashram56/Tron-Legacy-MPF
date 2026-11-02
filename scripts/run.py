@@ -311,7 +311,7 @@ def scenario_path(name):
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
-        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False, zedmd_serum=None):
+        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False, session_env=None):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -324,16 +324,10 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if pin2dmd or zedmd:                # the platform's add-on and overlays (scripts/dmd_out.py), classic 128x32
         dmd_env = dmd_out.prepare("zedmd" if zedmd else "pin2dmd")
     feed = dmd_out.feeder(zedmd_python) if zedmd else None
-    serum = dmd_out.serum_filter() if zedmd_serum and feed else None
-    if zedmd_serum and zedmd and not serum:
-        raise SystemExit("--zedmd-serum needs the game's Serum colouriser (game/native/dmd_serum: git, CMake, a C++ compiler; "
-                         "Linux or macOS, built with the bundle) and a ZeDMD answering: see docs/hardware.md, \"Serum on a ZeDMD\"")
     if zedmd:                           # the same frames: to the native feeder, else through MPF's platform
         gargs = user_arg(gargs, "--zedmd" + ("=" + zedmd if zedmd != "default" else ""))
         if feed:
-            gargs = user_arg(gargs, "--zedmd-feed=" + (serum or feed))
-            if serum:                   # the game's colouriser sits in front of the feeder and colours with libserum
-                dmd_env.update(dmd_out.serum_env(zedmd_serum, feed, zedmd if zedmd != "default" else "2a6cff"))
+            gargs = user_arg(gargs, "--zedmd-feed=" + feed)
     gmc_patch.patch()                   # GMC 1.0.0 drops BCP messages split across reads (sounds, music)
     stale = tc.media_stale()
     if stale:                           # e.g. after a pull: the display would show the old effects
@@ -343,6 +337,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
+    env.update(session_env or {})
     if pin2dmd or zedmd:
         env.update(dmd_env)
     if scenario:
@@ -420,10 +415,6 @@ def main(argv=None):
                         "default the original orange). docs/hardware.md, ZeDMD")
     p.add_argument("--dmd-out", choices=["auto", "pin2dmd", "zedmd"],
                    help="the RGB DMD to use; auto asks the platform which one is plugged in (none: the screen only)")
-    p.add_argument("--zedmd-serum", metavar="DIR",
-                   help="with --zedmd: colour the DMD with Serum (libserum linked into the native feeder) from the colourisation "
-                        "DIR/trn_174h/trn_174h.cROMc, which the player brings (never part of this repository); a frame it does not "
-                        "know stays in the --zedmd colour (default Tron blue)")
     p.add_argument("--zedmd-python", action="store_true",
                    help="drive the ZeDMD from MPF's Python platform instead of the native feeder (the platform's native/zedmd_feed)")
     p.add_argument("--monitor", action="store_true", help="also start MPF Monitor (layout in game/monitor/)")
@@ -473,6 +464,13 @@ def main(argv=None):
     p.add_argument("--no-render-thread", dest="render_thread", action="store_false",
                    help="draw on Godot's main thread instead of its separate render thread (the default, "
                         "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
+    p.add_argument("--replay", metavar="FILE",
+                   help="play a recording (game/data/recordings/*.json, also the platform's scenario files) at its own "
+                        "times on the virtual hardware, with its seed; a clock shows in the window and FILE.timeline.txt "
+                        "lists the switches and display effects on the same clock (docs/recording.md). Also TRON_REPLAY")
+    p.add_argument("--seed", metavar="N", help="seed of the game's random draws (default: drawn at each game start and "
+                                               "written to the recording). Also TRON_SEED")
+    p.add_argument("--no-record", action="store_true", help="do not record the played games (game/data/recordings/)")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     if args.dmd_out:
@@ -487,15 +485,22 @@ def main(argv=None):
     max_fps = args.max_fps if args.max_fps is not None else os.environ.get("TRON_MAX_FPS")
     if max_fps not in (None, "") and "--max-fps" not in args.godot_args:
         args.godot_args = engine_arg(args.godot_args, "--max-fps", str(int(max_fps)))
+    session_env = {}                    # recording, replay and seed: given to this run only (tron/recording.py)
+    if args.replay:
+        session_env["TRON_REPLAY"] = os.path.abspath(args.replay)
+    elif not args.no_record and not os.environ.get("TRON_RECORD_DIR") and not os.environ.get("TRON_REPLAY"):
+        session_env["TRON_RECORD_DIR"] = os.path.join(tc.GAME, "data", "recordings")
+    if args.seed is not None:
+        session_env["TRON_SEED"] = str(int(args.seed))
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
     return run(args.hw, machine=args.machine, fiber_optics=args.fiber_optics, monitor=args.monitor,
-               pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, zedmd_serum=args.zedmd_serum, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
+               pin2dmd=args.pin2dmd, zedmd=args.zedmd, zedmd_python=args.zedmd_python, scenario=args.scenario, seconds=args.seconds, text_ui=text_ui,
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
                                                      args.dmd_font, args.dmd_text_scale, args.dmd_color, args.dmd_score),
-               trace=args.trace and os.path.abspath(args.trace))
+               trace=args.trace and os.path.abspath(args.trace), session_env=session_env)
 
 
 if __name__ == "__main__":

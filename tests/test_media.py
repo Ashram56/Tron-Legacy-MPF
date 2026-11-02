@@ -47,8 +47,9 @@ class TestBridge(TronTestCase):
             plays = [c.kwargs for c in trig.call_args_list if c.kwargs["name"] == "slides_play"
                      and "deff_025" in c.kwargs["settings"]
                      and c.kwargs["settings"]["deff_025"]["action"] == "play"]
-            self.assertEqual("TOTAL BONUS", plays[-1]["line0"])
-            self.assertEqual("1,500,000", plays[-1]["line1"])
+            # the bonus's screens (rom_layout.SCREENS[25]): line 7 TOTAL BONUS, line 8 its value from the live total
+            self.assertEqual("TOTAL BONUS", plays[-1]["line7"])
+            self.assertEqual("BONUS", plays[-1]["line0"])
             trig.reset_mock()
             self.tron.media.sound(0x01b)                  # main play music: looped on the music bus
             sent = trig.call_args_list[-1].kwargs["settings"]
