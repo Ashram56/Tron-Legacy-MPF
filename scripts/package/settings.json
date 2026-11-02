@@ -1,0 +1,461 @@
+{
+ "_about": "The settings of a Tron bundle in format 2 (MPF-Godot-Packaging platforms/game-bundle-format2.md): the platform draws the form, stores the values and applies each one through its target: a Godot user argument (--name=value), a key of an ini file written before the start, or the MPF hardware set. Source of truth for the bundle; options.json belongs to the format 1 tool.",
+ "groups": [
+  {
+   "id": "display",
+   "label": "DMD display"
+  },
+  {
+   "id": "pup",
+   "label": "PuP Pack (videos and music)"
+  },
+  {
+   "id": "machine",
+   "label": "Machine"
+  },
+  {
+   "id": "scorbit",
+   "label": "Scorbit"
+  }
+ ],
+ "options": [
+  {
+   "id": "machine.hardware",
+   "group": "machine",
+   "label": "Hardware and model",
+   "type": "choice",
+   "choices": [
+    "virtual",
+    "virtual_coins",
+    "virtual_le",
+    "proc",
+    "proc_le",
+    "proc_fiber"
+   ],
+   "default": "virtual",
+   "help": "virtual: no machine, play with the keyboard, free play (Pro). virtual_coins: the same with the factory pricing. virtual_le: the LE's IO. proc: a Multimorphic P-ROC on a Pro's SAM boards. proc_le: on an LE. proc_fiber: a Pro with its ramp light tubes driven (only after the wiring has been checked: docs/hardware.md).",
+   "target": {
+    "hardware": true
+   },
+   "restart": true
+  },
+  {
+   "id": "dmd.mode",
+   "group": "display",
+   "label": "DMD look",
+   "type": "choice",
+   "choices": [
+    "hd",
+    "classic"
+   ],
+   "default": "hd",
+   "help": "hd: smooth text and art at the window's size. classic: the ROM's 128x32 dots.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd"
+   }
+  },
+  {
+   "id": "dmd.tint",
+   "group": "display",
+   "label": "DMD colour",
+   "type": "choice",
+   "choices": [
+    "blue",
+    "orange"
+   ],
+   "default": "blue",
+   "help": "HD only. Tron blue, or the original DMD's orange.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-tint"
+   }
+  },
+  {
+   "id": "dmd.font",
+   "group": "display",
+   "label": "Text font",
+   "type": "choice",
+   "choices": [
+    "rajdhani",
+    "orbitron",
+    "godot",
+    "rom"
+   ],
+   "default": "rajdhani",
+   "help": "HD only. rajdhani is clean, orbitron is Tron style (wider), rom is the ROM's own dot fonts smoothed.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-font"
+   }
+  },
+  {
+   "id": "dmd.text_scale",
+   "group": "display",
+   "label": "Text size",
+   "type": "number",
+   "min": 0.5,
+   "max": 1.1,
+   "step": 0.05,
+   "default": 0.85,
+   "help": "HD only. 1 = capitals as tall as the ROM's. Above 1.1 stacked lines touch. The service menu (ADJUSTMENTS > DISPLAY ADJUSTMENTS) sets it too, and what it saves wins.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-text-scale"
+   }
+  },
+  {
+   "id": "dmd.text_glow",
+   "group": "display",
+   "label": "Text glow",
+   "type": "number",
+   "min": 0,
+   "max": 3,
+   "step": 0.1,
+   "default": 0,
+   "help": "HD only. 0 = none. The service menu sets it too, and what it saves wins.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-text-glow"
+   }
+  },
+  {
+   "id": "dmd.text_color",
+   "group": "display",
+   "label": "Text colour",
+   "type": "string",
+   "default": "#2a6cff",
+   "help": "HD only. Leave unset for the colour of the DMD colour above.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-text-color"
+   }
+  },
+  {
+   "id": "dmd.dots",
+   "group": "display",
+   "label": "Dot-matrix look",
+   "type": "integer",
+   "min": 0,
+   "max": 4,
+   "default": 0,
+   "help": "HD only. 0 = off. N = N round dots per DMD dot (2 looks good from 1280 px up).",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-dots"
+   }
+  },
+  {
+   "id": "display.max_fps",
+   "group": "display",
+   "label": "Frame rate cap",
+   "type": "integer",
+   "min": 0,
+   "max": 240,
+   "default": 30,
+   "help": "Frames per second at most. 30 matches the PuP Pack's videos and keeps the frames steady; 60 for a smoother DMD where the GPU keeps up; 0 = no cap. On a 75 or 144 Hz screen pick 0 or a divisor of its rate (72 on 144 Hz): 30 would judder.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--max-fps"
+   }
+  },
+  {
+   "id": "dmd.size",
+   "group": "display",
+   "label": "DMD window size",
+   "type": "string",
+   "default": "1024x256",
+   "help": "WIDTHxHEIGHT, for example 1920x480.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--dmd-size"
+   }
+  },
+  {
+   "id": "pup.enabled",
+   "group": "pup",
+   "label": "PuP videos and music",
+   "type": "bool",
+   "default": true,
+   "help": "Off: the original game, ROM music, no extra windows.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "enabled"
+   }
+  },
+  {
+   "id": "pup.third_screen",
+   "group": "pup",
+   "label": "Topper screen",
+   "type": "bool",
+   "default": true,
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "third_screen"
+   }
+  },
+  {
+   "id": "pup.ost_music",
+   "group": "pup",
+   "label": "PuP OST music",
+   "type": "bool",
+   "default": true,
+   "help": "Off: the ROM's music, the videos still play.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "ost_music"
+   }
+  },
+  {
+   "id": "pup.video_volume",
+   "group": "pup",
+   "label": "Video volume",
+   "type": "integer",
+   "min": 0,
+   "max": 100,
+   "default": 100,
+   "unit": "%",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "video_volume"
+   }
+  },
+  {
+   "id": "pup.music_volume",
+   "group": "pup",
+   "label": "Music volume",
+   "type": "integer",
+   "min": 0,
+   "max": 100,
+   "default": 100,
+   "unit": "%",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "music_volume"
+   }
+  },
+  {
+   "id": "pup.layout",
+   "group": "pup",
+   "label": "Window layout",
+   "type": "choice",
+   "choices": [
+    "split",
+    "stack",
+    "manual"
+   ],
+   "default": "split",
+   "help": "split: the backglass at the left as large as the screen allows, the DMD over the topper at the right. stack: the three windows one under the other at the left. manual: each at the screen, position and size of its own section in pup.local.cfg.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "pup",
+    "key": "layout"
+   }
+  },
+  {
+   "id": "pup.backglass.screen",
+   "group": "pup",
+   "label": "Backglass monitor",
+   "type": "integer",
+   "min": 0,
+   "max": 7,
+   "default": 0,
+   "help": "Monitor index of the backglass window (0 = the main one). With the split layout the DMD and topper join it in the right column when they are on the same monitor.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "backglass",
+    "key": "screen"
+   }
+  },
+  {
+   "id": "pup.dmd.screen",
+   "group": "pup",
+   "label": "DMD monitor",
+   "type": "integer",
+   "min": 0,
+   "max": 7,
+   "default": 0,
+   "help": "Monitor index of the DMD window. Another monitor than the backglass's: the DMD fills it (a second screen in the backbox). Same monitor: it sits in the column at the right of the backglass.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "dmd",
+    "key": "screen"
+   }
+  },
+  {
+   "id": "pup.topper.screen",
+   "group": "pup",
+   "label": "Topper monitor",
+   "type": "integer",
+   "min": 0,
+   "max": 7,
+   "default": 0,
+   "help": "Monitor index of the topper window; another monitor than the backglass's: it fills that monitor.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "topper",
+    "key": "screen"
+   }
+  },
+  {
+   "id": "pup.backglass.enabled",
+   "group": "pup",
+   "label": "Backglass window",
+   "type": "bool",
+   "default": true,
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "backglass",
+    "key": "enabled"
+   }
+  },
+  {
+   "id": "pup.backglass.service_menu",
+   "group": "pup",
+   "label": "Service menu on the backglass",
+   "type": "bool",
+   "default": true,
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "backglass",
+    "key": "service_menu"
+   }
+  },
+  {
+   "id": "pup.dmd.dmd_size",
+   "group": "pup",
+   "label": "DMD size in the PuP window",
+   "type": "choice",
+   "choices": [
+    "cycles",
+    "full"
+   ],
+   "default": "cycles",
+   "help": "cycles: a smaller DMD with the light cycles round it. full: a real DMD's size, no light cycles. The service menu (PUP DMD SIZE) chooses too, and wins.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "dmd",
+    "key": "dmd_size"
+   }
+  },
+  {
+   "id": "pup.dmd.window",
+   "group": "pup",
+   "label": "DMD display",
+   "type": "choice",
+   "choices": [
+    "window",
+    "external",
+    "stacked",
+    "overlay"
+   ],
+   "default": "window",
+   "help": "window: its own window. external: none on screen, a PIN2DMD or ZeDMD shows it. stacked: under the backglass videos, in the backglass window. overlay: over the bottom of the backglass videos. stacked and overlay keep one full screen window (much faster on a Raspberry Pi 4). The platform's DMD output (a PIN2DMD or ZeDMD) always means external.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "dmd",
+    "key": "window"
+   }
+  },
+  {
+   "id": "pup.dmd.background",
+   "group": "pup",
+   "label": "DMD background",
+   "type": "choice",
+   "choices": [
+    "lightcycles",
+    "frame",
+    "none"
+   ],
+   "default": "lightcycles",
+   "help": "lightcycles: a live 3D light cycle chase round the DMD (too heavy for a Raspberry Pi 4). frame: the PuP Pack's DMD panel art. none: black.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "dmd",
+    "key": "background"
+   }
+  },
+  {
+   "id": "scorbit.provider",
+   "group": "scorbit",
+   "label": "Provider",
+   "type": "string",
+   "default": "",
+   "restart": true,
+   "target": {
+    "ini": "game/scorbit.local.cfg",
+    "section": "scorbit",
+    "key": "provider"
+   },
+   "raw": true
+  },
+  {
+   "id": "scorbit.machine_id",
+   "group": "scorbit",
+   "label": "Machine id",
+   "type": "string",
+   "default": "",
+   "restart": true,
+   "target": {
+    "ini": "game/scorbit.local.cfg",
+    "section": "scorbit",
+    "key": "machine_id"
+   },
+   "raw": true
+  },
+  {
+   "id": "scorbit.encrypted_key",
+   "group": "scorbit",
+   "label": "Encrypted provider key",
+   "type": "string",
+   "default": "",
+   "secret": true,
+   "help": "As Scorbit gave it. Never shown again after it is set.",
+   "restart": true,
+   "target": {
+    "ini": "game/scorbit.local.cfg",
+    "section": "scorbit",
+    "key": "encrypted_key"
+   },
+   "raw": true
+  },
+  {
+   "id": "scorbit.hostname",
+   "group": "scorbit",
+   "label": "Server",
+   "type": "choice",
+   "choices": [
+    "production",
+    "staging"
+   ],
+   "default": "production",
+   "help": "The service menu's SCORBIT SERVER chooses too, and wins.",
+   "restart": true,
+   "target": {
+    "ini": "game/scorbit.local.cfg",
+    "section": "scorbit",
+    "key": "hostname"
+   },
+   "raw": true
+  }
+ ]
+}

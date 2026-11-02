@@ -1,0 +1,887 @@
+{
+ "pack": "pup_pack/trn_174h",
+ "still": "service/backglass_still.png",
+ "files": {
+  "Arcade/ArcadeMystery.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.17,
+   "native": true
+  },
+  "AttractMode/AttractMode-Trailer1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 152.43,
+   "native": true
+  },
+  "AttractMode/AttractMode-Trailer2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 141.37,
+   "native": true
+  },
+  "AttractMode/AttractMode-Trailer3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 151.3,
+   "native": true
+  },
+  "Background - Backglass/TronLegacyBG.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 15.23,
+   "native": true
+  },
+  "Background - Topper/TronLegacyLogo.mp4": {
+   "w": 1920,
+   "h": 560,
+   "duration": 9.77,
+   "native": true
+  },
+  "BallSaved/Ball Saved 1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.23,
+   "native": true
+  },
+  "BallSaved/Ball Saved 2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.07,
+   "native": true
+  },
+  "CluJackpot/CluJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.7,
+   "native": true
+  },
+  "CluJackpot/CluJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.87,
+   "native": true
+  },
+  "CluJackpot/CluJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.57,
+   "native": true
+  },
+  "CluMode/CLU Mode Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 45.43,
+   "native": true
+  },
+  "CluMode/CLUMode.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 22.73,
+   "native": true
+  },
+  "CluModeInfo/CLU_Mode_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 22.73,
+   "native": true
+  },
+  "DaftPunk/DaftPunk1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.27,
+   "native": true
+  },
+  "DaftPunk/DaftPunk2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 1.1,
+   "native": true
+  },
+  "DiscBattle/DiscWars1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.93,
+   "native": true
+  },
+  "DiscBattle/DiscWars2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.77,
+   "native": true
+  },
+  "DiscBattle/DiscWars3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.53,
+   "native": true
+  },
+  "DiscBattle/DiscWars4.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.87,
+   "native": true
+  },
+  "DiscBattle/DiscWars5.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 8.77,
+   "native": true
+  },
+  "DiscBattle/DiscWars6.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 7.87,
+   "native": true
+  },
+  "DiscBattle/DiscWars7.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.93,
+   "native": true
+  },
+  "DiscBattleJackpot/DiscWarsJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.87,
+   "native": true
+  },
+  "DiscBattleJackpot/DiscWarsJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.87,
+   "native": true
+  },
+  "DiscBattleJackpot/DiscWarsJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.4,
+   "native": true
+  },
+  "DiscBattleMB/DiscWarsMB Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 30.03,
+   "native": true
+  },
+  "DiscBattleMB/DiscWarsMB.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 10.03,
+   "native": true
+  },
+  "DiscBattleReady/DiscWarsReady.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.27,
+   "native": true
+  },
+  "DiscWarsMBInfo/DiscWarsMB_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 10.03,
+   "native": true
+  },
+  "DoubleScore/DoubleScoring.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.7,
+   "native": true
+  },
+  "Drain/Drain1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 1.73,
+   "native": true
+  },
+  "Drain/Drain2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.07,
+   "native": true
+  },
+  "Drain/Drain3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.9,
+   "native": true
+  },
+  "Drain/Drain4.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.63,
+   "native": true
+  },
+  "Drain/Drain5.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.27,
+   "native": true
+  },
+  "EndOfLine/EndOfLine.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 4.93,
+   "native": true
+  },
+  "EndofLineMB/EOLMB.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 8.23,
+   "native": true
+  },
+  "EndofLineMBTopper/EOLMB_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 12.0,
+   "native": true
+  },
+  "ExtraBall/ExtraBall.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.93,
+   "native": true
+  },
+  "ExtraBallLit/ExtraBallisLit.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.27,
+   "native": true
+  },
+  "FindFlynn/FindFlynn.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.1,
+   "native": true
+  },
+  "FindFlynnInfo/FindFlynnInfo.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 10.03,
+   "native": true
+  },
+  "FlynnFound/FlynnFound.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.77,
+   "native": true
+  },
+  "Gem/Gem1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.83,
+   "native": true
+  },
+  "Gem/Gem2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.0,
+   "native": true
+  },
+  "Gem/Gem3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.37,
+   "native": true
+  },
+  "GemJackpot/GemJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.07,
+   "native": true
+  },
+  "GemJackpot/GemJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.9,
+   "native": true
+  },
+  "GemJackpot/GemJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.77,
+   "native": true
+  },
+  "GemMode/FollowGem.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 16.63,
+   "native": true
+  },
+  "GemMode/Gem Mode Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 16.63,
+   "native": true
+  },
+  "GemModeInfo/Gem_Mode_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 16.63,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.2,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.1,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 8.8,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare4.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.7,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare5.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.7,
+   "native": true
+  },
+  "LightCycle/LightCycleFlare6.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.27,
+   "native": true
+  },
+  "LightCycleJackpot/LightCycleJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.43,
+   "native": true
+  },
+  "LightCycleJackpot/LightCycleJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.1,
+   "native": true
+  },
+  "LightCycleJackpot/LightCycleJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.7,
+   "native": true
+  },
+  "LightCycleJackpot/LightCycleJackpot4.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.9,
+   "native": true
+  },
+  "LightCycleJackpot/LightCycleJackpot5.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.63,
+   "native": true
+  },
+  "LightCycleMB/Light Cycle MB Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 30.13,
+   "native": true
+  },
+  "LightCycleMB/LightCycleMB.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 20.1,
+   "native": true
+  },
+  "LightCycleMBInfo/LightCycle_MB_INFO.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 10.0,
+   "native": true
+  },
+  "LightCycleMBLit/LightCycleMBLit.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.87,
+   "native": true
+  },
+  "LightCycles - Topper/LC Blue Reverse.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Blue.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Both Blue Bottom Reverse.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Both Blue Bottom.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Both Yellow Bottom Reverse.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Both Yellow Bottom.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Yellow Reverse.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "LightCycles - Topper/LC Yellow.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.23,
+   "native": true
+  },
+  "MatchEvent/MatchGameOver.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 9.23,
+   "native": true
+  },
+  "Music - CLU/CLU Intro.mp3": {
+   "out": "Music - CLU/CLU Intro.mp3",
+   "duration": 24.61
+  },
+  "Music - CLU/CLU.mp3": {
+   "out": "Music - CLU/CLU.mp3",
+   "duration": 55.72
+  },
+  "Music - Disc MB/Disc MB.mp3": {
+   "out": "Music - Disc MB/Disc MB.mp3",
+   "duration": 48.09
+  },
+  "Music - Disc MB/DiscMB-Countdown.mp3": {
+   "out": "Music - Disc MB/DiscMB-Countdown.mp3",
+   "duration": 15.12
+  },
+  "Music - Disc Wars/Disc Wars.mp3": {
+   "out": "Music - Disc Wars/Disc Wars.mp3",
+   "duration": 41.72
+  },
+  "Music - Disc Wars/Rinzler.mp3": {
+   "out": "Music - Disc Wars/Rinzler.mp3",
+   "duration": 15.54
+  },
+  "Music - End of Ball/Empty Audio.mp3": {
+   "out": "Music - End of Ball/Empty Audio.mp3",
+   "duration": 64.13
+  },
+  "Music - End of Line MB/EOL MB Full.mp3": {
+   "out": "Music - End of Line MB/EOL MB Full.mp3",
+   "duration": 103.03
+  },
+  "Music - End of Line MB/End of Line MB.mp3": {
+   "out": "Music - End of Line MB/End of Line MB.mp3",
+   "duration": 239.23
+  },
+  "Music - GEM/Gem.mp3": {
+   "out": "Music - GEM/Gem.mp3",
+   "duration": 126.46
+  },
+  "Music - HiScore/Arcade_HiScore.mp3": {
+   "out": "Music - HiScore/Arcade_HiScore.mp3",
+   "duration": 7.0
+  },
+  "Music - HiScore/Solar Sailer.mp3": {
+   "out": "Music - HiScore/Solar Sailer.mp3",
+   "duration": 162.17
+  },
+  "Music - HiScore/Tron_FanFare.mp3": {
+   "out": "Music - HiScore/Tron_FanFare.mp3",
+   "duration": 3.98
+  },
+  "Music - Light Cycle MB/Light Cycle MB.mp3": {
+   "out": "Music - Light Cycle MB/Light Cycle MB.mp3",
+   "duration": 191.43
+  },
+  "Music - Main Gameplay/01 - TRON Legacy (End Titles).mp3": {
+   "out": "Music - Main Gameplay/01 - TRON Legacy (End Titles).mp3",
+   "duration": 189.73
+  },
+  "Music - Main Gameplay/02 - Outlands Pt.II.mp3": {
+   "out": "Music - Main Gameplay/02 - Outlands Pt.II.mp3",
+   "duration": 177.04
+  },
+  "Music - Main Gameplay/03 - The Son of Flynn.mp3": {
+   "out": "Music - Main Gameplay/03 - The Son of Flynn.mp3",
+   "duration": 95.27
+  },
+  "Music - Main Gameplay/04 - Escape.mp3": {
+   "out": "Music - Main Gameplay/04 - Escape.mp3",
+   "duration": 146.0
+  },
+  "Music - Match Event Game Over/Game Over.mp3": {
+   "out": "Music - Match Event Game Over/Game Over.mp3",
+   "duration": 27.01
+  },
+  "Music - No Music/No Music.mp3": {
+   "out": "Music - No Music/No Music.mp3",
+   "duration": 23.17
+  },
+  "Music - Portal/PortalMB.mp3": {
+   "out": "Music - Portal/PortalMB.mp3",
+   "duration": 78.84
+  },
+  "Music - Quorra MB/QuorraMB.mp3": {
+   "out": "Music - Quorra MB/QuorraMB.mp3",
+   "duration": 38.74
+  },
+  "Music - Quorra MB/QuorraMB_FULL.mp3": {
+   "out": "Music - Quorra MB/QuorraMB_FULL.mp3",
+   "duration": 70.87
+  },
+  "Music - Sea of Simulation/SOS.mp3": {
+   "out": "Music - Sea of Simulation/SOS.mp3",
+   "duration": 143.18
+  },
+  "Music - Sea of Simulation/SOS_FULL.mp3": {
+   "out": "Music - Sea of Simulation/SOS_FULL.mp3",
+   "duration": 187.72
+  },
+  "Music - Zuse/Castor.mp3": {
+   "out": "Music - Zuse/Castor.mp3",
+   "duration": 133.43
+  },
+  "Portal Jackpot/Portal Jackpot 1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.1,
+   "native": true
+  },
+  "Portal Jackpot/Portal Jackpot 2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.43,
+   "native": true
+  },
+  "PortalMB/Portal Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 30.13,
+   "native": true
+  },
+  "PortalMB/Portal.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 10.07,
+   "native": true
+  },
+  "PortalModeInfo/Portal_Mode_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 15.07,
+   "native": true
+  },
+  "PuPAlphas/Tron Backbox 1x1.png": {
+   "out": "PuPAlphas/Tron Backbox 1x1.png"
+  },
+  "PuPAlphas/Tron Backbox 4x3 or 5x4.png": {
+   "out": "PuPAlphas/Tron Backbox 4x3 or 5x4.png"
+  },
+  "PuPFrames/Tron EOL OST Demo.png": {
+   "out": "PuPFrames/Tron EOL OST Demo.png"
+  },
+  "Quorra/QuorraFlare_1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 1.57,
+   "native": true
+  },
+  "Quorra/QuorraFlare_2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.67,
+   "native": true
+  },
+  "Quorra/QuorraFlare_3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.03,
+   "native": true
+  },
+  "QuorraJackpot/QuorraJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.37,
+   "native": true
+  },
+  "QuorraJackpot/QuorraJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.23,
+   "native": true
+  },
+  "QuorraJackpot/QuorraJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.3,
+   "native": true
+  },
+  "QuorraMB/QuorraMB Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 30.13,
+   "native": true
+  },
+  "QuorraMB/QuorraMB.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 10.07,
+   "native": true
+  },
+  "QuorraMBInfo/Quorra_MB_INFO.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 10.07,
+   "native": true
+  },
+  "QuorraMBLit/QuorraMBLit.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.77,
+   "native": true
+  },
+  "Recognizer/Recognizer1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.33,
+   "native": true
+  },
+  "Recognizer/Recognizer2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.0,
+   "native": true
+  },
+  "Recognizer/Recognizer3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.53,
+   "native": true
+  },
+  "SOSJackpot/SOSJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.03,
+   "native": true
+  },
+  "SOSJackpot/SOSJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 5.37,
+   "native": true
+  },
+  "SOSJackpot/SOSJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.87,
+   "native": true
+  },
+  "SeaofSimulation/Sea of Simulation Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 16.63,
+   "native": true
+  },
+  "SeaofSimulation/SeaOfSimulation.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 16.63,
+   "native": true
+  },
+  "ShootAgain/ShootAgain.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.1,
+   "native": true
+  },
+  "SkillShot/SkillShot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.23,
+   "native": true
+  },
+  "SkillShot/SkillShot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.47,
+   "native": true
+  },
+  "SkillShot/Skillshot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 6.57,
+   "native": true
+  },
+  "SoSModeInfo/SoS_Mode_Info.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 16.67,
+   "native": true
+  },
+  "StartGame/StartGame 1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 8.27,
+   "native": true
+  },
+  "StartGame/StartGame 2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.23,
+   "native": true
+  },
+  "StartGame/StartGame 3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.47,
+   "native": true
+  },
+  "StartGameLogo/StartGameLogo.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 6.55,
+   "native": true
+  },
+  "SuperPops/SuperPops.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.77,
+   "native": true
+  },
+  "SuperSpins/SuperSpins.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.6,
+   "native": true
+  },
+  "TILT/TILT.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.1,
+   "native": true
+  },
+  "TRON/TRON_N.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "TRON/TRON_O.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "TRON/TRON_R.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "TRON/TRON_T.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "TronComplete/TronComplete1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.73,
+   "native": true
+  },
+  "ZEN/ZEN.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 4.0,
+   "native": true
+  },
+  "ZUSE/ZUSE_E.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "ZUSE/ZUSE_S.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "ZUSE/ZUSE_U.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "ZUSE/ZUSE_Z.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 2.0,
+   "native": true
+  },
+  "ZuseJackpot/ZuseJackpot1.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 2.87,
+   "native": true
+  },
+  "ZuseJackpot/ZuseJackpot2.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 3.9,
+   "native": true
+  },
+  "ZuseJackpot/ZuseJackpot3.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 1.93,
+   "native": true
+  },
+  "ZuseMode/Zuse Mode Default.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 30.03,
+   "native": true
+  },
+  "ZuseMode/ZuseMode.mp4": {
+   "w": 1920,
+   "h": 1080,
+   "duration": 10.03,
+   "native": true
+  },
+  "ZuseModeInfo/ZuseInfo.mp4": {
+   "w": 1920,
+   "h": 562,
+   "duration": 10.03,
+   "native": true
+  }
+ }
+}

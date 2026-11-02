@@ -43,6 +43,8 @@ def load(game_dir=GAME):
 
 
 def pack_dir(cfg, root=ROOT):
+    if os.environ.get("MPF_PUP_PACK"):          # the platform's pack (a bundle): read in place
+        return os.environ["MPF_PUP_PACK"]
     return os.path.join(root, cfg.get("pup", {}).get("pack_dir", "pup_pack/trn_174h"))
 
 
