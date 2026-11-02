@@ -59,3 +59,6 @@ game/native/serum_build/
 # holds everything but the PuP Pack); only the Godot import files next to them are not
 /addons/**/*.import
 /dist/
+
+# aside copy of game/data during conformance runs (scripts/conform/godot_run.py): never committed
+game/data.conform_keep/
