@@ -23,8 +23,8 @@ ALL_SHOTS = 0xcf
 PROGRESS_LAMPS = {0x01: 14, 0x02: 11, 0x04: 62, 0x08: 59, 0x40: 42, 0x80: 35}
 # award level -> (points, deff, audit) [0x01018804]
 AWARDS = {1: (350000, 87, 0x4b), 2: (750000, 88, 0x4c), 3: (1500000, 89, 0x4d)}
-# film clips of the Jackpot (deff 87) per level, in the order of the effect's variants (level_L_N.gif): the n-th Jackpot of a level
-# plays its n-th clip and goes back to the first past the last; Super and Double Super Jackpots (88, 89) have one clip per level
+# clips of the Jackpot (deff 87) per level in the order of the effect's variants (level_L_N.gif). Only the first clip of a level is
+# played (see award()); Super and Double Super Jackpots (88, 89) have one clip per level
 # (assets/mpf_package/README.md, "Film clip effects"; the level is the ROM's lc_clip_level)
 JACKPOT_CLIPS = (2, 1, 2, 1, 2, 4)
 TIMER_TICKS = 315                         # 312 counted down by 7 every 7 ticks (task 0xba / 0xbc)
@@ -234,9 +234,10 @@ class LightCycle(Feature):
         self.total += scored
         clip_level = pd.lc_clip_level
         if deff == 87:
-            n = getattr(pd, "lc_jackpot_n", 0)
-            clip = sum(JACKPOT_CLIPS[:clip_level]) + n % JACKPOT_CLIPS[clip_level]
-            pd.lc_jackpot_n = n + 1
+            # one clip per level: the ROM names it by the level (table 0x040d3084, no pick; the reference at every Jackpot
+            # of a level shows the same clip, and Serum knows only the first clip of each level: the others are not frames
+            # of the ROM). The effect's other variants (level_L_N.gif, JACKPOT_CLIPS) are never played.
+            clip = sum(JACKPOT_CLIPS[:clip_level])
         else:
             clip = clip_level
         os_.deff_start(deff, points=scored, clip=clip)
