@@ -40,22 +40,6 @@
    "restart": true
   },
   {
-   "id": "dmd.mode",
-   "group": "display",
-   "label": "DMD look",
-   "type": "choice",
-   "choices": [
-    "hd",
-    "classic"
-   ],
-   "default": "hd",
-   "help": "hd: smooth text and art at the window's size. classic: the ROM's 128x32 dots.",
-   "restart": true,
-   "target": {
-    "godot_arg": "--dmd"
-   }
-  },
-  {
    "id": "dmd.tint",
    "group": "display",
    "label": "DMD colour",
@@ -157,18 +141,6 @@
    "restart": true,
    "target": {
     "godot_arg": "--max-fps"
-   }
-  },
-  {
-   "id": "dmd.size",
-   "group": "display",
-   "label": "DMD window size",
-   "type": "string",
-   "default": "1024x256",
-   "help": "WIDTHxHEIGHT, for example 1920x480.",
-   "restart": true,
-   "target": {
-    "godot_arg": "--dmd-window"
    }
   },
   {

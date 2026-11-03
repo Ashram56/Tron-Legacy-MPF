@@ -106,11 +106,12 @@ def spec(template):
     for pr in old["profiles"]:
         if pr["id"] != "rpi4":
             continue
-        limits = {k: v["choices"] for k, v in pr["limits"].items()}
+        # the look of the DMD is the platform's card (bundle.json dmd.looks), no longer a game setting: dmd.mode is not limited here
+        limits = {k: v["choices"] for k, v in pr["limits"].items() if k != "dmd.mode"}
         limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
         defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
         defaults["pup.dmd.window"] = "overlay"
-        profiles["rpi4"] = {"limits": limits, "defaults": defaults}
+        profiles["rpi4"] = {"limits": limits, "defaults": defaults, "dmd_looks": ["classic"]}     # a Pi 4 cannot draw the HD look
     asset_globs = []
     for folder, name in ASSET_GLOBS:
         for d in sorted(os.listdir(os.path.join(ROOT, folder))) if os.path.isdir(os.path.join(ROOT, folder)) else ():
@@ -136,9 +137,13 @@ def spec(template):
                 "hardware": {"virtual": ["hw_virtual", "free_play"], "virtual_coins": ["hw_virtual"],
                              "virtual_le": ["hw_virtual_le", "free_play"], "proc": ["hw_proc"], "proc_le": ["hw_proc_le"],
                              "proc_fiber": ["hw_proc", "fiber_optics"]}},
-        "dmd": {"rom": "trn_174h", "size": "128x32"},
+        "dmd": {"rom": "trn_174h", "size": "128x32", "look": "hd",
+                "looks": {"classic": ["--dmd=classic"], "hd": ["--dmd=hd"],
+                          # advanced: HD DMD + the PuP's DMD window with the light cycles (game/pup/pup_player.gd cycles_arg);
+                          # without a linked pack the PuP is off and the screen shows the hd look
+                          "advanced": ["--dmd=hd", "--dmd-cycles"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
-        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.mode", "when": "hd"}],
+        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "hd"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
         "profiles": profiles,
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],

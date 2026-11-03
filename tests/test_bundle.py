@@ -214,7 +214,7 @@ class TestBuilder(unittest.TestCase):
             for c in sets:
                 self.assertTrue(os.path.exists(os.path.join(ROOT, "game", "config", c + ".yaml")), c)
         for board in sp["profiles"].values():
-            self.assertEqual(set(board), {"limits", "defaults"})
+            self.assertEqual(set(board), {"limits", "defaults", "dmd_looks"})
 
     @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "assets", "mpf_package")), "needs the assets submodule")
     def test_spec_lists_only_files_that_exist(self):

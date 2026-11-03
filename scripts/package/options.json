@@ -33,7 +33,7 @@
      "target": {"arg": "--max-fps"}, "restart": true},
     {"id": "dmd.size", "group": "display", "label": "DMD window size", "type": "size", "default": "1024x256",
      "help": "WIDTHxHEIGHT, for example 1920x480.",
-     "target": {"arg": "--dmd-window"}, "restart": true},
+     "target": {"arg": "--dmd-size"}, "restart": true},
 
     {"id": "pup.enabled", "group": "pup", "label": "PuP videos and music", "type": "bool", "default": true,
      "help": "Off: the original game, ROM music, no extra windows.",
