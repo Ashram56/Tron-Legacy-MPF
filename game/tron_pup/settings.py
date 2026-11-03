@@ -39,6 +39,8 @@ def load(game_dir=GAME):
     pup = cfg.setdefault("pup", {})
     if os.environ.get("TRON_PUP", "").strip().lower() in ("0", "false", "no", "off"):
         pup["enabled"] = False
+    if os.environ.get("MPF_GAME_DATA") and not os.environ.get("MPF_PUP_PACK"):
+        pup["enabled"] = False      # run by the platform without a linked pack: no PuP (pup.cfg enabled=true is the desktop default)
     return cfg
 
 
