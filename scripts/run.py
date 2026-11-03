@@ -311,7 +311,7 @@ def scenario_path(name):
 
 def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=False, free_play=None, godot_args=(),
         godot_log=None, mpf_log=None, trace=None, virtual_display=None, wait_godot_exit=False, machine=None,
-        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False):
+        fiber_optics=False, pin2dmd=None, zedmd=None, zedmd_python=False, session_env=None):
     """Godot, then MPF (and MPF Monitor); returns MPF's exit code. Everything is stopped on the way out."""
     logs = os.path.join(tc.GAME, "logs")
     os.makedirs(logs, exist_ok=True)
@@ -337,6 +337,7 @@ def run(hw="virtual", *, monitor=False, scenario=None, seconds=None, text_ui=Fal
     if port_in_use(tc.BCP_PORT):
         raise SystemExit("port {} is already taken: is another Godot/GMC running?".format(tc.BCP_PORT))
     env = dict(os.environ)
+    env.update(session_env or {})
     if pin2dmd or zedmd:
         env.update(dmd_env)
     if scenario:
@@ -463,6 +464,13 @@ def main(argv=None):
     p.add_argument("--no-render-thread", dest="render_thread", action="store_false",
                    help="draw on Godot's main thread instead of its separate render thread (the default, "
                         "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
+    p.add_argument("--replay", metavar="FILE",
+                   help="play a recording (game/data/recordings/*.json, also the platform's scenario files) at its own "
+                        "times on the virtual hardware, with its seed; a clock shows in the window and FILE.timeline.txt "
+                        "lists the switches and display effects on the same clock (docs/recording.md). Also TRON_REPLAY")
+    p.add_argument("--seed", metavar="N", help="seed of the game's random draws (default: drawn at each game start and "
+                                               "written to the recording). Also TRON_SEED")
+    p.add_argument("--no-record", action="store_true", help="do not record the played games (game/data/recordings/)")
     p.add_argument("godot_args", nargs="*", help="extra Godot arguments, after --")
     args = p.parse_args(argv)
     if args.dmd_out:
@@ -477,6 +485,13 @@ def main(argv=None):
     max_fps = args.max_fps if args.max_fps is not None else os.environ.get("TRON_MAX_FPS")
     if max_fps not in (None, "") and "--max-fps" not in args.godot_args:
         args.godot_args = engine_arg(args.godot_args, "--max-fps", str(int(max_fps)))
+    session_env = {}                    # recording, replay and seed: given to this run only (tron/recording.py)
+    if args.replay:
+        session_env["TRON_REPLAY"] = os.path.abspath(args.replay)
+    elif not args.no_record and not os.environ.get("TRON_RECORD_DIR") and not os.environ.get("TRON_REPLAY"):
+        session_env["TRON_RECORD_DIR"] = os.path.join(tc.GAME, "data", "recordings")
+    if args.seed is not None:
+        session_env["TRON_SEED"] = str(int(args.seed))
     text_ui = args.text_ui
     if text_ui is None:
         text_ui = sys.stdin.isatty() and sys.stdout.isatty() and args.seconds is None
@@ -485,7 +500,7 @@ def main(argv=None):
                free_play=args.free_play, godot_args=dmd_args(args.godot_args, args.dmd, args.dmd_dots, args.dmd_size,
                                                      args.dmd_text_color, args.dmd_text_glow, args.dmd_tint,
                                                      args.dmd_font, args.dmd_text_scale, args.dmd_color, args.dmd_score),
-               trace=args.trace and os.path.abspath(args.trace))
+               trace=args.trace and os.path.abspath(args.trace), session_env=session_env)
 
 
 if __name__ == "__main__":

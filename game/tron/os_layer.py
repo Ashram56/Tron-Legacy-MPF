@@ -255,6 +255,8 @@ class TronOS(CustomCode):
         self.switches = switches.SwitchLayer(self)
         from tron.features import load_features     # noqa: E402
         self.features = load_features(self)
+        from tron.recording import Session
+        self.session = Session(self)
         if os.environ.get("TRON_LIVE_SCENARIO"):
             from tron.live_scenario import LiveScenario  # noqa: E402
             self.live = LiveScenario(self, os.environ["TRON_LIVE_SCENARIO"])
@@ -336,7 +338,8 @@ class TronOS(CustomCode):
         total = sum(weights)
         if total <= 0:
             return None
-        r = self.random.randrange(total)
+        # conformance runs (TRON_DMD_SEED=first, with the reference's TRON_RNG_ZERO=1): the draw is the lowest one, like the ROM's
+        r = 0 if os.environ.get("TRON_DMD_SEED") == "first" else self.random.randrange(total)
         for i, w in enumerate(weights):
             if r < w:
                 return i
@@ -758,6 +761,7 @@ class TronOS(CustomCode):
         if not self._score_pending:
             self.machine.clock.schedule_once(self._score_flush, 0)
         self._score_pending[self.player_num] = self._score_pending.get(self.player_num, 0) + points
+        getattr(self.media, "score_added", lambda *a: None)(self.player_num, points, player.score)   # event 0x4d
         self.replay_check(self.player_num, player.score)
 
     # ------------------------------------------------------------------ replay (game_flow.md 5.5)
@@ -888,7 +892,7 @@ class TronOS(CustomCode):
             return True
         self.machine.events.post("tron_start_refused")    # event 0x2d
         if not self.display.running(15):
-            self.deff_start(15, credits=self.credit_model.text())
+            self.deff_start(15, credits=self.credit_model.text(), prompt=self.credit_model.prompt())
         return False
 
     def _player_add_request(self, **kwargs):
@@ -964,6 +968,7 @@ class TronOS(CustomCode):
 
     def _game_starting(self, queue=None, **kwargs):
         self.state = 0
+        self.session.game_seed()                     # per-game seed when recording/replaying (tron/recording.py)
         self.players = [PlayerData() for _ in range(4)]
         self.eb_lit = [0] * 4
         self.eb_collected = [0] * 4
@@ -1010,8 +1015,10 @@ class TronOS(CustomCode):
             self.deff_start(26, player=self.player_num)   # speech 0x11b comes with the deff
             self.leff_start(16)
         self.deff_start(19)
+        self.display.held = False
         self.ball_validated = False
         self.music(self.base_music())
+        self.display.rules_refresh(ball_start=True)  # the deff rules after the ball start (ROM caller 0x19944)
         self.hook("ball_start_media")                # leffs/tube shows the features start with the ball
         self.deff_stop(27)                           # instant info off
         if self._new_game:

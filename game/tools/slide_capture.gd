@@ -22,6 +22,7 @@ func _ready() -> void:
 
 
 func _run(jobs: Array) -> void:
+	ProjectSettings.set_setting("tron/dmd/variants", false)      # the reference capture shows one clip of the ROM's random choice
 	for job in jobs:
 		DirAccess.make_dir_recursive_absolute(job["out"])
 		var scene: String = job.get("scene", "res://slides/deffs/%s.tscn" % job["slide"])

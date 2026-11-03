@@ -77,6 +77,7 @@ class Display:
         self.rules = []
         self.hold_tail = {}         # deff id -> seconds of its hold when not HOLD_TICKS (set_hold_tail)
         self.music = None           # music call the background rules last played
+        self.held = False           # from ball end / game start until the ball start's deff 19: no rules refresh
 
     # ------------------------------------------------------------------ start / stop
 
@@ -96,6 +97,8 @@ class Display:
             else:
                 os_.trace.log("deff_start", id=deff_id)
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+            if deff_id == 19 and self.fg is None:
+                getattr(os_.media, "score_display_shown", lambda: None)()    # shown at once: deff_019's task starts now
             os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
             if deff_id == 19:
                 os_.tube_start(10)
@@ -256,6 +259,8 @@ class Display:
                     self.os.tubes.stop(tube)
         self.fg = None
         self.arcade_held = False
+        if self.bg == 19 and not stopped:
+            getattr(self.os.media, "score_display_shown", lambda: None)()    # the effect in front ends: deff_019's task runs from here
 
     def _ended(self, deff_id):
         self.fg_handle = None
@@ -264,9 +269,12 @@ class Display:
         arcade_end = self.arcade_held
         self._end_fg()
         # the deff rules restart a mode's background deff when the effect in front of it ends
-        # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end)
+        # (traces/disc_multiball.jsonl: deff 47 again as deff 48/50 end; quorra_multiball.jsonl 41.51 s: 65 as 68 ends), except
+        # Zuse's status, which the rules started again behind the target hit and which shows again with no new start
+        # (traces/zuse_fast_scoring.jsonl: 96 then 95 at once, nothing as 96 ends)
         if self.mode_bg():
-            self.start(self.mode_bg(), refresh=False)
+            if not (self.mode_bg() == 95 and self.bg == 95):
+                self.start(self.mode_bg(), refresh=False)
             self.os.request_refresh()              # the same rules pass restarts the mode's tube show
         elif arcade_end:
             # the rules pass deferred during the Flynn's Arcade show 0x97 runs at its deff's exit and puts
@@ -328,7 +336,7 @@ class Display:
     def refresh(self):
         """Deff rules [0x000198a8] after an effect ends: restart the background deff (deff 19 or a mode's)
         behind whatever runs, in normal play."""
-        if self.os.in_play and self.bg is None and not self.show:
+        if self.os.in_play and self.bg is None and not self.show and not self.held:
             deff_id, _, on_start = self.select()
             self._start_rule(deff_id, on_start)
 
@@ -337,18 +345,22 @@ class Display:
         deff_id = self.select()[0] if self.os.in_play else 19
         return None if deff_id == 19 else deff_id
 
-    def rules_refresh(self):
-        """Rules refresh: a change of the selected rule starts its background deff and its music."""
+    def rules_refresh(self, ball_start=False):
+        """Rules refresh: a change of the selected rule starts its background deff and its music.
+        ball_start: the first pass after the ball start's deff 19, which the ROM restarts behind the effect in
+        front (deff 104): every reference trace has 104 (0x100de10), 19 (0x2074c), 19 (0x19944)."""
         os_ = self.os
-        if not os_.in_play:
+        if not os_.in_play or self.held:
             return
         deff_id, music, on_start = self.select()
         changed = deff_id != self.bg and (self.bg is not None or deff_id != 19)
+        if ball_start and deff_id == 19 and self.fg is not None:
+            changed = True
         if changed:
             self._start_rule(deff_id, on_start)
         if music and music != self.music:
-            if not changed and deff_id == 19:
-                self.start(19, refresh=False)       # the ROM restarts the score display with new music
+            # no restart of a running deff for the music: FUN_000198a8 starts the rule's deff only when it is not running
+            # (traces/sea_of_simulation.jsonl 14.31 s: music 0x01b at the VUK, no deff_start)
             self.music = music
             os_.sound(music)
 
@@ -357,6 +369,7 @@ class Display:
         self.shows = []
         self.show = None
         self.music = None
+        self.held = True            # the ROM's ball start draws deff 104 before deff 19 (traces/sea_of_simulation.jsonl 9.89 s)
         self.idle_waits = []
         self._end_fg(exit_handler=False)
         if self._pump_handle:

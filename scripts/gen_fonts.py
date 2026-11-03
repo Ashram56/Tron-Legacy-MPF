@@ -184,6 +184,19 @@ def x_offset(c, outline):
     return 0
 
 
+# The ROM's own font records (asset repo rom_data/fonts.json, read from the font table at 0x041258b8...): the font
+# spacing and each glyph's x offset, keyed by the font's first image. They win over the rules above where they
+# differ: the outlined fonts also draw the comma one dot to the left (deff 115 "3,000,000" in font 16, observed),
+# font 25 has spacing 0 and font 27 -1.
+ROM_FONTS = os.path.join(ROOT, "assets", "rom_data", "fonts.json")
+
+
+def rom_fonts():
+    if not os.path.exists(ROM_FONTS):
+        return {}
+    return {f["image_first"]: f for f in json.load(open(ROM_FONTS, encoding="utf-8"))["fonts"]}
+
+
 def decode_all():
     """(index, get, fonts): fonts[n] is ROM font n (the n-th font image group in the ROM)."""
     index, get = load_images()
@@ -191,6 +204,7 @@ def decode_all():
     rh = max(index[i]["h"] for i in range(ra, rb + 1))
     ref = {c: feature(get(i), rh) for c, i in zip(ALPHABET, range(ra, rb + 1))}
     fonts = []
+    rom = rom_fonts()
     for a, b in font_groups(index):
         chars = label_group(a, b, index, get, ref)
         if chars is None:
@@ -202,12 +216,14 @@ def decode_all():
         if "," in glyphs and all(v == TRANSPARENT for v in get(glyphs[","])[0]):
             place[","] = 0                               # comma padded with clear rows: drawn as is
         outline = is_outline(get, glyphs)
+        rf = rom.get(a, {})
+        rg = {c: g for c, g in rf.get("glyphs", {}).items() if g["image"] == glyphs.get(c)}
         fonts.append({"id": n, "group": a, "last": b, "cap": cap, "outline": outline,
-                      "spacing": SPACING.get(n, -1 if outline else 1),
+                      "spacing": rf.get("spacing", SPACING.get(n, -1 if outline else 1)),
                       "ascent": max(index[i]["h"] - place[c] for c, i in glyphs.items()),
                       "descent": max(0, max(place.values())),
                       "glyphs": {c: {"image": i, "w": index[i]["w"], "h": index[i]["h"], "below": place[c],
-                                     "xoff": x_offset(c, outline)}
+                                     "xoff": rg[c]["x_offset"] if c in rg else x_offset(c, outline)}
                                  for c, i in glyphs.items()}})
     return index, get, fonts
 

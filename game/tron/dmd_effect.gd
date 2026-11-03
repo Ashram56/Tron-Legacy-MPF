@@ -49,9 +49,31 @@ const ICON_TEXT_X := 100.0               # the text beside the icon is centred h
 const ICON_GLIDE_MS := 600.0            # the face slides in from the right in this time
 
 
+## The folders of the platform's add-ons (MPF_ADDONS, ":"-separated): made once outside the build and copied into the bundle.
+static func addon_dirs() -> PackedStringArray:
+	var sep := ";" if OS.get_name() == "Windows" else ":"
+	return OS.get_environment("MPF_ADDONS").split(sep, false)
+
+
+## A file of an add-on (rel: "dmd_clip/clips.json"), as an absolute path, or "" when no add-on has it.
+static func addon_file(rel: String) -> String:
+	for d in addon_dirs():
+		var p := d.path_join(rel)
+		if FileAccess.file_exists(p):
+			return p
+	return ""
+
+
+## media/dmd_clip/clips.json of the add-on (its paths made absolute), else of the project (a development checkout).
 static func clips() -> Dictionary:
 	if _clips == null:
-		var parsed = JSON.parse_string(FileAccess.get_file_as_string(CLIP_DATA)) if FileAccess.file_exists(CLIP_DATA) else null
+		var parsed = null
+		var from_addon := addon_file("dmd_clip/clips.json")
+		if from_addon != "":
+			var text := FileAccess.get_file_as_string(from_addon).replace("res://media/dmd_clip/", from_addon.get_base_dir() + "/")
+			parsed = JSON.parse_string(text)
+		elif FileAccess.file_exists(CLIP_DATA):
+			parsed = JSON.parse_string(FileAccess.get_file_as_string(CLIP_DATA))
 		_clips = parsed if parsed is Dictionary else {}
 	return _clips
 
@@ -110,7 +132,9 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 		return null
 	var key := "%s_%s" % [letter, "on" if on else "off"]
 	if not _letter_art.has(key):
-		var path := "res://hd_art/letters/%s.png" % key
+		var path := addon_file("hd_art/letters/%s.png" % key)
+		if path == "":
+			path = "res://hd_art/letters/%s.png" % key
 		var tex: Texture2D = null
 		if FileAccess.file_exists(path):
 			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
@@ -120,6 +144,49 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 		_letter_art[key] = tex
 		print("DMD: letter art %s: %s" % [key, "loaded" if tex else "missing at " + ProjectSettings.globalize_path(path)])
 	return _letter_art[key]
+
+
+## The ROM picks one of several film clips at random for some effects (assets/mpf_package/config/dmd_variants.yaml: the Disc
+## Multiball and Light Cycle jackpots, Quorra's, the Sea of Simulation stages ...); the effect's "variants" hold them. Off for
+## the render checks (tools/slide_capture.gd), which compare the one clip the reference capture shows.
+static var _variant_rng: RandomNumberGenerator = null
+
+
+## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
+## conformance checks repeat a scenario and get the same clips), or always the first clip when TRON_DMD_SEED is "first" (the
+## reference run of PinMAME with TRON_RNG_ZERO makes the ROM pick its first entry too: same clip on both sides).
+static func pick_variant(n: int) -> int:
+	if OS.get_environment("TRON_DMD_SEED") == "first":
+		return 0
+	if _variant_rng == null:
+		_variant_rng = RandomNumberGenerator.new()
+		var seed_text := OS.get_environment("TRON_DMD_SEED")
+		if seed_text != "":
+			_variant_rng.seed = int(seed_text)
+		else:
+			_variant_rng.randomize()
+	return _variant_rng.randi() % n
+
+
+## Seeds the picks with the game's seed (tools/replay_overlay.gd, sent by MPF at each game start): the same seed gives the same
+## clip variants and clip files. TRON_DMD_SEED stays stronger (the conformance checks).
+static func seed_game(seed_value: int) -> void:
+	if OS.get_environment("TRON_DMD_SEED") != "":
+		return
+	if _variant_rng == null:
+		_variant_rng = RandomNumberGenerator.new()
+	_variant_rng.seed = seed_value
+	seed(seed_value)
+
+
+static func pick_file(files: Array):
+	if OS.get_environment("TRON_DMD_SEED") == "" and _variant_rng != null:
+		return files[_variant_rng.randi() % files.size()]
+	return files.pick_random()
+
+
+static func variants_enabled() -> bool:
+	return bool(ProjectSettings.get_setting("tron/dmd/variants", true))
 
 
 static func clips_enabled() -> bool:
@@ -161,6 +228,9 @@ static func _dmd() -> Node:
 
 ## The picture drawn for a picture path: in HD its media/dmd_hd/ twin when there is one.
 static func picture(path: String, hd: bool) -> Texture2D:
+	if path.is_absolute_path() and not path.begins_with("res://"):       # a file of an add-on: not in the import
+		var img := Image.load_from_file(path) if FileAccess.file_exists(path) else null
+		return ImageTexture.create_from_image(img) if img else null
 	if hd and path.begins_with(MEDIA):
 		var big := MEDIA_HD + path.trim_prefix(MEDIA)
 		if ResourceLoader.exists(big):
@@ -184,6 +254,8 @@ class State extends RefCounted:
 	var _durations := PackedFloat32Array()
 	var _total_ms := 0.0
 	var _frames_item := -1
+	var _variant := -1             # the clip picked for this show (item "variants"), -1: the effect's own frames
+	var _shift_ms := 0.0           # the picked clip ends this much later than the effect's own (item "variant_shift"): its text too
 	var effect_name := ""          # deff_NNN, to find the effect's clips (tron/dmd_effect_slide.gd)
 	var clip_path := ""            # the PuP clip playing behind the text for this show (absolute path), "" for the ROM's pictures
 	var clip_loop := false
@@ -200,15 +272,13 @@ class State extends RefCounted:
 		for i in items.size():
 			if items[i]["type"] == "frames":
 				_frames_item = i
-				for f in items[i]["frames"]:
-					_durations.append(float(f[1]))
-					_total_ms += float(f[1])
 		reset()
 
 	## Back to the start of a show: time 0, no values, no text (as a node scene just built).
 	func reset() -> void:
 		elapsed_ms = 0.0
 		seeked = false
+		_pick_variant()
 		clip_path = ""
 		icon_path = ""
 		if hd and effect_name != "" and DmdEffect.clips_enabled() and ResourceLoader.exists(DmdEffect.CLIP_PLAYER):
@@ -220,7 +290,7 @@ class State extends RefCounted:
 					clip_path = last["path"]
 					show = int(last["show"])           # the same show: the video is not restarted
 				else:
-					clip_path = ProjectSettings.globalize_path(c["files"].pick_random())
+					clip_path = ProjectSettings.globalize_path(DmdEffect.pick_file(c["files"]))
 					DmdEffect._show_seq += 1
 					show = DmdEffect._show_seq
 				clip_loop = bool(c.get("loop", false))
@@ -251,6 +321,10 @@ class State extends RefCounted:
 	func update(settings: Dictionary, kwargs: Dictionary) -> void:
 		for k in kwargs:
 			values[k] = kwargs[k]
+		if kwargs.has("clip"):                    # the rules name the clip (Light Cycle jackpots, by level): not a random pick
+			_set_variant(int(kwargs["clip"]))
+		elif kwargs.get("done", false) and _frames_item >= 0 and items[_frames_item].has("alt"):
+			_set_variant(int(items[_frames_item]["alt"]))     # the stage-completing shot plays its own clip (FUN_01027478)
 		received_ms = elapsed_ms
 		for i in items.size():
 			var it: Dictionary = items[i]
@@ -279,6 +353,39 @@ class State extends RefCounted:
 	func _int(key: String, default := 0) -> int:
 		var v = values.get(key, default)
 		return int(v) if v != null and str(v) != "" else default
+
+	## The frames of this show: the effect's own, or the clip picked at random among its variants.
+	func _frames() -> Array:
+		var it: Dictionary = items[_frames_item]
+		var shifts: Array = it.get("variant_shift", [])
+		_shift_ms = float(shifts[_variant]) if _variant >= 0 and _variant < shifts.size() else 0.0
+		return it["variants"][_variant] if _variant >= 0 else it["frames"]
+
+	func _set_variant(k: int) -> void:
+		if _frames_item < 0 or not DmdEffect.variants_enabled():
+			return
+		var vs: Array = items[_frames_item].get("variants", [])
+		if k < 0 or k >= vs.size():
+			return
+		_variant = k
+		_durations = PackedFloat32Array()
+		_total_ms = 0.0
+		for f in _frames():
+			_durations.append(float(f[1]))
+			_total_ms += float(f[1])
+
+	func _pick_variant() -> void:
+		_durations = PackedFloat32Array()
+		_total_ms = 0.0
+		_variant = -1
+		if _frames_item < 0:
+			return
+		var vs: Array = items[_frames_item].get("variants", [])
+		if vs.size() and DmdEffect.variants_enabled():
+			_variant = DmdEffect.pick_variant(vs.size() - (1 if items[_frames_item].has("alt") else 0))
+		for f in _frames():
+			_durations.append(float(f[1]))
+			_total_ms += float(f[1])
 
 	## The frame shown at the current time (AnimatedSprite2D's timing: each picture for its ms; a loop starts over).
 	func frame_index() -> int:
@@ -324,19 +431,20 @@ class State extends RefCounted:
 						mod = st["mod"]
 					if color and it.has("color_rgb"):
 						c = Color(it["color_rgb"])
-					elif hd and it["name"] != "Background":
+					elif hd and it["name"] != "Background" and not str(it["name"]).begins_with("Roll"):
 						c = dmd.text_tint(c)
 					if r.size.x > 0 and r.size.y > 0:
 						out.append(["rect", r, c * mod])
 				"frames":
 					var k := frame_index()
-					var f: Array = it["frames"][k] if it["frames"].size() else []
+					var all := _frames()
+					var f: Array = all[k] if all.size() else []
 					if clip_path != "" or icon_path != "":
 						_clip_frame(out, f, dmd)
 						continue
 					if hd and effect_name == "deff_080" and _clu_letters(out):
 						continue
-					if color and f.size() and it.has("color_frames") and k < it["color_frames"].size():
+					if color and _variant < 0 and f.size() and it.has("color_frames") and k < it["color_frames"].size():
 						var ctex := _picture(it["color_frames"][k])
 						if ctex:
 							out.append(["tex", ctex, BOX, Color.WHITE])
@@ -370,28 +478,33 @@ class State extends RefCounted:
 
 	func _timed(it: Dictionary) -> bool:
 		return it.get("show_after_ms", 0) or it.get("hide_after_ms", 0) or it.get("blink_ms", 0) \
-			or it.get("cycle_ms", 0) or it.get("level_steps", []).size()
+			or it.get("blink_frames", 0) or it.get("cycle_ms", 0) or it.get("level_steps", []).size()
 
 	func _text(out: Array, i: int, it: Dictionary, st: Dictionary) -> void:
 		var visible: bool = screen_on[i]
 		var mod := Color.WHITE
 		if _timed(it):                                    # rom_text.gd _apply_time()
+			var te: float = elapsed_ms - _shift_ms          # the text follows the picked clip's end (deffs 48, 49)
 			var show_after: int = it.get("show_after_ms", 0)
 			var hide_after: int = it.get("hide_after_ms", 0)
 			var blink: int = it.get("blink_ms", 0)
 			var cycle: int = it.get("cycle_ms", 0)
 			var blink_dark: bool = it.get("blink_dark", false)
-			var blink_on := blink == 0 or int((elapsed_ms - show_after) / blink) % 2 == 0
-			var cycle_on: bool = cycle == 0 or fposmod(elapsed_ms - it.get("cycle_offset_ms", 0), cycle) \
+			var blink_from: int = maxi(it.get("blink_after_ms", 0), show_after)
+			var blink_on := blink == 0 or te < blink_from or int((te - blink_from) / blink) % 2 == 0
+			var blink_frames: int = it.get("blink_frames", 0)
+			if blink_frames > 0 and _frames_item >= 0:      # toggles with the clip's pictures, like the ROM's loop (one draw per frame)
+				blink_on = (frame_index() / blink_frames) % 2 == 0
+			var cycle_on: bool = cycle == 0 or fposmod(te - it.get("cycle_offset_ms", 0), cycle) \
 				< it.get("cycle_on_ms", 0)
-			visible = screen_on[i] and cycle_on and elapsed_ms >= show_after \
-				and (hide_after == 0 or elapsed_ms < hide_after) and (blink_on or blink_dark)
+			visible = screen_on[i] and cycle_on and te >= show_after \
+				and (hide_after == 0 or te < hide_after) and (blink_on or blink_dark)
 			if blink_dark:
 				mod = Color(1, 1, 1, 1) if blink_on else Color(0, 0, 0, 1)
 			var steps: Array = it.get("level_steps", [])
 			var step: int = it.get("step_ms", 0)
 			if steps.size() and step > 0:
-				var level: float = steps[mini(int(elapsed_ms / step), steps.size() - 1)] / 15.0
+				var level: float = steps[mini(int(te / step), steps.size() - 1)] / 15.0
 				mod = Color(level, level, level, 1)
 		if st.has("visible"):
 			visible = st["visible"]
@@ -446,7 +559,11 @@ class State extends RefCounted:
 			m = fm
 			shown = fs
 			y = fit_ys[k] if k < fit_ys.size() else rom_y
-			if RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
+			var mins: Array = it.get("score_min", [])
+			if mins.size() > k:
+				if int(text.replace(",", "")) >= int(mins[k]):
+					break
+			elif RomText.rom_width(fm, fs) <= it.get("fit_width", 0):
 				break
 		if m.is_empty():
 			return {}
@@ -484,6 +601,8 @@ class State extends RefCounted:
 			return {}
 		var out := {}
 		var ticks := int(elapsed_ms / ScoreDisplay.TICK_MS)
+		if values.has("rot_ms"):                  # the rotation runs on the machine's clock, not the effect's
+			ticks = int((_int("rot_ms") + elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var since := int((elapsed_ms - received_ms) / ScoreDisplay.TICK_MS)
 		var players := maxi(_int("players", 1), 1)
 		var current := _int("player", 1)
@@ -499,6 +618,10 @@ class State extends RefCounted:
 		var blank := not bool(values.get("valid", true)) and blink_age >= 63 and (blink_age - 62) % 14 <= 6
 		if score_lines:
 			out["Line1"] = {"visible": not blank}
+		var roll := ScoreDisplay.roll(blink_age, ScoreDisplay.score_of(str(values.get("p%d" % current, ""))),
+			(21 if current == 2 and players == 2 else current * 8 - 3) - 4) if bool(values.get("valid", true)) else []
+		out["RollBig"] = {"visible": score_lines and roll.size() > 0, "rect": roll[0] if roll.size() else Rect2()}
+		out["RollPanel"] = {"visible": roll.size() > 0 and not match_panel, "rect": roll[1] if roll.size() else Rect2()}
 		for p in range(1, 5):
 			var st := {"visible": p <= players and not (blank and p == current),
 				"rom_y": 21 if p == 2 and players == 2 else p * 8 - 3,

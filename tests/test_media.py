@@ -47,8 +47,9 @@ class TestBridge(TronTestCase):
             plays = [c.kwargs for c in trig.call_args_list if c.kwargs["name"] == "slides_play"
                      and "deff_025" in c.kwargs["settings"]
                      and c.kwargs["settings"]["deff_025"]["action"] == "play"]
-            self.assertEqual("TOTAL BONUS", plays[-1]["line0"])
-            self.assertEqual("1,500,000", plays[-1]["line1"])
+            # the bonus's screens (rom_layout.SCREENS[25]): line 7 TOTAL BONUS, line 8 its value from the live total
+            self.assertEqual("TOTAL BONUS", plays[-1]["line7"])
+            self.assertEqual("BONUS", plays[-1]["line0"])
             trig.reset_mock()
             self.tron.media.sound(0x01b)                  # main play music: looped on the music bus
             sent = trig.call_args_list[-1].kwargs["settings"]
@@ -86,7 +87,7 @@ class TestBridge(TronTestCase):
         self.assertEqual("2", kw["line0"])                       # the count, in the ring font
         self.assertEqual(("WAY", "COMBO"), (kw["line1"], kw["line2"]))
         self.assertRegex(kw["line3"], r"^\d{1,3}(,\d{3})+$")    # the points
-        self.assertEqual("CASTOR", kw["line4"])                  # the named combo, on its own row
+        self.assertEqual("CASTOR COMBO", kw["line4"])           # the named combo (the ROM's message 0x6a4), on its own row
         self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), kw["line5"])
         with mock.patch.object(bridge, "connected", return_value=True), \
                 mock.patch.object(self.machine.bcp, "interface") as iface:

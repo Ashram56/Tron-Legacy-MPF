@@ -29,8 +29,10 @@ SPEC = re.compile(r"%(P\d/[^%]*%|[-+ #0,]*\d*l?[dus])")
 # deffs 68 / 69 (0x0101e320 / 0x0101e654): the points on the row of the screen shown (`screen` = the double arg).
 # deff 78 (0x0101476c): "%d FOLLOWING%P1//S/%" the award count (task + 0x34), then the points (+ 0x30).
 # deff 140 (0x0102faec): the Sea of Simulation bonus (task + 0x34), not the start total.
-TEXT_ARGS = {43: ("hits_left", "points", "score"), 55: ("more",), 62: ("left",),
-             68: ("points", "points"), 69: ("points", "points"), 78: ("followings", "value"), 138: ("count", "points", "named", "jackpot"), 140: ("sos_bonus",)}
+# deff 25 (0x01000e7c): the bonus line on screen (tron/features/bonus.py, live values).
+TEXT_ARGS = {10: ("credits", "prompt"), 15: ("credits", "prompt"), 17: ("credits", "prompt"), 43: ("hits_left", "points", "score"), 55: ("more",), 62: ("left",),
+             68: ("points", "points"), 69: ("points", "points"), 78: ("followings", "value"), 138: ("count", "points", "named", "jackpot"), 140: ("sos_bonus",),
+             25: ("base", "name", "value", "sum", "mult", "mult_total", "total")}
 
 
 def format_rom_text(line, args):
@@ -81,6 +83,9 @@ class MediaBridge:
         self.service_shown = False
         self.counters = {}
         self.last_scores = {}
+        # the bottom line's rotation: deff_019's own counters (0x9c, 0x138, 0x4e2 ticks), so it starts over whenever the
+        # score display gets the display again (score_display_shown)
+        self.rot_epoch = self.machine.clock.get_time()
         self.award = (0, None, None)               # last points, shown since, blink counter since
         self.bar_max = {}
         self._refresh = None
@@ -94,6 +99,9 @@ class MediaBridge:
         self.shown = set()                         # deff and text slides playing now
         self.kept = None                           # the last one, stopped but left up until the next plays
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
+        # last points: each score_add on its own (FUN_010238ac on event 0x4d, posted by every score_add: os_layer calls
+        # score_added), not the sum of one task run's adds (a jackpot and its switch's 10,000 showed 510,000 for 500,000)
+        self.machine.events.add_handler("ball_started", self._ball_start, priority=1000)
 
     # ------------------------------------------------------------------ transport
 
@@ -202,6 +210,12 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ score display (deff 19)
 
+    def score_display_shown(self):
+        """deff_019's task (re)starts: its bottom-line counters start over (BALL / credits first)."""
+        self.rot_epoch = self.machine.clock.get_time()
+        if 19 in self.active:
+            self.score_changed()
+
     def credits_text(self):
         """FUN_00004ff4: "FREE PLAY", "CREDITS n", "CREDITS a/b" (coins toward the next credit) or
         "CREDITS n a/b". The credit count comes from the OS when it keeps one (os.credits,
@@ -235,6 +249,22 @@ class MediaBridge:
         self.bar_max[key] = top
         return seconds * 10 // top if top else 0
 
+    def _ball_start(self, **kwargs):
+        """FUN_01023858 on the ball start event (0x13): the ticks since the last points start at 0 (the score blinks
+        only 63 ticks later), no last points."""
+        self.award = (0, None, self.machine.clock.get_time())
+
+    def score_added(self, player_num, change, value):
+        """FUN_010238ac, called with each score added: within 16 ticks of the last points shown, smaller points
+        only restart the counter; otherwise they become the last points shown."""
+        self.last_scores[player_num] = value
+        if player_num != self.os.player_num or change <= 0:
+            return
+        now = self.machine.clock.get_time()
+        shown_value, shown, _ = self.award
+        age = (now - shown) / TICK if shown is not None else 99
+        self.award = (shown_value, shown, now) if age < 16 and change < shown_value else (change, now, now)
+
     def score_display_args(self):
         """Event args of deff 19 beyond line0/line1, for tron/score_display.gd."""
         game = self.os.game
@@ -250,14 +280,16 @@ class MediaBridge:
                 age = (now - shown) / TICK if shown is not None else 99
                 self.award = (value, shown, now) if age < 16 and delta < value else (delta, now, now)
         value, shown, blink = self.award
-        out = {"players": max(len(players), 1), "player": current or 1,
+        out = {"rot_ms": int((now - self.rot_epoch) * 1000),
+               "players": max(len(players), 1), "player": current or 1,
                "valid": bool(getattr(self.os, "ball_validated", False)) or not game,
                "credits": self.credits_text(), "replay": self.replay_text() if game else "",
                "award": format_rom_text("%,02lu", [value]) if value else "",
                "award_age": int((now - shown) / TICK) if shown is not None else 99,
                "blink_age": int((now - blink) / TICK) if blink is not None else 999}
         for p in range(1, 5):
-            out["p%d" % p] = format_rom_text("%,02lu", [players[p - 1].score]) if p <= len(players) else ""
+            out["p%d" % p] = format_rom_text("%,02lu", [players[p - 1].score]) if p <= len(players) else (
+                "00" if p == 1 and not players else "")        # no game: P1's 00, as the ROM's panel shows
         feats = self.os.features_by_name if hasattr(self.os, "features") else {}
         targets = feats.get("tron_targets")
         for bit, key in ((1, "bar_ds"), (2, "bar_bumpers"), (4, "bar_spinners")):
@@ -333,6 +365,20 @@ class MediaBridge:
         client = self.machine.bcp.transport.get_named_client("local_display")
         self.machine.bcp.interface.bcp_trigger_client(client=client, name="service_backglass",
                                                       state=json.dumps(state, separators=(",", ":")))
+
+    def send_seed(self, seed):
+        """The game's random seed for Godot's own draws (clip variants, PuP picks): tools/replay_overlay.gd."""
+        if not self.connected(need_data=False):
+            return
+        client = self.machine.bcp.transport.get_named_client("local_display")
+        self.machine.bcp.interface.bcp_trigger_client(client=client, name="tron_seed", seed=int(seed))
+
+    def send_replay_clock(self):
+        """Starts the replay clock overlay (mm:ss.s) in Godot."""
+        if not self.connected(need_data=False):
+            return
+        client = self.machine.bcp.transport.get_named_client("local_display")
+        self.machine.bcp.interface.bcp_trigger_client(client=client, name="tron_replay")
 
     def confirm_show(self, draw):
         """The end-the-game question before the service menu opens in a game (tron/os_layer.py, not in the

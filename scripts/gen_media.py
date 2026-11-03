@@ -38,10 +38,10 @@ PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
-TEXT_ONLY = {19, 25, 26, 33, 38, 40}
+TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
-CAPTURE_PANEL_KEPT = {85, 112}
+CAPTURE_PANEL_KEPT = {85}
 PANEL_WIDTH = 41
 TICK_MS = 15.41      # ROM tick as the captures run (rom_layout.TICK_MS)
 # Effects that draw the four letters of a target bank, one bitmap per letter and state
@@ -78,7 +78,9 @@ ARCADE_FRAME_MS = 3 * 16.26          # a reel frame is 3 ROM ticks (os_layer.TIC
 # 0x65e + 2k (item / "BONUS") and the points paid; the stage deffs 116-124 (FUN_01027374 /
 # FUN_01027478): the points.
 # deffs 55, 60: every screen's lines (rom_layout.SCREENS); deff 60 prints the points on either screen's row.
-ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
+# the credits screens (effects 10, 15, 17: the credit text, then PRESS START or INSERT COINS; "%-s" tells the two apart)
+CREDITS_TEXT = "%s / %-s"
+ROM_TEXT = {10: CREDITS_TEXT, 15: CREDITS_TEXT, 17: CREDITS_TEXT, 114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             55: "MULTIBALL + E.B. / ARE LIT / EXTRA BALL / IS LIT / %u MORE TO / LIGHT MULTIBALL / LIGHT EX. BALL"
                 " / LIGHT M.B. + E.B. / MULTIBALL / IS LIT",
             60: "%,02lu / BALL ADDED / %,02lu / %u MORE FOR / ADD-A-BALL",
@@ -99,6 +101,9 @@ ROM_TEXT = {114: "SEA OF / SIMULATION / %s / %s", 115: "%s / %s / %,02lu",
             # deff 141 (0x0102ffa0): each pm_phase's lines, with SUPER= (0x6bd / 0x6c0, picked into msg_id)
             141: "PORTAL MULTIBALL / NEXT SHOT=%,02lu / SUPER=%,02lu / SUPER JACKPOT LIT / SHOOT DISC"
                  " / SUPER=%,02lu / ALL SHOTS=%,02lu",
+            # deff 25 (0x01000e7c / 0x01000d78): the base line, each item / SEA OF SIMULATION / PORTAL line (name, "+value",
+            # running total), each multiplier step ("%dX", total x n), then TOTAL BONUS (rom_layout.SCREENS)
+            25: "BONUS / %,02lu / %s / +%,02lu / %,02lu / %dX / %,02lu / TOTAL BONUS / %,02lu",
             **{d: "%,02lu" for d in range(116, 125)}}
 
 
@@ -149,6 +154,37 @@ def gif_frames(path):
     return out
 
 
+def remap_levels(img, mapping):
+    """The picture with the DMD levels (0-15) of `mapping` replaced: {from: to}."""
+    from PIL import Image
+    table = list(range(256))
+    for lv, to in mapping.items():
+        for v in range(lv * 17 - 8, lv * 17 + 9):
+            if 0 <= v < 256:
+                table[v] = to * 17
+    r, g, b, a = img.split()
+    return Image.merge("RGBA", (r.point(table), g.point(table), b.point(table), a))
+
+
+def dim_after(frames, at_ms):
+    """The frames with every lit dot at level 1 from at_ms on (the ROM's palette change under the text): the frame running
+    at that time is split in two."""
+    from PIL import Image
+    out, t = [], 0
+    for img, ms in frames:
+        end = t + ms
+        if end <= at_ms:
+            out.append((img, ms))
+        else:
+            if t < at_ms:
+                out.append((img, at_ms - t))
+            grey = img.convert("L").point(lambda v: 17 if v else 0)
+            dim = Image.merge("RGBA", (grey, grey, grey, Image.new("L", img.size, 255)))
+            out.append((dim, end - max(t, at_ms)))
+        t = end
+    return out
+
+
 def png_frames(folder):
     from PIL import Image
     timing = json.load(open(os.path.join(folder, "timing.json"), encoding="utf-8"))
@@ -180,13 +216,15 @@ def text_node(i, lay, name=None, var=None):
         out += ['fit_fonts = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_fonts"]))),
                 'fit_ys = PackedInt32Array({})'.format(", ".join(map(str, lay["fit_ys"]))),
                 'fit_width = {}'.format(lay["fit_width"])]
+        if "score_min" in lay:
+            out.append('score_min = PackedInt32Array({})'.format(", ".join(map(str, lay["score_min"]))))
     if "alt_when_empty" in lay:
         out += ['alt_x = {}'.format(lay["alt_x"]), 'alt_y = {}'.format(lay["alt_y"]),
                 'alt_when_empty = "{}"'.format(lay["alt_when_empty"])]
     if lay.get("screens"):
         out.append('screens = PackedInt32Array({})'.format(", ".join(map(str, lay["screens"]))))
-    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms",
-                "cycle_offset_ms"):
+    for key in ("show_after_ms", "hide_after_ms", "step_ms", "blink_ms", "blink_after_ms", "blink_frames", "cycle_ms",
+                "cycle_on_ms", "cycle_offset_ms"):
         if lay.get(key):
             out.append('{} = {}'.format(key, lay[key]))
     if lay.get("blink_dark"):
@@ -198,8 +236,8 @@ def text_node(i, lay, name=None, var=None):
 
 # the root script of an effect's node scene (media/dmd/<name>/nodes.tscn), shown inside its GMC slide
 NODES_SLIDE = "res://addons/mpf-gmc/classes/mpf_slide.gd"
-TEXT_KEYS = ("fit_fonts", "fit_ys", "fit_width", "alt_x", "alt_y", "alt_when_empty", "screens", "show_after_ms",
-             "hide_after_ms", "step_ms", "blink_ms", "cycle_ms", "cycle_on_ms", "cycle_offset_ms", "blink_dark",
+TEXT_KEYS = ("fit_fonts", "fit_ys", "fit_width", "score_min", "alt_x", "alt_y", "alt_when_empty", "screens", "show_after_ms",
+             "hide_after_ms", "step_ms", "blink_ms", "blink_after_ms", "blink_frames", "cycle_ms", "cycle_on_ms", "cycle_offset_ms", "blink_dark",
              "level_steps")
 
 
@@ -253,6 +291,8 @@ def score_display_nodes(score_lines=True, match=False):
         out += rect_node(name, x, 31, 0, 1, 15)
     for name in ("BarZfs", "BarClu", "BarGem"):
         out += rect_node(name, 40, 0, 1, 0, 15)
+    for name in ("RollBig", "RollPanel"):          # the score roll's blanked rows (score_display.gd roll())
+        out += rect_node(name, 0, 0, 0, 0, 0) + ['visible = false']
     out += ['', '[node name="ScoreDisplay" type="Node" parent="."]', 'script = ExtResource("score")']
     if score_lines:
         out.append('score_lines = true')
@@ -273,6 +313,7 @@ def score_display_items(score_lines=True, match=False):
         out += [rect_item("Dash%d" % k, x, 31, 10, 1, 1), rect_item(name, x, 31, 0, 1, 15)]
     for name in ("BarZfs", "BarClu", "BarGem"):
         out.append(rect_item(name, 40, 0, 1, 0, 15))
+    out += [rect_item("RollBig", 0, 0, 0, 0, 0), rect_item("RollPanel", 0, 0, 0, 0, 0)]
     return out + [{"type": "panel", "score_lines": score_lines, "match": match}]
 
 
@@ -388,7 +429,43 @@ def loop_period(frames):
 SHARED = {}
 
 
-def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False):
+def clear_black_panel(img):
+    """The frame with its level-0 (black) pixels over the status panel (x < PANEL_WIDTH) made transparent: the ROM draws the clip
+    with bitmap_draw_masked, which does not draw level 0, so the panel's score shows through (the extraction made the area opaque
+    black in some variants: the Recognizer's tower film, 3 frames of every deff 108 unknown to Serum)."""
+    import numpy as np
+    from PIL import Image
+    a = np.array(img.convert("RGBA"))
+    black = (a[:, :PANEL_WIDTH, 0] == 0) & (a[:, :PANEL_WIDTH, 3] == 255)
+    a[:, :PANEL_WIDTH, 3][black] = 0
+    return Image.fromarray(a, "RGBA")
+
+
+def open_white(img):
+    """The frame with its full-white (level 15) areas that reach the picture's edge made transparent: the extraction filled the
+    area outside the clip's shape with white where the ROM draws nothing (the text of the effect shows there)."""
+    import numpy as np
+    a = np.array(img.convert("RGBA"))
+    white = (a[:, :, 0] == 255) & (a[:, :, 3] == 255)
+    reach = np.zeros_like(white)
+    stack = [(y, x) for y in range(white.shape[0]) for x in range(white.shape[1])
+             if (y in (0, white.shape[0] - 1) or x in (0, white.shape[1] - 1)) and white[y, x]]
+    while stack:
+        y, x = stack.pop()
+        if reach[y, x]:
+            continue
+        reach[y, x] = True
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < white.shape[0] and 0 <= nx < white.shape[1] and white[ny, nx] and not reach[ny, nx]:
+                stack.append((ny, nx))
+    a[reach] = (0, 0, 0, 0)
+    from PIL import Image
+    return Image.fromarray(a, "RGBA")
+
+
+def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(), letters=None, recorded=False, variants=(), alt_clip=None,
+                variant_shift=()):
     name = "deff_{:03d}".format(deff_id)
     ext, entries = [], []
     seen = {}
@@ -420,30 +497,61 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
               'offset_right = 128.0', 'offset_bottom = 32.0', 'script = ExtResource("slide")', '',
               '[node name="Background" type="ColorRect" parent="."]', 'layout_mode = 0',
               'offset_right = 128.0', 'offset_bottom = 32.0', 'color = Color(0, 0, 0, 1)']
-    if frames:
-        parts += ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
-                  'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
-                  'autoplay = "default"', 'centered = false']
+    anim_node = ['', '[node name="Anim" type="AnimatedSprite2D" parent="."]',
+                 'modulate = {}'.format(DMD_COLOR), 'sprite_frames = SubResource("frames")',
+                 'autoplay = "default"', 'centered = false']
+    import rom_layout
+    under = deff_id in rom_layout.TEXT_UNDER_CLIP
+    if frames and not under:
+        parts += anim_node
     for k, (x0, y0, x1, y1) in enumerate(fills):     # black boxes the ROM clears over the bitmap
         parts += rect_node("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0)
     parts += letter_nodes_
     for i, lay in enumerate(layouts):
         if lay:
             parts += text_node(i, lay)
+    if frames and under:            # the ROM draws this bitmap after its text
+        parts += anim_node
     if panel:
         parts += score_display_nodes(deff_id == 19, panel == "match")
     items = [rect_item("Background", 0, 0, 128, 32, 0)]
     if frames:
-        items.append({"type": "frames", "name": "Anim", "loop": bool(loop),
-                      "frames": [[files[k], round(ms, 1)] for k, ms in order]})
+        item = {"type": "frames", "name": "Anim", "loop": bool(loop),
+                "frames": [[files[k], round(ms, 1)] for k, ms in order]}
+        if variants:                    # the ROM's random choice among film clips (dmd_variants.yaml): one list of frames each
+            clips, pics = [], {}
+            for clip in list(variants) + ([alt_clip] if alt_clip else []):
+                row = []
+                for img, ms in clip:
+                    digest = hashlib.md5(img.tobytes()).hexdigest()
+                    if digest in files:                 # a picture the effect has already
+                        row.append([files[digest], ms])
+                        continue
+                    if digest not in pics:
+                        fname = "v{:03d}.png".format(len(pics))
+                        img.save(os.path.join(GAME, folder_rel, fname))
+                        pics[digest] = "res://{}/{}".format(folder_rel, fname)
+                    row.append([pics[digest], ms])
+                clips.append(row)
+            item["variants"] = clips
+            if variant_shift:            # each clip's end minus the effect's own (rom_layout.CLIP_END_TEXT): its text moves with it
+                item["variant_shift"] = list(variant_shift)
+            if alt_clip:                # the clip of the stage-completing shot (FUN_01027478, deffs 116-124): the rules ask for it with done
+                item["alt"] = len(clips) - 1
+        if not under:
+            items.append(item)
     items += [rect_item("Clear%d" % k, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0) for k, (x0, y0, x1, y1) in enumerate(fills)]
     if letter_item:
         items.append(letter_item)
     for i, lay in enumerate(layouts):
         if lay:
             items += text_items(i, lay)
+    if frames and under and deff_id not in rom_layout.CLIP_OVER_PANEL:
+        items.append(item)
     if panel:
         items += score_display_items(deff_id == 19, panel == "match")
+    if frames and under and deff_id in rom_layout.CLIP_OVER_PANEL:
+        items.append(item)
     write_effect(name, folder_rel, parts, items)
     return name
 
@@ -478,10 +586,14 @@ def build_deffs(only_data):
         # a capture shows the status panel of the moment it was recorded (score 00): the live panel is drawn
         # over its columns 0-40 instead, except where the effect itself covers them (deffs 85, 112)
         panel = panels.get(deff_id) if source != "reference" or deff_id not in CAPTURE_PANEL_KEPT else None
+        if deff_id in (10, 15, 17):             # the capture of the credits screens shows the panel's line and P1's "00" (PinMAME)
+            panel = "status"
         info = {"slide": "deff_{:03d}".format(deff_id), "source": source, "text": lines, "loop": loop,
                 "panel": panel, "args": ([letters[k] for k in ("lit", "new") if k in letters] if letters else [])
                 + (["screen"] if deff_id in rom_layout.SCREENS else [])
-                + (ARCADE_ARGS if source == "arcade" else []),
+                + (ARCADE_ARGS if source == "arcade" else [])
+                + (["clip"] if deff_id in (83, 87, 88, 89) else [])
+                + (["done"] if 116 <= deff_id <= 124 else []),
                 "fonts": [lay["font"] if lay else None for lay in layouts]}
         out[deff_id] = info
         if only_data:
@@ -502,11 +614,85 @@ def build_deffs(only_data):
             last_ms = frames[end - 1][1]
             frames = frames[:end - 1] + [(frames[end - 1][0], frames[end - 2][1]),
                                          (Image.new("RGBA", (128, 32)), max(1, last_ms - frames[end - 2][1]))]
+        if source == "graphics" and deff_id in rom_layout.OPEN_WHITE:
+            frames = [(open_white(img), ms) for img, ms in frames]
+        if source == "graphics" and deff_id in rom_layout.CLEAR_AT_MS:
+            from PIL import Image
+            at, kept, t = rom_layout.CLEAR_AT_MS[deff_id], [], 0
+            for img, ms in frames:
+                if t >= at:
+                    break
+                kept.append((img, min(ms, at - t)))
+                t += ms
+            frames = kept + [(Image.new("RGBA", (128, 32)), 100000)]
+        if source == "graphics" and deff_id in rom_layout.LEVEL_MAP:
+            frames = [(remap_levels(img, rom_layout.LEVEL_MAP[deff_id]), ms) for img, ms in frames]
+        if source == "graphics" and deff_id in rom_layout.DIM_AFTER_MS:
+            frames = dim_after(frames, rom_layout.DIM_AFTER_MS[deff_id])
         if loop and source == "graphics":       # loop whole bitmap cycles only
             period = loop_period(frames)
             frames = frames[:period] if period else frames
+        variants, shifts = [], []
+        if source == "graphics":
+            clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
+            for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
+                clip = gif_frames(gif)
+                if deff_id == 108 or 116 <= deff_id <= 124:
+                    # the ROM draws every picture of these clips for the same time, the capture's frame period (the gifs carry 40 ms
+                    # defaults or a mean over a measured run)
+                    period = sorted(ms for _, ms in frames[:30])[len(frames[:30]) // 2]
+                    if deff_id == 108:     # FUN_01020388 ...: FUN_01024378(3), 3 ticks a picture (the capture ran at 33 ms)
+                        period = 49        # 3 ticks of the reference runs (16.26 ms, os_layer.TICK)
+                    clip = [(img, period) for img, _ in clip]
+                if deff_id == 111:
+                    # the ROM's clip functions (random_parts.csv, deff 111): ticks a picture, each clip's own pace (the gifs carry capture defaults)
+                    k = int(os.path.basename(gif)[1:3])
+                    ticks = ([4] * 32, [3] * 58 + [4] * 12 + [3] * 6, [2] * 48 + [3] * 14, [3] * 51, [4] * 12 + [3] * 35, [5] * 19, [3] * 29,
+                             [3] * 40, [3] * 36, [3] * 35, [3] * 71)[k]
+                    if len(ticks) == len(clip):
+                        clip = [(img, int(round(t * 15.8))) for (img, _), t in zip(clip, ticks)]   # 15.8 ms: clip 0 ends at the captured 1960 ms
+                if deff_id in rom_layout.OPEN_WHITE:
+                    clip = [(open_white(img), ms) for img, ms in clip]
+                if deff_id in rom_layout.CLIP_OVER_PANEL:      # the ROM's masked draw leaves level 0 alone: the panel's score shows through
+                    clip = [(clear_black_panel(img), ms) for img, ms in clip]
+                if deff_id in rom_layout.CLIP_END_TEXT:        # dims at its own end, the text follows (variant_shift)
+                    end = sum(ms for _, ms in clip[:-1])
+                    clip = dim_after(clip, end)
+                    shifts.append(end - rom_layout.DIM_AFTER_MS[deff_id])
+                elif deff_id in rom_layout.DIM_AFTER_MS:       # the variants dim like the effect's own frames
+                    clip = dim_after(clip, rom_layout.DIM_AFTER_MS[deff_id])
+                if panel and deff_id not in rom_layout.CLIP_OVER_PANEL:   # the effect's own frames leave the status panel to the score display
+                    from PIL import ImageDraw
+                    for img, _ in clip:
+                        ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
+                variants.append(clip)
+        if deff_id == 83 and source == "graphics":
+            # deff_083_more [0x01018ba0]: the bike crosses the screen 8 dots per frame, right to left with bitmaps 3941-3943 when
+            # (task+0x34 & 7) == 0, else left to right with 3944-3946; the capture shows the first, the second is drawn from the library
+            from PIL import Image
+            lib = os.path.join(ROOT, "assets", "mpf_package", "media", "dmd_library")
+            def bike(base, k):
+                return Image.open(os.path.join(lib, base, "frames", "%03d.png" % (k % 3))).convert("RGBA")
+            right = []
+            for j, (_, ms) in enumerate(frames[:27]):
+                canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 0))    # see-through, like the capture's frames: the text shows under the bike
+                sprite = bike("anim_052_img3944", j)
+                canvas.paste(sprite, (-73 + 8 * j, 0), sprite)
+                right.append((canvas, ms))
+            variants = [list(frames[:27]), right]
+        alt_clip = None
+        alt_gif = os.path.join(folder, "variants", "alt_v00.gif")
+        if source == "graphics" and variants and os.path.exists(alt_gif) and 116 <= deff_id <= 124:
+            alt_clip = gif_frames(alt_gif)
+            period = sorted(ms for _, ms in frames[:30])[len(frames[:30]) // 2]
+            alt_clip = [(img, period) for img, _ in alt_clip]
+            if panel:
+                from PIL import ImageDraw
+                for img, _ in alt_clip:
+                    ImageDraw.Draw(img).rectangle((0, 0, PANEL_WIDTH - 1, 31), fill=(0, 0, 0, 255))
         write_slide(deff_id, frames, layouts, loop, rel, panel,
-                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference")
+                    fills.get(deff_id, ()) if source == "graphics" else (), letters, source == "reference", variants, alt_clip,
+                    shifts)
     return out
 
 
@@ -550,6 +736,8 @@ def build_hd_frames(scale=None, deffs=None):
         os.makedirs(out, exist_ok=True)
         for src in sorted(glob.glob(os.path.join(folder, "*.png"))):
             name = os.path.basename(src)
+            if name[0] == "v" and name[1:4].isdigit():    # the film clips' variants (write_slide): the HD effects play the PuP clips
+                continue
             kind = "sprite" if name.startswith(("solid", "hollow")) else "frame"
             found, boxes, cleared = texts.get(src, ([], [], None))
             key = os.path.basename(folder) + "/" + name
@@ -633,6 +821,17 @@ def build_attract_art():
         img = image(i)
         canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
         canvas.paste(img, (128 - img.width, 0))
+        # the ROM draws the status panel left of the animation (PinMAME's attract capture, constant on all its frames): P1's "00"
+        # (two 3x5 zeros at x 32 and 36, row 1) and the separator column x 40, at level 15; without them every frame of the page is
+        # one that Serum does not know. A game's last scores are not drawn here (the panel's live scores are not given to this page).
+        px = canvas.load()
+        for y in range(32):
+            px[40, y] = (255, 255, 255, 255)
+        for x0 in (32, 36):
+            for y in range(1, 6):
+                for x in range(x0, x0 + 3):
+                    if not (x == x0 + 1 and 1 < y < 5):
+                        px[x, y] = (255, 255, 255, 255)
         canvas.save(os.path.join(GAME, rel, "f{:03d}.png".format(k)))
         frames.append(["res://{}/f{:03d}.png".format(rel, k), 5 * tick_ms + (62 * tick_ms if i == ANIM_IMAGES[-1] else 0)])
     write_effect(name, rel, scene, [rect, {"type": "frames", "name": "Anim", "loop": False, "frames": frames}])

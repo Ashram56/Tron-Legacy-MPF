@@ -23,6 +23,10 @@ ALL_SHOTS = 0xcf
 PROGRESS_LAMPS = {0x01: 14, 0x02: 11, 0x04: 62, 0x08: 59, 0x40: 42, 0x80: 35}
 # award level -> (points, deff, audit) [0x01018804]
 AWARDS = {1: (350000, 87, 0x4b), 2: (750000, 88, 0x4c), 3: (1500000, 89, 0x4d)}
+# clips of the Jackpot (deff 87) per level in the order of the effect's variants (level_L_N.gif). Only the first clip of a level is
+# played (see award()); Super and Double Super Jackpots (88, 89) have one clip per level
+# (assets/mpf_package/README.md, "Film clip effects"; the level is the ROM's lc_clip_level)
+JACKPOT_CLIPS = (2, 1, 2, 1, 2, 4)
 TIMER_TICKS = 315                         # 312 counted down by 7 every 7 ticks (task 0xba / 0xbc)
 GRACE_TICKS = 125                         # task 0xbb / 0xbd: the old lit shots still score
 END_WINDOW = (312, 125)                   # tasks 0xb8 then 0xb9 after the last-but-one ball drains
@@ -73,6 +77,7 @@ class LightCycle(Feature):
         pd.lc_starts = 0
         pd.lc_super_points = 0
         pd.lc_clip_level = 0
+        pd.lc_jackpot_n = 0
 
     # ------------------------------------------------------------------ state tests
 
@@ -151,7 +156,7 @@ class LightCycle(Feature):
         made = popcount(pd.lc_collected)
         if made < needed:
             if not quiet:
-                self.os.deff_start(83, more=needed - made, mask=mask)
+                self.os.deff_start(83, more=needed - made, mask=mask, clip=0 if mask & 7 == 0 else 1)   # the bike crosses right to left, or the other way
         elif self.os.hook("vuk_lit_add", VUK_BIT):
             pd.lc_remaining, pd.lc_collected = ALL_SHOTS, 0
             if not quiet:
@@ -227,9 +232,18 @@ class LightCycle(Feature):
         if self.mb_super_points > 2:
             os_.hook("item_collect", ITEM)
         self.total += scored
-        os_.deff_start(deff, points=scored)
+        clip_level = pd.lc_clip_level
+        if deff == 87:
+            # one clip per level: the ROM names it by the level (table 0x040d3084, no pick; the reference at every Jackpot
+            # of a level shows the same clip, and Serum knows only the first clip of each level: the others are not frames
+            # of the ROM). The effect's other variants (level_L_N.gif, JACKPOT_CLIPS) are never played.
+            clip = sum(JACKPOT_CLIPS[:clip_level])
+        else:
+            clip = clip_level
+        os_.deff_start(deff, points=scored, clip=clip)
         if level == 3:                    # art for the next Jackpots (deff 87 clip range)
             pd.lc_clip_level = pd.lc_clip_level + 1 if pd.lc_clip_level < 5 else 0
+            pd.lc_jackpot_n = 0
 
     def advance_a(self, mask, level):
         """lc_chain_a_advance [0x010183a0]."""

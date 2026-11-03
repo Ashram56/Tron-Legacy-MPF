@@ -1,0 +1,528 @@
+{
+ "clips": {
+  "deff_038": {
+   "files": [
+    "res://media/dmd_clip/deff_038_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 6230
+  },
+  "deff_046": {
+   "files": [
+    "res://media/dmd_clip/deff_046_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 4990
+  },
+  "deff_047": {
+   "files": [
+    "res://media/dmd_clip/deff_047_v0.mp4",
+    "res://media/dmd_clip/deff_047_v1.mp4"
+   ],
+   "loop": true,
+   "ms": 652
+  },
+  "deff_048": {
+   "files": [
+    "res://media/dmd_clip/deff_048_v0.mp4",
+    "res://media/dmd_clip/deff_048_v1.mp4",
+    "res://media/dmd_clip/deff_048_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 2818
+  },
+  "deff_049": {
+   "files": [
+    "res://media/dmd_clip/deff_049_v0.mp4",
+    "res://media/dmd_clip/deff_049_v1.mp4",
+    "res://media/dmd_clip/deff_049_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 3306
+  },
+  "deff_051": {
+   "files": [
+    "res://media/dmd_clip/deff_051_v0.mp4",
+    "res://media/dmd_clip/deff_051_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 3639
+  },
+  "deff_052": {
+   "files": [
+    "res://media/dmd_clip/deff_052_v0.mp4",
+    "res://media/dmd_clip/deff_052_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 2730
+  },
+  "deff_053": {
+   "files": [
+    "res://media/dmd_clip/deff_053_v0.mp4",
+    "res://media/dmd_clip/deff_053_v1.mp4"
+   ],
+   "loop": true,
+   "ms": 389
+  },
+  "deff_054": {
+   "files": [
+    "res://media/dmd_clip/deff_054_v0.mp4",
+    "res://media/dmd_clip/deff_054_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 2230
+  },
+  "deff_055": {
+   "files": [
+    "res://media/dmd_clip/deff_055_v0.mp4",
+    "res://media/dmd_clip/deff_055_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 2177
+  },
+  "deff_056": {
+   "files": [
+    "res://media/dmd_clip/deff_056_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3920
+  },
+  "deff_057": {
+   "files": [
+    "res://media/dmd_clip/deff_057_v0.mp4"
+   ],
+   "loop": true,
+   "ms": 2829
+  },
+  "deff_058": {
+   "files": [
+    "res://media/dmd_clip/deff_058_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 2204
+  },
+  "deff_059": {
+   "files": [
+    "res://media/dmd_clip/deff_059_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 2217
+  },
+  "deff_060": {
+   "files": [
+    "res://media/dmd_clip/deff_060_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 2219
+  },
+  "deff_064": {
+   "files": [
+    "res://media/dmd_clip/deff_064_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3780
+  },
+  "deff_065": {
+   "files": [
+    "res://media/dmd_clip/deff_065_v0.mp4"
+   ],
+   "loop": true,
+   "ms": 12004
+  },
+  "deff_068": {
+   "files": [
+    "res://media/dmd_clip/deff_068_v0.mp4",
+    "res://media/dmd_clip/deff_068_v1.mp4",
+    "res://media/dmd_clip/deff_068_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 3840
+  },
+  "deff_069": {
+   "files": [
+    "res://media/dmd_clip/deff_069_v0.mp4",
+    "res://media/dmd_clip/deff_069_v1.mp4",
+    "res://media/dmd_clip/deff_069_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 4374
+  },
+  "deff_071": {
+   "files": [
+    "res://media/dmd_clip/deff_071_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 2090
+  },
+  "deff_073": {
+   "files": [
+    "res://media/dmd_clip/deff_073_v0.mp4",
+    "res://media/dmd_clip/deff_073_v1.mp4",
+    "res://media/dmd_clip/deff_073_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 2328
+  },
+  "deff_076": {
+   "files": [
+    "res://media/dmd_clip/deff_076_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 2530
+  },
+  "deff_078": {
+   "files": [
+    "res://media/dmd_clip/deff_078_v0.mp4",
+    "res://media/dmd_clip/deff_078_v1.mp4",
+    "res://media/dmd_clip/deff_078_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 2515
+  },
+  "deff_083": {
+   "files": [
+    "res://media/dmd_clip/deff_083_v0.mp4",
+    "res://media/dmd_clip/deff_083_v1.mp4",
+    "res://media/dmd_clip/deff_083_v2.mp4",
+    "res://media/dmd_clip/deff_083_v3.mp4",
+    "res://media/dmd_clip/deff_083_v4.mp4",
+    "res://media/dmd_clip/deff_083_v5.mp4"
+   ],
+   "loop": false,
+   "ms": 1982
+  },
+  "deff_084": {
+   "files": [
+    "res://media/dmd_clip/deff_084_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 4010
+  },
+  "deff_085": {
+   "files": [
+    "res://media/dmd_clip/deff_085_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 5200
+  },
+  "deff_086": {
+   "files": [
+    "res://media/dmd_clip/deff_086_v0.mp4",
+    "res://media/dmd_clip/deff_086_v1.mp4"
+   ],
+   "loop": true,
+   "ms": 11360
+  },
+  "deff_087": {
+   "files": [
+    "res://media/dmd_clip/deff_087_v0.mp4",
+    "res://media/dmd_clip/deff_087_v1.mp4",
+    "res://media/dmd_clip/deff_087_v2.mp4",
+    "res://media/dmd_clip/deff_087_v3.mp4"
+   ],
+   "loop": false,
+   "ms": 2692
+  },
+  "deff_088": {
+   "files": [
+    "res://media/dmd_clip/deff_088_v0.mp4",
+    "res://media/dmd_clip/deff_088_v1.mp4",
+    "res://media/dmd_clip/deff_088_v2.mp4",
+    "res://media/dmd_clip/deff_088_v3.mp4"
+   ],
+   "loop": false,
+   "ms": 2907
+  },
+  "deff_089": {
+   "files": [
+    "res://media/dmd_clip/deff_089_v0.mp4",
+    "res://media/dmd_clip/deff_089_v1.mp4",
+    "res://media/dmd_clip/deff_089_v2.mp4",
+    "res://media/dmd_clip/deff_089_v3.mp4"
+   ],
+   "loop": false,
+   "ms": 2423
+  },
+  "deff_090": {
+   "files": [
+    "res://media/dmd_clip/deff_090_v0.mp4",
+    "res://media/dmd_clip/deff_090_v1.mp4",
+    "res://media/dmd_clip/deff_090_v2.mp4",
+    "res://media/dmd_clip/deff_090_v3.mp4",
+    "res://media/dmd_clip/deff_090_v4.mp4",
+    "res://media/dmd_clip/deff_090_v5.mp4"
+   ],
+   "loop": false,
+   "ms": 3201
+  },
+  "deff_095": {
+   "files": [
+    "res://media/dmd_clip/deff_095_v0.mp4"
+   ],
+   "loop": true,
+   "ms": 2247
+  },
+  "deff_096": {
+   "files": [
+    "res://media/dmd_clip/deff_096_v0.mp4",
+    "res://media/dmd_clip/deff_096_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 1080
+  },
+  "deff_097": {
+   "files": [
+    "res://media/dmd_clip/deff_097_v0.mp4",
+    "res://media/dmd_clip/deff_097_v1.mp4",
+    "res://media/dmd_clip/deff_097_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 1788
+  },
+  "deff_098": {
+   "files": [
+    "res://media/dmd_clip/deff_098_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1530
+  },
+  "deff_100": {
+   "files": [
+    "res://media/dmd_clip/deff_100_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1150
+  },
+  "deff_104": {
+   "files": [
+    "res://media/dmd_clip/deff_104_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3230
+  },
+  "deff_108": {
+   "files": [
+    "res://media/dmd_clip/deff_108_v0.mp4",
+    "res://media/dmd_clip/deff_108_v1.mp4",
+    "res://media/dmd_clip/deff_108_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 1809
+  },
+  "deff_109": {
+   "files": [
+    "res://media/dmd_clip/deff_109_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3580
+  },
+  "deff_111": {
+   "files": [
+    "res://media/dmd_clip/deff_111_v0.mp4",
+    "res://media/dmd_clip/deff_111_v1.mp4",
+    "res://media/dmd_clip/deff_111_v2.mp4",
+    "res://media/dmd_clip/deff_111_v3.mp4",
+    "res://media/dmd_clip/deff_111_v4.mp4",
+    "res://media/dmd_clip/deff_111_v5.mp4",
+    "res://media/dmd_clip/deff_111_v6.mp4"
+   ],
+   "loop": false,
+   "ms": 4106
+  },
+  "deff_112": {
+   "files": [
+    "res://media/dmd_clip/deff_112_v0.mp4",
+    "res://media/dmd_clip/deff_112_v1.mp4",
+    "res://media/dmd_clip/deff_112_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 3970
+  },
+  "deff_113": {
+   "files": [
+    "res://media/dmd_clip/deff_113_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 6950
+  },
+  "deff_114": {
+   "files": [
+    "res://media/dmd_clip/deff_114_v0.mp4",
+    "res://media/dmd_clip/deff_114_v1.mp4"
+   ],
+   "loop": true,
+   "ms": 12009
+  },
+  "deff_115": {
+   "files": [
+    "res://media/dmd_clip/deff_115_v0.mp4",
+    "res://media/dmd_clip/deff_115_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 6379
+  },
+  "deff_116": {
+   "files": [
+    "res://media/dmd_clip/deff_116_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1589
+  },
+  "deff_117": {
+   "files": [
+    "res://media/dmd_clip/deff_117_v0.mp4",
+    "res://media/dmd_clip/deff_117_v1.mp4",
+    "res://media/dmd_clip/deff_117_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 1590
+  },
+  "deff_118": {
+   "files": [
+    "res://media/dmd_clip/deff_118_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1589
+  },
+  "deff_119": {
+   "files": [
+    "res://media/dmd_clip/deff_119_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1980
+  },
+  "deff_120": {
+   "files": [
+    "res://media/dmd_clip/deff_120_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1590
+  },
+  "deff_121": {
+   "files": [
+    "res://media/dmd_clip/deff_121_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1592
+  },
+  "deff_122": {
+   "files": [
+    "res://media/dmd_clip/deff_122_v0.mp4",
+    "res://media/dmd_clip/deff_122_v1.mp4",
+    "res://media/dmd_clip/deff_122_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 1590
+  },
+  "deff_123": {
+   "files": [
+    "res://media/dmd_clip/deff_123_v0.mp4",
+    "res://media/dmd_clip/deff_123_v1.mp4",
+    "res://media/dmd_clip/deff_123_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 1588
+  },
+  "deff_124": {
+   "files": [
+    "res://media/dmd_clip/deff_124_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1589
+  },
+  "deff_125": {
+   "files": [
+    "res://media/dmd_clip/deff_125_v0.mp4"
+   ],
+   "loop": true,
+   "ms": 10200
+  },
+  "deff_126": {
+   "files": [
+    "res://media/dmd_clip/deff_126_v0.mp4",
+    "res://media/dmd_clip/deff_126_v1.mp4",
+    "res://media/dmd_clip/deff_126_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 4129
+  },
+  "deff_128": {
+   "files": [
+    "res://media/dmd_clip/deff_128_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 5470
+  },
+  "deff_129": {
+   "files": [
+    "res://media/dmd_clip/deff_129_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 5510
+  },
+  "deff_130": {
+   "files": [
+    "res://media/dmd_clip/deff_130_v0.mp4",
+    "res://media/dmd_clip/deff_130_v1.mp4",
+    "res://media/dmd_clip/deff_130_v2.mp4"
+   ],
+   "loop": false,
+   "ms": 2164
+  },
+  "deff_133": {
+   "files": [
+    "res://media/dmd_clip/deff_133_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3108
+  },
+  "deff_139": {
+   "files": [
+    "res://media/dmd_clip/deff_139_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 1688
+  },
+  "deff_140": {
+   "files": [
+    "res://media/dmd_clip/deff_140_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 5302
+  },
+  "deff_142": {
+   "files": [
+    "res://media/dmd_clip/deff_142_v0.mp4",
+    "res://media/dmd_clip/deff_142_v1.mp4"
+   ],
+   "loop": false,
+   "ms": 3405
+  },
+  "deff_143": {
+   "files": [
+    "res://media/dmd_clip/deff_143_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 8937
+  },
+  "deff_951": {
+   "files": [
+    "res://media/dmd_clip/deff_951_v0.mp4"
+   ],
+   "loop": false,
+   "ms": 3950
+  }
+ },
+ "icons": {
+  "deff_062": "res://media/dmd_clip/icon_quorra.png",
+  "deff_063": "res://media/dmd_clip/icon_quorra.png",
+  "deff_070": "res://media/dmd_clip/icon_quorra.png",
+  "deff_074": "res://media/dmd_clip/icon_clu.png",
+  "deff_075": "res://media/dmd_clip/icon_gem.png",
+  "deff_079": "res://media/dmd_clip/icon_gem.png",
+  "deff_099": "res://media/dmd_clip/icon_zuse.png",
+  "deff_131": "res://media/dmd_clip/icon_clu.png",
+  "deff_136": "res://media/dmd_clip/icon_flynn.png",
+  "deff_137": "res://media/dmd_clip/icon_flynn.png"
+ }
+}

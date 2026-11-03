@@ -210,6 +210,14 @@ static func is_classic_tint(c: Color) -> bool:
 
 func _enter_tree() -> void:
 	var args := OS.get_cmdline_user_args()
+	# the platform gives these as user arguments (a bundle's settings): the DMD window's size and the frame rate cap
+	for a in args:
+		if a.begins_with("--dmd-window="):      # not --dmd-size=: the platform's dmd_out add-on reads that one as the RGB DMD device's size
+			var wh := a.trim_prefix("--dmd-window=").to_lower().split("x")
+			if wh.size() == 2 and wh[0].is_valid_int() and wh[1].is_valid_int():
+				get_window().size = Vector2i(int(wh[0]), int(wh[1]))
+		elif a.begins_with("--max-fps=") and a.trim_prefix("--max-fps=").is_valid_int():
+			Engine.max_fps = int(a.trim_prefix("--max-fps="))
 	mode = choose(args, OS.get_environment("TRON_DMD"),
 		str(ProjectSettings.get_setting("tron/dmd/mode", "hd")))
 	hd = mode == "hd" and FileAccess.file_exists("res://fonts/hd/fonts_hd.json")
@@ -384,6 +392,8 @@ func _data_pictures(effect_path: String) -> Array[String]:
 		match it["type"]:
 			"frames":
 				pics = it["color_frames"] if color and it.has("color_frames") else it["frames"].map(func(f): return f[0])
+				for clip in it.get("variants", []):
+					pics = pics + clip.map(func(f): return f[0])
 			"letters":
 				pics = it["sprites"].map(func(sp): return sp["color_pic"] if color and sp.has("color_pic") else sp["pic"])
 		for p in pics:

@@ -4,6 +4,8 @@ The award functions of the other features are reached through hooks named arcade
 (returns the entry's weight, given its default) and arcade_<award> (gives the award, returns True when
 given). A feature that is not built leaves its entry at weight 0.
 """
+import os as osenv
+
 from tron.features import Feature
 from tron.os_layer import TICK
 
@@ -144,11 +146,13 @@ class Arcade(Feature):
         The award goes where it already shows, else in a random slot (FUN_0000c6b4(3)). A test or
         scenario can force the slot (os.forced["arcade_slot"])."""
         os_ = self.os
-        rnd = os_.random
+        # conformance runs (TRON_DMD_SEED=first; the reference's TRON_RNG_ZERO=1 zeroes sites 0x100e904, 0x100e920,
+        # 0x100ea24): every draw is the lowest
+        draw = (lambda n: 0) if osenv.environ.get("TRON_DMD_SEED") == "first" else os_.random.randrange
         cabinets, icons = [], []
         for _ in range(3):
-            cabinets.append(rnd.randrange(4))
-            first = rnd.randrange(13)
+            cabinets.append(draw(4))
+            first = draw(13)
             v = first
             while True:
                 v = v + 1 if v + 1 < 13 else 1
@@ -158,7 +162,7 @@ class Arcade(Feature):
         forced = os_.forced.get("arcade_slot")
         slot = forced.pop(0) if forced else None
         if slot is None:
-            slot = icons.index(award_id) if award_id in icons else rnd.randrange(3)
+            slot = icons.index(award_id) if award_id in icons else draw(3)
         elif award_id in icons and icons.index(award_id) != slot:
             icons[icons.index(award_id)] = icons[slot]
         icons[slot] = award_id

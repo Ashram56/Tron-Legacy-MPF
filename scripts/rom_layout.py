@@ -220,10 +220,12 @@ FONT_TABLES = {"0x040d31bc": 2,     # deff 44 LEVEL %d COMPLETED
                "0x040d32c4": 39,    # deff 108 %u MORE / TO ACCESS
                "0x040d2900": 39,    # deff 112 SUPER / POPS / DOUBLE / SCORING / SPINNERS
                "0x040d2918": 10}    # deff 112 SPINNERS SCORE
-# The score display (deff 19) picks font and row from a table by score (RAM 0x370ac, not in the
-# package). Score 0 is font 26 on row 21 (reference capture); the smaller fonts for longer scores are
-# a guess: the first that fits the 87 dots right of the status panel, centred on the same middle row.
-SCORE_FIT = {"fit_fonts": [26, 23, 21, 19], "fit_ys": [21, 21, 18, 16], "fit_width": 87}
+# The score display (deff 19) picks font and row from the score-size table (RAM 0x370ac -> ROM 0x40d3484, records
+# {min score, font, y}; assets/rom_data/deffs/README.md): >= 100,000,000 font 22 row 18, >= 1,000,000 font 17 row 18,
+# >= 100,000 font 24 row 21, below font 26 row 21. fit_fonts lists them from the largest minimum down; score_min picks
+# by the value, not by the width.
+SCORE_FIT = {"fit_fonts": [22, 17, 24, 26], "fit_ys": [18, 18, 21, 21], "score_min": [100000000, 1000000, 100000, 0],
+             "fit_width": 87}
 FALLBACK_FONT = 12
 # Draw calls whose font or row come from ROM tables: values read off the reference capture.
 # deff 38 match: "MATCH" in the font of table 0x40d3ce0 (font 37 in the capture), right-aligned at
@@ -235,6 +237,53 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                             "hide_after_frame": 30, "step_frames": 2,
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
+             # deff 48 (0x01008950) Disc Multiball jackpot: the clip plays bare, the text comes at 1410 ms with the sound
+             # 0x05b (1420 ms), the points blinking on 4 ticks off 4 (PinMAME capture)
+             48: {"DISC MULTIBALL": {"show_after_ms": 1410}, "JACKPOT": {"show_after_ms": 1410},
+                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4}},
+             # deffs 49, 87-89 (the other jackpot clips): the same, at DIM_AFTER_MS
+             49: {"DISC MULTIBALL": {"show_after_ms": 1865}, "JACKPOT": {"show_after_ms": 1865},
+                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4}},
+             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4}},
+             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4}},
+             89: {"DOUBLE": {"show_after_ms": 983}, "SUPER JACKPOT": {"show_after_ms": 983},
+                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4}},
+             # deffs 68, 69 (Quorra's jackpots): the clip plays bare, the text of the screen the capture shows comes at the last
+             # sound call (timing.json), the points blinking like the other jackpots
+             68: {"JACKPOT": {"show_after_ms": 1806}, "%,02lu": {"show_after_ms": 1806, "blink_ticks": 4}},
+             69: {"SUPER JACKPOT": {"show_after_ms": 2199}, "SUPER": {"show_after_ms": 2199},
+                  "JACKPOT": {"show_after_ms": 2199}, "%,02lu": {"show_after_ms": 2199, "blink_ticks": 4}},
+             # deff 73 (Clu's award): the clip plays bare, the points come with its last frames (PinMAME capture: text on from about
+             # 512 ms, blinking on 48 ms, off 48: fitted on the capture)
+             73: {"%,02lu": {"show_after_ms": 512, "blink_ms": 48}},
+             # FUN_01020388: "%u MORE" is hidden (palette to black) while bit 1 of the frame number is set: 2 frames shown, 2 hidden (3 ticks each)
+             # deffs 58, 59, 60 (End of Line jackpots): the points alternate shown / hidden every 6-tick frame, shown first (21 frames)
+             **{d: {"%,02lu": {"blink_ms": 97, "blink_dark": True}} for d in (58, 59, 60)},
+             # deff 144 (deff_144_portal_bonus_award): the points alternate shown / hidden every 3-tick frame, shown first (41 frames)
+             144: {"%,02lu": {"blink_ms": 48.5, "blink_dark": True}},
+             # deff 108 (FUN_01020388 ...): "%u MORE" lit on frames 0-1 of every 4 (3-tick frames, frame & 2 picks the black palette:
+             # nothing drawn, the clip's picture shows where the text was), with the clip's pictures
+             108: {"%u MORE": {"blink_frames": 2}},
+             # deff 097 (Zuse ALL TARGETS, 0x...): one of 2 clips (table 0x040d6fd4), then ALL / TARGETS and the value over its last
+             # picture dimmed, the value lit and black on alternate 3-tick frames (CLIP_END_TEXT moves the times with the clip)
+             97: {"ALL": {"show_after_ms": 640}, "TARGETS": {"show_after_ms": 640},
+                  "%,02lu": {"show_after_ms": 640, "blink_ms": 49, "blink_dark": True}},
+             # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
+             111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
+                   "DISC MULTIBALL": {"show_after_ms": 1960}},
+             # deff 142 (Portal shot): the clip plays bare, then the picture dims and the points blink on it from 1680 ms (PinMAME
+             # capture; on 48 ms, black 48 ms)
+             142: {"%,02lu": {"show_after_ms": 1680, "blink_ms": 48, "blink_dark": True}},
+             # deff 143 (Portal's super jackpot): the clip plays bare, the text comes over the picture at 4240 ms from the start
+             # (portal_multiball reference run; the capture's 4100 ms counted from its first frame), the points lit and drawn
+             # black on alternate 3-tick frames
+             143: {"SUPER": {"show_after_ms": 4240}, "JACKPOT": {"show_after_ms": 4240},
+                   "%,02lu": {"show_after_ms": 4240, "blink_ms": 49, "blink_dark": True}},
+             # deffs 10, 15, 17 (the credits screens): the credit text on the upper row, the prompt on the lower one blinking
+             # 15 ticks on, 15 off from the start (PinMAME capture, rows 5-12 and 18-25 of the right part)
+             **{d: {"%s": {"font": 10, "x": 84, "y": 12, "flags": 2, "source": "capture"},
+                    "%-s": {"font": 10, "x": 84, "y": 25, "flags": 2, "source": "capture", "blink_ticks": 15}}
+                for d in (10, 15, 17)},
              # deff 40 (0x0100f604): "YOU'RE UP" drawn on every other 6-tick step
              40: {"YOU'RE UP": {"blink_ticks": 6}},
              # deff 94 (0x01032510): FAST SCORING in a font from table 0x040d6f98 (font 34 in the capture)
@@ -258,7 +307,7 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                            "hide_after_ms": round(24 * TICK_MS)}},
              # deffs 115-124 (deff_115, FUN_01027374 / FUN_01027478): the points are printed with the
              # palette palette_fill(0, 1, 15) every other 3-tick frame: the glyphs drawn black (blink_dark)
-             **{d: {"%,02lu": {"blink_ticks": 3, "blink_dark": True}} for d in range(115, 125)},
+             **{d: {"%,02lu": {"blink_frames": 1, "blink_dark": True}} for d in range(115, 125)},
              # deff 138 (0x01003c30): the combo count "%u" right-aligned at x 0x53, row 0x13, in font 0x2a on
              # frames where !(frame & 2), else in the outlined font 0x2b (frames of 3 ticks): two labels that
              # blink in turn
@@ -300,6 +349,25 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              141: {"SUPER=%,02lu": {"font": 0, "x": 84, "y": 28, "flags": 2, "source": "rom (message picked into msg_id)"},
                    "SUPER JACKPOT LIT": {"blink_ticks": 16}, "ALL SHOTS=%,02lu": {"blink_ticks": 16}}}
 GRAPHICS_END = {38: 64}
+# Effects whose picture is cleared at this time, the points staying on black (PinMAME capture; deff 73: the last frame, 1740 ms in
+# timing.json because it runs to the end of the capture, is on for one frame time)
+CLEAR_AT_MS = {73: 600, 112: 1410}
+# Effects whose bitmap frames have a full-white area reaching the picture's edge that the ROM leaves undrawn (deff 108: the text shows
+# through), and whose bitmap the ROM draws after its text (the clip covers the text where it is drawn)
+OPEN_WHITE = {108}
+TEXT_UNDER_CLIP = {108, 83, 78}
+# ... and whose bitmap the ROM draws over the status panel too (deff 108: bitmap_draw_masked from x 0 after the panel; the Recognizer
+# crosses the scores)
+CLIP_OVER_PANEL = {108}
+# Effects whose pictures use a level the ROM shows as another (PinMAME capture; {deff: {level in the picture: level shown}})
+LEVEL_MAP = {65: {1: 0}, 112: {15: 1}}   # 112: the TRON outline through palette slot 15 -> 1 (deff_112_super)
+# Effects whose picture goes dim when their text comes (PinMAME capture): from this time every lit dot of the picture is level 1
+# (deff 48: the last clip frame, silhouetted, under the text at 1410 ms). The jackpot effects switch at the start of their last
+# graphics frame + 35 ms, a little before their last sound call (timing.json); their text and points come at the same time.
+# Effects whose film clip the ROM picks (at random, or by the Light Cycle level: 87-89, table 0x040d3084) and whose text loop starts when the clip ends (deff_048 0x01008920: the clip
+# function of table 0x040d2804 returns its last bitmap, drawn dimmed under the text): each clip dims and shows its text at its own end
+CLIP_END_TEXT = {48, 49, 87, 88, 89, 97, 111}
+DIM_AFTER_MS = {97: 640, 142: 1680, 111: 1960, 48: 1410, 49: 1865, 87: 1235, 88: 1473, 89: 983}
 # Effects that draw one of several screens on the same rows, picked by the deff's arguments (the event
 # arg `screen`, tron/rom_text.gd): {deff: {line: screens it shows on}}; other lines show on every
 # screen. Lines of different screens may overlap; the rules pass `screen`.
@@ -350,11 +418,17 @@ def frame_ms(deff_id, k):
 # deff 140 (0x0102faec): the animation's 67 frames (2 ticks) with the bonus lines, then PORTAL / MULTIBALL
 # (font 0x27) for 21 frames of 3 ticks, then COMPLETE ALL SHOTS / FOR / SUPER JACKPOT to the end
 _P140 = frame_ms(140, 67)
+# Past the animation its last picture stays at level 1 (palette 0x30 of the deff) and the text blinks every 3-tick frame,
+# lit first (palette 0x40 on odd frames: the glyphs vanish); COMPLETE ALL SHOTS holds its first frame (FUN_00027acc(1),
+# about 370 ms in the capture) before it blinks.
+_B140 = round(3 * TICK_MS)
 OVERRIDES[140] = {**{t: {"hide_after_frame": 67} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
-                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS)}
-                     for t in ("PORTAL", "MULTIBALL")},
-                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS)} for t in ("COMPLETE ALL SHOTS", "FOR",
-                                                                                 "SUPER JACKPOT")}}
+                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140,
+                         "blink_dark": True} for t in ("PORTAL", "MULTIBALL")},
+                  **{t: {"show_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140, "blink_dark": True,
+                         "blink_after_ms": _P140 + round(63 * TICK_MS) + 370}
+                     for t in ("COMPLETE ALL SHOTS", "FOR", "SUPER JACKPOT")}}
+DIM_AFTER_MS[140] = _P140
 SAMPLE = {"%,02lu": "1,234,560", "%luK": "100K"}
 
 
@@ -404,6 +478,8 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             lay.update({k: v for k, v in over.items() if not k.endswith(("_frame", "_frames", "_ticks"))})
             if "blink_ticks" in over:
                 lay["blink_ms"] = round(over["blink_ticks"] * TICK_MS)
+            if "blink_frames" in over:               # a count of the clip's pictures (the "_frames" keys above are frame times)
+                lay["blink_frames"] = over["blink_frames"]
             if "show_after_frame" in over:
                 lay["show_after_ms"] = frame_ms(deff_id, over["show_after_frame"])
             if "hide_after_frame" in over:
@@ -416,8 +492,8 @@ def line_layouts(deff_id, lines, fonts, calls=None):
         if i in SCREENS.get(deff_id, {}):
             lay["screens"] = list(SCREENS[deff_id][i])
         if deff_id == 19 and "%" in line and "BALL" not in line:
-            lay.update(font=SCORE_FIT["fit_fonts"][0], x=84, flags=2, y=SCORE_FIT["fit_ys"][0],
-                       source="rom+table guess", **SCORE_FIT)
+            lay.update(font=SCORE_FIT["fit_fonts"][-1], x=84, flags=2, y=SCORE_FIT["fit_ys"][-1],
+                       source="rom+table", **SCORE_FIT)
         lays.append(lay)
     out, boxes = [None] * len(lines), []
     order = sorted(range(len(lines)), key=lambda k: (lays[k]["source"] == "fallback", k))
@@ -446,3 +522,22 @@ def line_layouts(deff_id, lines, fonts, calls=None):
             boxes.append(box + (call, screens, cycle))
             out[i] = lay
     return out
+
+# deff 25 (end of ball bonus, 0x01000e7c): screen 0 BONUS / base, 1 an item, SEA OF SIMULATION or PORTAL line (name at 84,8 font 2,
+# FUN_01015f40 or msg 0x610 / 0x612), 2 a multiplier step, 3 TOTAL BONUS (0x01000d78)
+SCREENS[25] = {0: (0,), 1: (0,), 2: (1,), 3: (1,), 4: (1,), 5: (2,), 6: (2,), 7: (3,), 8: (3,)}
+# (the code's calls list only the total screen's: the other lines are placed from text_draws.csv)
+OVERRIDES[25] = {t: {"font": f, "x": 84, "y": y, "flags": 2, "source": "rom"}
+                 for t, f, y in (("BONUS", 15, 13), ("%s", 2, 8), ("+%,02lu", 2, 14), ("%dX", 12, 12))}
+
+# deff 112 (0x0100d108) TRON timed award, by the award (task+0x30: 1 DOUBLE SCORING, 2 SUPER POPS, 4 SUPER SPINNERS; the rules pass
+# screen 0, 1, 2): the TRON outline with the award's two words lit on frames 2-3 of every 4 (24 frames of 4 ticks), then the
+# second screen (FUN_0100cab4 / cccc / cee8): its title at level 4 (palette slot 15 -> 4), its value held 12 + 3 ticks, then
+# shown on even frames of 3 ticks (43 frames)
+_P112 = 1410        # 24 frames of 4 ticks, measured on the capture (its ticks run a little short)
+SCREENS[112] = {0: (1,), 1: (1,), 2: (0,), 3: (0,), 4: (2,), 5: (2,), 6: (0,), 7: (0,), 8: (1,), 9: (1,), 10: (2,), 11: (2,)}
+OVERRIDES[112] = {**{t: {"show_after_ms": 140, "blink_ms": 127, "hide_after_ms": _P112}
+                     for t in ("SUPER", "POPS", "DOUBLE", "SCORING", "SPINNERS")},
+                  **{t: {"show_after_ms": _P112, "level_steps": [4], "step_ms": 10 ** 6}
+                     for t in ("ALL SCORES", "POPS SCORE", "SPINNERS SCORE")},
+                  **{t: {"show_after_ms": _P112, "blink_ms": 50, "blink_after_ms": 1640} for t in ("DOUBLED", "3X")}}

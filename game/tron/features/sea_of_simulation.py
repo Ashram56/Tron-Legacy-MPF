@@ -11,6 +11,8 @@ chain table 0x040d3748) are modelled as the spec describes them; see STAGES.
 from tron.features import Feature
 from tron.os_layer import TICK
 
+COMPLETE_TOTAL_SECONDS = 2.28       # completion to the TOTAL screen (PinMAME: 85.97 -> 88.25)
+
 ORDER = 40
 
 # simulation_shot ids [table 0x040d35dc]
@@ -40,6 +42,9 @@ STAGES = (
     (13,),
     (2, 3, 4, 5),
 )
+# Stage 6: the shots a made shot adds (chain table 0x040d3748; ids 14 left orbit, 15 left ramp, 16 left inner loop,
+# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (PinMAME: six deff 122)
+LIGHT_CYCLE_CHAIN = {15: (14, 16), 16: (17, 18), 19: (17, 18)}
 # The stage's messages (stage table + 0x18 and + 0x19), drawn by deff 114 under SEA OF SIMULATION
 STAGE_TEXT = ("FLYNNS ARCADE", "GEM", "CLU HELMETS", "ZUSE TARGETS", "QUORRA", "DISCS", "LIGHT CYCLES",
               "RECOGNIZER", "TRON TARGETS")
@@ -274,7 +279,8 @@ class SeaOfSimulation(Feature):
             return False
         if k == 6:                                   # shots made stay excluded (chain table 0x040d3748)
             self.lc_made |= bit
-            self.needed &= ~self.lc_made
+            self.needed &= ~bit
+            self.needed |= bits(LIGHT_CYCLE_CHAIN.get(shot, ())) & ~self.lc_made
         elif k == 7:                                 # six recognizer hits, each one paid
             self.rec_hits = min(self.rec_hits + 1, RECOGNIZER_HITS)
             if self.rec_hits >= RECOGNIZER_HITS:
@@ -329,20 +335,22 @@ class SeaOfSimulation(Feature):
         setattr(self, counter, 0 if n + 1 >= samples else n + 1)
 
     def complete(self):
-        """sos_complete [0x01026430]: flag 0x36, SOS ends, deff 125."""
+        """sos_complete [0x01026430]: flag 0x36, SOS ends, then task 0x56 shows deff 126 TOTAL (2.28 s later in the
+        PinMAME trace; deff 125 has no start site in 1.74)."""
         os_ = self.os
         os_.flag_set(0x36)
         if self.running():
             os_.flag_clear(0x34)
-            self.show_total()
+            os_.after(round(COMPLETE_TOTAL_SECONDS / TICK), self.show_total)
             os_.request_refresh()
 
     def show_total(self):
-        """FUN_01026724, task 0x56: deff 125 after completion, else deff 126 TOTAL (not when tilted)."""
+        """FUN_01026724, task 0x56: deff 126 TOTAL, after a drain and after completion alike (deff 125 never plays
+        in 1.74, rules/modes/sea_of_simulation.md section 6; not when tilted)."""
         os_ = self.os
         if os_.state & 0x310:
             return 0
-        deff = 125 if os_.flag(0x36) else 126
+        deff = 126
         os_.deff_start(deff, total=self.total)
         info = os_.display.media.get(deff)
         return round(info.seconds / TICK) if info else 0

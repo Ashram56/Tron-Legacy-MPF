@@ -330,6 +330,14 @@ python scripts/run.py --dmd-out auto           # the platform looks: PIN2DMD, Ze
 On a P-ROC machine (`--hw proc`) the RGB DMD replaces the original DMD (the P-ROC's DMD connector is left alone; both
 together are not supported). A machine installed by the setup page picks the device by itself with `[dmd] window = auto`.
 
+### Dot colourisation (Serum)
+
+The colourisation of the dot DMD (128x32 or 256x64) with a Serum file is **not part of the game**: it is handled apart, by the platform
+(MPF-Godot-Packaging, which also owns libserum and the build tools), and the player brings the colourisation file, which is never in this
+repository. The game only provides its DMD output: the classic 128x32 picture in the ROM's 16 shades to the add-on (`--zedmd`,
+`--pin2dmd`) and, for the HD LCD, its own colour (docs/dmd_colour.md). A colouriser finds a frame by the dots its comparison masks keep,
+so the game's DMD must draw the ROM's dots: [dmd_conformance.md](dmd_conformance.md) measures how close it is to PinMAME's output.
+
 **Not tried on a real PIN2DMD or ZeDMD**: the protocols follow libdmdutil's and libzedmd's source and are tested against
 fake devices in the platform's repository. To check: the PIN2DMD's colour order (`pin2dmd: panel: rbg` swaps green and
 blue) and firmware ("virtual pinball" mode), the ZeDMD's port, firmware 5.x and colour order. This game's own copy of the

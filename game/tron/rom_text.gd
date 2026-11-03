@@ -20,6 +20,9 @@ extends MPFVariable
 @export var fit_fonts: PackedInt32Array = PackedInt32Array()
 @export var fit_ys: PackedInt32Array = PackedInt32Array()
 @export var fit_width: int = 0
+## score_min: fit_fonts picked by the number in the text instead of its width: the first entry whose minimum the
+## value reaches (the score-size table of deff 19, ROM 0x40d3484)
+@export var score_min: PackedInt32Array = PackedInt32Array()
 @export var alt_x: int = 0
 @export var alt_y: int = 0
 @export var alt_when_empty: String = ""
@@ -28,6 +31,8 @@ extends MPFVariable
 @export var level_steps: PackedInt32Array = PackedInt32Array()
 @export var step_ms: int = 0
 @export var blink_ms: int = 0
+## blink_after_ms: the blink starts there (the line shows steadily from show_after_ms until then); 0 = at show_after_ms
+@export var blink_after_ms: int = 0
 ## blink_dark: the off phase of blink_ms draws the glyphs black over the picture instead of hiding them
 ## (the ROM prints with a palette mapping the font's colours to 0: deffs 116-124)
 @export var blink_dark := false
@@ -140,7 +145,8 @@ func _process(delta: float) -> void:
 func _apply_time() -> void:
 	if not _timed():
 		return
-	var blink_on := blink_ms == 0 or int((_elapsed_ms - show_after_ms) / blink_ms) % 2 == 0
+	var blink_from := maxi(blink_after_ms, show_after_ms)
+	var blink_on := blink_ms == 0 or _elapsed_ms < blink_from or int((_elapsed_ms - blink_from) / blink_ms) % 2 == 0
 	var cycle_on := cycle_ms == 0 or fposmod(_elapsed_ms - cycle_offset_ms, cycle_ms) < cycle_on_ms
 	visible = _screen_on and cycle_on and _elapsed_ms >= show_after_ms and (hide_after_ms == 0 or _elapsed_ms < hide_after_ms) \
 		and (blink_on or blink_dark)
@@ -188,7 +194,10 @@ func _layout() -> void:
 		m = fm
 		shown = fs
 		y = fit_ys[i] if i < fit_ys.size() else rom_y
-		if rom_width(fm, fs) <= (hd_fit_width if hd_fit_width > 0 and hd() else fit_width):
+		if score_min.size() > i:
+			if int(text.replace(",", "")) >= score_min[i]:
+				break
+		elif rom_width(fm, fs) <= (hd_fit_width if hd_fit_width > 0 and hd() else fit_width):
 			break
 	if m.is_empty():
 		return
