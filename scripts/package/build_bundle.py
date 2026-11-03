@@ -111,7 +111,7 @@ def spec(template):
         limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
         defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
         defaults["pup.dmd.window"] = "overlay"
-        profiles["rpi4"] = {"limits": limits, "defaults": defaults}
+        profiles["rpi4"] = {"limits": limits, "defaults": defaults, "dmd_looks": ["classic"]}     # a Pi 4 cannot draw the HD look
     asset_globs = []
     for folder, name in ASSET_GLOBS:
         for d in sorted(os.listdir(os.path.join(ROOT, folder))) if os.path.isdir(os.path.join(ROOT, folder)) else ():
@@ -140,7 +140,7 @@ def spec(template):
         "dmd": {"rom": "trn_174h", "size": "128x32", "look": "hd",
                 "looks": {"classic": ["--dmd=classic"], "hd": ["--dmd=hd"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
-        "addons": [{"id": "pup_art", "dir": ADDON}],      # always on: the look is the platform's choice, the classic look ignores the art
+        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "hd"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
         "profiles": profiles,
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],
