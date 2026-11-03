@@ -106,7 +106,8 @@ def spec(template):
     for pr in old["profiles"]:
         if pr["id"] != "rpi4":
             continue
-        limits = {k: v["choices"] for k, v in pr["limits"].items()}
+        # the look of the DMD is the platform's card (bundle.json dmd.looks), no longer a game setting: dmd.mode is not limited here
+        limits = {k: v["choices"] for k, v in pr["limits"].items() if k != "dmd.mode"}
         limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
         defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
         defaults["pup.dmd.window"] = "overlay"
@@ -136,9 +137,10 @@ def spec(template):
                 "hardware": {"virtual": ["hw_virtual", "free_play"], "virtual_coins": ["hw_virtual"],
                              "virtual_le": ["hw_virtual_le", "free_play"], "proc": ["hw_proc"], "proc_le": ["hw_proc_le"],
                              "proc_fiber": ["hw_proc", "fiber_optics"]}},
-        "dmd": {"rom": "trn_174h", "size": "128x32"},
+        "dmd": {"rom": "trn_174h", "size": "128x32", "look": "hd",
+                "looks": {"classic": ["--dmd=classic"], "hd": ["--dmd=hd"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
-        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.mode", "when": "hd"}],
+        "addons": [{"id": "pup_art", "dir": ADDON}],      # always on: the look is the platform's choice, the classic look ignores the art
         "settings": {"schema": "scripts/package/settings.json"},
         "profiles": profiles,
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],
