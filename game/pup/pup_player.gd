@@ -521,7 +521,7 @@ func _make_dmd_window() -> void:
 		if mode == "external":
 			own.hide()
 		w = own
-	var background := str(setting("dmd", "background", "lightcycles"))
+	var background := "lightcycles" if cycles_arg() else str(setting("dmd", "background", "lightcycles"))
 	var frame_path := str(setting("dmd", "frame_image", ""))
 	if background == "lightcycles":
 		_cycles = LightCycles.new()
@@ -627,9 +627,18 @@ func _layout_dmd() -> void:
 ## The DMD window's size ([dmd] dmd_size in pup.cfg, the service menu's ADJUSTMENTS > DISPLAY ADJUSTMENTS >
 ## PUP DMD SIZE over it): false = "cycles", a smaller DMD with the light cycles round it; true = "full", the DMD
 ## full size over the grid alone.
+## The user argument --dmd-cycles (the platform's "advanced" DMD look, bundle.json dmd.looks): the DMD window with the light
+## cycles round it, whatever pup.cfg says. Only the PuP draws it: without a linked pack (PuP off) the argument does nothing
+## and the screen shows the HD DMD, so the look falls back to "hd" by itself.
+func cycles_arg() -> bool:
+	return "--dmd-cycles" in OS.get_cmdline_user_args()
+
+
 func full_size_dmd() -> bool:
 	if _service_dmd_size >= 0:
 		return _service_dmd_size == 1
+	if cycles_arg():
+		return false
 	return str(setting("dmd", "dmd_size", "cycles")) == "full"
 
 
