@@ -644,6 +644,13 @@ def build_deffs(only_data):
                     if deff_id == 108:     # FUN_01020388 ...: FUN_01024378(3), 3 ticks a picture (the capture ran at 33 ms)
                         period = 49        # 3 ticks of the reference runs (16.26 ms, os_layer.TICK)
                     clip = [(img, period) for img, _ in clip]
+                if deff_id == 111:
+                    # the ROM's clip functions (random_parts.csv, deff 111): ticks a picture, each clip's own pace (the gifs carry capture defaults)
+                    k = int(os.path.basename(gif)[1:3])
+                    ticks = ([4] * 32, [3] * 58 + [4] * 12 + [3] * 6, [2] * 48 + [3] * 14, [3] * 51, [4] * 12 + [3] * 35, [5] * 19, [3] * 29,
+                             [3] * 40, [3] * 36, [3] * 35, [3] * 71)[k]
+                    if len(ticks) == len(clip):
+                        clip = [(img, int(round(t * 15.8))) for (img, _), t in zip(clip, ticks)]   # 15.8 ms: clip 0 ends at the captured 1960 ms
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
                 if deff_id in rom_layout.CLIP_OVER_PANEL:      # the ROM's masked draw leaves level 0 alone: the panel's score shows through

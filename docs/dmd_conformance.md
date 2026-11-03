@@ -266,3 +266,5 @@ panel (x < 41) opaque black from the extraction, so the score vanished during th
 in Vincent's play). `gen_media.clear_black_panel` makes them transparent for the effects of `CLIP_OVER_PANEL`. The panel is now right in
 those frames; the rest of the unknown frames of 108 (23 distinct with the first variant, 4 variants measured) are slivers along the
 film's contour and the "N MORE" digits, the film phase listed above, still open. Deff 111's last frames (about 2.1-2.8 s) are open too.
+
+Deff 111, the text at the end of each clip (2026-11-03): the text of "N MORE TO START DISC MULTIBALL" comes when the picked clip ends, over its last picture dimmed, not at a fixed 1960 ms (that is clip 0's length only). Deff 111 is in `CLIP_END_TEXT` and each clip's pictures last the ROM's ticks (`random_parts.csv`: 2 to 5 ticks of 15.8 ms a picture, `scripts/gen_media.py`). Four seeds of the Recognizer scenario: the frames Serum does not know in 111 went from 15 to 0 on the variants that had them.
