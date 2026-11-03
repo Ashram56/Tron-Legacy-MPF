@@ -248,3 +248,14 @@ animation (images 0x5a0-0x5c4); the game drew the animation alone, so every fram
 "Tron Legacy" logo animation) was unknown to Serum and shown in Tron blue. `build_attract_art` now draws them into each frame: unknown
 frames of the 85 s attract run 99 -> 10 (PinMAME: 0). A game's last scores are not drawn on this page (the page is not given the
 panel's live scores). Found by comparing the game's frames with their nearest PinMAME frame: 56 pixels apart, always the same ones.
+
+## Pass over the scenarios (2026-11-03)
+
+Frames the Serum file does not know, game / PinMAME, per scenario (classic DMD, equal draw): game_flow 1/1134,
+bonus 0, combos 0, Light Cycle MB 0/955, gem and CLU hurry-ups 0, Portal MB 2/739, Quorra MB 11/812 (effects 62, 63: the
+small film is at another phase), disc multiball 33/933 and recognizer+disc battle 40/411 (effects 108, 111: film
+phase and contour, PinMAME 0), Sea of Simulation stages 4-8 20/1151 (PinMAME 21; was 197: deff 125 never plays in 1.74,
+the ROM shows deff 126 TOTAL 2.28 s after completion, and stage 6 needs all six shots through the chain table),
+attract 3 (the clock page). Open: Daft Punk MB 132/611 (effect 57, "n MORE FOR ADDABALL": the bright triangle and
+the background lines differ from PinMAME's frames over ~675 dots per frame; the level histogram is the same, so the
+cause is a blink or background phase, not the palette).
