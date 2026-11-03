@@ -168,7 +168,7 @@
    "help": "WIDTHxHEIGHT, for example 1920x480.",
    "restart": true,
    "target": {
-    "godot_arg": "--dmd-size"
+    "godot_arg": "--dmd-window"
    }
   },
   {
