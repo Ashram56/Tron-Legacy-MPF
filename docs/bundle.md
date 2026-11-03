@@ -23,6 +23,8 @@ Tron.
 
 Format version 1. `bundle.json` at the root of the archive says everything a loader needs; this page says why.
 
+**Naming (2026-11-02):** `tron-legacy-mpf-<version>-<label>-linux-<target>.tar.xz`, e.g. `tron-legacy-mpf-1.1.0-serum-zedmd-linux-all.tar.xz`. The version is a number (`scripts/package/VERSION`, or `--version`; raise it for each bundle handed out), the label says what the build holds (`--label`: `base`, `hd-colour`, `serum-zedmd`). The commit is no longer in the name: `bundle.json` has `source.game_commit` and `game_commit_short`.
+
 ## Build one
 
 On a computer where `python scripts/setup.py` has finished (the workspace must be current: the builder refuses a
@@ -32,7 +34,7 @@ stale one):
 python scripts/package/build_bundle.py                    # dist/tron-legacy-mpf-<date>-<commit>-linux-arm64.tar.xz
 python scripts/package/build_bundle.py --target x86_64    # a PC
 python scripts/package/build_bundle.py --target all       # universal: both texture formats, no binary (GoZen comes from the platform)
-python scripts/package/build_bundle.py --version 2026.10.24 --out DIR --no-archive
+python scripts/package/build_bundle.py --version 1.1.0 --label serum-zedmd --out DIR --no-archive
 ```
 
 The `bundle` workflow (Actions tab, run by hand once it is on `main`) does both targets on a GitHub runner and
