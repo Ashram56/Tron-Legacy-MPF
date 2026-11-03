@@ -79,8 +79,10 @@ func _ready() -> void:
 	if platform_pack != "":
 		pack_dir = platform_pack
 		manifest_file = root.path_join("pup/manifest.json")
-	elif FileAccess.file_exists(root.path_join("pup/manifest.json")) and not FileAccess.file_exists(manifest_file):
-		push_warning("PuP: this bundle has no PuP Pack assigned (MPF_PUP_PACK): PuP off")
+	elif OS.get_environment("MPF_GAME_DATA") != "" or (FileAccess.file_exists(root.path_join("pup/manifest.json")) and not FileAccess.file_exists(manifest_file)):
+		# run by the platform (it always sets MPF_GAME_DATA) or from a bundle: the pack is the one assigned on the platform, and
+		# the platform sets MPF_PUP_PACK only when one is linked; without it no PuP window opens, whatever pup.cfg says
+		push_warning("PuP: no PuP Pack assigned (MPF_PUP_PACK): PuP off")
 		return
 	if not _load_media(manifest_file):
 		return
