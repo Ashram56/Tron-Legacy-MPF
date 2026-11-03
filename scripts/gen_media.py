@@ -429,6 +429,18 @@ def loop_period(frames):
 SHARED = {}
 
 
+def clear_black_panel(img):
+    """The frame with its level-0 (black) pixels over the status panel (x < PANEL_WIDTH) made transparent: the ROM draws the clip
+    with bitmap_draw_masked, which does not draw level 0, so the panel's score shows through (the extraction made the area opaque
+    black in some variants: the Recognizer's tower film, 3 frames of every deff 108 unknown to Serum)."""
+    import numpy as np
+    from PIL import Image
+    a = np.array(img.convert("RGBA"))
+    black = (a[:, :PANEL_WIDTH, 0] == 0) & (a[:, :PANEL_WIDTH, 3] == 255)
+    a[:, :PANEL_WIDTH, 3][black] = 0
+    return Image.fromarray(a, "RGBA")
+
+
 def open_white(img):
     """The frame with its full-white (level 15) areas that reach the picture's edge made transparent: the extraction filled the
     area outside the clip's shape with white where the ROM draws nothing (the text of the effect shows there)."""
@@ -634,6 +646,8 @@ def build_deffs(only_data):
                     clip = [(img, period) for img, _ in clip]
                 if deff_id in rom_layout.OPEN_WHITE:
                     clip = [(open_white(img), ms) for img, ms in clip]
+                if deff_id in rom_layout.CLIP_OVER_PANEL:      # the ROM's masked draw leaves level 0 alone: the panel's score shows through
+                    clip = [(clear_black_panel(img), ms) for img, ms in clip]
                 if deff_id in rom_layout.CLIP_END_TEXT:        # dims at its own end, the text follows (variant_shift)
                     end = sum(ms for _, ms in clip[:-1])
                     clip = dim_after(clip, end)

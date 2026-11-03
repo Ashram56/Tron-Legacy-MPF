@@ -259,3 +259,10 @@ the ROM shows deff 126 TOTAL 2.28 s after completion, and stage 6 needs all six 
 attract 3 (the clock page). Open: Daft Punk MB 132/611 (effect 57, "n MORE FOR ADDABALL": the bright triangle and
 the background lines differ from PinMAME's frames over ~675 dots per frame; the level histogram is the same, so the
 cause is a blink or background phase, not the palette).
+
+**Deff 108, the panel under the clip (2026-11-03).** The Recognizer's film (deff 108) is drawn with `bitmap_draw_masked`, which does
+not draw level 0, so the status panel's score shows through it. Some clip variants (the tower film) had their level-0 pixels over the
+panel (x < 41) opaque black from the extraction, so the score vanished during the film while PinMAME keeps it (frames unknown to Serum
+in Vincent's play). `gen_media.clear_black_panel` makes them transparent for the effects of `CLIP_OVER_PANEL`. The panel is now right in
+those frames; the rest of the unknown frames of 108 (23 distinct with the first variant, 4 variants measured) are slivers along the
+film's contour and the "N MORE" digits, the film phase listed above, still open. Deff 111's last frames (about 2.1-2.8 s) are open too.
