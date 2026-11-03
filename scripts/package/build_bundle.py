@@ -145,9 +145,9 @@ def spec(template):
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
         "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "hd"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
-        "screens": [{"id": "backglass", "label": "Backglass", "setting": "pup.backglass.screen"},     # the platform's "Screens" card
+        "screens": [{"id": "backglass", "label": "Backglass", "setting": "pup.backglass.screen", "enabled": "pup.backglass.enabled"},     # the platform's "Screens" card
                     {"id": "dmd", "label": "DMD (LCD)", "setting": "pup.dmd.screen"},                  # (PR 67): the game places its windows
-                    {"id": "topper", "label": "Topper", "setting": "pup.topper.screen"}],              # from the index, as before
+                    {"id": "topper", "label": "Topper", "setting": "pup.topper.screen", "enabled": "pup.third_screen"}],              # from the index, as before
         "profiles": profiles,
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],
     }
