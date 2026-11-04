@@ -196,6 +196,23 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(sp["pup"], {"rom": "trn_174h", "manifest": bb.MANIFEST})
         json.dumps(sp)
 
+    def test_screens_name_their_windows_and_their_off_switch(self):
+        """The platform's cabinet preview captures each window by its title and skips one whose `enabled` option is off (a topper nobody has)."""
+        with open(os.path.join(ROOT, "scripts", "package", "settings.json"), encoding="utf-8") as f:
+            opts = {o["id"]: o for o in json.load(f)["options"]}
+        with open(os.path.join(ROOT, "game", "pup", "pup_player.gd"), encoding="utf-8") as f:
+            player = f.read()
+        self.assertIn('w.title = "Tron Legacy - " + section', player)      # what `title` below must match
+        screens = {w["id"]: w for w in bb.spec("t")["screens"]}
+        self.assertEqual(set(screens), {"backglass", "dmd", "topper"})
+        for sid, w in screens.items():
+            self.assertEqual(w["title"], "Tron Legacy - " + sid)
+            self.assertEqual(opts[w["setting"]]["type"], "integer")
+            if w.get("enabled"):
+                self.assertEqual(opts[w["enabled"]]["type"], "bool")
+        self.assertEqual(screens["topper"]["enabled"], "pup.third_screen")
+        self.assertNotIn("enabled", screens["dmd"])         # the DMD is always there: the platform draws it from the DMD's pictures
+
     def test_settings_schema_follows_the_contract(self):
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "MPF-Godot-Packaging", "common", "netconfig"))
