@@ -202,6 +202,37 @@ class TestPortalExtendedEnding(WizardTestCase):
         self.assertTrue(portal.ultimate_done)
 
 
+    def test_instructions_and_lamps(self):
+        """The player is told what to do in each phase (deff 141's lines) and the inserts show it."""
+        from tron.features.portal import MAX_HITS, SHOT_LAMPS, DISC_LAMP
+        portal = self.start_portal(True)
+        lamps = self.tron.lamps
+        self.tron.rules_refresh()
+        guard = portal.guard
+        self.assertIn("CLU BLOCKS", portal.ext_lines()[1])
+        self.assertTrue(portal.ext_lines()[2].startswith("PORTAL OPEN"))
+        self.assertTrue(all(lamps.lamp_state(n) == 0 for n in SHOT_LAMPS[guard]))      # blocked: dark
+        other = (guard + 1) % 6
+        self.assertEqual(2, lamps.lamp_state(SHOT_LAMPS[other][0]))                    # shoot it: flashing
+        for shot in range(6):
+            while portal.counts[shot] < MAX_HITS[shot]:
+                self.h("portal_mb_shot", shot)
+        self.tron.rules_refresh()
+        self.assertEqual("CLU GONE: ALL PAY", portal.ext_lines()[3])
+        self.assertEqual(2, lamps.lamp_state(SHOT_LAMPS[0][0]))
+        self.advance_time_and_run(11)
+        self.tron.rules_refresh()
+        self.assertEqual("ACTIVATE PORTAL", portal.ext_lines()[3])
+        self.assertEqual(2, lamps.lamp_state(DISC_LAMP))                                # the disc is the shot
+        self.assertEqual(0, lamps.lamp_state(SHOT_LAMPS[0][0]))
+        self.h("portal_mb_shot", 6)
+        self.assertTrue(portal.ext_lines()[6].startswith("COMBO"))
+
+    def test_off_shows_the_rom_lines(self):
+        portal = self.start_portal(False)
+        self.assertEqual({}, portal.ext_lines())
+
+
 class TestMultiballTask(WizardTestCase):
     """OS multiball_start [0x0001ed7c]: one multiball task; later requests while it runs keep the larger save."""
 

@@ -23,6 +23,13 @@ COMBO_SECONDS = 6            # act 5: a different shot within this time raises t
 COMBO_MAX = 5
 ULTIMATE_AFTER = 8           # act 5: shots in the final wave before the disc pays the ultimate jackpot
 ULTIMATE_POINTS = 10000000
+# the shot lamps by shot (assets/rules/modes/portal_multiball.md 2 and 8: the last one of a group is its arrow),
+# the CENTER lamps (17 PORTAL and the item lamps) and CENTER DISC
+SHOT_LAMPS = {0: (13, 14, 15, 16), 1: (11, 50, 49), 2: (60, 61, 62, 63, 64), 3: (59, 58, 57),
+              4: (42, 55, 56), 5: (36, 35, 34, 33)}
+CENTER_LAMPS = (17, 18, 19, 20, 21, 22, 23, 24, 25, 27)
+DISC_LAMP = 21
+SHOT_NAMES = ("L ORBIT", "L RAMP", "L LOOP", "R LOOP", "R RAMP", "R ORBIT")
 
 
 class Portal(Feature):
@@ -48,10 +55,13 @@ class Portal(Feature):
                               players=1)
         os_.lamp_rule(self.lit_rule, leff=164, order=0x0102fa64)
         os_.lamp_rule(self.lit_rule, leff=163, tube=79, order=0x0102fa64)
-        os_.lamp_rule(self.background_rule, leff=166, tube=81, order=0x01030150)
+        os_.lamp_rule(self.shot_lamps_rule, leff=166, order=0x01030150)
+        os_.lamp_rule(self.background_rule, tube=81, order=0x01030150)
+        os_.lamps.add_rule(self.ext_lamps, priority=-50)            # after the other lamp rules: it overrides
         os_.lamp_rule(self.all_shots_done, leff=167, order=0x0102f37c)
         os_.deff_rule(self.background_rule, 141, music=0x076, priority=7)
         # deff 141 [0x0102ffa0] reads pm_phase, the next award and pm_super_value on every frame
+        os_.deff_text(141, self.ext_lines)
         os_.deff_live((141,), lambda: {"screen": self.phase, "next": self.award_value(),
                                        "super": self.super_value, "super_lit": self.super_value,
                                        "all_shots": 1000000})
@@ -91,6 +101,10 @@ class Portal(Feature):
         """[0x01030150]: running, and the intro (task 0xa5) is not still waiting for the display."""
         os_ = self.os
         return os_.flag(0x37) and not (os_.display.task_running(0xa5) and not os_.display.running(140))
+
+    def shot_lamps_rule(self):
+        """leff 166 (the ROM's shot lamps) unless the extended ending draws them (ext_lamps)."""
+        return self.background_rule() and not self.ext
 
     def award_value(self):
         """portal_mb_award_value [0x0102f5f4]."""
@@ -195,6 +209,51 @@ class Portal(Feature):
         after = [i for i in open_ if self.guard is None or i > self.guard]
         self.guard = (after or open_)[0]
 
+    def window_open(self):
+        return self.phase == 1 and self.os.now < self.window_end
+
+    def ext_lines(self):
+        """Instructions on deff 141 (lines 1, 2 = phase 0, 3 to 5 = phase 1, 6 = phase 2), 19 characters at most."""
+        if not (self.ext and self.os.flag(0x37)):
+            return {}
+        if self.phase == 0:
+            hold = ("CLU BLOCKS " + SHOT_NAMES[self.guard]) if self.guard is not None else "CROSS THE BRIDGE"
+            return {1: hold, 2: "PORTAL OPEN %d%%" % self.gauge()}
+        if self.phase == 1:
+            if self.window_open():
+                return {3: "CLU GONE: ALL PAY", 4: "SHOOT ANY SHOT", 5: "PORTAL OPEN %d%%" % self.gauge()}
+            return {3: "ACTIVATE PORTAL", 4: "SHOOT DISC", 5: "SUPER=%s" % format(self.super_value, ",")}
+        if self.wave_hits >= ULTIMATE_AFTER and not self.ultimate_done:
+            return {6: "SHOOT DISC! 10M"}
+        return {6: "COMBO x%d ALT SHOTS" % max(self.combo, 1)}
+
+    def ext_lamps(self):
+        """Lamp rule of the extended ending (replaces leff 166): solid = done or ready, flashing = shoot it,
+        dark = Clu blocks it."""
+        os_ = self.os
+        if not (self.ext and os_.flag(0x37)):
+            return
+        lamps = os_.lamps
+        for lamp in CENTER_LAMPS:
+            lamps.lamp_set(lamp, 1)
+        for shot, group in SHOT_LAMPS.items():
+            done = self.counts[shot] >= MAX_HITS[shot]
+            if self.phase == 0:
+                if shot == self.guard:
+                    states = [0] * len(group)                          # Clu is here: dark
+                else:
+                    states = [1 if i < self.counts[shot] else 2 if i == self.counts[shot] else 0
+                              for i in range(len(group))]
+            elif self.phase == 1:
+                states = [2 if self.window_open() else 0] * len(group)
+            else:
+                states = [0 if shot == self.combo_shot else 2] * len(group)
+            for lamp, state in zip(group, states):
+                lamps.lamp_set(lamp, state)
+        disc = self.phase == 1 and not self.window_open() or \
+            self.phase == 2 and self.wave_hits >= ULTIMATE_AFTER and not self.ultimate_done
+        lamps.lamp_set(DISC_LAMP, 2 if disc else 1)
+
     def ext_shot(self, shot):
         os_ = self.os
         awarded = False
@@ -219,6 +278,7 @@ class Portal(Feature):
                 self.phase = 1                       # act 3: Clu takes the disc and leaves
                 self.guard = None
                 self.window_end = os_.now + WINDOW_SECONDS
+                os_.after(round(WINDOW_SECONDS / TICK) + 1, os_.request_refresh)   # the lamps and text change
                 self.ext_post(3)
             awarded = True
         elif self.phase == 1:

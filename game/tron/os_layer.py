@@ -174,6 +174,7 @@ class TronOS(CustomCode):
         # deff id -> function returning the values the deff's code reads from RAM each frame (timers,
         # mode values, the current stage): its display lines (tron/media_bridge.py, refreshed while shown)
         self.deff_values = {}
+        self.deff_texts = {}
         self.random = random.Random()
         self._new_game = False
         self._new_game_ball = False
@@ -355,6 +356,11 @@ class TronOS(CustomCode):
         of the rule's condition function, so rules start in the ROM's order)."""
         self.rules.append([cond, leff, tube, False, order])
         self.rules.sort(key=lambda r: r[4])
+
+    def deff_text(self, deff_id, lines):
+        """lines() -> {line index: text}: lines of deff `deff_id` this game writes over the ROM's (the
+        extended ending's instructions; docs/rom_differences.md). Empty dict = the ROM's lines."""
+        self.deff_texts[deff_id] = lines
 
     def deff_live(self, deff_ids, values):
         """values() -> {arg: value}: what deffs `deff_ids` print from RAM (not passed at deff start)."""
