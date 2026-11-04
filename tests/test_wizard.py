@@ -155,6 +155,84 @@ class TestPortal(WizardTestCase):
         self.h("tilt_start")
 
 
+class TestPortalExtendedEnding(WizardTestCase):
+    """EXTENDED ENDING (GAME OPTIONS item 1): the film's last sequence on the ROM's three phases."""
+
+    def start_portal(self, extended):
+        self.start_play()
+        self.tron.game_options[1] = int(extended)
+        self.items(collected=range(9))
+        self.assertTrue(self.h("portal_vuk", True))
+        return self.tron.features_by_name["portal"]
+
+    def test_off_is_the_rom(self):
+        portal = self.start_portal(False)
+        self.assertFalse(portal.ext)
+        self.assertIsNone(portal.guard)
+
+    def test_acts(self):
+        from tron.features.portal import MAX_HITS
+        portal = self.start_portal(True)
+        self.assertTrue(portal.ext)
+        self.assertIsNotNone(portal.guard)
+        guarded = portal.guard
+        full = portal.award_value()
+        before = self.score()
+        self.assertTrue(self.h("portal_mb_shot", guarded))               # act 2: the guarded shot pays half
+        self.assertEqual(full * 50 // 100, self.score() - before)
+        for shot in range(6):                                           # finish every shot
+            while portal.counts[shot] < MAX_HITS[shot]:
+                self.assertTrue(self.h("portal_mb_shot", shot))
+        self.assertEqual(1, portal.phase)                               # act 3: the window
+        self.assertIsNone(portal.guard)
+        self.assertTrue(self.h("portal_mb_shot", 0))
+        self.advance_time_and_run(11)
+        self.assertFalse(self.h("portal_mb_shot", 0))                   # window closed, only the disc
+        self.assertTrue(self.h("portal_mb_shot", 6))                    # act 4: the super jackpot
+        self.assertEqual(2, portal.phase)
+        self.assertTrue(self.h("portal_mb_shot", 0))                    # act 5: combos
+        self.assertEqual(1, portal.combo)
+        self.assertTrue(self.h("portal_mb_shot", 1))
+        self.assertEqual(2, portal.combo)
+        self.assertTrue(self.h("portal_mb_shot", 1))                    # the same shot resets the combo
+        self.assertEqual(1, portal.combo)
+        self.assertFalse(portal.ultimate_done)
+        portal.wave_hits = 8
+        self.assertTrue(self.h("portal_mb_shot", 6))                    # the reintegration
+        self.assertTrue(portal.ultimate_done)
+
+
+    def test_instructions_and_lamps(self):
+        """The player is told what to do in each phase (deff 141's lines) and the inserts show it."""
+        from tron.features.portal import MAX_HITS, SHOT_LAMPS, DISC_LAMP
+        portal = self.start_portal(True)
+        lamps = self.tron.lamps
+        self.tron.rules_refresh()
+        guard = portal.guard
+        self.assertIn("CLU BLOCKS", portal.ext_lines()[1])
+        self.assertTrue(portal.ext_lines()[2].startswith("PORTAL OPEN"))
+        self.assertTrue(all(lamps.lamp_state(n) == 0 for n in SHOT_LAMPS[guard]))      # blocked: dark
+        other = (guard + 1) % 6
+        self.assertEqual(2, lamps.lamp_state(SHOT_LAMPS[other][0]))                    # shoot it: flashing
+        for shot in range(6):
+            while portal.counts[shot] < MAX_HITS[shot]:
+                self.h("portal_mb_shot", shot)
+        self.tron.rules_refresh()
+        self.assertEqual("CLU GONE: ALL PAY", portal.ext_lines()[3])
+        self.assertEqual(2, lamps.lamp_state(SHOT_LAMPS[0][0]))
+        self.advance_time_and_run(11)
+        self.tron.rules_refresh()
+        self.assertEqual("ACTIVATE PORTAL", portal.ext_lines()[3])
+        self.assertEqual(2, lamps.lamp_state(DISC_LAMP))                                # the disc is the shot
+        self.assertEqual(0, lamps.lamp_state(SHOT_LAMPS[0][0]))
+        self.h("portal_mb_shot", 6)
+        self.assertTrue(portal.ext_lines()[6].startswith("COMBO"))
+
+    def test_off_shows_the_rom_lines(self):
+        portal = self.start_portal(False)
+        self.assertEqual({}, portal.ext_lines())
+
+
 class TestMultiballTask(WizardTestCase):
     """OS multiball_start [0x0001ed7c]: one multiball task; later requests while it runs keep the larger save."""
 

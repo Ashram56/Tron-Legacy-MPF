@@ -460,6 +460,20 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.svc.factory_reset()
         self.assertEqual((0, -1), (os_.display_settings[3], var("pup_dmd_size")))
 
+    def test_game_options_extended_ending(self):
+        """ADJUSTMENTS > GAME OPTIONS > EXTENDED ENDING (OFF = the ROM's Portal rules), persisted."""
+        os_ = self.tron
+        self.enter()
+        self.goto("GO TO ADJUSTMENTS MENU", "GAME OPTIONS")
+        self.assertEqual(("GAME OPTIONS", "01 EXTENDED ENDING", "OFF (FACTORY)"), self.shown[-1])
+        self.press("select")
+        self.press("plus")
+        self.press("select")
+        self.assertEqual(1, os_.game_options[1])
+        self.assertTrue(self.machine.variables.machine_vars["extended_ending_setting"]["persist"])
+        self.svc.factory_reset()
+        self.assertEqual(0, os_.game_options[1])
+
     def test_pup_dmd_size_factory_from_pup_cfg(self):
         """PUP DMD SIZE's factory value is pup.cfg's [dmd] dmd_size (pup.local.cfg over it)."""
         from tron import settings

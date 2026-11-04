@@ -155,6 +155,9 @@ class MediaBridge:
                 continue
             out["line{}".format(i)] = format_rom_text(line, values[:n])
             values = values[n:]
+        texts = getattr(self.os, "deff_texts", {}).get(deff_id)
+        if texts:                                      # text this game writes over the ROM's lines (Portal extended ending)
+            out.update({"line{}".format(i): t for i, t in texts().items()})
         return out
 
     def deff_start(self, deff_id, priority, **args):

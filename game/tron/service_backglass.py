@@ -71,6 +71,7 @@ SCREEN_INFO = {
     "STANDARD ADJUSTMENTS": "Pricing, replays, game settings",
     "FEATURE ADJUSTMENTS": "Tron's mode and difficulty settings",
     "DISPLAY ADJUSTMENTS": "HD text glow and size, PuP DMD size",
+    "GAME OPTIONS": "Extended ending of the Portal",
     "ENTER CUSTOM MESSAGE": "The attract mode's message",
     "SET CUSTOM PRICING": "Coin units and units per credit",
     "SET DATE/TIME": "The game's clock",
