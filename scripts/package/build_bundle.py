@@ -145,9 +145,13 @@ def spec(template):
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
         "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "advanced"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
-        "screens": [{"id": "backglass", "label": "Backglass", "setting": "pup.backglass.screen", "enabled": "pup.backglass.enabled"},     # the platform's "Screens" card
-                    {"id": "dmd", "label": "DMD (LCD)", "setting": "pup.dmd.screen"},                  # (PR 67): the game places its windows
-                    {"id": "topper", "label": "Topper", "setting": "pup.topper.screen", "enabled": "pup.third_screen"}],              # from the index, as before
+        # the platform's "Screens" card (PR 67) and cabinet preview: the game places its windows from the index, as before; `title` is the
+        # window's title (game/pup/pup_player.gd _make_window) so the preview captures each window alone; `enabled` turns a window off
+        "screens": [{"id": "backglass", "label": "Backglass", "setting": "pup.backglass.screen", "enabled": "pup.backglass.enabled",
+                     "title": "Tron Legacy - backglass"},
+                    {"id": "dmd", "label": "DMD (LCD)", "setting": "pup.dmd.screen", "title": "Tron Legacy - dmd"},
+                    {"id": "topper", "label": "Topper", "setting": "pup.topper.screen", "enabled": "pup.third_screen",
+                     "title": "Tron Legacy - topper"}],
         "profiles": profiles,
         "keep_on_update": ["game/data", "game/audits", "game/logs", "game/pup.local.cfg", "game/scorbit.local.cfg"],
     }

@@ -1,13 +1,13 @@
 extends Node
-## Starts the platform's DMD output (MPF-Godot-Packaging addons/dmd_out: frames to a PIN2DMD or a ZeDMD) when Godot is
-## given --pin2dmd or --zedmd, and does nothing otherwise. The add-on is the platform's, not this game's:
+## Starts the platform's DMD output (MPF-Godot-Packaging addons/dmd_out: frames to a PIN2DMD or a ZeDMD, or the PNG of the
+## DMD for the setup page's cabinet preview) when Godot is given --pin2dmd, --zedmd or --dmd-preview=, and does nothing otherwise. The add-on is the platform's, not this game's:
 ## scripts/dmd_out.py copies it into game/addons/dmd_out before the start (docs/hardware.md, "PIN2DMD and ZeDMD").
 ## The game's DMD stays classic then (dmd_mode.gd): the add-on sends the root viewport, the exact 128x32 dots.
 
 
 func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
-		if a == "--pin2dmd" or a.begins_with("--pin2dmd=") or a == "--zedmd" or a.begins_with("--zedmd="):
+		if a == "--pin2dmd" or a.begins_with("--pin2dmd=") or a == "--zedmd" or a.begins_with("--zedmd=") or a.begins_with("--dmd-preview="):
 			_start()
 			return
 
