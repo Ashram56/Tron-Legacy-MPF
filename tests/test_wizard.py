@@ -156,11 +156,11 @@ class TestPortal(WizardTestCase):
 
 
 class TestPortalExtendedEnding(WizardTestCase):
-    """EXTENDED ENDING (DISPLAY ADJUSTMENTS item 4): the film's last sequence on the ROM's three phases."""
+    """EXTENDED ENDING (GAME OPTIONS item 1): the film's last sequence on the ROM's three phases."""
 
     def start_portal(self, extended):
         self.start_play()
-        self.tron.display_settings[4] = int(extended)
+        self.tron.game_options[1] = int(extended)
         self.items(collected=range(9))
         self.assertTrue(self.h("portal_vuk", True))
         return self.tron.features_by_name["portal"]
@@ -177,9 +177,9 @@ class TestPortalExtendedEnding(WizardTestCase):
         self.assertIsNotNone(portal.guard)
         guarded = portal.guard
         full = portal.award_value()
-        before = self.tron.score
+        before = self.score()
         self.assertTrue(self.h("portal_mb_shot", guarded))               # act 2: the guarded shot pays half
-        self.assertEqual(full * 50 // 100, self.tron.score - before)
+        self.assertEqual(full * 50 // 100, self.score() - before)
         for shot in range(6):                                           # finish every shot
             while portal.counts[shot] < MAX_HITS[shot]:
                 self.assertTrue(self.h("portal_mb_shot", shot))

@@ -189,9 +189,10 @@ class TronOS(CustomCode):
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
                                 "settings.yaml")
         self.adj_table = adjustment_defaults(settings)
-        from tron.settings import Adjustments, Audits, DisplaySettings   # noqa: E402
+        from tron.settings import Adjustments, Audits, DisplaySettings, GameOptions   # noqa: E402
         self.adj = Adjustments(self.machine, self.adj_table)   # MPF settings, persisted (tron/settings.py)
         self.display_settings = DisplaySettings(self.machine)  # HD text glow and size, persisted
+        self.game_options = GameOptions(self.machine)          # the game's own options (extended ending)
         from tron.scorbit import Scorbit             # noqa: E402
         self.scorbit = Scorbit(self)                           # scores to Scorbit, when set up (docs/scorbit.md)
         self.audits = Audits(self.machine)                     # ROM audit counters, persisted

@@ -46,6 +46,8 @@ LOCK_KEY = "service"
 # the HD display's text glow and size and the PuP DMD window's size (tron/settings.py DisplaySettings);
 # the NETWORK (Wi-Fi, tron/network.py) and SCORBIT (tron/scorbit.py) menus under UTILITIES
 GAME_ITEMS = {"ADJUSTMENTS": [{"text": "DISPLAY ADJUSTMENTS", "kind": "screen", "submenu": None,
+                               "shown_only_if": None},
+                              {"text": "GAME OPTIONS", "kind": "screen", "submenu": None,
                                "shown_only_if": None}],
               "UTILITIES": [{"text": "GO TO NETWORK MENU", "kind": "game_menu", "menu": "NETWORK"},
                             {"text": "GO TO SCORBIT MENU", "kind": "game_menu", "menu": "SCORBIT"}]}
@@ -105,7 +107,7 @@ ICONS = {
     "GO TO NETWORK MENU": 9006, "WI-FI STATUS": 9008, "SCAN WI-FI NETWORKS": 9010, "JOIN HIDDEN NETWORK": 9012,
     "FORGET WI-FI NETWORK": 9014,
     "GO TO SCORBIT MENU": 9016, "SCORBIT STATUS": 9018, "SCORBIT PAIRING": 9020, "SCORBIT UNPAIR": 9022,
-    "SCORBIT ADJUSTMENTS": 9024,
+    "SCORBIT ADJUSTMENTS": 9024, "GAME OPTIONS": 9026,
     "GAME-SPECIFIC TESTS": 1429, "3-BANK MOTOR TEST": 1431, "DISC MOTOR TEST": 1433,
     "RECOGNIZER MOTOR TEST": 1435, "FIBER OPTIC LIGHT TUBE TEST": 1437,
 }
@@ -1992,6 +1994,7 @@ class ServiceMode(Mode):
             "STANDARD ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "standard"),
             "FEATURE ADJUSTMENTS": lambda: AdjustmentScreen(self, text, "feature"),
             "DISPLAY ADJUSTMENTS": lambda: AdjustmentScreen(self, text, None, os_.display_settings),
+            "GAME OPTIONS": lambda: AdjustmentScreen(self, text, None, os_.game_options),
             "WI-FI STATUS": lambda: WifiStatusScreen(self),
             "SCAN WI-FI NETWORKS": lambda: WifiScanScreen(self),
             "JOIN HIDDEN NETWORK": lambda: HiddenNetworkScreen(self),
@@ -2036,6 +2039,7 @@ class ServiceMode(Mode):
         scores and credits."""
         self.os.adj.factory_reset()
         self.os.display_settings.factory_reset()
+        self.os.game_options.factory_reset()
         self.os.scorbit.settings.factory_reset()
         self.os.audits.reset_all()
         self.reset_high_scores(3)

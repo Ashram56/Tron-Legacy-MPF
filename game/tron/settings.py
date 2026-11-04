@@ -252,13 +252,11 @@ DISPLAY_ITEMS = {
     1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 0, 0, 300, 10),
     2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 110, 5),
     3: ("PUP DMD SIZE", "pup_dmd_size_setting", "pup_dmd_size", 0, 0, 1, 1),
-    # not a display item: the Portal's extended ending (tron/features/portal.py), OFF = the ROM's rules
-    4: ("EXTENDED ENDING", "extended_ending_setting", "extended_ending", 0, 0, 1, 1),
 }
 # items whose values are names, not percentages: item -> names by value. PUP DMD SIZE: the PuP DMD window
 # (game/pup/pup_player.gd) with a smaller DMD among the light cycles, or the DMD full size over the grid alone
 PUP_DMD_SIZES = ("WITH LIGHT CYCLES", "FULL SIZE")
-DISPLAY_NAMES = {3: PUP_DMD_SIZES, 4: ("OFF", "ON")}
+DISPLAY_NAMES = {3: PUP_DMD_SIZES}
 
 
 def pup_dmd_size_default():
@@ -276,22 +274,26 @@ class DisplaySettings:
     (tools/dmd_mode.gd, pup/pup_player.gd) follows, through GMC's machine variable monitor; preview() shows a value being edited there. A value
     stored at its factory default leaves the display's own start value in place."""
 
+    ITEMS = DISPLAY_ITEMS
+    NAMES = DISPLAY_NAMES
+
     def __init__(self, machine):
         self.machine = machine
         self.info = {num: {"name": spec[0], "min": spec[4], "max": spec[5], "step": spec[6]}
-                     for num, spec in DISPLAY_ITEMS.items()}
-        self.factory = {num: spec[3] for num, spec in DISPLAY_ITEMS.items()}
-        self.factory[3] = pup_dmd_size_default()
-        for num in DISPLAY_ITEMS:
+                     for num, spec in self.ITEMS.items()}
+        self.factory = {num: spec[3] for num, spec in self.ITEMS.items()}
+        if self.ITEMS is DISPLAY_ITEMS:
+            self.factory[3] = pup_dmd_size_default()
+        for num in self.ITEMS:
             self._show(num, self.stored(num))
 
     def stored(self, num):
         """The operator's value, None when unset or at the factory default."""
-        value = self.machine.variables.get_machine_var(DISPLAY_ITEMS[num][1])
+        value = self.machine.variables.get_machine_var(self.ITEMS[num][1])
         return None if value is None or int(value) < 0 or int(value) == self.default(num) else int(value)
 
     def _show(self, num, value):
-        self.machine.variables.set_machine_var(DISPLAY_ITEMS[num][2], -1 if value is None else int(value))
+        self.machine.variables.set_machine_var(self.ITEMS[num][2], -1 if value is None else int(value))
 
     def default(self, num):
         return self.factory[num]
@@ -301,7 +303,7 @@ class DisplaySettings:
         return self.default(num) if value is None else value
 
     def __setitem__(self, num, value):
-        key = DISPLAY_ITEMS[num][1]
+        key = self.ITEMS[num][1]
         value = int(value)
         self.machine.variables.configure_machine_var(key, persist=True)
         self.machine.variables.set_machine_var(key, -1 if value == self.default(num) else value)
@@ -313,15 +315,15 @@ class DisplaySettings:
                    (None if int(value) == self.default(num) else value))
 
     def keys(self):
-        return sorted(DISPLAY_ITEMS)
+        return sorted(self.ITEMS)
 
     def menu(self, group=None):
         return self.keys()
 
     def label(self, num, value=None):
         value = self[num] if value is None else value
-        if num in DISPLAY_NAMES:
-            return DISPLAY_NAMES[num][value]
+        if num in self.NAMES:
+            return self.NAMES[num][value]
         return "OFF" if num == 1 and value == 0 else "{}%".format(value)
 
     def step(self, num, value, direction):
@@ -332,3 +334,21 @@ class DisplaySettings:
     def factory_reset(self):
         for num in self.keys():
             self[num] = self.default(num)
+
+
+# ---------------------------------------------------------------------------------------------- game options
+
+# GAME OPTIONS (ADJUSTMENTS menu, added by this game): options that change the game's rules or shows beyond
+# the ROM, each one switchable back to the ROM's behaviour (docs/rom_differences.md). Same item layout as
+# DISPLAY_ITEMS; the live machine var is not read by a display, the rules read the option itself.
+GAME_OPTION_ITEMS = {
+    # the Portal's extended ending (tron/features/portal.py): the film's last sequence; OFF = the ROM's rules
+    1: ("EXTENDED ENDING", "extended_ending_setting", "extended_ending", 0, 0, 1, 1),
+}
+GAME_OPTION_NAMES = {1: ("OFF", "ON")}
+
+
+class GameOptions(DisplaySettings):
+    """GAME OPTIONS: the game's own options, with DisplaySettings' persistence and interface."""
+    ITEMS = GAME_OPTION_ITEMS
+    NAMES = GAME_OPTION_NAMES

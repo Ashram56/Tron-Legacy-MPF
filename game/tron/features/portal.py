@@ -14,7 +14,7 @@ MAX_HITS = (4, 3, 5, 3, 3, 4, 0)            # shot table 0x040d6e14
 COUNTER_ADDR = 0x3b85c                      # pm_cnt_* bytes, 4 apart
 SAVE_TICKS, GRACE_TICKS = 0x3a9, 0x138
 ADD_BALL_TICKS = 0x3e
-# EXTENDED ENDING (service menu, DISPLAY ADJUSTMENTS item 4; docs/rom_differences.md): the film's last
+# EXTENDED ENDING (service menu, GAME OPTIONS item 1; docs/rom_differences.md): the film's last
 # sequence on top of the ROM's three phases. Off by default = the ROM's rules.
 GAUGE_SECONDS = 120          # act 1: the Portal closes; the gauge empties over this time (no sudden death)
 GUARD_PERCENT = 50           # act 2: Clu guards one shot, which pays this percentage
@@ -171,7 +171,7 @@ class Portal(Feature):
 
     def ext_start(self):
         """Act 1: the bridge, the Portal starts to close; act 2: Clu guards the first shot."""
-        self.ext = bool(self.os.display_settings[4])
+        self.ext = bool(self.os.game_options[1])
         self.started = self.os.now
         self.guard = None
         self.window_end = 0.0
