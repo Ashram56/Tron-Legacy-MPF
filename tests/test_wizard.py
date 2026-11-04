@@ -155,6 +155,53 @@ class TestPortal(WizardTestCase):
         self.h("tilt_start")
 
 
+class TestPortalExtendedEnding(WizardTestCase):
+    """EXTENDED ENDING (DISPLAY ADJUSTMENTS item 4): the film's last sequence on the ROM's three phases."""
+
+    def start_portal(self, extended):
+        self.start_play()
+        self.tron.display_settings[4] = int(extended)
+        self.items(collected=range(9))
+        self.assertTrue(self.h("portal_vuk", True))
+        return self.tron.features_by_name["portal"]
+
+    def test_off_is_the_rom(self):
+        portal = self.start_portal(False)
+        self.assertFalse(portal.ext)
+        self.assertIsNone(portal.guard)
+
+    def test_acts(self):
+        from tron.features.portal import MAX_HITS
+        portal = self.start_portal(True)
+        self.assertTrue(portal.ext)
+        self.assertIsNotNone(portal.guard)
+        guarded = portal.guard
+        full = portal.award_value()
+        before = self.tron.score
+        self.assertTrue(self.h("portal_mb_shot", guarded))               # act 2: the guarded shot pays half
+        self.assertEqual(full * 50 // 100, self.tron.score - before)
+        for shot in range(6):                                           # finish every shot
+            while portal.counts[shot] < MAX_HITS[shot]:
+                self.assertTrue(self.h("portal_mb_shot", shot))
+        self.assertEqual(1, portal.phase)                               # act 3: the window
+        self.assertIsNone(portal.guard)
+        self.assertTrue(self.h("portal_mb_shot", 0))
+        self.advance_time_and_run(11)
+        self.assertFalse(self.h("portal_mb_shot", 0))                   # window closed, only the disc
+        self.assertTrue(self.h("portal_mb_shot", 6))                    # act 4: the super jackpot
+        self.assertEqual(2, portal.phase)
+        self.assertTrue(self.h("portal_mb_shot", 0))                    # act 5: combos
+        self.assertEqual(1, portal.combo)
+        self.assertTrue(self.h("portal_mb_shot", 1))
+        self.assertEqual(2, portal.combo)
+        self.assertTrue(self.h("portal_mb_shot", 1))                    # the same shot resets the combo
+        self.assertEqual(1, portal.combo)
+        self.assertFalse(portal.ultimate_done)
+        portal.wave_hits = 8
+        self.assertTrue(self.h("portal_mb_shot", 6))                    # the reintegration
+        self.assertTrue(portal.ultimate_done)
+
+
 class TestMultiballTask(WizardTestCase):
     """OS multiball_start [0x0001ed7c]: one multiball task; later requests while it runs keep the larger save."""
 

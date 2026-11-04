@@ -252,11 +252,13 @@ DISPLAY_ITEMS = {
     1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 0, 0, 300, 10),
     2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 110, 5),
     3: ("PUP DMD SIZE", "pup_dmd_size_setting", "pup_dmd_size", 0, 0, 1, 1),
+    # not a display item: the Portal's extended ending (tron/features/portal.py), OFF = the ROM's rules
+    4: ("EXTENDED ENDING", "extended_ending_setting", "extended_ending", 0, 0, 1, 1),
 }
 # items whose values are names, not percentages: item -> names by value. PUP DMD SIZE: the PuP DMD window
 # (game/pup/pup_player.gd) with a smaller DMD among the light cycles, or the DMD full size over the grid alone
 PUP_DMD_SIZES = ("WITH LIGHT CYCLES", "FULL SIZE")
-DISPLAY_NAMES = {3: PUP_DMD_SIZES}
+DISPLAY_NAMES = {3: PUP_DMD_SIZES, 4: ("OFF", "ON")}
 
 
 def pup_dmd_size_default():

@@ -14,6 +14,15 @@ MAX_HITS = (4, 3, 5, 3, 3, 4, 0)            # shot table 0x040d6e14
 COUNTER_ADDR = 0x3b85c                      # pm_cnt_* bytes, 4 apart
 SAVE_TICKS, GRACE_TICKS = 0x3a9, 0x138
 ADD_BALL_TICKS = 0x3e
+# EXTENDED ENDING (service menu, DISPLAY ADJUSTMENTS item 4; docs/rom_differences.md): the film's last
+# sequence on top of the ROM's three phases. Off by default = the ROM's rules.
+GAUGE_SECONDS = 120          # act 1: the Portal closes; the gauge empties over this time (no sudden death)
+GUARD_PERCENT = 50           # act 2: Clu guards one shot, which pays this percentage
+WINDOW_SECONDS = 10          # act 3: Clu leaves with the disc, every shot pays for this long
+COMBO_SECONDS = 6            # act 5: a different shot within this time raises the multiplier
+COMBO_MAX = 5
+ULTIMATE_AFTER = 8           # act 5: shots in the final wave before the disc pays the ultimate jackpot
+ULTIMATE_POINTS = 10000000
 
 
 class Portal(Feature):
@@ -28,6 +37,12 @@ class Portal(Feature):
         self.super_value = 0
         self.total = 0
         self.end_wait = 0
+        self.ext = False            # EXTENDED ENDING chosen when the Portal started
+        self.started = 0.0
+        self.guard = None
+        self.window_end = 0.0
+        self.combo, self.combo_shot, self.combo_time, self.wave_hits = 0, None, 0.0, 0
+        self.ultimate_done = False
         for i in range(7):
             os_.register_poke(COUNTER_ADDR + 4 * i, (lambda i_: lambda p, v: self.counts.__setitem__(i_, v))(i),
                               players=1)
@@ -97,6 +112,7 @@ class Portal(Feature):
         if not os_.any_multiball():
             os_.flag_clear(0x32)
         os_.flag_set(0x37)
+        self.ext_start()
         self.pd.portal_count = min(self.pd.get("portal_count", 0) + 1, 0xff)
         os_.hook("items_clear", False)
         os_.hook("sos_clear_skip_flags")
@@ -116,6 +132,8 @@ class Portal(Feature):
         if not self.running_or_grace() or not 0 <= shot < 7:
             return False
         awarded = False
+        if self.ext:
+            return self.ext_shot(shot)
         if self.phase == 2:
             points = os_.score_add(1000000)
             os_.deff_start(144, value=points)
@@ -144,6 +162,110 @@ class Portal(Feature):
         if awarded:
             os_.request_refresh()
         return awarded
+
+    # ------------------------------------------------------------------ EXTENDED ENDING
+
+    def ext_post(self, act, **kw):
+        """Event for the display and the PuP: portal_act {act: 1..6} (the film's scenes)."""
+        self.os.machine.events.post("tron_portal_act", act=act, **kw)
+
+    def ext_start(self):
+        """Act 1: the bridge, the Portal starts to close; act 2: Clu guards the first shot."""
+        self.ext = bool(self.os.display_settings[4])
+        self.started = self.os.now
+        self.guard = None
+        self.window_end = 0.0
+        self.combo, self.combo_shot, self.combo_time, self.wave_hits = 0, None, 0.0, 0
+        self.ultimate_done = False
+        if self.ext:
+            self.next_guard()
+            self.ext_post(1)
+            self.ext_post(2, guard=self.guard)
+
+    def gauge(self):
+        """The Portal's gauge, 100 to 0 over GAUGE_SECONDS."""
+        return max(0, 100 - int((self.os.now - self.started) * 100 / GAUGE_SECONDS))
+
+    def next_guard(self):
+        """Clu guards the next unfinished shot after the current guard (none when all are done)."""
+        open_ = [i for i in range(6) if self.counts[i] < MAX_HITS[i]]
+        if not open_:
+            self.guard = None
+            return
+        after = [i for i in open_ if self.guard is None or i > self.guard]
+        self.guard = (after or open_)[0]
+
+    def ext_shot(self, shot):
+        os_ = self.os
+        awarded = False
+        if self.phase == 0:
+            if self.counts[shot] >= MAX_HITS[shot]:
+                return False
+            points = self.award_value()
+            if shot == self.guard:
+                points = points * GUARD_PERCENT // 100
+            points = os_.score_add(points)
+            self.counts[shot] += 1
+            done = self.counts[shot] >= MAX_HITS[shot]
+            added = done and self.add_a_ball()
+            os_.deff_start(142, value=points, count=self.counts[shot], ball_added=bool(added))
+            self.super_value += points
+            self.total += points
+            os_.audit(0x8a)
+            if done:
+                self.next_guard()
+                self.ext_post(2, guard=self.guard)
+            if self.all_shots_done():
+                self.phase = 1                       # act 3: Clu takes the disc and leaves
+                self.guard = None
+                self.window_end = os_.now + WINDOW_SECONDS
+                self.ext_post(3)
+            awarded = True
+        elif self.phase == 1:
+            if shot == 6 and self.all_shots_done():
+                # act 4: Sam activates the Portal with the real disc; a fuller gauge pays more
+                points = os_.score_add(self.super_value * (100 + self.gauge()) // 100)
+                os_.deff_start(143, value=points)
+                self.total += points
+                os_.audit(0x8b)
+                self.phase = 2
+                self.ext_post(4, gauge=self.gauge())
+                self.ext_post(5)
+                awarded = True
+            elif shot != 6 and os_.now < self.window_end:
+                points = os_.score_add(self.award_value())    # the window of act 3
+                os_.deff_start(142, value=points, count=MAX_HITS[shot], ball_added=False)
+                self.total += points
+                os_.audit(0x8a)
+                awarded = True
+        elif self.phase == 2:
+            awarded = self.ext_wave(shot)
+        if awarded:
+            os_.request_refresh()
+        return awarded
+
+    def ext_wave(self, shot):
+        """Act 5: Clu leaps, Kevin reintegrates him. Combos of different shots (1M, 2M ... 5M); after
+        ULTIMATE_AFTER shots the disc pays the ultimate jackpot once (the reintegration)."""
+        os_ = self.os
+        if shot == 6 and self.wave_hits >= ULTIMATE_AFTER and not self.ultimate_done:
+            self.ultimate_done = True
+            points = os_.score_add(ULTIMATE_POINTS)
+            os_.deff_start(143, value=points)
+            self.total += points
+            os_.audit(0x8b)
+            self.ext_post(6)
+            return True
+        if shot == self.combo_shot or os_.now - self.combo_time > COMBO_SECONDS:
+            self.combo = 0
+        self.combo = min(self.combo + 1, COMBO_MAX)
+        self.combo_shot, self.combo_time = shot, os_.now
+        self.wave_hits += 1
+        points = os_.score_add(1000000 * self.combo)
+        os_.deff_start(144, value=points)
+        self.total += points
+        os_.audit(0x8c)
+        return True
 
     def add_a_ball(self):
         """portal_mb_add_a_ball [0x0102f314]: multiball_add_balls(1, save 62, grace 62)."""
