@@ -143,7 +143,7 @@ def spec(template):
                           # without a linked pack the PuP is off and the screen shows the hd look
                           "advanced": ["--dmd=hd", "--dmd-cycles"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
-        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "hd"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
+        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "advanced"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
         "screens": [{"id": "backglass", "label": "Backglass", "setting": "pup.backglass.screen"},     # the platform's "Screens" card
                     {"id": "dmd", "label": "DMD (LCD)", "setting": "pup.dmd.screen"},                  # (PR 67): the game places its windows
