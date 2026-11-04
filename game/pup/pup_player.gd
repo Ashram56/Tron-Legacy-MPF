@@ -310,6 +310,21 @@ func _split_windows() -> void:
 			windows[section].mode = Window.MODE_FULLSCREEN
 		else:
 			column.append(windows[section])
+	if back != null and back.mode != Window.MODE_FULLSCREEN and not windows.has("topper"):
+		# no topper ([pup] third_screen=false): the backglass fills its monitor (1920x1080 on a 1080p one); a DMD on the
+		# same monitor floats over its bottom edge, half as wide
+		var full := DisplayServer.screen_get_usable_rect(screen)
+		back.borderless = true
+		back.size = full.size
+		back.position = full.position
+		if not column.is_empty():
+			var d: Window = column[0]
+			d.borderless = true
+			d.always_on_top = true
+			var dw := full.size.x / 2
+			d.size = Vector2i(dw, maxi(1, int(round(float(dw) * float(d.size.y) / maxf(1.0, float(d.size.x))))))
+			d.position = full.position + Vector2i((full.size.x - dw) / 2, full.size.y - d.size.y)
+		return
 	if back == null or back.mode == Window.MODE_FULLSCREEN or column.is_empty():
 		if back != null and back.mode != Window.MODE_FULLSCREEN and not column.is_empty():
 			_stack_windows()
