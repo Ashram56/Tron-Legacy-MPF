@@ -143,7 +143,7 @@ def spec(template):
                           # without a linked pack the PuP is off and the screen shows the hd look
                           "advanced": ["--dmd=hd", "--dmd-cycles"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
-        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "hd"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
+        "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "advanced"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
         # the platform's "Screens" card (PR 67) and cabinet preview: the game places its windows from the index, as before; `title` is the
         # window's title (game/pup/pup_player.gd _make_window) so the preview captures each window alone; `enabled` turns a window off
@@ -166,6 +166,9 @@ def main(argv=None):
                    "(the archive is tron-legacy-mpf-<version>-<label>-linux-<target>.tar.xz; the commit is only in bundle.json)")
     p.add_argument("--out", default=os.path.join(ROOT, "dist"), help="where the archive goes (default dist/)")
     p.add_argument("--no-archive", action="store_true", help="stop after staging; leave the folder")
+    p.add_argument("--fast", action="store_true", help="the platform's test loop (kept staged tree and Godot import in OUT/cache/)")
+    p.add_argument("--import-cache", metavar="URL", help="WebDAV folder that keeps Godot's import per medium (the platform's builder; "
+                   "WEBDAV_PASS in the environment)")
     args = p.parse_args(argv)
     check_workspace()
     missing = check_pup_files()
@@ -187,6 +190,10 @@ def main(argv=None):
         cmd += ["--label", args.label]
     if args.no_archive:
         cmd.append("--no-archive")
+    if args.fast:
+        cmd.append("--fast")
+    if args.import_cache:
+        cmd += ["--import-cache", args.import_cache]
     env = dict(os.environ, PYTHONPATH=platform_dir(), GODOT=os.environ.get("GODOT") or tc.godot_path())
     try:
         return subprocess.run(cmd, env=env, cwd=ROOT).returncode
