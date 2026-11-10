@@ -213,6 +213,14 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(screens["topper"]["enabled"], "pup.third_screen")
         self.assertNotIn("enabled", screens["dmd"])         # the DMD is always there: the platform draws it from the DMD's pictures
 
+    def test_advanced_look_leaves_the_light_cycles_to_the_game(self):
+        """The platform's `advanced` look once passed --dmd-cycles, which pup_player.gd puts before pup.cfg and the service menu's
+        PUP DMD SIZE: "full" had no effect (found on a Pi 5, 2026-11-10). The game alone decides the light cycles."""
+        looks = bb.spec("t")["dmd"]["looks"]
+        self.assertIn("advanced", looks)
+        for args in looks.values():
+            self.assertNotIn("--dmd-cycles", args)
+
     def test_settings_schema_follows_the_contract(self):
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "MPF-Godot-Packaging", "common", "netconfig"))
