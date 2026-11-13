@@ -104,6 +104,9 @@ def spec(template):
         old = json.load(f)
     profiles = {}
     for pr in old["profiles"]:
+        if pr["id"] == "rpi5":     # nothing is refused on a Pi 5; only the arena's MSAA starts off (2026-11-13: 27 fps instead of 22)
+            profiles["rpi5"] = {"limits": {}, "defaults": dict(pr["install"]["options"]), "dmd_looks": ["classic", "hd"]}
+            continue
         if pr["id"] != "rpi4":
             continue
         # the look of the DMD is the platform's card (bundle.json dmd.looks), no longer a game setting: dmd.mode is not limited here

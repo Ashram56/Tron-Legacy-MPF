@@ -461,6 +461,10 @@ def main(argv=None):
                    help="frames per second cap (default 30, game/project.godot: the PuP Pack's videos are 30 fps and "
                         "the frames come steady; 0 = none, 60 for a smoother DMD where the GPU keeps up). "
                         "Also TRON_MAX_FPS")
+    p.add_argument("--arena-msaa", choices=["off", "2x", "4x"],
+                   help="anti-aliasing of the 3D light cycle arena (default 2x; off is faster on a Raspberry Pi 5)")
+    p.add_argument("--arena-res", choices=["full", "half"],
+                   help="resolution of the light cycle arena (default full; half is faster but blurred)")
     p.add_argument("--no-render-thread", dest="render_thread", action="store_false",
                    help="draw on Godot's main thread instead of its separate render thread (the default, "
                         "docs/performance.md), should a GPU driver misbehave with it. Also TRON_RENDER_THREAD=0")
@@ -485,6 +489,10 @@ def main(argv=None):
     max_fps = args.max_fps if args.max_fps is not None else os.environ.get("TRON_MAX_FPS")
     if max_fps not in (None, "") and "--max-fps" not in args.godot_args:
         args.godot_args = engine_arg(args.godot_args, "--max-fps", str(int(max_fps)))
+    for name in ("arena_msaa", "arena_res"):
+        value = getattr(args, name)
+        if value and not any(a.startswith("--" + name.replace("_", "-") + "=") for a in args.godot_args):
+            args.godot_args = user_arg(args.godot_args, "--{}={}".format(name.replace("_", "-"), value))
     session_env = {}                    # recording, replay and seed: given to this run only (tron/recording.py)
     if args.replay:
         session_env["TRON_REPLAY"] = os.path.abspath(args.replay)

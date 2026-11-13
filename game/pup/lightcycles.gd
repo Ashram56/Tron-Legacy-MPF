@@ -41,6 +41,17 @@ func _ready() -> void:
 	_view = SubViewport.new()
 	_view.own_world_3d = true
 	_view.msaa_3d = Viewport.MSAA_2X
+	# the platform's bundle settings (user arguments): --arena-msaa=off|2x|4x, --arena-res=full|half; none = MSAA 2x, full resolution
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--arena-msaa="):
+			match a.trim_prefix("--arena-msaa=").to_lower():
+				"off": _view.msaa_3d = Viewport.MSAA_DISABLED
+				"2x": _view.msaa_3d = Viewport.MSAA_2X
+				"4x": _view.msaa_3d = Viewport.MSAA_4X
+		elif a.begins_with("--arena-res="):
+			match a.trim_prefix("--arena-res=").to_lower():
+				"full": stretch_shrink = 1
+				"half": stretch_shrink = 2
 	add_child(_view)
 
 	var e := Environment.new()
