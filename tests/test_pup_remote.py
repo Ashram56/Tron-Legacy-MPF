@@ -11,9 +11,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 class TestRemoteSettings(unittest.TestCase):
 
     def test_option_targets_the_remote_section(self):
-        with open(os.path.join(ROOT, "scripts", "package", "options.json"), encoding="utf-8") as f:
+        with open(os.path.join(ROOT, "scripts", "package", "settings.json"), encoding="utf-8") as f:
             options = {o["id"]: o for o in json.load(f)["options"]}
-        self.assertEqual({"cfg": "pup.local.cfg", "section": "remote", "key": "enabled"}, options["remote.enabled"]["target"])
+        self.assertEqual({"ini": "game/pup.local.cfg", "section": "remote", "key": "enabled"}, options["remote.enabled"]["target"])
         self.assertFalse(options["remote.enabled"]["default"])
         self.assertEqual("remote", options["remote.port"]["target"]["section"])
 

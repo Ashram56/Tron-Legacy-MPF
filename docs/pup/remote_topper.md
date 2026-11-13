@@ -29,7 +29,7 @@ The server, PinUP Player's screen rules and the Pi's agent and installer are the
 3. **The videos come from the game.** Nothing to copy or run on the cabinet: the game serves the topper's videos (the
    playlists of its PuP screens 13 and 14: default backgrounds and every trigger), read in place from the PuP Pack, over HTTP on
    `[remote] media_port` (5053), and the Pi downloads what is new at each connection (platforms/pup-remote-topper.md,
-   "Videos"). The same switch, `remote.enabled`, is in the bundle's settings (`scripts/package/options.json`).
+   "Videos"). The same switch, `remote.enabled`, is in the bundle's settings (`scripts/package/settings.json`).
 
 4. **Start the game.** The Pi finds it by itself (broadcast on UDP port 5052); the game's log says
    `remote PuP display 'topper' connected`.
