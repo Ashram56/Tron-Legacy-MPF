@@ -33,7 +33,11 @@ def _platform_remote():
     if where not in sys.path:
         sys.path.insert(0, where)
     from mpf_godot.pup_remote import server
-    return server
+    try:
+        from mpf_godot.pup_remote import media
+    except ImportError:                 # a platform before the media server: the displays keep their own videos
+        media = None
+    return server, media
 
 
 class PupMode(Mode):
@@ -94,14 +98,20 @@ class PupMode(Mode):
         if not opts.get("enabled", False):
             return
         try:
-            remote = _platform_remote()
+            remote, media = _platform_remote()
         except (ImportError, SystemExit) as e:
             log.warning("remote PuP screens: the platform (MPF-Godot-Packaging) is missing (%s); no remote displays", e)
             return
+        screens = pupfiles.load_screens(pack)
+        # the displays download the topper's videos from here, read in place from the pack (nothing copied or generated)
+        extra = {}
+        if media:
+            extra = {"media": media.topper_media(pack, screens, pupfiles.load_triggers(pack)),
+                     "media_port": int(opts.get("media_port", 5053))}
         self.remote = remote.RemoteServer(
-            pupfiles.load_screens(pack), pupfiles.load_playlists(pack), game=os.path.basename(pack),
+            screens, pupfiles.load_playlists(pack), game=os.path.basename(pack),
             host=str(opts.get("listen", "0.0.0.0")), port=int(opts.get("port", 5052)),
-            discovery=bool(opts.get("discovery", True)))
+            discovery=bool(opts.get("discovery", True)), **extra)
         task = asyncio.ensure_future(self.remote.start(), loop=self.machine.clock.loop)
         task.add_done_callback(self._remote_started)
         self.machine.events.add_handler("shutdown", self._stop_remote)
