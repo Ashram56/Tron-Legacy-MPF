@@ -32,6 +32,16 @@
            "why": "only with a Godot carrying the platform's build/godot/egl_release_current.patch (Godot 4.6.3 crashes without it)"}
         ]
       }
+    },
+    {
+      "id": "rpi5",
+      "label": "Raspberry Pi 5",
+      "match": ["Raspberry Pi 5", "raspberrypi,5-model-b"],
+      "measured": "2026-11-13, Pi 5, two screens: arena MSAA 2x 22.4 fps, MSAA off 27.1 fps",
+      "install": {
+        "options": {"display.arena_msaa": "off"}
+      }
     }
+
   ]
 }

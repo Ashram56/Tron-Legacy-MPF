@@ -144,6 +144,39 @@
    }
   },
   {
+   "id": "display.arena_msaa",
+   "group": "display",
+   "label": "Light cycle arena anti-aliasing (MSAA)",
+   "type": "choice",
+   "choices": [
+    "off",
+    "2x",
+    "4x"
+   ],
+   "default": "2x",
+   "help": "The 3D light cycle arena round the DMD. Off is faster (Raspberry Pi 5, two screens: 27 fps instead of 22) but the edges are rougher.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--arena-msaa"
+   }
+  },
+  {
+   "id": "display.arena_res",
+   "group": "display",
+   "label": "Light cycle arena resolution",
+   "type": "choice",
+   "choices": [
+    "full",
+    "half"
+   ],
+   "default": "full",
+   "help": "Half draws the arena at half resolution: a little faster (29.5 fps on a Pi 5 with MSAA off) but visibly blurred.",
+   "restart": true,
+   "target": {
+    "godot_arg": "--arena-res"
+   }
+  },
+  {
    "id": "pup.enabled",
    "group": "pup",
    "label": "PuP videos and music",
