@@ -171,7 +171,7 @@ also shows on the backglass (2026-10-18: `game/pup/service_backglass.gd`, `game/
 keeps the ROM's screens), fading in and out over a median still of the backglass loop made by `gen_pup.py`;
 `[backglass] service_menu`. Remote topper on a Raspberry Pi (2026-10-19, Vincent: Pi 3 A+ first, Zero W to try;
 videos copied as they are, re-encoded only when the Pi can't decode them): `[remote] enabled`; server, rules, Pi agent and installer are the
-platform's (MPF-Godot-Packaging `mpf_godot/pup_remote/`), the game keeps `scripts/pup/topper_media.py`: [docs/pup/remote_topper.md](../pup/remote_topper.md); not yet run on a real Pi. Open: the remote topper on
+platform's (MPF-Godot-Packaging `mpf_godot/pup_remote/`), the game only passes the topper's videos (`media.topper_media`) to the server and has the `remote.enabled` option in `scripts/package/options.json` (2026-11-13: the Pi downloads the videos from the game, no script on the cabinet; the Zero W image is the platform's): [docs/pup/remote_topper.md](../pup/remote_topper.md); not yet run on a real Pi. Open: the remote topper on
 the Pi (the platform's pup-remote-topper.md, "To check on the Pi"); the owner's look on a real backglass; after a display change, re-run `scripts/pup/pup_captures.py`
 and fix the flagged rows of `game/tron_pup/trigger_map.yaml`.
 
