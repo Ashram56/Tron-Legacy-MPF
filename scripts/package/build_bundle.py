@@ -139,9 +139,10 @@ def spec(template):
                              "proc_fiber": ["hw_proc", "fiber_optics"]}},
         "dmd": {"rom": "trn_174h", "size": "128x32", "look": "hd",
                 "looks": {"classic": ["--dmd=classic"], "hd": ["--dmd=hd"],
-                          # advanced: HD DMD + the PuP's DMD window with the light cycles (game/pup/pup_player.gd cycles_arg);
-                          # without a linked pack the PuP is off and the screen shows the hd look
-                          "advanced": ["--dmd=hd", "--dmd-cycles"]}},
+                          # advanced: the HD DMD plus the PuP's extras (the pup_art add-on follows dmd.look). The light cycles
+                          # are the game's own choice (pup.cfg [dmd] dmd_size, service menu PUP DMD SIZE): the platform passes
+                          # no --dmd-cycles, which used to force them over both (2026-11-10)
+                          "advanced": ["--dmd=hd"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
         "addons": [{"id": "pup_art", "dir": ADDON, "setting": "dmd.look", "when": "advanced"}],   # dmd.look = the look that runs (classic on a ZeDMD, a PIN2DMD or a limited board)
         "settings": {"schema": "scripts/package/settings.json"},
