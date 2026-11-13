@@ -8,10 +8,10 @@
 +    // (0x%x = call site + 4 of the effects' RNG sites, assets/rom_data/deffs/random_parts.csv), so a run can be compared to the game's with the same clip
 +    static const unsigned sites[] = { 0x102cf58, 0x1008978, 0x1008c74, 0x101e384, 0x101e6bc, 0x1019f58, 0x101ab18, 0x1032938, 0x1032944,
 +      0x1032958, 0x1032d5c, 0x100e904, 0x100e920, 0x100ea24, 0x10209dc, 0x1021be8, 0x1027488, 0x1027384 };
-+    static int on = getenv("TRON_RNG_ZERO") != NULL;
++    static int on = getenv("TRON_RNG_ZERO") != NULL; static unsigned val = getenv("TRON_RNG_VALUE") ? (unsigned)atoi(getenv("TRON_RNG_VALUE")) : 0;
 +    if (!on) break;
 +    unsigned caller = r32(r[13] + 4);
-+    for (unsigned a : sites) if (a == caller) { r[0] = 0; break; }
++    for (unsigned a : sites) if (a == caller) { r[0] = val; break; }
 +    if (caller >= 0xc708 && caller < 0xc828) r[0] = 0;   // bag_weighted_pick: every weighted bag (Flynn's Arcade award...) takes its first entry
 +    break; }
    case 0x2c744: { unsigned tk = r32(RAM_TASK_CUR); unsigned d = tk ? r16(tk+0x24) : 0;

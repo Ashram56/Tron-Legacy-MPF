@@ -429,6 +429,34 @@ def loop_period(frames):
 SHARED = {}
 
 
+# The ROM's own clips of a deff (assets/rom_data/deffs/random_parts.csv: which of 4 clips, one function per case): the library
+# animations (dmd_library/anim_NNN_imgMMMM, the ROM's bitmaps) and the x each is drawn at with bitmap_draw_masked, which leaves level 0
+# alone. Deff 108: 2683..2712 and 2713..2742 at x 0, 2623..2652 and 2653..2682 at x 41.
+ROM_CLIPS = {108: [("anim_012_img2683", 0), ("anim_013_img2713", 0), ("anim_010_img2623", 41), ("anim_011_img2653", 41)]}
+
+
+def rom_clip(deff_id, k):
+    """[(RGBA 128x32 frame, ms)] of the ROM's clip k of a deff drawn masked at its x, or None without the library."""
+    import glob as _glob
+    import numpy as np
+    from PIL import Image
+    name, x = ROM_CLIPS[deff_id][k]
+    folder = os.path.join(ROOT, "assets", "mpf_package", "media", "dmd_library", name, "frames")
+    files = sorted(_glob.glob(os.path.join(folder, "*.png")))
+    if not files:
+        return None
+    out = []
+    for f in files:
+        src = np.array(Image.open(f).convert("RGBA"))
+        canvas = np.zeros((32, 128, 4), np.uint8)
+        h, w = src.shape[:2]
+        part = src.copy()
+        part[part[:, :, 3] == 0] = 0                                  # the bitmap's own mask (alpha); an opaque level 0 inside the shape stays black
+        canvas[:h, x:x + w] = part[:, :min(w, 128 - x)]
+        out.append((Image.fromarray(canvas, "RGBA"), 49))
+    return out
+
+
 def clear_black_panel(img):
     """The frame with its level-0 (black) pixels over the status panel (x < PANEL_WIDTH) made transparent: the ROM draws the clip
     with bitmap_draw_masked, which does not draw level 0, so the panel's score shows through (the extraction made the area opaque
@@ -438,6 +466,37 @@ def clear_black_panel(img):
     a = np.array(img.convert("RGBA"))
     black = (a[:, :PANEL_WIDTH, 0] == 0) & (a[:, :PANEL_WIDTH, 3] == 255)
     a[:, :PANEL_WIDTH, 3][black] = 0
+    return Image.fromarray(a, "RGBA")
+
+
+def open_white_big(img, min_area=100):
+    """The frame with its full-white (level 15) areas of min_area dots or more made transparent: a ROM clip's bitmap holds white
+    where the ROM draws nothing (the text of the effect shows there: the tower's inside, the corners), against shine spots of at most
+    ~60 dots that are the film (deff 108's four clips: the components are below 60 or above 120 dots)."""
+    import numpy as np
+    from PIL import Image
+    a = np.array(img.convert("RGBA"))
+    white = (a[:, :, 0] == 255) & (a[:, :, 3] == 255)
+    seen = np.zeros_like(white)
+    h, w = white.shape
+    for y in range(h):
+        for x in range(w):
+            if not white[y, x] or seen[y, x]:
+                continue
+            comp, stack = [], [(y, x)]
+            while stack:
+                cy, cx = stack.pop()
+                if seen[cy, cx]:
+                    continue
+                seen[cy, cx] = True
+                comp.append((cy, cx))
+                for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    ny, nx = cy + dy, cx + dx
+                    if 0 <= ny < h and 0 <= nx < w and white[ny, nx] and not seen[ny, nx]:
+                        stack.append((ny, nx))
+            if len(comp) >= min_area:
+                for cy, cx in comp:
+                    a[cy, cx] = (0, 0, 0, 0)
     return Image.fromarray(a, "RGBA")
 
 
@@ -635,8 +694,9 @@ def build_deffs(only_data):
         variants, shifts = [], []
         if source == "graphics":
             clips = glob.glob(os.path.join(folder, "variants", "v*.gif")) or glob.glob(os.path.join(folder, "variants", "level_*.gif"))
-            for gif in sorted(clips):               # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
-                clip = gif_frames(gif)
+            for k, gif in enumerate(sorted(clips)):  # the Light Cycle jackpots' clips by level (level_L_N / level_L): the rules pick one
+                from_rom = rom_clip(deff_id, k) if deff_id in ROM_CLIPS else None
+                clip = from_rom or gif_frames(gif)
                 if deff_id == 108 or 116 <= deff_id <= 124:
                     # the ROM draws every picture of these clips for the same time, the capture's frame period (the gifs carry 40 ms
                     # defaults or a mean over a measured run)
@@ -652,7 +712,7 @@ def build_deffs(only_data):
                     if len(ticks) == len(clip):
                         clip = [(img, int(round(t * 15.8))) for (img, _), t in zip(clip, ticks)]   # 15.8 ms: clip 0 ends at the captured 1960 ms
                 if deff_id in rom_layout.OPEN_WHITE:
-                    clip = [(open_white(img), ms) for img, ms in clip]
+                    clip = [((open_white_big(img) if from_rom else open_white(img)), ms) for img, ms in clip]
                 if deff_id in rom_layout.CLIP_OVER_PANEL:      # the ROM's masked draw leaves level 0 alone: the panel's score shows through
                     clip = [(clear_black_panel(img), ms) for img, ms in clip]
                 if deff_id in rom_layout.CLIP_END_TEXT:        # dims at its own end, the text follows (variant_shift)
