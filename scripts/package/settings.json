@@ -204,6 +204,36 @@
    }
   },
   {
+   "id": "remote.enabled",
+   "group": "pup",
+   "label": "Remote topper (Raspberry Pi)",
+   "type": "bool",
+   "default": false,
+   "help": "On: the topper's PuP screens also go to a Raspberry Pi on the network (the platform's topper image), which downloads the videos from this game.",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "remote",
+    "key": "enabled"
+   }
+  },
+  {
+   "id": "remote.port",
+   "group": "pup",
+   "label": "Remote topper port",
+   "type": "integer",
+   "min": 1024,
+   "max": 65534,
+   "default": 5052,
+   "help": "TCP and UDP port of the commands and of the Pi's search; the videos are served on the media port (5053 by default).",
+   "restart": true,
+   "target": {
+    "ini": "game/pup.local.cfg",
+    "section": "remote",
+    "key": "port"
+   }
+  },
+  {
    "id": "pup.ost_music",
    "group": "pup",
    "label": "PuP OST music",
