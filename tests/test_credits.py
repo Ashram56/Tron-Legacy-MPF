@@ -262,7 +262,8 @@ class TestHighScores(HsCase):
         os_.adj[48] = 0
         self.play(90000000)
         self.assertNotIn(31, self.deffs())
-        self.assertIn(38, self.deffs())                       # straight to the match
+        self.assertNotIn(38, self.deffs())                    # and no match either: play() turns it OFF
+        self.assertIsNone(self.machine.game)
         self.assertEqual([], os_.features_by_name["high_scores"].table())
 
     def test_entry_initials_award_and_table(self):
@@ -297,7 +298,8 @@ class TestHighScores(HsCase):
         self.assertEqual([0x33, 0x34, 0x35, 0x36, 0x37, 0x38], [s["stage"] for s in stages])
         self.assertEqual((1, 1), (os_.credit_model.credits, os_.audits[0x10]))
         self.assertIn("0x019", self.sounds())                 # credit award: knocker
-        self.assertEqual([31, 32, 33, 38], [d for d in self.deffs() if d in (31, 32, 33, 38)])
+        # MATCH PERCENTAGE is OFF in play(): no match display after the entry [0x0001b660]
+        self.assertEqual([31, 32, 33], [d for d in self.deffs() if d in (31, 32, 33, 38)])
         self.assertEqual(0, os_.audits.get(0x2c, 0))          # the flipper buttons were not flipper audits
         self.assertFalse(os_.state & 0x40)
 

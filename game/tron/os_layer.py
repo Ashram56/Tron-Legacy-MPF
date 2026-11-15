@@ -27,6 +27,7 @@ START_HOLD_TICKS = 62   # adj 36 GAME RESTART: START held this long (timer 4, 0x
 
 # game state word 0x37274 bits (game_flow.md section 3)
 ST_BONUS, ST_END_BALL, ST_ATTRACT, ST_TILT = 0x01, 0x04, 0x10, 0x200
+ST_GAME_START = 0x20        # from the game start to its first ball start [0x00020584]
 
 # valid playfield (game_flow.md 4.3): "force" switches validate at once, 3 distinct "counting" ones do
 FORCE_SWITCHES = {11, 12, 14, 24, 25, 28, 29, 34, 37, 39, 43, 46}
@@ -38,7 +39,11 @@ MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
 BALL_SAVE_GRACE = 218        # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
 SERVE_EJECT_TICKS = 32
 LATER_SERVE_EXTRA_TICKS = 6     # every later ball start: trough eject 0.645 s after the ball start, not 0.545 s
-SAVE_EJECT_TICKS = 39
+# MPF counts a ball in the shooter lane 100 ms after its switch closes (hardware.yaml: the ROM's 6 ticks),
+# not after its default 500 ms, which lost a ball plunged at once. The waits before an auto-launched ball
+# were measured with the 500 ms: they keep the ROM's times with the 0.4 s added here.
+SHOOTER_COUNT_SHIFT = 25
+SAVE_EJECT_TICKS = 39 + SHOOTER_COUNT_SHIFT
 AUTO_LAUNCH_TICKS = 12      # task 0x3c after an auto-launch (inferred: covers the shooter lane opening)
 MB_TASK = "multiball"       # the multiball task (ROM id: trough device + 0x18)
 MB_EJECT_TICKS = 101        # trough eject cycle while it launches multiball balls (portal_multiball.jsonl)
@@ -46,12 +51,12 @@ MB_EJECT_TICKS = 101        # trough eject cycle while it launches multiball bal
 # multiball ball leaves the shooter lane (sound 0x0ea) 3.0 s after the kick in every ROM trace
 # (light_cycle_multiball 26.70 -> 29.73, portal_multiball 17.87 -> 20.86, quorra_multiball 28.86 -> 31.88);
 # MPF's trough eject + auto-launch take the remaining ~0.6 s.
-VUK_BUSY_TICKS = 149
+VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # A request without the VUK (add-a-ball, a drain during the save) launches its first ball after a trough
 # cycle: sound 0x0ea 1.43 s after the Quorra add-a-ball (quorra_multiball 46.68 -> 48.11), of which MPF's
 # trough eject + auto-launch take ~0.6 s.
-MB_FIRST_EJECT_TICKS = 51
-SAVE_SERVE_TICKS = 48           # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
+MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
+SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
                                 # resumes (traces/tron_targets.jsonl: searches 33.88 s and 48.79 s)
@@ -718,12 +723,21 @@ class TronOS(CustomCode):
 
     def _mb_launch(self):
         if self._mb_pending <= 0 or not self.game or self.state & 0x214:
-            self._mb_pending = 0
-            self.task_kill(MB_TASK)
+            self._mb_cancel()
             return
         self._mb_pending -= 1
         self.machine.playfield.add_ball(balls=1, player_controlled=False)
         self.task_start(MB_TASK, MB_EJECT_TICKS, self._mb_launch)
+
+    def _mb_cancel(self):
+        """The multiball task ends with balls still to launch (a tilt before the launches): they never
+        come, so MPF's count gives them back. The ROM counts the balls from the devices and has nothing
+        to undo; without this the game waits for ever for a ball that was never served."""
+        pending, self._mb_pending = self._mb_pending, 0
+        self.task_kill(MB_TASK)
+        game = self.machine.game
+        if pending > 0 and game and not self.state & ST_END_BALL and not game.ending:
+            game.balls_in_play = max(game.balls_in_play - pending, 0)
 
     def _mb_save_grace(self, grace_ticks):
         self.leff_stop(13)
@@ -974,7 +988,9 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ game start (4.1)
 
     def _game_starting(self, queue=None, **kwargs):
-        self.state = 0
+        # not in play until the first ball starts: a ball still on the playfield (GAME RESTART, a ball
+        # found by the ball search) closes switches before the players' data is set up
+        self.state = ST_GAME_START
         self.session.game_seed()                     # per-game seed when recording/replaying (tron/recording.py)
         self.players = [PlayerData() for _ in range(4)]
         self.eb_lit = [0] * 4
@@ -1111,8 +1127,8 @@ class TronOS(CustomCode):
 
     def _ball_drain(self, balls=0, **kwargs):
         """ball_drain relay: ball save and re-serve before the playfield is valid [0x0001dd90]."""
-        if not balls or not self.game:
-            return {"balls": balls}
+        if not balls or not self.game or self.state & ST_GAME_START:
+            return {"balls": balls}                  # no ball started yet: the ball of a restarted game comes home
         self.vuk_ejecting = False
         if self._coindoor_save and self.mb_save_running() and not self.tilted:
             # the coin door ball saver's save (adj 41) re-serves even the last ball [0x0001ff74]
@@ -1473,7 +1489,10 @@ class TronOS(CustomCode):
             self.audit(0x28)
         if self.task_running(0x38):
             self.audit(0x29)
-        wait_ticks = self.hook("ball_end_wait") or 0  # mode TOTAL displays (flag-0x2000 tasks)
+        # mode TOTAL displays (flag-0x2000 tasks) [0x00020764]: the longest one. (The ROM stops waiting after
+        # gf_eob_mode_wait ticks; sea_of_simulation.jsonl waits longer than 169, so no limit is applied.)
+        waits = [fn() or 0 for fn in self.hooks.get("ball_end_wait", ())]
+        wait_ticks = max(waits, default=0)
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
     def _ball_ending_bonus(self, queue):

@@ -214,6 +214,7 @@ Tron-Legacy-MPF/
 │   └── clean_tree.py        removes empty leftover folders
 ├── scenarios/               (PuP) game scripts for run.py --scenario (a whole game to Portal Multiball)
 ├── tests/                   unit tests (pytest -q tests) and the machine configs they load
+│   └── bench/               the rules test bench: player robot, physical table, stress games (docs/test_bench.md)
 ├── docs/                    development, hardware, requirements, vpx, performance, rom_differences, agents/
 │   ├── pup/                 (PuP) how the PuP is wired in; captures.md, the trigger map report
 │   ├── jetson/              NVIDIA Jetson set-up and video fixes, Xavier NX results
@@ -231,6 +232,8 @@ PuP media), `game/addons/` (GMC and the video add-ons), `game/logs/`, `game/data
 - [docs/pup/README.md](docs/pup/README.md): the PuP Pack: setting it up, the screens, how it is wired in.
 - [docs/development.md](docs/development.md): the workspace in detail (layout, setup options, running by hand,
   tests and checks, the asset sync).
+- [docs/test_bench.md](docs/test_bench.md): the rules test bench (`python scripts/bench.py`): the modes one by one against
+  the ROM's rules, the service menu's adjustments in play, random games; what it found.
 - [docs/requirements.md](docs/requirements.md): what a computer needs, per OS.
 - [docs/install_findings.md](docs/install_findings.md): what testing the one-line installers found (tokens, Windows, Linux arm64).
 - [docs/hardware.md](docs/hardware.md): virtual hardware and the P-ROC.

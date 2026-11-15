@@ -202,7 +202,13 @@ To change what an effect shows:
 .venv/bin/python -m pytest -q tests                   # all OSes (Windows: .venv\Scripts\python)
 python scripts/render_check.py [seconds] [scenario]   # boots Godot + MPF, captures the DMD, fails if blank
 .venv/bin/python scripts/scenario_report.py           # rule traces against the ROM references
+python scripts/bench.py [modes|adjustments|stress|soak]   # the rules test bench (part of pytest -q tests)
 ```
+
+The test bench ([test_bench.md](test_bench.md)) plays the game with a player robot on a physical table
+model: every mode against its spec, the service menu's adjustments checked in play, random whole games with
+invariants checked after every action. Run it before and after a change to the rules; a bug it finds gets a
+regression test there.
 
 The render check writes `captures/dmd_latest.png` and an 8x preview. Godot's `--headless` mode uses a dummy
 renderer that draws nothing, so the check opens a real window with the OpenGL renderer: under Xvfb (Mesa

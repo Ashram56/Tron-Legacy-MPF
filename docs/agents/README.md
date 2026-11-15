@@ -41,6 +41,7 @@ Stern-SAM-Decryption) when you learn something any SAM game would need; update t
 | Coil times | the ROM's, generated into `game/config/rom/coil_times.yaml` from `assets/rom_data/io/coils.csv` |
 | User docs | [README](../../README.md), [requirements.md](../requirements.md), [hardware.md](../hardware.md) (P-ROC), [vpx.md](../vpx.md) (Visual Pinball X), [development.md](../development.md), [performance.md](../performance.md) |
 | Departures from the ROM | [rom_differences.md](../rom_differences.md): read before changing a rule; add every new departure there |
+| Rules test bench | [test_bench.md](../test_bench.md): `python scripts/bench.py` (player robot on a physical table, modes one by one, adjustments in play, random games); run it before and after a rules change |
 
 ## A, ROM extraction
 
@@ -68,6 +69,10 @@ coin door and in-game service (PR #17). Open:
 4. Ramp tube wiring on the IO board: documentation PR #16 is open; tubes stay off on the P-ROC until checked
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
+6. From the test bench's review (2026-11-15, [test_bench.md](../test_bench.md) "Found by the bench"): adj 80 DISABLE DROP
+   TARGETS, adj 75 ABORT ANIMATIONS and adj 46 PLAYER COMPETITION do nothing; what the ROM does on a GAME RESTART with
+   a ball in play is not traced. Five bugs it found are fixed there (tilt before a multiball's launches, fast plunge,
+   GAME RESTART with a ball in play, MATCH OFF, end-of-ball wait).
 
 ## D, VPX bridge
 
@@ -182,4 +187,4 @@ a short numbered list. Small update zips of changed files only, never a full reb
 owner's language (Vincent sometimes writes in French). CI runs only on pushes to `main`: test locally before
 pushing a branch.
 
-Last updated 2026-10-27 (PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
+Last updated 2026-11-15 (rules test bench; earlier: PIN2DMD output; earlier: PuP Pack merged in from the fork; DMD glow and size in the service menu; PuP video on Windows; agents and knowledge base moved to Stern-SAM-Decryption; this page keeps Tron's part).
