@@ -14,17 +14,26 @@ class GameOver(Feature):
             os_.hook("attract_start")
             done()
             return
-        number = os_.random.randrange(0, 100, 10)
-        os_.deff_start(38, number=number, number_again=number)   # deff 38 prints the number (task + 0x34)
         forced = os_.forced.get("match")
+        if os_.adj_value(30) == 11 and not forced:     # match [0x0001b660]: MATCH PERCENTAGE OFF, no match
+            self._attract(done)                        # at all (no deff 38): straight to the attract mode
+            return
+        number = os_.random.randrange(0, 100, 10)
         matched = 0
-        # match [0x0001b660]: adj 30 MATCH PERCENTAGE (11 = OFF). The number can match only while the
-        # machine's match rate (TOTAL MATCHES 0x0f x 100 / games 0x11, persistent audits) is below adj 30;
-        # otherwise the ROM picks a number no player has.
+        # adj 30 MATCH PERCENTAGE: the number can match only while the machine's match rate (TOTAL MATCHES
+        # 0x0f x 100 / games 0x11, persistent audits) is below adj 30; otherwise the ROM moves on by tens
+        # to a number no player has.
         audits = os_.audits
         rate = audits[0x0f] * 100 // audits[0x11] if audits[0x11] else 0
-        if os_.adj_value(30) < 11 and rate < os_.adj_value(30):
-            matched = sum(1 for p in self.machine.game.player_list if p.score % 100 == number)
+        ends = [p.score % 100 for p in self.machine.game.player_list]
+        if rate < os_.adj_value(30):
+            matched = ends.count(number)
+        elif not forced:
+            for _ in range(10):
+                number = (number + 10) % 100
+                if number not in ends:
+                    break
+        os_.deff_start(38, number=number, number_again=number)   # deff 38 prints the number (task + 0x34)
         if forced:
             matched = forced.pop(0)
         if matched:
