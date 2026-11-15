@@ -27,6 +27,7 @@ START_HOLD_TICKS = 62   # adj 36 GAME RESTART: START held this long (timer 4, 0x
 
 # game state word 0x37274 bits (game_flow.md section 3)
 ST_BONUS, ST_END_BALL, ST_ATTRACT, ST_TILT = 0x01, 0x04, 0x10, 0x200
+ST_GAME_START = 0x20        # from the game start to its first ball start [0x00020584]
 
 # valid playfield (game_flow.md 4.3): "force" switches validate at once, 3 distinct "counting" ones do
 FORCE_SWITCHES = {11, 12, 14, 24, 25, 28, 29, 34, 37, 39, 43, 46}
@@ -987,7 +988,9 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ game start (4.1)
 
     def _game_starting(self, queue=None, **kwargs):
-        self.state = 0
+        # not in play until the first ball starts: a ball still on the playfield (GAME RESTART, a ball
+        # found by the ball search) closes switches before the players' data is set up
+        self.state = ST_GAME_START
         self.session.game_seed()                     # per-game seed when recording/replaying (tron/recording.py)
         self.players = [PlayerData() for _ in range(4)]
         self.eb_lit = [0] * 4
@@ -1124,8 +1127,8 @@ class TronOS(CustomCode):
 
     def _ball_drain(self, balls=0, **kwargs):
         """ball_drain relay: ball save and re-serve before the playfield is valid [0x0001dd90]."""
-        if not balls or not self.game:
-            return {"balls": balls}
+        if not balls or not self.game or self.state & ST_GAME_START:
+            return {"balls": balls}                  # no ball started yet: the ball of a restarted game comes home
         self.vuk_ejecting = False
         if self._coindoor_save and self.mb_save_running() and not self.tilted:
             # the coin door ball saver's save (adj 41) re-serves even the last ball [0x0001ff74]
