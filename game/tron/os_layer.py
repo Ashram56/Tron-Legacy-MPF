@@ -1489,7 +1489,10 @@ class TronOS(CustomCode):
             self.audit(0x28)
         if self.task_running(0x38):
             self.audit(0x29)
-        wait_ticks = self.hook("ball_end_wait") or 0  # mode TOTAL displays (flag-0x2000 tasks)
+        # mode TOTAL displays (flag-0x2000 tasks) [0x00020764]: the longest one. (The ROM stops waiting after
+        # gf_eob_mode_wait ticks; sea_of_simulation.jsonl waits longer than 169, so no limit is applied.)
+        waits = [fn() or 0 for fn in self.hooks.get("ball_end_wait", ())]
+        wait_ticks = max(waits, default=0)
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
     def _ball_ending_bonus(self, queue):
