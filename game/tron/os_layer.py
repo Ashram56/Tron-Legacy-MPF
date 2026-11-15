@@ -38,7 +38,11 @@ MULTIBALL_FLAGS = (0x27, 0x24, 0x2b, 0x29, 0x37)
 BALL_SAVE_GRACE = 218        # ticks (0xda) of grace after the ball-save timer (game_flow.md 5.1)
 SERVE_EJECT_TICKS = 32
 LATER_SERVE_EXTRA_TICKS = 6     # every later ball start: trough eject 0.645 s after the ball start, not 0.545 s
-SAVE_EJECT_TICKS = 39
+# MPF counts a ball in the shooter lane 100 ms after its switch closes (hardware.yaml: the ROM's 6 ticks),
+# not after its default 500 ms, which lost a ball plunged at once. The waits before an auto-launched ball
+# were measured with the 500 ms: they keep the ROM's times with the 0.4 s added here.
+SHOOTER_COUNT_SHIFT = 25
+SAVE_EJECT_TICKS = 39 + SHOOTER_COUNT_SHIFT
 AUTO_LAUNCH_TICKS = 12      # task 0x3c after an auto-launch (inferred: covers the shooter lane opening)
 MB_TASK = "multiball"       # the multiball task (ROM id: trough device + 0x18)
 MB_EJECT_TICKS = 101        # trough eject cycle while it launches multiball balls (portal_multiball.jsonl)
@@ -46,12 +50,12 @@ MB_EJECT_TICKS = 101        # trough eject cycle while it launches multiball bal
 # multiball ball leaves the shooter lane (sound 0x0ea) 3.0 s after the kick in every ROM trace
 # (light_cycle_multiball 26.70 -> 29.73, portal_multiball 17.87 -> 20.86, quorra_multiball 28.86 -> 31.88);
 # MPF's trough eject + auto-launch take the remaining ~0.6 s.
-VUK_BUSY_TICKS = 149
+VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # A request without the VUK (add-a-ball, a drain during the save) launches its first ball after a trough
 # cycle: sound 0x0ea 1.43 s after the Quorra add-a-ball (quorra_multiball 46.68 -> 48.11), of which MPF's
 # trough eject + auto-launch take ~0.6 s.
-MB_FIRST_EJECT_TICKS = 51
-SAVE_SERVE_TICKS = 48           # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
+MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
+SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
                                 # resumes (traces/tron_targets.jsonl: searches 33.88 s and 48.79 s)

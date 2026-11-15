@@ -54,6 +54,8 @@ ball_devices:
     debug: false
   bd_shooter_lane:
     ball_switches: s_shooter_lane
+    entrance_count_delay: 100ms   # ROM task 0x3d: the ball is in the lane after 6 ticks (98 ms); MPF's
+                                  # 500 ms missed a ball plunged at once (docs/test_bench.md, findings)
     eject_coil: c_auto_launch
     mechanical_eject: true
     eject_timeouts: 1s
