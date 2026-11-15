@@ -718,12 +718,21 @@ class TronOS(CustomCode):
 
     def _mb_launch(self):
         if self._mb_pending <= 0 or not self.game or self.state & 0x214:
-            self._mb_pending = 0
-            self.task_kill(MB_TASK)
+            self._mb_cancel()
             return
         self._mb_pending -= 1
         self.machine.playfield.add_ball(balls=1, player_controlled=False)
         self.task_start(MB_TASK, MB_EJECT_TICKS, self._mb_launch)
+
+    def _mb_cancel(self):
+        """The multiball task ends with balls still to launch (a tilt before the launches): they never
+        come, so MPF's count gives them back. The ROM counts the balls from the devices and has nothing
+        to undo; without this the game waits for ever for a ball that was never served."""
+        pending, self._mb_pending = self._mb_pending, 0
+        self.task_kill(MB_TASK)
+        game = self.machine.game
+        if pending > 0 and game and not self.state & ST_END_BALL and not game.ending:
+            game.balls_in_play = max(game.balls_in_play - pending, 0)
 
     def _mb_save_grace(self, grace_ticks):
         self.leff_stop(13)
