@@ -373,21 +373,18 @@
    }
   },
   {
-   "id": "pup.dmd.dmd_size",
+   "id": "pup.dmd.lightcycles",
    "group": "pup",
-   "label": "DMD size in the PuP window",
-   "type": "choice",
-   "choices": [
-    "cycles",
-    "full"
-   ],
-   "default": "cycles",
-   "help": "cycles: a smaller DMD with the light cycles round it. full: a real DMD's size, no light cycles. The service menu (PUP DMD SIZE) chooses too, and wins.",
+   "label": "Light cycles",
+   "type": "bool",
+   "default": true,
+   "help": "The light cycle chase round the DMD (full HD look only). Off: the DMD full size, no light cycles. The service menu (DISPLAY ADJUSTMENTS > LIGHT CYCLES) chooses too, applies at once and wins.",
    "restart": true,
+   "when_look": "advanced",
    "target": {
     "ini": "game/pup.local.cfg",
     "section": "dmd",
-    "key": "dmd_size"
+    "key": "lightcycles"
    }
   },
   {
@@ -408,25 +405,6 @@
     "ini": "game/pup.local.cfg",
     "section": "dmd",
     "key": "window"
-   }
-  },
-  {
-   "id": "pup.dmd.background",
-   "group": "pup",
-   "label": "DMD background",
-   "type": "choice",
-   "choices": [
-    "lightcycles",
-    "frame",
-    "none"
-   ],
-   "default": "lightcycles",
-   "help": "lightcycles: a live 3D light cycle chase round the DMD (too heavy for a Raspberry Pi 4). frame: the PuP Pack's DMD panel art. none: black.",
-   "restart": true,
-   "target": {
-    "ini": "game/pup.local.cfg",
-    "section": "dmd",
-    "key": "background"
    }
   },
   {

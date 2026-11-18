@@ -166,7 +166,7 @@ Built (in the fork Tron-Legacy-MPF-PuP, merged here 2026-10-10): Terry Red's "En
 DMD and topper windows, OST in place of the ROM music, GoZen (Linux, Windows, macOS: the platform's add-on; native_video removed 2026-10-28) player,
 Jetson hardware decoding: [docs/pup/README.md](../pup/README.md), [docs/jetson/README.md](../jetson/README.md),
 [docs/performance.md](../performance.md). The DMD window has the DMD with the light cycles round it or full size
-(320x80 mm, no light cycles): `[dmd] dmd_size`, service menu PUP DMD SIZE (2026-10-12). The service menu
+(320x80 mm, no light cycles): `[dmd] lightcycles`, service menu LIGHT CYCLES (2026-10-12; 2026-11-18: only two looks, DOT and HD Full with videos, light cycles an on/off over HD Full, `background` and `--dmd-cycles` removed). The service menu
 also shows on the backglass (2026-10-18: `game/pup/service_backglass.gd`, `game/tron/service_backglass.py`; the DMD
 keeps the ROM's screens), fading in and out over a median still of the backglass loop made by `gen_pup.py`;
 `[backglass] service_menu`. Remote topper on a Raspberry Pi (2026-10-19, Vincent: Pi 3 A+ first, Zero W to try;

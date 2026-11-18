@@ -105,12 +105,12 @@ def spec(template):
     profiles = {}
     for pr in old["profiles"]:
         if pr["id"] == "rpi5":     # nothing is refused on a Pi 5; only the arena's MSAA starts off (2026-11-13: 27 fps instead of 22)
-            profiles["rpi5"] = {"limits": {}, "defaults": dict(pr["install"]["options"]), "dmd_looks": ["classic", "hd"]}
+            profiles["rpi5"] = {"limits": {}, "defaults": dict(pr["install"]["options"]), "dmd_looks": ["classic", "advanced"]}
             continue
         if pr["id"] != "rpi4":
             continue
         # the look of the DMD is the platform's card (bundle.json dmd.looks), no longer a game setting: dmd.mode is not limited here
-        limits = {k: v["choices"] for k, v in pr["limits"].items() if k != "dmd.mode"}
+        limits = {k: v["choices"] for k, v in pr["limits"].items() if k not in ("dmd.mode", "pup.dmd.background")}
         limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
         defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
         defaults["pup.dmd.window"] = "overlay"
@@ -140,10 +140,12 @@ def spec(template):
                 "hardware": {"virtual": ["hw_virtual", "free_play"], "virtual_coins": ["hw_virtual"],
                              "virtual_le": ["hw_virtual_le", "free_play"], "proc": ["hw_proc"], "proc_le": ["hw_proc_le"],
                              "proc_fiber": ["hw_proc", "fiber_optics"]}},
-        "dmd": {"rom": "trn_174h", "size": "128x32", "look": "hd",
-                "looks": {"classic": ["--dmd=classic"], "hd": ["--dmd=hd"],
+        "dmd": {"rom": "trn_174h", "size": "128x32", "look": "advanced",
+                # only two looks (Vincent, 2026-11-18): the ROM's dots, and the full HD DMD with its videos. No "hd" alone (HD
+                # without the pup_art add-on: no videos in the DMD)
+                "looks": {"classic": ["--dmd=classic"],
                           # advanced: the HD DMD plus the PuP's extras (the pup_art add-on follows dmd.look). The light cycles
-                          # are the game's own choice (pup.cfg [dmd] dmd_size, service menu PUP DMD SIZE): the platform passes
+                          # are the game's own choice (pup.cfg [dmd] lightcycles, service menu LIGHT CYCLES): the platform passes
                           # no --dmd-cycles, which used to force them over both (2026-11-10)
                           "advanced": ["--dmd=hd"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},

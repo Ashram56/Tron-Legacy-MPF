@@ -102,12 +102,12 @@ class TestOptions(unittest.TestCase):
         path = os.path.join(self.dir, "pup.local.cfg")
         with open(path, "w") as f:
             f.write("; mine\n[dmd]\nscreen=1\nsize=[960, 193]\n\n[pup]\nlayout=\"manual\"\n")
-        bo.set_values({"pup.dmd.dmd_size": "full", "pup.layout": "stack", "pup.backglass.enabled": "false"}, self.dir)
+        bo.set_values({"pup.dmd.lightcycles": "false", "pup.layout": "stack", "pup.backglass.enabled": "false"}, self.dir)
         text = open(path).read()
         self.assertIn("; mine", text)
         self.assertIn("screen=1", text)
         self.assertIn("size=[960, 193]", text)
-        self.assertEqual(bo.cfg_read(path, "dmd", "dmd_size"), '"full"')
+        self.assertEqual(bo.cfg_read(path, "dmd", "lightcycles"), "false")
         self.assertEqual(bo.cfg_read(path, "pup", "layout"), '"stack"')
         self.assertEqual(text.count("layout="), 1)
         self.assertEqual(bo.cfg_read(path, "backglass", "enabled"), "false")
@@ -115,12 +115,12 @@ class TestOptions(unittest.TestCase):
     def test_pup_settings_read_what_is_written(self):
         sys.path.insert(0, GAME)
         from tron_pup import settings
-        bo.set_values({"pup.video_volume": "40", "pup.dmd.dmd_size": "full", "pup.third_screen": "no"}, self.dir)
+        bo.set_values({"pup.video_volume": "40", "pup.dmd.lightcycles": "false", "pup.third_screen": "no"}, self.dir)
         shutil.copy(os.path.join(GAME, "pup.cfg"), self.dir)
         cfg = settings.load(self.dir)
         self.assertEqual(cfg["pup"]["video_volume"], 40)
         self.assertEqual(cfg["pup"]["third_screen"], False)
-        self.assertEqual(cfg["dmd"]["dmd_size"], "full")
+        self.assertIs(cfg["dmd"]["lightcycles"], False)
 
     def test_scorbit_secret_is_private_and_not_returned(self):
         key = "A" * 104
@@ -220,6 +220,19 @@ class TestBuilder(unittest.TestCase):
         self.assertIn("advanced", looks)
         for args in looks.values():
             self.assertNotIn("--dmd-cycles", args)
+
+    def test_pi5_allows_the_advanced_look(self):
+        """bundle 1.6.0 listed only classic and hd for the Pi 5, so the platform fell back to the dot DMD on the LCD although the
+        advanced look was asked for (2026-11-18). A Pi 5 draws every look; a Pi 4 only the classic one."""
+        profiles = bb.spec("t")["profiles"]
+        self.assertEqual(set(profiles["rpi5"]["dmd_looks"]), {"classic", "advanced"})
+        self.assertEqual(profiles["rpi4"]["dmd_looks"], ["classic"])
+
+    def test_only_two_dmd_looks(self):
+        """The ROM's dots (classic) and the full HD DMD with its videos (advanced): no HD without videos (2026-11-18)."""
+        d = bb.spec("t")["dmd"]
+        self.assertEqual(set(d["looks"]), {"classic", "advanced"})
+        self.assertEqual(d["look"], "advanced")
 
     def test_settings_schema_follows_the_contract(self):
         import sys
@@ -341,14 +354,13 @@ class TestBoardProfile(unittest.TestCase):
             bo.store_write({"dmd.mode": "hd"}, game=game)                       # set before, or by hand
             path = os.path.join(game, "pup.local.cfg")
             bo.cfg_write(path, "dmd", "window", "true")                          # the older spelling of "window"
-            bo.cfg_write(path, "dmd", "background", '"frame"')
             log = self.bp.enforce(profile, game=game)
-            self.assertEqual(bo.get_values(["dmd.mode", "pup.dmd.window", "pup.dmd.background"], game=game),
-                             {"dmd.mode": "classic", "pup.dmd.window": "auto", "pup.dmd.background": "frame"})
+            self.assertEqual(bo.get_values(["dmd.mode", "pup.dmd.window"], game=game),
+                             {"dmd.mode": "classic", "pup.dmd.window": "auto"})
             self.assertEqual(len(log), 2)
             self.assertEqual(self.bp.enforce(profile, game=game), [])
-            bo.unset_values(["pup.dmd.background"], game=game)                  # the game's default: light cycles
-            self.assertIn("pup.dmd.background", self.bp.enforce(profile, game=game)[0])
+            bo.unset_values(["pup.dmd.window"], game=game)                      # the game's default: its own window, not allowed on a Pi 4
+            self.assertIn("pup.dmd.window", self.bp.enforce(profile, game=game)[0])
             self.bp.apply(profile, game=game)
             bo.store_write({"dmd.mode": "hd"}, game=game)
             self.assertIn("instead of", self.bp.apply(profile, game=game)[0])    # limits hold after the first install

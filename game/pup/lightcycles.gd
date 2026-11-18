@@ -28,7 +28,7 @@ var _cells := {}             # cell -> [time laid, cycle index]
 var _cycles := []
 var _now := 0.0
 var _rng := RandomNumberGenerator.new()
-var _cycles_on := true       # false: the grid alone (pup.cfg [dmd] dmd_size="full")
+var _cycles_on := true       # false: the grid alone (light cycles off: [dmd] lightcycles, service menu)
 
 
 func _init() -> void:

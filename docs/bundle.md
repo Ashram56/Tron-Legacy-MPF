@@ -194,7 +194,7 @@ Every value is validated before anything is written; one bad value writes nothin
 | Scorbit | `scorbit.provider`, `scorbit.machine_id`, `scorbit.encrypted_key` (secret), `scorbit.hostname` | `game/scorbit.local.cfg`, mode 0600 |
 
 Where the game has two ways to set the same thing, the service menu wins over the file: the operator's DISPLAY
-ADJUSTMENTS (text glow, text size), PUP DMD SIZE and SCORBIT SERVER are saved by the game and replace the
+ADJUSTMENTS (text glow, text size), LIGHT CYCLES and SCORBIT SERVER are saved by the game and replace the
 values above (`help` says so on each). Window positions and sizes of the PuP screens (a cabinet layout) are
 not in the schema yet: `pup.layout=manual` plus a hand-written `game/pup.local.cfg` ([pup/README.md](pup/README.md)).
 `tests/test_bundle.py` checks that every key exists in the shipped cfg, every flag in `run.py --help`, and that

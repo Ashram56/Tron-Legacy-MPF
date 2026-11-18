@@ -247,30 +247,30 @@ class Audits:
 # The HD DMD's text glow and size (not in the ROM: docs/rom_differences.md), as percentages, and the PuP
 # DMD window's layout: {item: (name, stored machine var, live machine var, factory, min, max, step)}. The
 # factory values are tools/dmd_mode.gd's defaults (glow 0, text scale 0.85) and game/pup.cfg's
-# [dmd] dmd_size ("cycles").
+# [dmd] lightcycles (true).
 DISPLAY_ITEMS = {
     1: ("TEXT GLOW", "dmd_text_glow_setting", "dmd_text_glow", 0, 0, 300, 10),
     2: ("TEXT SIZE", "dmd_text_size_setting", "dmd_text_size", 85, 50, 110, 5),
-    3: ("PUP DMD SIZE", "pup_dmd_size_setting", "pup_dmd_size", 0, 0, 1, 1),
+    3: ("LIGHT CYCLES", "pup_lightcycles_setting", "pup_lightcycles", 1, 0, 1, 1),
 }
-# items whose values are names, not percentages: item -> names by value. PUP DMD SIZE: the PuP DMD window
-# (game/pup/pup_player.gd) with a smaller DMD among the light cycles, or the DMD full size over the grid alone
-PUP_DMD_SIZES = ("WITH LIGHT CYCLES", "FULL SIZE")
-DISPLAY_NAMES = {3: PUP_DMD_SIZES}
+# items whose values are names, not percentages: item -> names by value. LIGHT CYCLES: the PuP DMD window
+# (game/pup/pup_player.gd, full HD look) with the light cycles round the DMD, or the DMD full size over the grid alone
+PUP_LIGHT_CYCLES = ("OFF", "ON")
+DISPLAY_NAMES = {3: PUP_LIGHT_CYCLES}
 
 
-def pup_dmd_size_default():
-    """PUP DMD SIZE's factory value: game/pup.cfg's (+ pup.local.cfg's) [dmd] dmd_size, "cycles" (0) or
-    "full" (1)."""
+def pup_lightcycles_default():
+    """LIGHT CYCLES' factory value: game/pup.cfg's (+ pup.local.cfg's) [dmd] lightcycles, on (1) or off (0)."""
     from tron_pup import settings as pup_settings
-    return int(str(pup_settings.load().get("dmd", {}).get("dmd_size", "cycles")) == "full")
+    value = pup_settings.load().get("dmd", {}).get("lightcycles", True)
+    return int(str(value).lower() not in ("false", "0", "no", "off"))
 
 
 class DisplaySettings:
     """DISPLAY ADJUSTMENTS (ADJUSTMENTS menu, added by this game): the HD DMD's text glow and text size and
-    the PuP DMD window's size (with the light cycles, or full size), with the interface of Adjustments (the adjustment editor uses either). The operator's value persists in
+    the PuP DMD window's light cycles (on or off), with the interface of Adjustments (the adjustment editor uses either). The operator's value persists in
     the stored machine var; the live machine var (not persisted, -1 = the value the display was started
-    with: --dmd-text-glow / --dmd-text-scale, pup.cfg's dmd_size, or their defaults) is what the display
+    with: --dmd-text-glow / --dmd-text-scale, pup.cfg's lightcycles, or their defaults) is what the display
     (tools/dmd_mode.gd, pup/pup_player.gd) follows, through GMC's machine variable monitor; preview() shows a value being edited there. A value
     stored at its factory default leaves the display's own start value in place."""
 
@@ -283,7 +283,7 @@ class DisplaySettings:
                      for num, spec in self.ITEMS.items()}
         self.factory = {num: spec[3] for num, spec in self.ITEMS.items()}
         if self.ITEMS is DISPLAY_ITEMS:
-            self.factory[3] = pup_dmd_size_default()
+            self.factory[3] = pup_lightcycles_default()
         for num in self.ITEMS:
             self._show(num, self.stored(num))
 
