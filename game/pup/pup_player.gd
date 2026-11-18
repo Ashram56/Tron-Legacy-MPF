@@ -486,8 +486,7 @@ var _cycles: LightCycles                # the light cycle chase (background="lig
 var _neon: ColorRect                    # its neon frame round the DMD
 var _dmd_view: TextureRect              # the game's DMD (the main window's picture)
 var _dmd_area: Control                  # [dmd] window="backglass": the DMD's area in the backglass window
-var _cycles_only_by_menu := false       # the arena exists only so the service menu can show the light cycles (background "none")
-var _service_dmd_size := -1             # the service menu's PUP DMD SIZE: -1 = pup.cfg's, 0 = cycles, 1 = full
+var _service_lightcycles := -1          # the service menu's LIGHT CYCLES: -1 = pup.cfg's, 0 = off, 1 = on
 const FRAME_PAD := 20.0                 # the neon frame's line and its glow past the DMD (772 px wide DMD)
 
 
@@ -537,15 +536,11 @@ func _make_dmd_window() -> void:
 		if mode == "external":
 			own.hide()
 		w = own
-	var background := "lightcycles" if cycles_arg() else str(setting("dmd", "background", "lightcycles"))
-	var frame_path := str(setting("dmd", "frame_image", ""))
-	# In the full HD look (the platform's "advanced") the service menu's PUP DMD SIZE must work whatever [dmd] background says
-	# (the page stores "none"): the arena is made, and stays hidden (full size) until the menu or pup.cfg asks for the light cycles.
+	# One model (Vincent, 2026-11-18): the look is the platform's (classic dots, or the full HD DMD with videos). The light
+	# cycles exist only in the full HD look: the arena is always made there and stays hidden while they are off, so the
+	# service menu's LIGHT CYCLES works at once. [dmd] background (lightcycles/frame/none) and --dmd-cycles are gone.
 	var dm = get_node_or_null("/root/DmdMode")
-	if background == "none" and dm != null and bool(dm.get("hd")):
-		background = "lightcycles"
-		_cycles_only_by_menu = true
-	if background == "lightcycles":
+	if dm != null and bool(dm.get("hd")):
 		_cycles = LightCycles.new()
 		w.add_child(_cycles)
 		_neon = ColorRect.new()
@@ -553,18 +548,6 @@ func _make_dmd_window() -> void:
 		_neon.material = ShaderMaterial.new()
 		_neon.material.shader = NEON_SHADER
 		w.add_child(_neon)
-	elif background == "frame" and frame_path != "":
-		var image := Image.load_from_file(pack_dir.path_join(frame_path))
-		if image:
-			var c = setting("dmd", "frame_crop", [0, 0, image.get_width(), image.get_height()])
-			_dmd_crop = Rect2i(int(c[0]), int(c[1]), int(c[2]), int(c[3]))
-			_dmd_frame = TextureRect.new()
-			_dmd_frame.texture = ImageTexture.create_from_image(image.get_region(_dmd_crop))
-			_dmd_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			_dmd_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			w.add_child(_dmd_frame)
-		else:
-			push_warning("PuP: cannot load the DMD frame %s" % frame_path)
 	_dmd_view = TextureRect.new()
 	_dmd_view.name = "dmd"
 	_dmd_view.texture = get_tree().root.get_texture()
@@ -646,24 +629,17 @@ func _layout_dmd() -> void:
 	_dmd_view.position = dmd_rect.position + (dmd_rect.size - _dmd_view.size) * 0.5
 
 
-## The DMD window's size ([dmd] dmd_size in pup.cfg, the service menu's ADJUSTMENTS > DISPLAY ADJUSTMENTS >
-## PUP DMD SIZE over it): false = "cycles", a smaller DMD with the light cycles round it; true = "full", the DMD
-## full size over the grid alone.
-## The user argument --dmd-cycles (the platform's "advanced" DMD look, bundle.json dmd.looks): the DMD window with the light
-## cycles round it, whatever pup.cfg says. Only the PuP draws it: without a linked pack (PuP off) the argument does nothing
-## and the screen shows the HD DMD, so the look falls back to "hd" by itself.
-func cycles_arg() -> bool:
-	return "--dmd-cycles" in OS.get_cmdline_user_args()
+## The light cycles round the DMD (full HD look only): the service menu's LIGHT CYCLES (machine variable pup_lightcycles,
+## persisted) when the operator set it, else [dmd] lightcycles of pup.cfg (pup.local.cfg over it, the page's option). Off = the DMD
+## full size over the grid alone (at most full_dmd_mm wide).
+func lightcycles_on() -> bool:
+	if _service_lightcycles >= 0:
+		return _service_lightcycles == 1
+	return bool(setting("dmd", "lightcycles", true))
 
 
 func full_size_dmd() -> bool:
-	if _service_dmd_size >= 0:
-		return _service_dmd_size == 1
-	if cycles_arg():
-		return false
-	if _cycles_only_by_menu:       # [dmd] background = "none": no light cycles unless the service menu asks for them
-		return true
-	return str(setting("dmd", "dmd_size", "cycles")) == "full"
+	return not lightcycles_on()
 
 
 ## A pixel's width over its height on the DMD window's monitor: [dmd] screen_mm (the monitor's picture, in mm)
@@ -712,27 +688,27 @@ func full_dmd_width(area: Vector2, pa: float) -> float:
 	return w
 
 
-## The service menu's PUP DMD SIZE (MPF machine variable pup_dmd_size, tron/settings.py DisplaySettings,
-## sent by GMC's machine variable monitor): -1 = pup.cfg's dmd_size, 0 = with the light cycles, 1 = full size.
+## The service menu's LIGHT CYCLES (MPF machine variable pup_lightcycles, tron/settings.py DisplaySettings, sent by GMC's
+## machine variable monitor): -1 = pup.cfg's [dmd] lightcycles, 0 = off, 1 = on. Applied at once.
 func _follow_service_settings() -> void:
 	var mpf = get_tree().root.get_node_or_null("MPF")
 	if mpf == null or mpf.game == null:
 		return
 	mpf.game.machine_update.connect(service_setting)
-	if mpf.game.machine_vars.has("pup_dmd_size"):
-		service_setting("pup_dmd_size", mpf.game.machine_vars["pup_dmd_size"])
+	if mpf.game.machine_vars.has("pup_lightcycles"):
+		service_setting("pup_lightcycles", mpf.game.machine_vars["pup_lightcycles"])
 
 
 func service_setting(var_name: String, value) -> void:
-	if var_name != "pup_dmd_size" or not str(value).is_valid_int():
+	if var_name != "pup_lightcycles" or not str(value).is_valid_int():
 		return
 	var v := clampi(str(value).to_int(), -1, 1)
-	if v == _service_dmd_size:
+	if v == _service_lightcycles:
 		return
-	var was := full_size_dmd()
-	_service_dmd_size = v
-	if full_size_dmd() != was and (windows.has("dmd") or _dmd_area):
-		print("PuP: DMD %s (service menu)" % ("full size" if full_size_dmd() else "with the light cycles"))
+	var was := lightcycles_on()
+	_service_lightcycles = v
+	if lightcycles_on() != was and _cycles and (windows.has("dmd") or _dmd_area):
+		print("PuP: DMD %s (service menu)" % ("with the light cycles" if lightcycles_on() else "full size"))
 		_layout_dmd()
 
 

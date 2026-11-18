@@ -149,14 +149,13 @@ borderless=true
   a few hundred triangles; now and then a glowing segment with a fading tail runs along a grid line
   picked at random, along x or z, like the pulses round the DMD's frame (`game/pup/lightcycles_grid.gdshader`:
   `pulse_chance`, `pulse_speed`, `pulse_length`, `pulse_energy`; all in the shader,
-  no work on the CPU), with the light cycles or without. `background="frame"` is the PuP Pack's DMD panel art
-  instead.
-- `[dmd] dmd_size` (`background="lightcycles"`): `cycles` (the default) is the DMD above with the light cycles
-  round it; `full` is the DMD full size over the grid, without the light cycles. The service menu chooses too,
-  over pup.cfg: ADJUSTMENTS > DISPLAY ADJUSTMENTS > PUP DMD SIZE, `WITH LIGHT CYCLES` or `FULL SIZE` (stored,
-  shown at once). `screen_mm` is the DMD monitor's picture in mm and `full_dmd_mm` the full DMD's width
+  no work on the CPU), with the light cycles or without. Only the full HD look (the platform's `advanced`) draws them; the classic dot DMD has
+  none. `[dmd] background` and `--dmd-cycles` no longer exist (2026-11-18).
+- `[dmd] lightcycles` (true by default): the DMD above with the light cycles round it; false is the DMD full size over the
+  grid, without them. The service menu chooses too, over pup.cfg: ADJUSTMENTS > DISPLAY ADJUSTMENTS > LIGHT CYCLES,
+  `ON` or `OFF` (stored, shown at once). `screen_mm` is the DMD monitor's picture in mm and `full_dmd_mm` the full DMD's width
   (see "DMD size" below).
-- `[dmd] frame_crop` / `dmd_rect` (`background="frame"`) place the art and the DMD (pixels of the art image),
+- `[dmd] frame_crop` / `dmd_rect` (the pack's DMD panel art, no longer drawn) placed the art and the DMD (pixels of the art image),
   `dots` draws round dots.
   The game's own 128x32 window is minimised (`hide_main_window`); it stays the source of the DMD picture, so
   `render_check.py` and the P-ROC DMD output work as before. Keys pressed in any PuP window drive the game as

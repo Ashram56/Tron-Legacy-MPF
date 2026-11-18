@@ -110,7 +110,7 @@ def spec(template):
         if pr["id"] != "rpi4":
             continue
         # the look of the DMD is the platform's card (bundle.json dmd.looks), no longer a game setting: dmd.mode is not limited here
-        limits = {k: v["choices"] for k, v in pr["limits"].items() if k != "dmd.mode"}
+        limits = {k: v["choices"] for k, v in pr["limits"].items() if k not in ("dmd.mode", "pup.dmd.background")}
         limits["pup.dmd.window"] = [c for c in limits["pup.dmd.window"] if c != "auto"]
         defaults = {k: v for k, v in pr["install"]["options"].items() if k in limits or k == "pup.third_screen"}
         defaults["pup.dmd.window"] = "overlay"
@@ -145,7 +145,7 @@ def spec(template):
                 # without the pup_art add-on: no videos in the DMD)
                 "looks": {"classic": ["--dmd=classic"],
                           # advanced: the HD DMD plus the PuP's extras (the pup_art add-on follows dmd.look). The light cycles
-                          # are the game's own choice (pup.cfg [dmd] dmd_size, service menu PUP DMD SIZE): the platform passes
+                          # are the game's own choice (pup.cfg [dmd] lightcycles, service menu LIGHT CYCLES): the platform passes
                           # no --dmd-cycles, which used to force them over both (2026-11-10)
                           "advanced": ["--dmd=hd"]}},
         "pup": {"rom": "trn_174h", "manifest": MANIFEST},
