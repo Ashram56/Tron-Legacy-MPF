@@ -486,6 +486,7 @@ var _cycles: LightCycles                # the light cycle chase (background="lig
 var _neon: ColorRect                    # its neon frame round the DMD
 var _dmd_view: TextureRect              # the game's DMD (the main window's picture)
 var _dmd_area: Control                  # [dmd] window="backglass": the DMD's area in the backglass window
+var _cycles_only_by_menu := false       # the arena exists only so the service menu can show the light cycles (background "none")
 var _service_dmd_size := -1             # the service menu's PUP DMD SIZE: -1 = pup.cfg's, 0 = cycles, 1 = full
 const FRAME_PAD := 20.0                 # the neon frame's line and its glow past the DMD (772 px wide DMD)
 
@@ -538,6 +539,12 @@ func _make_dmd_window() -> void:
 		w = own
 	var background := "lightcycles" if cycles_arg() else str(setting("dmd", "background", "lightcycles"))
 	var frame_path := str(setting("dmd", "frame_image", ""))
+	# In the full HD look (the platform's "advanced") the service menu's PUP DMD SIZE must work whatever [dmd] background says
+	# (the page stores "none"): the arena is made, and stays hidden (full size) until the menu or pup.cfg asks for the light cycles.
+	var dm = get_node_or_null("/root/DmdMode")
+	if background == "none" and dm != null and bool(dm.get("hd")):
+		background = "lightcycles"
+		_cycles_only_by_menu = true
 	if background == "lightcycles":
 		_cycles = LightCycles.new()
 		w.add_child(_cycles)
@@ -654,6 +661,8 @@ func full_size_dmd() -> bool:
 		return _service_dmd_size == 1
 	if cycles_arg():
 		return false
+	if _cycles_only_by_menu:       # [dmd] background = "none": no light cycles unless the service menu asks for them
+		return true
 	return str(setting("dmd", "dmd_size", "cycles")) == "full"
 
 
