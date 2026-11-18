@@ -388,7 +388,8 @@
     "ini": "game/pup.local.cfg",
     "section": "dmd",
     "key": "dmd_size"
-   }
+   },
+   "when_look": "advanced"
   },
   {
    "id": "pup.dmd.window",
