@@ -105,7 +105,7 @@ def spec(template):
     profiles = {}
     for pr in old["profiles"]:
         if pr["id"] == "rpi5":     # nothing is refused on a Pi 5; only the arena's MSAA starts off (2026-11-13: 27 fps instead of 22)
-            profiles["rpi5"] = {"limits": {}, "defaults": dict(pr["install"]["options"]), "dmd_looks": ["classic", "hd"]}
+            profiles["rpi5"] = {"limits": {}, "defaults": dict(pr["install"]["options"]), "dmd_looks": ["classic", "hd", "advanced"]}
             continue
         if pr["id"] != "rpi4":
             continue

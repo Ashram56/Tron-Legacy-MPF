@@ -221,6 +221,13 @@ class TestBuilder(unittest.TestCase):
         for args in looks.values():
             self.assertNotIn("--dmd-cycles", args)
 
+    def test_pi5_allows_the_advanced_look(self):
+        """bundle 1.6.0 listed only classic and hd for the Pi 5, so the platform fell back to the dot DMD on the LCD although the
+        advanced look was asked for (2026-11-18). A Pi 5 draws every look; a Pi 4 only the classic one."""
+        profiles = bb.spec("t")["profiles"]
+        self.assertEqual(set(profiles["rpi5"]["dmd_looks"]), {"classic", "hd", "advanced"})
+        self.assertEqual(profiles["rpi4"]["dmd_looks"], ["classic"])
+
     def test_settings_schema_follows_the_contract(self):
         import sys
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "MPF-Godot-Packaging", "common", "netconfig"))
