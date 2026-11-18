@@ -225,8 +225,14 @@ class TestBuilder(unittest.TestCase):
         """bundle 1.6.0 listed only classic and hd for the Pi 5, so the platform fell back to the dot DMD on the LCD although the
         advanced look was asked for (2026-11-18). A Pi 5 draws every look; a Pi 4 only the classic one."""
         profiles = bb.spec("t")["profiles"]
-        self.assertEqual(set(profiles["rpi5"]["dmd_looks"]), {"classic", "hd", "advanced"})
+        self.assertEqual(set(profiles["rpi5"]["dmd_looks"]), {"classic", "advanced"})
         self.assertEqual(profiles["rpi4"]["dmd_looks"], ["classic"])
+
+    def test_only_two_dmd_looks(self):
+        """The ROM's dots (classic) and the full HD DMD with its videos (advanced): no HD without videos (2026-11-18)."""
+        d = bb.spec("t")["dmd"]
+        self.assertEqual(set(d["looks"]), {"classic", "advanced"})
+        self.assertEqual(d["look"], "advanced")
 
     def test_settings_schema_follows_the_contract(self):
         import sys
