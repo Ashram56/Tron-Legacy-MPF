@@ -46,6 +46,7 @@ class AttractPages(Feature):
         self.index = 0
         self.boot = False                       # the next first pass is the power-up's: the version screen comes first
         self.last_scores = []
+        self.last_player = 1                    # the player whose turn was last (the panel's bright score)
         ev = self.machine.events
         ev.add_handler("game_starting", self.stop, priority=2000)
         ev.add_handler("tron_service_entered", self.stop)
@@ -64,6 +65,16 @@ class AttractPages(Feature):
 
     def _game_ending(self, **kwargs):
         self.last_scores = [p.score for p in self.machine.game.player_list] if self.machine.game else []
+        self.last_player = self.os.player_num or 1
+
+    def panel(self):
+        """The status panel left of every page (deff_draw_status_panel 0x010230ec, tron/score_display.gd): the last game's scores, the player of
+        the last turn bright, the others dim; "00" for P1 on a fresh machine."""
+        from tron.media_bridge import format_rom_text   # noqa: E402
+        out = {"players": max(len(self.last_scores), 1), "player": self.last_player, "valid": True}
+        for p in range(1, 5):
+            out["p%d" % p] = format_rom_text("%,02lu", [self.last_scores[p - 1]]) if p <= len(self.last_scores) else ("00" if p == 1 else "")
+        return out
 
     def page_list(self, first_pass):
         os_ = self.os
@@ -119,7 +130,7 @@ class AttractPages(Feature):
         if shown is None:
             pass
         elif shown == "text_page":
-            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), p1=("{:,}".format(self.last_scores[0]) if self.last_scores else "00"))
+            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), **self.panel())
         else:
             self.os.media.text_show(shown, [], PRIORITY)
         for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):
