@@ -81,6 +81,11 @@ class Display:
 
     # ------------------------------------------------------------------ start / stop
 
+    def _log_args(self, deff_id, args):
+        """The arguments a deff starts with, in the wall-clock trace only (scripts/conform: they set the state of the ROM-code run)."""
+        if args and getattr(self.os.trace, "_wall", False):
+            self.os.trace.log("deff_args", id=deff_id, args={k: v for k, v in args.items() if isinstance(v, (int, float, str, bool))})
+
     def start(self, deff_id, hold=False, refresh=True, run_seconds=None, sounds=None, media=False, **args):
         """run_seconds: the run length when this call's variant differs from the recorded one.
         media: a held deff still plays its own sounds and lamp effects (deff 4, which runs until stopped).
@@ -99,6 +104,7 @@ class Display:
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
             if deff_id == 19 and self.fg is None:
                 getattr(os_.media, "score_display_shown", lambda: None)()    # shown at once: deff_019's task starts now
+            self._log_args(deff_id, args)
             os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
             if deff_id == 19:
                 os_.tube_start(10)
@@ -117,6 +123,7 @@ class Display:
         self.fg_prio = self.prio.get(deff_id, 0)
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+        self._log_args(deff_id, args)
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
         info = self.media.get(deff_id)
         if info:
