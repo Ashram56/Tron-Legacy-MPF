@@ -72,10 +72,25 @@ class Bonus(Feature):
         os_.deff_start(25, hold=True, total=self.total())   # this feature drives the bonus media
         os_.leff_start(20)
         self._skip = False
-        state = {"i": 0, "running": 0}
+        state = {"i": 0, "gen": 0}
 
         def both_flippers():
             return self.machine.switches["s_left_flipper"].state and self.machine.switches["s_right_flipper"].state
+
+        def poll():
+            """deff 25 polls both flipper inputs every tick [0x01001374]: both down breaks the count at once."""
+            if state["gen"] < 0:
+                return
+            if both_flippers():
+                state["gen"] += 1                       # cancels the pending line
+                return show_total()
+            os_.after(1, poll)
+
+        def line_later(gen):
+            def fire():
+                if gen == state["gen"]:
+                    show_line()
+            os_.after(LINE_TICKS, fire)
 
         def show_line():
             if both_flippers():
@@ -88,17 +103,18 @@ class Bonus(Feature):
                     os_.leff_start(leff)
                     os_.tube_start(tube)
                     self._show(screen=1, name=name, value=value, sum=sum(line[2] for line in lines[:i + 1]))
-                os_.after(LINE_TICKS, show_line)
+                line_later(state["gen"])
             elif i - len(lines) < len(steps):
                 k = steps[i - len(lines)]
                 self._show(screen=2, mult=k, mult_total=base * k)
                 os_.leff_start(32)
                 os_.tube_start(104)
-                os_.after(LINE_TICKS, show_line)
+                line_later(state["gen"])
             else:
                 show_total()
 
         def show_total():
+            state["gen"] = -1                           # nothing else runs from the count or the poll
             self._show(screen=3)
             os_.sound(0x0ba, in_deff=25)
             os_.tube_start(105)
@@ -109,6 +125,7 @@ class Bonus(Feature):
             done(self.total())
 
         show_line()
+        os_.after(1, poll)
 
 
 feature = Bonus

@@ -6,7 +6,7 @@ whose item is already collected is skipped and pays (k+1) million once per playe
 Game flags: 0x33 played since the last Portal, 0x34 running, 0x35 final stage, 0x36 completed.
 
 ROM tables that are not in the decompile (stage 2 shot order, the CLU helmet sounds, the Light Cycle
-chain table 0x040d3748) are modelled as the spec describes them; see STAGES.
+chain table 0x040d3748) are read from the ROM image; see STAGES.
 """
 from tron.features import Feature
 from tron.os_layer import TICK
@@ -28,9 +28,10 @@ def bits(ids):
 
 
 # Stage table 0x040d37d8, k = item: shot ids in spot order (the first needed one is spotted).
-# Stage 2 (CLU): mask 0x94001, the decompile shows the left orbit first; the rest of the order is assumed.
-# Stage 6 (LIGHT CYCLE): mask 0xc8000; its chain table 0x040d3748 is not readable here, so the three
-# shots are needed in any order (shots already made stay excluded, as in the ROM).
+# Stage 2 (CLU): mask 0x94001; spot order = 0x040d367c (12-byte entries: id, bit, ...) read from the ROM image:
+# left orbit 14 (0xe, checked first by FUN_010250f0), left inner loop 16, right orbit 19, VUK 0 [0x01024f34].
+# Stage 5 (DISCS): the six chain ids 14-19 in the order of table 0x040d3748 (FUN_01025d94). Stage 6 (LIGHT CYCLE):
+# mask 0xc8000 (shots 15, 18, 19); the shots are needed in any order, a made shot adds its chain below.
 STAGES = (
     (VUK,),
     (RIGHT_INNER_LOOP,),
@@ -42,8 +43,9 @@ STAGES = (
     (13,),
     (2, 3, 4, 5),
 )
-# Stage 6: the shots a made shot adds (chain table 0x040d3748; ids 14 left orbit, 15 left ramp, 16 left inner loop,
-# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (PinMAME: six deff 122)
+# Stage 6: the shots a made shot adds, word 2 of the 16-byte entries of table 0x040d3748 (read from the ROM image:
+# 0x14000, 0x60000, 0, 0, 0x60000; ids 14 left orbit, 15 left ramp, 16 left inner loop,
+# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (FUN_01025c50 [0x01025c50])
 LIGHT_CYCLE_CHAIN = {15: (14, 16), 16: (17, 18), 19: (17, 18)}
 # The stage's messages (stage table + 0x18 and + 0x19), drawn by deff 114 under SEA OF SIMULATION
 STAGE_TEXT = ("FLYNNS ARCADE", "GEM", "CLU HELMETS", "ZUSE TARGETS", "QUORRA", "DISCS", "LIGHT CYCLES",

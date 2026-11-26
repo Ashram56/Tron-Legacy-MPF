@@ -220,6 +220,7 @@ class Lamps:
         self._dirty = False
         self.leff_players = {}      # leff id -> ShowPlayer
         self.tube_players = {}      # tube show id -> ShowPlayer
+        self.code_tubes = {}        # tube show id -> code that draws it
         self.code_leffs = {}        # leff id -> (layer priority, fn(LeffTask)): leffs drawn by code
         self.rules = []             # list-5 lamp rules: (priority, seq, fn)
         root = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package")
@@ -413,9 +414,18 @@ class Lamps:
 
     # ------------------------------------------------------------------ tubes and flashers
 
+    def tube_code(self, show_id, fn):
+        """Draw tube show `show_id` with code instead of its captured show: fn(lamps) starts it and returns a
+        stop() callable."""
+        self.code_tubes[show_id] = fn
+
     def tube_play(self, show_id):
         """Ramp tube show (display.Tubes accepted it): its show on the two RGB tube lights."""
         self.tube_end(show_id)
+        if show_id in self.code_tubes:
+            stop = self.code_tubes[show_id](self)
+            self.tube_players[show_id] = type("CodeTube", (), {"stop": staticmethod(stop)})
+            return
         steps = self.show("leff_{:03d}".format(show_id))
         if steps:
             loops = -1 if self.os.tubes.info.get(show_id, (0, 0, "loop", 0))[2] != "once" else 0
@@ -427,10 +437,10 @@ class Lamps:
         if player:
             player.stop()
 
-    def rgb(self, light_name, value):
+    def rgb(self, light_name, value, fade_ms=0):
         light = getattr(self.machine, "lights", {}).get(light_name)
         if light is not None:
-            light.color(value.lstrip("#"), key=MPF_KEY)
+            light.color(value.lstrip("#"), key=MPF_KEY, fade_ms=fade_ms)
 
     def flasher(self, name, ms=30, owner=None):
         """coil_pulse(coil, time) for a flasher: pulse the MPF coil, log coil on/off like the ROM traces.

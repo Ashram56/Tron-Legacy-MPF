@@ -1,12 +1,20 @@
 """Game over: match, game-over music and the return to attract (game_flow.md 5.5 and 6.2)."""
 from tron.features import Feature
+from tron.os_layer import TICK
 
 MATCH_REVEAL = 258       # ticks from deff 38 to the match award (traces/game_flow.jsonl 4.19 s)
 ATTRACT_DELAY = 482      # ticks from the match display to attract (7.84 s measured)
+MUSIC_TICKS = 0x271      # leff 133 runs 625 ticks with the game-over music [0x0100f29c]
+SPEECH_WAIT_MAX = 0x1d4  # FUN_0100ff08: wait for the speech to end, at most 468 ticks
+SPEECH_GAP = 0x2e        # then 46 ticks before the music
 
 
 class GameOver(Feature):
     name = "match"
+
+    def __init__(self, os_):
+        super().__init__(os_)
+        self.countdown = None    # attr_gameover_countdown 0x3afec: game overs left until the speech (RAM, per power-up)
 
     def run(self, done):
         os_ = self.os
@@ -54,9 +62,36 @@ class GameOver(Feature):
     def _attract(self, done):
         os_ = self.os
         os_.hook("attract_start")                 # event 0x08: deff 1, leff 1, attract tube rule
-        # task 0x45 [0x0100f29c], one tick later: game-over music 0x01d with leff 133
-        os_.after(1, lambda: (os_.sound(0x01d), os_.leff_start(133)))
+        os_.after(1, self._music_task)            # task 0x45 [0x0100f29c], one tick later
         done()
+
+    def _music_task(self):
+        """game_over_music_task [0x0100f29c]: speech 0x01e when no game can be started on the credits left,
+        else on every 4th-6th game over (countdown = random(3) + 4, set on the first run and after each
+        speech); the speech is waited for (FUN_0100ff08, max 468 ticks) plus 46 ticks; then music 0x01d
+        with leff 133 for 625 ticks."""
+        os_ = self.os
+        if not os_.state & 0x10:                  # no game over any more (a game started in the tick)
+            return
+        if self.countdown is None:
+            self.countdown = os_.random.randrange(3) + 4
+        gap = 0
+        if not os_.credit_model.can_start():
+            speech = True
+        else:
+            self.countdown -= 1
+            speech = self.countdown < 1
+        if speech:
+            self.countdown = os_.random.randrange(3) + 4
+            end = os_.sound(0x01e)
+            gap = SPEECH_GAP + (min(SPEECH_WAIT_MAX, int((end - os_.now) / TICK + 0.999)) if end else 0)
+        os_.after(gap, self._music)
+
+    def _music(self):
+        os_ = self.os
+        os_.sound(0x01d)
+        os_.leff_start(133)
+        os_.after(MUSIC_TICKS, lambda: os_.leff_stop(133))
 
 
 feature = GameOver

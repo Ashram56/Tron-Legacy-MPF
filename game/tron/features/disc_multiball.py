@@ -326,7 +326,7 @@ class DiscMultiball(Feature):
     def close_window(self):
         for task in (0xad, 0xae, 0xaf):
             self.os.task_kill(task)
-        self.os.display.cancel(0x89)
+        # the ROM kills only tasks 0xad-0xaf [0x0100781c, 0x010078c8]: a queued deff 52 (task 0x89) stays queued
         self.restart_waiting = False
 
     def dmb_cancel_restart_window(self):

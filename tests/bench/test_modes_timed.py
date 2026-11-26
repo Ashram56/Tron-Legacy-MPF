@@ -478,9 +478,11 @@ class TestFindFlynn(Bench):
         self.shot("left_orbit")
         self.assertNotIn(250000, self.adds(m))
 
-    def test_not_in_a_multiball(self):
+    def test_blocked_only_by_end_of_line_and_wizards(self):
+        """FUN_0100d654 [0x0100d654] blocks it on task 0xd1, flag 0x34, Portal 0x37 and End of Line 0x27 only: a
+        Quorra multiball does not block it."""
         self.start_game(validate=True)
         self.start_quorra()
         self.wait(12)
         self.shot("zen")
-        self.assertFalse(self.tron.task_running(0xd1))
+        self.assertTrue(self.tron.task_running(0xd1))
