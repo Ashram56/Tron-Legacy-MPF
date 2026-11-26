@@ -395,14 +395,14 @@ class TestAttractPages(HsCase):
         self.advance_time_and_run(46)
         names = [p["page"] for p in pages]
         self.assertIn("CUSTOM MESSAGE", names)
-        self.assertEqual("CREDITS", names[names.index("CLOCK") + 1])     # wraps without GAME OVER
+        self.assertEqual("CREDITS", names[names.index("CUSTOM MESSAGE") + 1])     # wraps without GAME OVER
         os_.adj[2] = 0                                                   # CUSTOM MESSAGE OFF
         self.advance_time_and_run(60)                                    # from the next pass on
         self.assertNotIn("CUSTOM MESSAGE", [p["page"] for p in pages[-10:]])
         os_.features_by_name["attract_pages"].attract_start()
         self.hit_and_release_switch("s_left_flipper")                    # first page: back to the last one
         self.advance_time_and_run(0.01)
-        self.assertEqual("CLOCK", pages[-1]["page"])
+        self.assertEqual("URL", pages[-1]["page"])     # the last page (adj 2 off); the ROM has no clock page
         current = pages[-1]["page"]
         self.hit_and_release_switch("s_right_flipper")
         self.hit_and_release_switch("s_left_flipper")

@@ -324,3 +324,18 @@ fading under the score in bonus, other players): the sweeps of effects 19 and 77
 (`assets/rom_data/fonts.json`, text_draw_str 0x28f74: `y - h + y_offset + 1`). 73 of 1635 glyphs differed (the "#" of fonts 10-13, "*", ";", "<=>", quotes):
 "HIGH SCORE #n" had its "#" one row too low. The fonts now read the ROM's offset. Attract, columns 41-127: 139/148 -> 143/151 distinct frames found in the code run;
 the 8 left are the credits, clock and custom-message pages (machine state), to run in Unicorn with the machine's own state.
+
+## Attract pages checked against the code (2026-11-26)
+
+- The ROM's attract table (RAM 0x36e10, file 0x36e10, 32 entries: predicate, routine) is walked by deff 1 (0x01034364), which skips a page whose predicate returns 0.
+  Entry 30 (clock, routine 0x32d04) has predicate 0x32cfc = `mov r0, #0`: **the ROM never shows a clock page**. The game's CLOCK page
+  (an invention, date and 12/24 h time) is removed; `attract_pages.py` cites the entry.
+- Entry 31 (custom message, predicate 0x010002dc = adj 2 == 1, routine 0x01000308): with no message stored FUN_00005858 asks FUN_00006110 for the language's
+  factory message id (824 = "PARTICIPATE IN\nLOCAL TOURNAMENTS!" in 5 languages, table 0x040eeb7c); `gen_code_dmd.py` stubs 0x6110 (`deff_unicorn.STUBS`) and
+  writes `rom_data/dmd_code/deff_001_pages/deff_031`; the game's frame is that frame.
+- Entry 1 (credits, 0x01000128) with FREE PLAY (adj 34 = 1, record 0x2102110) and 0..3 credits, 0..8 units: `scripts/conform/sweep_pages.py`.
+- Result (attract_and_service.dmd, columns 41-127): every distinct frame of the game is a frame of the code run except the DOT MATRIX TEST
+  page (service, below). Entries 11-26 (player-record pages, FUN_0002553c) need competition records and are not shown at the factory settings.
+- Not decoded yet: DOT MATRIX TEST (service, routine 0x01003fb44 in the menu table `service_texts.csv` 0xbd): the ROM sweeps one lit column at a time
+  (x 0-127, 6 ticks each), one lit row at a time (y 0-31), then fills row by row with alternating 0/0xff, twice; the game's
+  `DotMatrixScreen` shows three still pages (ALL DOTS ON, ALL DOTS OFF, STRIPES) that the ROM does not have.

@@ -87,9 +87,8 @@ class AttractPages(Feature):
             pages.append(("CUSTOM MESSAGE", [text], PAGE_SECONDS))
         elif os_.adj[2] == 1:                          # ON with no message set: the factory message (PinMAME attract, 27 s)
             pages.append(("DEFAULT MESSAGE", ["PARTICIPATE IN", "LOCAL TOURNAMENTS!"], PAGE_SECONDS))
-        from tron.service import clock_now, clock_text   # noqa: E402
-        day, clock = clock_text(self.machine, clock_now(self.machine), os_.adj[3])
-        pages.append(("CLOCK", [day, clock], PAGE_SECONDS))
+        # No clock page: the ROM's clock page (table 0x36e10 entry 30, routine 0x32d04) has the predicate 0x32cfc, which returns 0, and
+        # deff 1 (0x01034364) skips a page whose predicate returns 0 [code], so the attract never shows the date and time.
         return pages
 
     def attract_start(self):
