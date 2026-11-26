@@ -356,3 +356,24 @@ clock on row 18, msg 0x1e9 on row 27) after the seconds. +/- rules from FUN_0000
 Widths follow FUN_00028a74 (a glyph with a negative x offset, the comma, counts to the left of 0: 2 dots, not 1) and the line is centred on
 (128 - total) / 2 with total = the ROM's sum (13 gaps). Checked by `scripts/conform/sweep_datetime.py` (ROM routine in Unicorn, RTC stubbed
 via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day, 2000 and 2099): 26 of 26 pictures found among the code's frames, with the blink hiding the right field.
+
+## Competition mode (adj 46, attract pages 11-26): what the code says (2026-11-26)
+
+- **Pages 11-26 and the TOURNAMENT menu need a tournament record**: their predicates read the current record of the 10 records at
+  0x02100000 (`FUN_000251cc` = state, 4 = running; `FUN_0002553c`, `FUN_00025598`, record word 0x49). A record is only created by START
+  TOURNAMENT (`FUN_0103cde8` -> QUICK START `FUN_0103a49c` / CUSTOM `FUN_0103bf68`, both end in `FUN_000252c4`), by the start of a game with
+  the Tournament Start button (sw 15, `0x20d1c` param 2, state 4 only) or by the USB / network tournament files. That menu is shown only
+  when `FUN_0002ffc0` -> `FUN_00005ff0` finds a valid country record (0x021100d8, written at boot by `FUN_0000605c` from the inverted DIP
+  port 0x01100005, masked 0x7f) whose index is below 28 (table 0x040e17e0). The factory DIP value (0x80, PinMAME's default, and the
+  one the machine ships with) gives index 0x7f: no tournament menu, no record, pages 11-26 skipped. The game does the same
+  (`service.py` `visible()`: 0x2ffc0 false). Reason, not an omission.
+- **Adj 46 PLAYER COMPETITION** (factory YES): `FUN_0002dcc0` (the START button's press handler) calls `FUN_00019f98`, which starts task 0x3b
+  (`FUN_00019f20`): for 62 ticks it checks that the machine is in attract (`0x37274 & 0x118 == 0x10`), adj 46 = YES, a credit or free play
+  (`FUN_000202a8`) and START still held; then deff 39 (COMPETITION READY, six 62-tick frames in `rom_data/dmd_code/deff_039`) starts. A START with
+  a credit starts the game at once (`0x20d1c` -> `0x20584`, which clears state bit 0x10), so the task ends on its first tick; the held
+  START only reaches deff 39 when the start is refused: `FUN_0001f470` false or `FUN_0001f6fc` (balls counted by the trough differ from the
+  installed count `FUN_0001e044`), which runs the ROM's ball search task 0x2b (`FUN_0001f4a0`) behind deff 11 LOCATING PINBALLS. A game started
+  while deff 39 runs sets game flag 0xf (`0x20584`): the competition game, whose only effect in the code is Flynn's Arcade's 500K weight
+  +1000 (`0x0100df9c` via `FUN_00019e98`, ported: `features/arcade.py`). So adj 46 has no effect with the trough full, the ROM's own design.
+- **Open for the game**: the start with balls missing (deff 11, task 0x2b ball search, then the held-START deff 39 and flag 0xf). The game
+  never refuses a start for a missing ball (MPF's ball devices decide). Work item: decode `FUN_0001f4a0` and port it.
