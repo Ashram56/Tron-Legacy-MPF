@@ -845,29 +845,49 @@ class BurnInScreen(Screen):
             super().button(name)
 
 
-class DotMatrixScreen(ListScreen):
-    """DOT MATRIX TEST: full, blank and striped pages; MINUS / PLUS step."""
+class DotMatrixScreen(Screen):
+    """DOT MATRIX TEST [routine 0x01003fb44 of the menu, service_texts.csv 0xbd]: every 6 ticks (96 ms) the next picture, forever, until a button.
+    Leaves on BACK (the routine polls the service exit flag RAM 0x3c950 every step, like every service routine). Pass 0: one lit column (x 0-127) then one lit row (y 0-31) on black; pass 1: one black column then row on lit; then 64 pictures of the one-dot
+    checkerboard, its phase flipping each time (outer loop 32 x phase 0, 1). Checked: the first frame of every tick of the code run
+    (assets/tools/deff_frames.py on the routine) equals these pictures for the first 2400 ticks."""
 
-    PAGES = (("ALL DOTS ON", "#" * 21), ("ALL DOTS OFF", ""), ("STRIPES", "# " * 10 + "#"))
+    STEP_SECONDS = 6 * 0.016
+    WIDTH, HEIGHT = 128, 32
 
     def __init__(self, svc):
         super().__init__(svc, "DOT MATRIX TEST")
+        self.step = 0
+        self.handle = None
 
-    def entries(self):
-        return list(self.PAGES)
+    def enter(self):
+        self.step = 0
+        self.handle = self.machine.clock.schedule_once(self._next, self.STEP_SECONDS)
 
-    def entry_lines(self, entry):
-        return [entry[0], entry[1]]
+    def leave(self):
+        if self.handle:
+            self.machine.clock.unschedule(self.handle)
+            self.handle = None
+
+    def _next(self):
+        self.step = (self.step + 1) % (2 * (self.WIDTH + self.HEIGHT) + 64)
+        self.refresh()
+        self.handle = self.machine.clock.schedule_once(self._next, self.STEP_SECONDS)
+
+    def lines(self):
+        return [self.title]
 
     def draw(self):
-        """The page itself: every dot lit, none, or every other row lit (the ROM's pages are not in the
-        decompile)."""
-        name = self.current()[0]
-        if name == "ALL DOTS ON":
-            return [rd.box(0, 0, rd.WIDTH, 32, 15)]
-        if name == "STRIPES":
-            return [rd.box(0, y, rd.WIDTH, 1, 15) for y in range(0, 32, 2)]
-        return []
+        w, h = self.WIDTH, self.HEIGHT
+        sweep = w + h
+        if self.step < 2 * sweep:
+            p, i = divmod(self.step, sweep)
+            bg, col = (15, 0) if p else (0, 15)
+            items = [rd.box(0, 0, w, h, bg)]
+            items.append(rd.box(i, 0, 1, h, col) if i < w else rd.box(0, i - w, w, 1, col))
+            return items
+        phase = (self.step - 2 * sweep) % 2
+        return [rd.box(x, y, 1, 1, 15) for y in range(h) for x in range(w) if (x + y + phase) % 2]
+
 
 
 class MotorTestScreen(Screen):
