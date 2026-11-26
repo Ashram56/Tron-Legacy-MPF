@@ -339,3 +339,10 @@ the 8 left are the credits, clock and custom-message pages (machine state), to r
 - Not decoded yet: DOT MATRIX TEST (service, routine 0x01003fb44 in the menu table `service_texts.csv` 0xbd): the ROM sweeps one lit column at a time
   (x 0-127, 6 ticks each), one lit row at a time (y 0-31), then fills row by row with alternating 0/0xff, twice; the game's
   `DotMatrixScreen` shows three still pages (ALL DOTS ON, ALL DOTS OFF, STRIPES) that the ROM does not have.
+
+Attract, second pass (2026-11-26, same day): the ROM's panel in the attract draws the separator (x 40) and the three 10-dot segments of row 31 (x 4-13, 16-25, 28-37) at level 1, and
+"00" or the scores at level 15 / 1; the game drew a full-level line (text pages from `text_page.tscn`, the animation page from `gen_media.build_attract_art`, which copied
+PinMAME's level). Both now use level 1 and the segments (page 28 of the code run: 0 differing dot). There is no "PLAYER n" page in the ROM's table: the last scores go
+to the panel (P1 only so far, `attract_pages.py`; P2-P4 small and dim, not drawn yet), so those invented pages are gone. The REPLAY pages are four table entries (2-5, FUN_00022a90(n) != 0),
+one "REPLAY AT <value>" page per level that is set. Entries 11-26 (FUN_0002553c / FUN_00025598, mode 4 of FUN_000251cc: the competition records) are not modelled (adj 46).
+Measured on the attract + service scenario: panel 142/143, columns 41-127 141/143 (the two left: the service entry fade and SET DATE/TIME, which shows the machine's clock).

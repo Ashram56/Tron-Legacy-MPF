@@ -71,11 +71,10 @@ class AttractPages(Feature):
         self.boot = False
         pages += [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
         pages.append(("CREDITS", lambda: [os_.credit_model.text()], PAGE_SECONDS))
-        if self.last_scores:
-            for n, score in enumerate(self.last_scores, 1):
-                pages.append(("PLAYER {}".format(n), ["PLAYER {}".format(n), "{:,}".format(score)], PAGE_SECONDS))
-        elif os_.replay_level(1):
-            pages.append(("REPLAY", ["REPLAY AT", "{:,}".format(os_.replay_level(1))], PAGE_SECONDS))
+        for n in range(1, 5):          # table entries 2-5 (predicates 0x2eb68, 0x2eb88, 0x2eba8, 0x2ebc8 = FUN_00022a90(n) != 0): REPLAY AT for each level set
+            level = os_.replay_level(n)
+            if level:
+                pages.append(("REPLAY" if n == 1 else "REPLAY {}".format(n), ["REPLAY AT", "{:,}".format(level)], PAGE_SECONDS))
         hs = os_.features_by_name.get("high_scores")
         for title, name, score in (hs.table() if hs else []):
             pages.append((title, [title, name, "{:,}".format(score)], PAGE_SECONDS))
@@ -120,7 +119,7 @@ class AttractPages(Feature):
         if shown is None:
             pass
         elif shown == "text_page":
-            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), p1="00")
+            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), p1=("{:,}".format(self.last_scores[0]) if self.last_scores else "00"))
         else:
             self.os.media.text_show(shown, [], PRIORITY)
         for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):

@@ -898,11 +898,14 @@ def build_attract_art():
         canvas.paste(img, (128 - img.width, 0))
         # the status panel the ROM's attract code draws left of the page (assets/rom_data/dmd_code/deff_001_pages, every page of the
         # code run shows it), no scores yet: P1's "00"
-        # (two 3x5 zeros at x 32 and 36, row 1) and the separator column x 40, at level 15; without them every frame of the page is
-        # one that Serum does not know. A game's last scores are not drawn here (the panel's live scores are not given to this page).
+        # (two 3x5 zeros at x 32 and 36, row 1) at level 15, and the separator column x 40 and the three 10-dot segments of row 31
+        # (x 4-13, 16-25, 28-37) at level 1 [code run: deff_001_pages/deff_028 frame 000]. A game's last scores are not drawn here.
         px = canvas.load()
         for y in range(32):
-            px[40, y] = (255, 255, 255, 255)
+            px[40, y] = (17, 17, 17, 255)
+        for x0 in (4, 16, 28):
+            for x in range(x0, x0 + 10):
+                px[x, 31] = (17, 17, 17, 255)
         for x0 in (32, 36):
             for y in range(1, 6):
                 for x in range(x0, x0 + 3):

@@ -409,8 +409,8 @@ class TestAttractPages(HsCase):
         self.advance_time_and_run(0.01)
         self.assertEqual(current, pages[-1]["page"])          # next, then back
         self.assertNotEqual(current, pages[-2]["page"])
-        self.play(1000)                                       # the last game's scores replace REPLAY AT
+        self.play(1000)                                       # the last game's scores go to the status panel (no page of their own in the ROM table)
         self.advance_time_and_run(15)
         after = [p["page"] for p in pages]
         last = len(after) - 1 - after[::-1].index("GAME OVER")
-        self.assertEqual(["GAME OVER", "CREDITS", "PLAYER 1", "GRAND CHAMPION"], after[last:last + 4])
+        self.assertEqual(["GAME OVER", "CREDITS", "REPLAY", "GRAND CHAMPION"], after[last:last + 4])
