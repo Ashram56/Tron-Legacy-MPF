@@ -3,7 +3,8 @@
 (assets/rom_data/dmd_code, tools/gen_code_dmd.py): how many distinct frames of the game are a frame of the code run (all columns, and
 columns 41-127 that the status panel does not touch), listing the effects whose frames the game does not reproduce.
 
-    python scripts/conform/code_conform.py NAME.dmd [NAME.dmd ...]     (NAME.jsonl beside it attributes the misses to the running effect)
+    python scripts/conform/code_conform.py [--extra SWEEP.pkl ...] NAME.dmd [NAME.dmd ...]   (SWEEP.pkl: sweep_state.py)
+        (NAME.jsonl beside it attributes the misses to the running effect)
 """
 import glob
 import os
@@ -36,7 +37,17 @@ def game_frames(path):
 
 
 def main(paths):
+    import pickle
+    extra = []
+    while "--extra" in paths:
+        i = paths.index("--extra")
+        extra.append(paths[i + 1])
+        del paths[i:i + 2]
     full, cols = code_set()
+    for e in extra:
+        for f in pickle.load(open(e, "rb")):
+            full[f] = e
+            cols[bytes(f[y * 128 + x] for y in range(32) for x in range(41, 128))] = e
     seen, hit_full, hit_cols, miss = set(), 0, 0, []
     for p in paths:
         for t, f in game_frames(p):

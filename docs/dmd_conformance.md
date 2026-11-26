@@ -15,8 +15,10 @@ scenario's state, is the open work list. The misses are mostly the score display
 Check done on effect 19: run in the ROM code with the scenario's real scores (43,090 ... 275,210) and the credits record set to units -1 or 2 it draws
 frames byte-identical to the game's (3 of the game's frames each, all columns), the same layout otherwise; with the factory record (units 0) the code
 writes CREDITS 1/3 where the game shows CREDITS 0. So the layout agrees and the residual is the state (credits record, score roll-up animation
-between two scores, which a fixed-state run does not produce), not a different drawing. To close: run the effect with the state the game has at each
-moment (credits, scores, ball) and the roll-up, per scenario. The measure below (game vs PinMAME, per scenario) is the older control.
+between two scores, which a fixed-state run does not produce), not a different drawing. Done since (`scripts/conform/sweep_state.py`, score moves written at a tick with `ram_at`, playfield valid 0x372e8 and the tick counter 0x21117f4 for the
+ROM's score roll FUN_01023940): with these states for effect 19 the game's frames found in the code run (columns 41-127) become game_flow 471 of 517,
+bonus 244 of 366, game_flow_tilt 220 of 230, attract_and_service 118 of 148. Left: effects 105 (28), 10 (9, the credits screens), 25 (8-49, bonus), 77 (37),
+attract pages 29 (the attract's scores/credits pages), 19 in bonus (26). The measure below (game vs PinMAME, per scenario) is the older control.
 
 
 A colourisation (Serum) finds a frame by the dots its comparison mask keeps, so the classic 128x32 DMD of this game must
