@@ -313,3 +313,7 @@ python scripts/conform/code_conform.py --extra S19.pkl --extra S25.pkl --extra S
 Result of the last run (game frames found in the code run, columns 41-127): game_flow 508 of 509 (the missing one is the first, blank frame before any
 effect), bonus 349 of 350, game_flow_tilt 229 of 230, attract_and_service 139 of 148 (the rest: the high score table's initials, the credits page, the
 tournament page and the clock page, which depend on the machine's data).
+
+Status panel (columns 0-40, drawn by deff_draw_status_panel 0x010230ec), game frames whose panel is a panel of some frame of the code run: game_flow 444 of 509,
+game_flow_tilt 206 of 230, attract 105 of 148, bonus 216 of 350. The misses are panels with another state than the sweeps feed (the hurry-up value row
+fading under the score in bonus, other players): the sweeps of effects 19 and 77 must also vary what the panel reads (open work).
