@@ -7,8 +7,11 @@ classic DMD of the effects that have a recording from those frames only (no `ref
 effect 22 is `mov pc, lr` and draws nothing). PinMAME stays a control: `index.csv` of that folder counts how many captured frames the code frames
 reproduce (columns 41-127): 129 of 144 effects exactly; the 15 others carry a code-based reason in `assets/tools/dmd_recipes*.py` (REASONS): forced
 zero-argument or null-record captures (32, 33, 36), tournament-gated paths, a capture of the emulator's memory, or one capture frame at the start.
-The measure below (game vs PinMAME, per scenario) is the older control and is to be redone against the code frames: that comparison, with a new
-work list, is the next step.
+`scripts/conform/code_conform.py NAME.dmd` (dump of `scripts/conform/godot_run.py`) counts the game's distinct frames that are a frame of the code run.
+First measure (2026-11-26, 60 s of a scenario, columns 41-127 / all columns): attract_and_service 118 of 148 / 84; game_flow 178 of 517 / 46;
+bonus 154 of 366 / 44; game_flow_tilt 113 of 230 / 48. The frames not found are mostly screens the code run draws with other values (live scores, balls, a
+game in progress: the recipes use the factory state) and the live status panel; classifying them effect by effect, and running the effect with the
+scenario's state, is the open work list. The measure below (game vs PinMAME, per scenario) is the older control.
 
 
 A colourisation (Serum) finds a frame by the dots its comparison mask keeps, so the classic 128x32 DMD of this game must
