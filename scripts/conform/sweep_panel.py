@@ -53,7 +53,7 @@ def main(out, *logs):
     jobs += [(d, t, a, bar, v) for d, t in sorted(moves) for a in (0, 26) for bar in (0x3b58c, 0x3b57c, 0x3b584) for v in range(1, 11)]
     jobs += [(d, t, 0, True) for d, t in sorted(moves)]       # just scored, playfield valid: fade and roll run together
     frames = set()
-    with Pool(4) as pool:
+    with Pool(int(os.environ.get("SWEEP_PROCS", 4))) as pool:
         for fs in pool.imap_unordered(one, jobs):
             frames.update(fs)
     pickle.dump(frames, open(out, "wb"))

@@ -383,3 +383,13 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   with flag 0xb, clears it and adds audit 0x27 (0x00020d14). `os_layer.py` `_start_search`, `tests/test_start_search.py`. Not modelled: the
   search's coil pulses (`FUN_00003138`, `FUN_000072c8`, `FUN_0000364c`, `FUN_0001fd48`, `FUN_00003b68`, `FUN_00023dd4`, `FUN_00004068`), and the
   held-START deff 39 (needs the refused start with START still held 62 ticks).
+
+## Status panel in game: the last award (2026-11-26)
+
+`sweep_panel.py` now builds its (last award, total) pairs from the `score_add` events: `FUN_010238ac` (0x010238ac) keeps the larger points
+within 16 ticks (age `0x21117fc` < 0x10) and only restarts the age for smaller ones, so after 42 000 + 1 090 the panel shows 42 000, not the
+sum 43 090 (the game's `media_bridge.score_added` does the same). With these pairs (1 869 states, 2 169 distinct frames) the in-game panel
+(columns 0-40) of `game_flow` matches the code for all but 2 of 121 distinct panels (58 before):
+the very first frame (a uniform level before the ROM draws anything: the display's start-up, not a ROM frame) and one frame of
+effect 10 (the credit text, three coins at 0.6 s) that the credit sweep reproduces for its own columns. Not claimed beyond these runs: the
+gem timer bar (0x3b584) pairs other than the swept ones.
