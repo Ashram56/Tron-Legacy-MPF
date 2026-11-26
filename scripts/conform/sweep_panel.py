@@ -33,11 +33,22 @@ def one(job):
 def main(out, *logs):
     moves = set()
     for p in logs:
-        for line in open(p):
-            if '"ev": "score"' in line:
+        adds = []                       # the score_adds of one score event: FUN_010238ac keeps the larger points within 16 ticks, so the
+        for line in open(p):            # panel's last award is the sum or any one of them (the game's score_added), with the total so far
+            if '"ev": "score_add"' in line:
+                e = json.loads(line)
+                if e.get("player") == 1:
+                    adds.append(e["points"])
+            elif '"ev": "score"' in line:
                 e = json.loads(line)
                 if e.get("player") == 1:
                     moves.add((e["delta"], e["total"]))
+                    before, run = e["total"] - e["delta"], 0
+                    for a in adds:
+                        run += a
+                        moves.add((a, before + run))
+                        moves.add((max(adds[:adds.index(a) + 1]), before + run))
+                    adds = []
     jobs = [(d, t, a) for d, t in sorted(moves) for a in range(0, 28)]
     jobs += [(d, t, a, bar, v) for d, t in sorted(moves) for a in (0, 26) for bar in (0x3b58c, 0x3b57c, 0x3b584) for v in range(1, 11)]
     jobs += [(d, t, 0, True) for d, t in sorted(moves)]       # just scored, playfield valid: fade and roll run together

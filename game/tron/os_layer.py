@@ -912,11 +912,79 @@ class TronOS(CustomCode):
         """start_button_handler [0x00020d14] in attract: a game needs a credit or free play; otherwise event
         0x2d and deff 15 (credit text, PRESS START / INSERT COINS) unless it already runs."""
         if self.credit_model.can_start():
+            if self.game is None and not self._start_balls_ok():
+                self._start_search()                 # FUN_0001f6fc -> FUN_0001f758: the start is refused, the search runs
+                return False
+            if self.game is None and self.flag(0xb):
+                self.flag_clear(0xb)                 # [0x00020d14]: game_flag_clear(0xb), audit_add(0x27)
+                self.audit(0x27)
             return True
         self.machine.events.post("tron_start_refused")    # event 0x2d
         if not self.display.running(15):
             self.deff_start(15, credits=self.credit_model.text(), prompt=self.credit_model.prompt())
         return False
+
+    # the balls the machine counts at a start: FUN_0001f6fc / task_ball_search [0x0001f4a0]
+    BALL_DEVICES = ("bd_trough", "bd_shooter_lane", "bd_vuk")
+    START_SEARCH_ROUNDS = 4          # `iVar6` 1..4: the search ends once the 4th round has passed (4 < iVar7)
+    START_SEARCH_WAITS = 0x34        # `uVar5 < 0x34` checks per round, task_sleep(6) each
+
+    def _balls_counted(self):
+        """balls_count_all [0x0001bd18]: the balls the ball devices' switches hold."""
+        return sum(self.machine.ball_devices[name].balls for name in self.BALL_DEVICES)
+
+    def _balls_installed(self):
+        """FUN_0001e044 [0x0001e044]: the trough's switch list length (4 here)."""
+        return self.machine.ball_devices["bd_trough"].capacity
+
+    def _balls_recorded(self):
+        """FUN_0001e080 [0x0001e080]: the recorded ball count (NVRAM 0x0211191c, valid with its checksum), the
+        installed count when not written yet (FUN_0001e0e4)."""
+        return min(self.audits.extra.get("recorded_balls", self._balls_installed()), self._balls_installed())
+
+    def _start_balls_ok(self):
+        """FUN_0001f6fc [0x0001f6fc]: the start goes ahead when some balls are counted and their number is the
+        installed one or the recorded one."""
+        counted = self._balls_counted()
+        return counted != 0 and counted in (self._balls_installed(), self._balls_recorded())
+
+    def _start_search(self):
+        """task_ball_search [0x0001f4a0] started by a START that FUN_0001f6fc refused (FUN_0001f758). The
+        press that starts it does not start the game. Each of the 4 rounds posts the search (event 0xd/0xc/0xe:
+        deff 11 LOCATING PINBALLS, audit 0x25) and then re-counts every 6 ticks, 52 times: the search stops at
+        once when the count is the installed or the recorded one. After the last round: game flag 0xb when
+        fewer balls are counted than recorded, and the recorded count becomes the balls counted (FUN_0001e0e4)."""
+        if self.task_running(0x2b) or self.game is not None:
+            return
+        self.deff_start(11)
+        rounds = [0]
+
+        def finish():
+            counted = self._balls_counted()
+            if counted < self._balls_recorded():
+                self.flag_set(0xb)
+            if counted:
+                self.audits.extra["recorded_balls"] = min(counted, self._balls_installed())
+            self.deff_stop(11)
+
+        def round_start():
+            rounds[0] += 1
+            self.audit(0x25)
+            self.machine.events.post("tron_ball_search", count=rounds[0])
+            check(0)
+
+        def check(i):
+            if self._start_balls_ok():
+                self.task_kill(0x2b)
+                finish()
+                return
+            if i + 1 < self.START_SEARCH_WAITS:
+                self.task_start(0x2b, 6, lambda: check(i + 1))
+            elif rounds[0] < self.START_SEARCH_ROUNDS:
+                self.task_start(0x2b, 6, round_start)
+            else:
+                self.task_start(0x2b, 6, finish)
+        round_start()
 
     def _player_add_request(self, **kwargs):
         """START on ball 1 adds a player when a credit (or free play) allows it [0x00020d14]."""

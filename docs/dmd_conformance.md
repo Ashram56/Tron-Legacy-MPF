@@ -375,5 +375,11 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   installed count `FUN_0001e044`), which runs the ROM's ball search task 0x2b (`FUN_0001f4a0`) behind deff 11 LOCATING PINBALLS. A game started
   while deff 39 runs sets game flag 0xf (`0x20584`): the competition game, whose only effect in the code is Flynn's Arcade's 500K weight
   +1000 (`0x0100df9c` via `FUN_00019e98`, ported: `features/arcade.py`). So adj 46 has no effect with the trough full, the ROM's own design.
-- **Open for the game**: the start with balls missing (deff 11, task 0x2b ball search, then the held-START deff 39 and flag 0xf). The game
-  never refuses a start for a missing ball (MPF's ball devices decide). Work item: decode `FUN_0001f4a0` and port it.
+- **START with balls missing (ported 2026-11-26)**: `FUN_0001f6fc` (0x0001f6fc) refuses the start when the balls counted (`balls_count_all`
+  0x0001bd18) are 0 or differ from both the installed count (`FUN_0001e044`, the trough's switch list) and the recorded one (`FUN_0001e080`,
+  NVRAM 0x0211191c); it runs `task_ball_search` (0x0001f4a0, `FUN_0001f758`), and the press that started it does not start the game. Per
+  round (4 rounds): audit 0x25, deff 11, then 52 re-counts every 6 ticks, ending at once when the count is right; at the end game flag 0xb when
+  fewer balls than recorded, recorded count := min(counted, installed) (`FUN_0001e0e4`), deff 11 stops. The next START starts the game and,
+  with flag 0xb, clears it and adds audit 0x27 (0x00020d14). `os_layer.py` `_start_search`, `tests/test_start_search.py`. Not modelled: the
+  search's coil pulses (`FUN_00003138`, `FUN_000072c8`, `FUN_0000364c`, `FUN_0001fd48`, `FUN_00003b68`, `FUN_00023dd4`, `FUN_00004068`), and the
+  held-START deff 39 (needs the refused start with START still held 62 ticks).
