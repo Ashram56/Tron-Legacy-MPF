@@ -28,6 +28,7 @@ import re
 from mpf.core.mode import Mode
 
 from tron import network
+from tron import rom_datetime as rdt
 from tron import rom_draw as rd
 from tron import service_backglass as bg
 from tron.hw_numbers import sam_number
@@ -1218,55 +1219,100 @@ def clock_text(machine, when, time_format):
 
 
 class DateTimeScreen(Screen):
-    """SET DATE/TIME: SELECT steps through year, month, day, hour, minute (MINUS / PLUS change the field)
-    and stores the clock offset after the minutes."""
+    """SET DATE/TIME [FUN_01045b44, the line FUN_0000d814: tron/rom_datetime.py]. The record is read once; SELECT goes through the fields
+    month, day, year, hour, minute, second (the one being edited blinks: shown 9 loops, hidden 8, a loop = 2 ticks, solid for 16 loops
+    after a +/- press), BACK goes to the previous field (the first one leaves), SELECT after the seconds sets the clock
+    (DATE/TIME SET, the running clock, PRESS 'SELECT' TO CONTINUE) and the next SELECT leaves."""
 
-    FIELDS = ("YEAR", "MONTH", "DAY", "HOUR", "MINUTE")
+    LOOP_SECONDS = 2 * 0.01626            # FUN_0002791c(2): two 16.26 ms ticks per loop
+    LAST_FIELD = 6
 
     def __init__(self, svc):
         super().__init__(svc, "SET DATE/TIME")
-        self.when = clock_now(self.machine).replace(second=0, microsecond=0)
-        self.field = 0
+        now = clock_now(self.machine)
+        self.rec = [now.year, now.month, now.day, now.hour, now.minute, now.second]
+        self.field = 1
+        self.a, self.b = 0, 8             # iVar4, iVar3 of FUN_01045b44: the blink counters
+        self.done = False
+        self.handle = None
+        self.last = None
+
+    def enter(self):
+        self._loop()
+
+    def leave(self):
+        if self.handle:
+            self.machine.clock.unschedule(self.handle)
+            self.handle = None
+
+    def _hidden(self):
+        return self.field if (self.a < 0 and self.b < 0 and not self.done) else None
+
+    def _loop(self):
+        if self.a < 0:
+            self.b -= 1
+        else:
+            self.a -= 1
+        if self.done:
+            now = clock_now(self.machine)
+            self.rec = [now.year, now.month, now.day, now.hour, now.minute, now.second]
+        items = self.draw()
+        if items != self.last:
+            self.last = items
+            self.refresh()
+        if self.b + 7 < 0:
+            self.b = 8
+        self.handle = self.machine.clock.schedule_once(self._loop, self.LOOP_SECONDS)
 
     def lines(self):
-        date, clock = clock_text(self.machine, self.when, self.os.adj[3])
-        return ["SET " + self.FIELDS[self.field], date, clock]
+        y, mo, d, h, mi, sec = self.rec
+        twelve = self.os.adj[3] == 0
+        name = rdt.FIELDS[self.field - 1].upper()
+        clock = "{}:{:02d}:{:02d}".format((h % 12 or 12) if twelve else h, mi, sec) + (
+            (" PM" if h > 11 else " AM") if twelve else "")
+        return ["DATE/TIME SET" if self.done else "SET " + name, "{} {:02d}, {:04d}".format(rdt.MONTHS[mo - 1], d, y), clock]
 
     def draw(self):
-        """SET DATE/TIME (msg 0x1e6): the header, the field edited (CURRENT DATE/TIME: in the ROM) on row 16,
-        the date and the time in font 2 on rows 23 and 30."""
-        title, date, clock = self.lines()
-        return header("SET DATE/TIME") + [rd.text(title, 2, 64, 16), rd.text(date, 2, 64, 23),
-                                          rd.text(clock, 2, 64, 30)]
+        """The ROM's two screens. Setting: msg 0x1e6 on row 4, the rule on row 6, msg 0x1e7 on row 16 and the line on row 26 (font 2).
+        Set: msg 0x1e8 in font 8 on row 10, the line on row 18, msg 0x1e9 fitted on row 27."""
+        twelve = self.os.adj[3] == 0
+        if self.done:
+            return [rd.text("DATE/TIME SET", 8, 64, 10)] + rdt.draw(self.rec, twelve, 18) + [rd.fit(CONTINUE, 64, 27, SMALL_FONTS)]
+        return header("SET DATE/TIME") + [rd.text("CURRENT DATE/TIME:", 2, 64, 16)] + rdt.draw(self.rec, twelve, 26, self._hidden())
 
-    def _change(self, step):
-        w = self.when
-        field = self.FIELDS[self.field]
-        if field == "YEAR":
-            w = w.replace(year=min(2099, max(2000, w.year + step)))
-        elif field == "MONTH":
-            w = w.replace(month=(w.month - 1 + step) % 12 + 1, day=min(w.day, 28))
-        elif field == "DAY":
-            w = w + datetime.timedelta(days=step)
-        elif field == "HOUR":
-            w = w + datetime.timedelta(hours=step)
-        else:
-            w = w + datetime.timedelta(minutes=step)
-        self.when = w
+    def _solid(self):
+        self.a, self.b = 15, 8
 
     def button(self, name):
+        if self.done:
+            if name == "select":
+                self.svc.pop()
+            return
         if name in ("minus", "plus"):
-            self._change(1 if name == "plus" else -1)
+            self.rec = rdt.step(self.rec, self.field, 1 if name == "plus" else -1)
+            self._solid()
         elif name == "select":
-            self.field += 1
-            if self.field == len(self.FIELDS):
-                offset = int((self.when - datetime.datetime.now()).total_seconds())
-                persist_var(self.machine, "clock_offset", offset)
+            if self.field < self.LAST_FIELD:
+                self.field += 1
+                self.a, self.b = 0, 8
+            else:
+                y, mo, d, h, mi, sec = self.rec
+                try:
+                    when = datetime.datetime(y, mo, d, h, mi, sec)
+                except ValueError:                  # the ROM keeps a day past the month's end (Feb 31): the clock takes the last day
+                    when = datetime.datetime(y, mo, rdt.month_days(y, mo), h, mi, sec)
+                persist_var(self.machine, "clock_offset", int((when - datetime.datetime.now()).total_seconds()))
+                self.done = True
+        elif name == "back":
+            if self.field < 2:
                 self.svc.pop()
                 return
+            self.field -= 1
+            self.a, self.b = 0, 8
         else:
             super().button(name)
             return
+        self.last = None
         self.refresh()
 
 

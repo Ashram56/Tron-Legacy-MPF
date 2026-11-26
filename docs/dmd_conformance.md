@@ -346,3 +346,13 @@ PinMAME's level). Both now use level 1 and the segments (page 28 of the code run
 to the panel (`attract_pages.py` `panel()`: the same ScoreDisplay as the in-game panel, P1-P4, the last turn's player bright), so those invented pages are gone. The REPLAY pages are four table entries (2-5, FUN_00022a90(n) != 0),
 one "REPLAY AT <value>" page per level that is set. Entries 11-26 (FUN_0002553c / FUN_00025598, mode 4 of FUN_000251cc: the competition records) are not modelled (adj 46).
 Measured on the attract + service scenario: panel 142/143, columns 41-127 141/143 (the two left: the service entry fade and SET DATE/TIME, which shows the machine's clock).
+
+## SET DATE/TIME from the code
+
+The screen is ported from FUN_01045b44 (0x01045b44) and its line FUN_0000d814 (`game/tron/rom_datetime.py`, `DateTimeScreen`): fields in the
+order month, day, year, hour, minute, second (the old five-field YEAR-first version was invented), the edited field blinking (shown 9 loops,
+hidden 8, a loop = 2 ticks, solid 16 loops after +/-), BACK to the previous field, "DATE/TIME SET" (msg 0x1e8, font 8 row 10, the running
+clock on row 18, msg 0x1e9 on row 27) after the seconds. +/- rules from FUN_0000d438..d6dc (wraps, month length table 0x040d7cb8, leap years).
+Widths follow FUN_00028a74 (a glyph with a negative x offset, the comma, counts to the left of 0: 2 dots, not 1) and the line is centred on
+(128 - total) / 2 with total = the ROM's sum (13 gaps). Checked by `scripts/conform/sweep_datetime.py` (ROM routine in Unicorn, RTC stubbed
+via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day, 2000 and 2099): 26 of 26 pictures found among the code's frames, with the blink hiding the right field.
