@@ -18,12 +18,10 @@ writes CREDITS 1/3 where the game shows CREDITS 0. So the layout agrees and the 
 between two scores, which a fixed-state run does not produce), not a different drawing. Done since: the code is rerun with the state each scenario put the game in (`scripts/conform/sweep_state.py` effect 19: score moves written at a tick
 with `ram_at`, playfield valid 0x372e8 and tick counter 0x21117f4 for the score roll FUN_01023940; `sweep_bonus.py` effect 25: items_table 0x02111690,
 SoS 0x2111800, Portal 0x21118b8, multiplier 0x21115d4, totals read from the trace's `deff_args`; `sweep_args.py` effect 75 (the "N MORE TO START" count,
-task +0x30); `sweep_gem.py` effect 77: gem_timer 0x3b12c x score). Game frames found in the code run (columns 41-127): **bonus 340 of 350 (97 %),
-game_flow_tilt 220 of 230 (96 %), game_flow 475 of 517 (92 %), attract_and_service 118 of 148 (80 %)**. Left: effect 10, the credits screens
-(9 frames in each scenario: the game shows CREDITS 1/3, 2/3, 1; the code run draws 1/3 whatever the credits record I write, before or after the boot
-initialisers (`ram_late`): FUN_00004ff4 / FUN_00004d48 read a pricing descriptor via FUN_000047b0, not only the record 0x2111008; to trace);
-effect 105 (arcade award slot machine, 28 in game_flow: its reels follow 7 `random_below` draws, so a frame matches only with the same draws: the
-game's RNG must follow the LCG at 0x372c4 for that, to check); the attract pages (29: score and credit pages of effect 1). Status panel columns 0-40 are not compared.
+task +0x30); `sweep_gem.py` effect 77: gem_timer 0x3b12c x score). Game frames found in the code run (columns 41-127): **bonus 349 of 350 (99.7 %),
+game_flow_tilt 229 of 230 (99.6 %), game_flow 484 of 517 (94 %), attract_and_service 139 of 148 (94 %)** (`sweep_credits.py`: effect 10's argument is the credit record number, 1; the attract pages now run to their end, 60 M instructions). Left: effect 105 (arcade award slot machine, 28 in game_flow: its reels follow 7 `random_below` draws, so a frame matches only with the same draws: the
+game's RNG must follow the LCG at 0x372c4 for that, to check); 4 frames of effect 25 in game_flow (a total not yet swept); the attract's high score pages
+(the table's initials differ from the ROM's reset table), the credits page, the tournament page and the clock page (state of the machine). Status panel columns 0-40 are not compared.
 The measure below (game vs PinMAME, per scenario) is the older control.
 
 
