@@ -393,3 +393,7 @@ sum 43 090 (the game's `media_bridge.score_added` does the same). With these pai
 the very first frame (a uniform level before the ROM draws anything: the display's start-up, not a ROM frame) and one frame of
 effect 10 (the credit text, three coins at 0.6 s) that the credit sweep reproduces for its own columns. Not claimed beyond these runs: the
 gem timer bar (0x3b584) pairs other than the swept ones.
+
+Result of the same run against all the sweeps kept so far (state, bonus, args, gem, credits, arcade, 10, 25, 105, panel): columns 41-127 of
+`game_flow` 515/516 distinct frames (the one miss is the start-up frame above); the status panel 119/121 as above. The panels of the other
+scenarios (bonus, tilt, attract) are not swept with the score_add pairs yet: the same script takes their `.jsonl`.
