@@ -11,7 +11,12 @@ zero-argument or null-record captures (32, 33, 36), tournament-gated paths, a ca
 First measure (2026-11-26, 60 s of a scenario, columns 41-127 / all columns): attract_and_service 118 of 148 / 84; game_flow 178 of 517 / 46;
 bonus 154 of 366 / 44; game_flow_tilt 113 of 230 / 48. The frames not found are mostly screens the code run draws with other values (live scores, balls, a
 game in progress: the recipes use the factory state) and the live status panel; classifying them effect by effect, and running the effect with the
-scenario's state, is the open work list. The measure below (game vs PinMAME, per scenario) is the older control.
+scenario's state, is the open work list. The misses are mostly the score display (effect 19: 291 of the 339 misses in game_flow, 116 of 212 in bonus; next 25, 77, 105, 10).
+Check done on effect 19: run in the ROM code with the scenario's real scores (43,090 ... 275,210) and the credits record set to units -1 or 2 it draws
+frames byte-identical to the game's (3 of the game's frames each, all columns), the same layout otherwise; with the factory record (units 0) the code
+writes CREDITS 1/3 where the game shows CREDITS 0. So the layout agrees and the residual is the state (credits record, score roll-up animation
+between two scores, which a fixed-state run does not produce), not a different drawing. To close: run the effect with the state the game has at each
+moment (credits, scores, ball) and the roll-up, per scenario. The measure below (game vs PinMAME, per scenario) is the older control.
 
 
 A colourisation (Serum) finds a frame by the dots its comparison mask keeps, so the classic 128x32 DMD of this game must

@@ -3,7 +3,7 @@
 (assets/rom_data/dmd_code, tools/gen_code_dmd.py): how many distinct frames of the game are a frame of the code run (all columns, and
 columns 41-127 that the status panel does not touch), listing the effects whose frames the game does not reproduce.
 
-    python scripts/conform/code_conform.py NAME.dmd [NAME.dmd ...]
+    python scripts/conform/code_conform.py NAME.dmd [NAME.dmd ...]     (NAME.jsonl beside it attributes the misses to the running effect)
 """
 import glob
 import os
@@ -50,6 +50,18 @@ def main(paths):
                 hit_cols += 1
             else:
                 miss.append((t, p))
+    import collections
+    import json
+    by = collections.Counter()
+    for t, p in miss:
+        jl = p[:-4] + ".jsonl"
+        if not os.path.exists(jl):
+            continue
+        starts = [(e["wall"], e["id"]) for e in map(json.loads, open(jl)) if e.get("ev") == "deff_start" and "wall" in e]
+        cur = [i for w, i in starts if w <= t]
+        by[cur[-1] if cur else None] += 1
+    if by:
+        print("misses by the last deff_start before the frame:", ", ".join("{}:{}".format(k, v) for k, v in by.most_common(25)))
     print("distinct game frames: {}; found in the code run: {} (all columns), {} (columns 41-127)".format(len(seen), hit_full, hit_cols))
     return 0
 
