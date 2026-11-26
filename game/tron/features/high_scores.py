@@ -23,9 +23,10 @@ After the letters come three specials: BACK (deletes a letter), END and SPACE; o
 BACK and END can be picked, END at first. 3 initials (adj 60 = 0) or 10 letters. A 30 s countdown (63
 frames a second) restarts on every button; at its end 15 more seconds are shown, then the entry ends with
 what is entered (plus the letter under the cursor).
-Not in the decompile (ROM data): the letter set (msg 0x34a / 0x34c), the default names of HIGH SCORE #3-#4
-and the sounds of the entry (OS words 0x36f74/76/78, 0x39088/8a). The attract capture
-(media/dmd/deff_001_attract_score_display) shows GRAND CHAMPION "G S", HIGH SCORE #1 "L R", #2 "J R".
+Not in the decompile (ROM data): the letter set (msg 0x34a / 0x34c) and the sounds of the entry (OS words 0x36f74/76/78, 0x39088/8a).
+The default table is the ROM's own, read by running the attract pages after the reset FUN_0001a9f4 (assets/rom_data/dmd_code/deff_001_pages: page
+routine 0x100075c after reset(1): GRAND CHAMPION "G S" 75,000,000; pages 7-10 after reset(2): HIGH SCORE #1 "L R" 55,000,000, #2 "J R" 40,000,000,
+#3 "D T" 30,000,000, #4 "P P" 25,000,000).
 """
 from tron.features import Feature
 
@@ -34,7 +35,7 @@ TITLES = ("GRAND CHAMPION", "HIGH SCORE #1", "HIGH SCORE #2", "HIGH SCORE #3", "
 SCORE_ADJ = (49, 50, 51, 52, 53)
 AWARD_ADJ = (55, 56, 57, 58, 59)
 FLAGS = (1, 2, 2, 2, 2)                  # reset groups: 1 grand champion, 2 high scores
-DEFAULT_NAMES = ("G S", "L R", "J R", "???", "???")
+DEFAULT_NAMES = ("G S", "L R", "J R", "D T", "P P")   # code run of the attract pages (see the module docstring); "???" was a guess
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 SPECIALS = ("BACK", "END", "SPACE")
 FRAME_TICKS = 1
