@@ -218,6 +218,8 @@ def decode_all():
         outline = is_outline(get, glyphs)
         rf = rom.get(a, {})
         rg = {c: g for c, g in rf.get("glyphs", {}).items() if g["image"] == glyphs.get(c)}
+        for c, g in rg.items():                          # the glyph table's own y offset (text_draw_str 0x28f74: y - h + yoff + 1), not the heuristics
+            place[c] = g["y_offset"]
         fonts.append({"id": n, "group": a, "last": b, "cap": cap, "outline": outline,
                       "spacing": rf.get("spacing", SPACING.get(n, -1 if outline else 1)),
                       "ascent": max(index[i]["h"] - place[c] for c, i in glyphs.items()),

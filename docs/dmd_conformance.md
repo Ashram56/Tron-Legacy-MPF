@@ -21,7 +21,7 @@ SoS 0x2111800, Portal 0x21118b8, multiplier 0x21115d4, totals read from the trac
 task +0x30); `sweep_gem.py` effect 77: gem_timer 0x3b12c x score). Game frames found in the code run (columns 41-127): **bonus 349 of 350 (99.7 %),
 game_flow_tilt 229 of 230 (99.6 %), game_flow 484 of 517 (94 %), attract_and_service 139 of 148 (94 %)** (`sweep_credits.py`: effect 10's argument is the credit record number, 1; the attract pages now run to their end, 60 M instructions). Left: effect 105 (arcade award slot machine, 28 in game_flow: its reels follow 7 `random_below` draws, so a frame matches only with the same draws: the
 game's RNG must follow the LCG at 0x372c4 for that, to check); 4 frames of effect 25 in game_flow (a total not yet swept); the attract's high score pages
-(the table's initials differ from the ROM's reset table), the credits page, the tournament page and the clock page (state of the machine). Status panel columns 0-40 (game frames whose panel matches one drawn by the code, `sweep_panel.py`/`sweep_more.py` over the score, roll, fade age and the three timer bars): game_flow 455/509, bonus 251/350, tilt 206/230, attract 105/148. The misses are panel variants (gem timer bar at x 40 drawn by FUN_00027174, last-value pairs) whose state the sweeps do not yet reach; not a departure found.
+(the table's initials differ from the ROM's reset table), the credits page, the tournament page and the clock page (state of the machine). Status panel columns 0-40 (game frames whose panel matches one drawn by the code, `sweep_panel.py`/`sweep_more.py` over the score, roll, fade age and the three timer bars): game_flow 455/509, bonus 251/350, tilt 206/230, attract 105/151. The misses are panel variants (gem timer bar at x 40 drawn by FUN_00027174, last-value pairs) whose state the sweeps do not yet reach; not a departure found.
 The measure below (game vs PinMAME, per scenario) is the older control.
 
 
@@ -317,3 +317,10 @@ tournament page and the clock page, which depend on the machine's data).
 Status panel (columns 0-40, drawn by deff_draw_status_panel 0x010230ec), game frames whose panel is a panel of some frame of the code run: game_flow 444 of 509,
 game_flow_tilt 206 of 230, attract 105 of 148, bonus 216 of 350. The misses are panels with another state than the sweeps feed (the hurry-up value row
 fading under the score in bonus, other players): the sweeps of effects 19 and 77 must also vary what the panel reads (open work).
+
+## Font placement from the ROM (2026-11-26)
+
+`scripts/gen_fonts.py` placed glyphs vertically with heuristics read off captures; the ROM's glyph table gives the exact y offset
+(`assets/rom_data/fonts.json`, text_draw_str 0x28f74: `y - h + y_offset + 1`). 73 of 1635 glyphs differed (the "#" of fonts 10-13, "*", ";", "<=>", quotes):
+"HIGH SCORE #n" had its "#" one row too low. The fonts now read the ROM's offset. Attract, columns 41-127: 139/148 -> 143/151 distinct frames found in the code run;
+the 8 left are the credits, clock and custom-message pages (machine state), to run in Unicorn with the machine's own state.
