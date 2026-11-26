@@ -15,10 +15,16 @@ scenario's state, is the open work list. The misses are mostly the score display
 Check done on effect 19: run in the ROM code with the scenario's real scores (43,090 ... 275,210) and the credits record set to units -1 or 2 it draws
 frames byte-identical to the game's (3 of the game's frames each, all columns), the same layout otherwise; with the factory record (units 0) the code
 writes CREDITS 1/3 where the game shows CREDITS 0. So the layout agrees and the residual is the state (credits record, score roll-up animation
-between two scores, which a fixed-state run does not produce), not a different drawing. Done since (`scripts/conform/sweep_state.py`, score moves written at a tick with `ram_at`, playfield valid 0x372e8 and the tick counter 0x21117f4 for the
-ROM's score roll FUN_01023940): with these states for effect 19 the game's frames found in the code run (columns 41-127) become game_flow 471 of 517,
-bonus 244 of 366, game_flow_tilt 220 of 230, attract_and_service 118 of 148. Left: effects 105 (28), 10 (9, the credits screens), 25 (8-49, bonus), 77 (37),
-attract pages 29 (the attract's scores/credits pages), 19 in bonus (26). The measure below (game vs PinMAME, per scenario) is the older control.
+between two scores, which a fixed-state run does not produce), not a different drawing. Done since: the code is rerun with the state each scenario put the game in (`scripts/conform/sweep_state.py` effect 19: score moves written at a tick
+with `ram_at`, playfield valid 0x372e8 and tick counter 0x21117f4 for the score roll FUN_01023940; `sweep_bonus.py` effect 25: items_table 0x02111690,
+SoS 0x2111800, Portal 0x21118b8, multiplier 0x21115d4, totals read from the trace's `deff_args`; `sweep_args.py` effect 75 (the "N MORE TO START" count,
+task +0x30); `sweep_gem.py` effect 77: gem_timer 0x3b12c x score). Game frames found in the code run (columns 41-127): **bonus 340 of 350 (97 %),
+game_flow_tilt 220 of 230 (96 %), game_flow 475 of 517 (92 %), attract_and_service 118 of 148 (80 %)**. Left: effect 10, the credits screens
+(9 frames in each scenario: the game shows CREDITS 1/3, 2/3, 1; the code run draws 1/3 whatever the credits record I write, before or after the boot
+initialisers (`ram_late`): FUN_00004ff4 / FUN_00004d48 read a pricing descriptor via FUN_000047b0, not only the record 0x2111008; to trace);
+effect 105 (arcade award slot machine, 28 in game_flow: its reels follow 7 `random_below` draws, so a frame matches only with the same draws: the
+game's RNG must follow the LCG at 0x372c4 for that, to check); the attract pages (29: score and credit pages of effect 1). Status panel columns 0-40 are not compared.
+The measure below (game vs PinMAME, per scenario) is the older control.
 
 
 A colourisation (Serum) finds a frame by the dots its comparison mask keeps, so the classic 128x32 DMD of this game must
