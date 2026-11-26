@@ -1,4 +1,15 @@
-# DMD conformance with PinMAME (and so with Serum)
+# DMD conformance with the ROM's code (and PinMAME as a control)
+
+**Reference since 2026-11-26 (STRICT RULE 4): the frames the ROM's own code draws, not PinMAME.** `assets/rom_data/dmd_code/` holds, for each of
+the 144 effects and every random-clip variant, the frames of the ROM routine run in Unicorn (`assets/tools/gen_code_dmd.py`, recipes
+`dmd_recipes*.py`, method in `assets/docs/dmd_from_code.md`, one frame per page flip, time in 16.000 ms OS ticks). `scripts/gen_media.py` builds the
+classic DMD of the effects that have a recording from those frames only (no `reference_capture.gif`; effect 1's pages are `deff_001_pages`,
+effect 22 is `mov pc, lr` and draws nothing). PinMAME stays a control: `index.csv` of that folder counts how many captured frames the code frames
+reproduce (columns 41-127): 129 of 144 effects exactly; the 15 others carry a code-based reason in `assets/tools/dmd_recipes*.py` (REASONS): forced
+zero-argument or null-record captures (32, 33, 36), tournament-gated paths, a capture of the emulator's memory, or one capture frame at the start.
+The measure below (game vs PinMAME, per scenario) is the older control and is to be redone against the code frames: that comparison, with a new
+work list, is the next step.
+
 
 A colourisation (Serum) finds a frame by the dots its comparison mask keeps, so the classic 128x32 DMD of this game must
 draw the ROM's dots. How close it is is measured, not assumed: PinMAME plays a scenario on the real ROM and dumps every DMD
