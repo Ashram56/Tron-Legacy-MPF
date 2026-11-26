@@ -29,7 +29,7 @@ def page_layout(name, lines):
     if name == "CREDITS":
         return 0
     if name == "URL":
-        return 5                    # three lines in the 5-dot font, 9 dots apart (PinMAME)
+        return 5                    # three lines in the 5-dot font, 9 dots apart (ROM code run: rows 4-8, 13-17, 22-26 in assets/rom_data/dmd_code/deff_001_pages/deff_029)
     if name == "DEFAULT MESSAGE":
         return 6                    # the factory custom message, two lines in the 5-dot font 2 (PinMAME)
     return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)

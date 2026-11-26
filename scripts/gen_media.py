@@ -154,6 +154,19 @@ def gif_frames(path):
     return out
 
 
+def code_frames(deff_id):
+    """The effect's frames from the ROM's own code (assets/rom_data/dmd_code, tools/gen_code_dmd.py: the ROM routine run in Unicorn,
+    one frame per page flip, times in OS ticks of 16.000 ms) as (RGBA image, ms). None when the code run drew nothing (the effect has
+    no render: tournament-only, dead code; docs/dmd_from_code.md). PinMAME captures are never a source (STRICT RULE 4)."""
+    folder = os.path.join(ROOT, "assets", "rom_data", "dmd_code", "deff_{:03d}".format(deff_id))
+    if not os.path.exists(os.path.join(folder, "timing.json")):
+        return None
+    from PIL import Image
+    with open(os.path.join(folder, "timing.json"), encoding="utf-8") as f:
+        meta = json.load(f)["frames"]
+    return [(Image.open(os.path.join(folder, m["file"])).convert("RGBA"), max(1, int(round(m["duration_ms"])))) for m in meta]
+
+
 def remap_levels(img, mapping):
     """The picture with the DMD levels (0-15) of `mapping` replaced: {from: to}."""
     from PIL import Image
@@ -639,8 +652,10 @@ def build_deffs(only_data):
             source, lines = "letters", text_lines(rom_text)
         elif dynamic or not os.path.exists(ref):
             source, lines = ("graphics" if has_graphics else "none"), text_lines(rom_text)
-        else:
-            source, lines = "reference", []
+        elif os.path.exists(os.path.join(ROOT, "assets", "rom_data", "dmd_code", "deff_{:03d}".format(deff_id), "timing.json")):
+            source, lines = "reference", []     # the frames of the ROM's own code run (code_frames)
+        else:                                   # the code run draws nothing (deff 1: pages in deff_001_pages, 22: no render): no capture
+            source, lines = "none", []
         layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
         # a capture shows the status panel of the moment it was recorded (score 00): the live panel is drawn
         # over its columns 0-40 instead, except where the effect itself covers them (deffs 85, 112)
@@ -662,7 +677,7 @@ def build_deffs(only_data):
         if source == "arcade":
             arcade_slide(folder, rel, panel)
             continue
-        frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
+        frames = (code_frames(deff_id) or []) if source == "reference" else png_frames(folder) if source == "graphics" else []
         if source == "reference" and panel:
             from PIL import ImageDraw
             for img, _ in frames:
@@ -881,7 +896,8 @@ def build_attract_art():
         img = image(i)
         canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
         canvas.paste(img, (128 - img.width, 0))
-        # the ROM draws the status panel left of the animation (PinMAME's attract capture, constant on all its frames): P1's "00"
+        # the status panel the ROM's attract code draws left of the page (assets/rom_data/dmd_code/deff_001_pages, every page of the
+        # code run shows it), no scores yet: P1's "00"
         # (two 3x5 zeros at x 32 and 36, row 1) and the separator column x 40, at level 15; without them every frame of the page is
         # one that Serum does not know. A game's last scores are not drawn here (the panel's live scores are not given to this page).
         px = canvas.load()
