@@ -430,6 +430,19 @@ class Display:
         """task_running_range(0x81, 0xa7): a show task is waiting or playing."""
         return bool(self.show or self.shows)
 
+    def abort(self, mode):
+        """FUN_0100fb10 after the two flipper buttons: FUN_000283f8(1) kills the deff on screen unless it is the
+        default (background) one and empties the deff queue; mode 2 also kills the show tasks 0x81-0xa7 and the
+        mode total tasks 0x4d-0x58 (task_kill_range)."""
+        self.os.trace.log("abort_animations", mode=mode)
+        if mode == 2:
+            self.shows = []
+            self.idle_waits = []
+            if self.show:
+                self._end_show()
+        if self.fg is not None and self.fg != self.bg:
+            self.stop(self.fg)
+
     def _pump(self):
         if self._pump_handle:
             self.os.machine.clock.unschedule(self._pump_handle)

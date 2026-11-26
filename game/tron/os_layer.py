@@ -238,6 +238,8 @@ class TronOS(CustomCode):
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
         sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
+        sw.add_switch_handler("s_left_flipper", lambda: self._abort_animations("s_right_flipper"))
+        sw.add_switch_handler("s_right_flipper", lambda: self._abort_animations("s_left_flipper"))
         sw.add_switch_handler("s_coin_door_open", self._coin_door_opened)
         sw.add_switch_handler("s_coin_door_open", self._coin_door_closed, state=0)
         self._power_off_run = 0     # counts deff 4 starts, so a dim timer of an earlier start does nothing
@@ -1311,6 +1313,17 @@ class TronOS(CustomCode):
                                                                ("OR PULL INTERLOCK SWITCH", 22),
                                                                ("TO RESTORE POWER", 28))]
         self.media.deff_draw(POWER_OFF_DEFF, self.display.prio.get(POWER_OFF_DEFF, 0), draw)
+
+    def _abort_animations(self, other):
+        """adj 75 ABORT ANIMATIONS (queue_fullscreen_deff 0x0100fbb0, FUN_0100fb10): while a show task is waiting or
+        playing, a flipper button pressed while the other is held (FUN_00007404 edge, FUN_000073e4 held) aborts the
+        animation: 0 never, 1 the deff on screen (FUN_000283f8(1)), 2 also every show task 0x81-0xa7 and the mode
+        total tasks 0x4d-0x58."""
+        mode = self.adj_value(75)
+        if not mode or not self.display.show_running():
+            return
+        if self.machine.switch_controller.is_active(self.machine.switches[other]):
+            self.display.abort(mode)
 
     def _flipper_launch(self, side):
         """Flipper button with a ball waiting in the shooter lane [0x0002dcc0]: adj 40 FLIPPER BALL LAUNCH

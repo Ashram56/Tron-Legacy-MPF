@@ -141,7 +141,7 @@ class TronTargets(Feature):
         15 ticks apart); then read the switches, an open switch = drop up [0x0100bf04]."""
         switches = self.machine.switches
         down = {sw for sw in SWITCHES if switches[SW_NAME[sw]].state}
-        if down and tries:
+        if down and tries and self.os.adj_value(80) != 1:   # adj 80 DISABLE DROP TARGETS: no coil [0x0100bdf4]
             coil = self.machine.coils.get("c_drop_target_bank")
             if coil:
                 coil.pulse()

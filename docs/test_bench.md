@@ -86,10 +86,12 @@ Fixed (1 and 2 have a test in `TestRegressions`, 3 and 4 in `test_adjustments_pl
 
 Not changed, for the owner or the next agent:
 
-- **Adj 80 DISABLE DROP TARGETS** has a reader in the ROM (`FUN_0100b910`, the bank object's "disabled"
-  test) but does nothing in the game. tron_targets.md leaves its effect as an open question.
-- **Adj 75 ABORT ANIMATIONS** (flipper buttons skip a queued show) and **adj 46 PLAYER COMPETITION** are
-  not built.
+- **Adj 80 DISABLE DROP TARGETS** and **adj 75 ABORT ANIMATIONS** are built (2026-11-26, from the code):
+  adj 80 = 1 never pulses the bank's reset coil, the switches are only re-read (`FUN_0100bdf4`,
+  `FUN_0100b910`, `FUN_0100b1cc`); adj 75 skips the show on screen when both flipper buttons are held
+  (`FUN_0100fb10`; mode 2 also kills the queued shows). Tests: `tests/test_adj_75_80.py`.
+- **Adj 46 PLAYER COMPETITION** is not built: it only acts in the competition state
+  (`gf_state & 0x118 == 0x10`, `FUN_00019ecc` 0x19ecc), which no base-game flow enters.
 - **Adj 70 = 4** (no Disc Multiball restart): the multiball then ends with no total display and flag 0x25
   stays set. The game does as the ROM does [0x01007714]; it looks like a ROM oversight.
 - **flynns_arcade.md** gives the bag's total as 352 (452 with MORE TIME); its own table adds up to 327

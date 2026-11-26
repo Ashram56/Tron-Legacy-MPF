@@ -25,13 +25,13 @@ NOT_IN_PLAY = {
     33: "credit limit: tests/test_credits.py", 34: "free play: tests/test_credits.py",
     29: "match award: tests/test_adjustments.py (the match is random)", 35: "knocker volume: sound",
     37: "no reader in the ROM", 43: "no reader in the ROM", 44: "Q24 output: tests/test_adjustments.py",
-    45: "ticket dispenser: service menu only", 46: "player competition: not built", 47: "not read by the game",
+    45: "ticket dispenser: service menu only", 46: "player competition: only in the competition state (gf_state&0x118==0x10, FUN_00019ecc 0x19ecc)", 47: "not read by the game",
     48: "high scores: tests/test_credits.py", 49: "as 48", 50: "as 48", 51: "as 48", 52: "as 48", 53: "as 48",
     54: "as 48", 55: "as 48", 56: "as 48", 57: "as 48", 58: "as 48", 59: "as 48", 60: "as 48", 61: "as 48",
     62: "coin switch timing: tests/test_credits.py", 63: "lost ball: 5 ball searches (tests/test_adjustments.py)",
-    71: "restart autofire: tests/test_adjustments.py", 75: "abort animations: not built (docs/test_bench.md)",
+    71: "restart autofire: tests/test_adjustments.py", 75: "abort animations: tests/test_adj_75_80.py",
     76: "motor: tests/test_adjustments.py", 77: "motor: tests/test_adjustments.py",
-    80: "disable drop targets: not built (docs/test_bench.md)", 81: "Recognizer head motor: not driven",
+    80: "disable drop targets: tests/test_adj_75_80.py", 81: "Recognizer head motor: not driven",
 }
 
 
