@@ -507,3 +507,15 @@ timer left and right, ALL TARGETS=) are ported and equal to the ROM code (101, 9
 payload was dropped by the 0.25 s refresh (`media_bridge.score_changed` kept only the `line*` keys), so effects 57 and 95 would not have followed their values in
 Godot; the payload now goes with the refresh. `dmd_effect.gd` draws the engine's rectangle item (FUN_0002746c). Daft Punk multiball: **1378 of 1431** frames found
 (96.3 %); left 57 (12), 95 (9). End of Line (before 139 and 95): 1147 of 1224.
+
+End of Line multiball remeasured with 139 and 95 in the engine sweeps (`sweep_engine.py`, `sweep_engine19.py`, `sweep_arcade.py`, 120 s run): **1344 of 1396** distinct game frames found in
+columns 41-127 (96.3 %, 1147 of 1224 before); left: 19 (22), 57 (17), 95 (12), 1 unattributed. Viewed (`scratchpad/dumpmiss.py` = `code_conform` with the misses saved as pictures): the 57 and
+95 misses are not those effects' frames. They are two other Zuse fast scoring effects the sweeps do not cover: deff 94, the intro ("ALL TARGETS / SCORE / n POINTS" after the four
+Z U S E pictures), and deff 96, the hit popup over the score display ("RIGHT SPINNER =" / the value, drawn by child tasks 0x01032a30 and 0x01032900).
+
+Deff 94 ported (`game/tron/rom_deff94.py`, not yet wired into `rom_engine`): 24 flips of 4 ticks (pictures 0xa34 0xa33 0xa31 0xa2c at x 0x2a 0x3f 0x54 0x69 row 1, transparent 0xff,
+and "FAST SCORING" font 0x22 on the flips with bit 1), then FUN_010323d0 (ALL TARGETS font 10 row 8, SCORE font 0x11 row 0x15, "%,02lu POINTS" row 0x1e, levels 15 to 4). Equal to the
+ROM code on 130 of 139 flips (`engine_check.compare(94, [10000], ...)`); the 9 left are the transition between the two parts, `FUN_00027acc(0xc)` = the handler 0x0102b980 of table
+0x040e1b60: ten stages of two ticks (ticks 96-114) that copy rows of the 87 columns from the pages shown before (five stages) and from the new pages (five stages) per the rectangle tables
+0x040d3a18 / 0x040d3a40 (records src row x 16, dst row x 16, height; stage sizes 3, 7, 15, 8, 2 then 8, 15, 7, 3, 1). It needs a "copy rows of a previous page" item in `dmd_effect.gd`
+before 94 can go from the slide to the engine; open for that reason (the item model draws images, text and rectangles only). Deff 96 (child tasks, status panel) not started.
