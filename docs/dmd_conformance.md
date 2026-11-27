@@ -387,9 +387,14 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   tables (counts 0x00037270, 0x040d1024, 0x040c321c, 0x040d1028, 0x040d1034) with per-entry routines `FUN_000071f4`, `FUN_00003560`, `FUN_0001fc94`, `FUN_00003a8c`,
   `FUN_00023c6c`: resets of the switch, timer and ball-device records. `FUN_0001fd48` also starts, for ball devices 1-3 (the trough, shooter lane and VUK:
   table 0x040e41f4, kinds 5, 1 and 8, record +0x15 = 0), the device task 0x18 + dev (`FUN_0001dc70`: the kind handler of the RAM table 0x3744c via
-  `FUN_0001bf70`, then the trough drain check body of `FUN_0001dd90`) without a ball-presence test, and sets game flag 0xa. The kind handlers are filled in
-  at run time (RAM 0x3744c, 12 bytes per kind) and are not read out here: whether the three eject coils fire for an empty device is open, and MPF's ball
-  devices own those ejects (an unseen pulse would confuse their count). Event 0xc: the static registrations (`FUN_00007944`, 121 calls) hold none for events 0xd and 0xe
+  `FUN_0001bf70`, then the trough drain check body of `FUN_0001dd90`) without a ball-presence test, and sets game flag 0xa. The kind handlers are in ROM at 0x0003744c
+  (12 bytes per kind, slot +8 = the eject handler: kind 1 shooter lane `FUN_0001c264`, kind 5 trough `FUN_0001c668`, kind 8 VUK `FUN_0001d05c`; slot 0 init, slot 4 entry).
+  Each reads the device's flag word (record +0xc): the search's 0x1a sets 0x10 (request), 0x8 and 0x2; with a request and bit 2 set it posts event 3 to the
+  device's own handler (record +0xc: 0x0101bbc0 for the trough), recounts its switches and, when the device holds more balls than the target in record +0x12
+  (0 here: any ball), runs the kick sequence (events 7, 8, 9 with the retries of descriptor +0x22): an empty device is not kicked, a device holding balls
+  is. In a game `FUN_0001fc94` takes the other branch for a device whose RAM record +0x15 is nonzero (the balls it must keep): only the 4th search
+  calls `FUN_0001e17c` once (game flag 0xa then blocks a repeat). The game does not reproduce the device kicks (departure, `docs/rom_differences.md`): MPF's ball
+  devices own the ejects, and kicking the trough or the VUK from outside would put balls in the shooter lane in attract or desynchronise their count. Event 0xc: the static registrations (`FUN_00007944`, 121 calls) hold none for events 0xd and 0xe
   (`event_post` 0x79ec then returns 1) and four for 0xc (`FUN_00017128`, `FUN_00018560`, 0x0100a414, 0x0100bc88), each walking one object list (RAM 0x37408,
   0x37410, 0x37404, 0x37400) and calling one virtual method of every object (base slot tables in ROM, e.g. 0x39d08: slot 0xdc `FUN_0001723c` starts the object's task 0x2b
   `FUN_00017174` that re-reads its switch ring; slot 0xfc `FUN_00017bf0` sets a bit): resynchronisations after a search, not kicks. The held-START deff 39 is ported (`_start_pressed`, `_competition_hold`): at the press (the ROM acts at the press, MPF at the release) a
