@@ -234,6 +234,7 @@ class TronOS(CustomCode):
         sw = self.machine.switch_controller
         sw.add_switch_handler("s_coin", lambda: self.credit_model.coin("s_coin"))
         sw.add_switch_handler("s_start_button", self._start_held, ms=START_HOLD_TICKS * TICK * 1000)
+        sw.add_switch_handler("s_start_button", self._start_pressed)
         sw.add_switch_handler("s_service_back", self._service_back)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
@@ -915,6 +916,8 @@ class TronOS(CustomCode):
             if self.game is None and not self._start_balls_ok():
                 self._start_search()                 # FUN_0001f6fc -> FUN_0001f758: the start is refused, the search runs
                 return False
+            if self.game is None and self.display.running(39):
+                self.flag_set(0xf)                   # FUN_00020584: a game started while deff 39 runs is the competition game
             if self.game is None and self.flag(0xb):
                 self.flag_clear(0xb)                 # [0x00020d14]: game_flag_clear(0xb), audit_add(0x27)
                 self.audit(0x27)
@@ -995,6 +998,32 @@ class TronOS(CustomCode):
         if num > 1:
             self.credit_model.take(1)
             self.audit(0x11)
+
+    def _competition_ok(self):
+        """FUN_00019ecc: attract (state & 0x118 == 0x10), adj 46 PLAYER COMPETITION = YES, a credit or free play."""
+        return (self.game is None and self.state & 0x118 == ST_ATTRACT and self.adj_value(46) == 1 and self.has_credit()
+                and not self._start_balls_ok())   # a START that FUN_0001f6fc accepts starts the game at once in the ROM (MPF starts on release)
+
+    def _start_pressed(self):
+        """START pressed in attract [0x00020d14, run at the press]: a refused start (FUN_0001f6fc) runs the search at once, while task 0x3b
+        (FUN_00019f98) times the hold; MPF itself would only act on the release."""
+        if self.game is None and self.state & 0x118 == ST_ATTRACT and self.credit_model.can_start() and not self._start_balls_ok():
+            self._start_search()
+        self._competition_hold()
+
+    def _competition_hold(self):
+        """START pressed [0x0002dcc0 -> FUN_00019f98]: task 0x3b (FUN_00019f20) watches START for 62 ticks while FUN_00019ecc holds;
+        held to its end it starts deff 39 COMPETITION READY. A START that starts a game (clears the attract bit) ends it at once; only a
+        refused start (balls missing: the start search) leaves START held long enough. A game started while deff 39 runs is the
+        competition game (game flag 0xf, set in FUN_00020584)."""
+        if not self._competition_ok() or self.display.running(39) or self.task_running(0x3b):
+            return
+        sw = self.machine.switch_controller
+
+        def end():
+            if self._competition_ok() and sw.is_active(self.machine.switches["s_start_button"]):
+                self.deff_start(39)
+        self.task_start(0x3b, START_HOLD_TICKS, end)
 
     def _start_held(self):
         """adj 36 GAME RESTART [0x00020d14]: START held 62 ticks (timer 4) on ball 2 or later restarts the game,

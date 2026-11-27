@@ -32,3 +32,28 @@ class StartSearchTest(TronTestCase):
         self.assertFalse(self.tron.flag(0xb))
         self.assertEqual(self.tron.audits[0x27], 1)
 
+
+    def test_held_start_during_the_search_asks_for_deff_39_but_deff_11_keeps_the_display(self):
+        """FUN_00019f20 calls deff_start(0x27) after 62 held ticks; deff 11 (priority 224) is on screen for the whole search and deff 39 has
+        priority 80 (assets/rom_data/deffs/deffs.json), so the ROM's own display rule refuses it."""
+        self.tron.adj.override(46, 1)
+        self.three_balls()
+        self.hit_switch_and_run("s_start_button", 0.5)
+        self.assertTrue(self.tron.task_running(0x3b))               # task 0x3b times the hold while the search runs
+        self.advance_time_and_run(0.6)                              # 62 ticks (1.008 s) held
+        self.assertFalse(self.tron.task_running(0x3b))
+        self.assertTrue(self.tron.display.running(11))
+        self.assertFalse(self.tron.display.running(39))
+        self.release_switch_and_run("s_start_button", 0.1)
+        self.advance_time_and_run(30)                               # the search ends
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(0.1)
+        self.assertIsNotNone(self.machine.game)
+        self.assertFalse(self.tron.flag(0xf))                       # no deff 39 was running
+        self.advance_time_and_run(3)
+
+    def test_full_trough_start_never_shows_competition_ready(self):
+        self.tron.adj.override(46, 1)
+        self.fill_trough()
+        self.hit_switch_and_run("s_start_button", 1.5)
+        self.assertFalse(self.tron.display.running(39))

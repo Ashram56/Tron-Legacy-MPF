@@ -385,11 +385,21 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   (counts at 0x040c01a0, 0x00037270, 0x040d1024, 0x040c321c, 0x040d1028, 0x040d1034) and run its per-entry reset (`FUN_000030a8`, `FUN_000071f4`,
   `FUN_00003560`, `FUN_0001fc94`, `FUN_00003a8c`, `FUN_00023c6c`): they reinitialise the switch, timer and ball-device records the search shakes up;
   `FUN_0001fd48` also sets game flag 0xa (and clears 0x3741c) when a ball device record reports a change. They are not coil pulses. The static handler registrations (`FUN_00007944(list, event, handler, prio)`, 121 calls) hold none for events 0xd
-  and 0xe (`event_post` 0x79ec then just returns 1) and four for event 0xc (`FUN_00017128`, `FUN_00018560`, 0x0100a414, 0x0100bc88): each walks one
-  object list (RAM 0x37408, 0x37410, 0x37404, 0x37400) and calls a virtual method of every mechanism, which is where a search's coil pulses are
-  (0x0100bc88 waits 15 ticks after each). The game posts `tron_ball_search` for this search as the in-game search does, so the same mechanism
-  pulses (`_ball_search`'s consumers) run; the per-mechanism virtual methods are not decoded one by one here. And the held-START deff 39 (needs the refused start with START still
-  held 62 ticks).
+  and 0xe (`event_post` 0x79ec then just returns 1) and four for event 0xc (`FUN_00017128`, `FUN_00018560`, 0x0100a414, 0x0100bc88): each walks
+  one object list (RAM 0x37408, 0x37410, 0x37404, 0x37400, the game's feature / switch-object lists) and calls one virtual method of every object
+  (slot tables in ROM, e.g. base table 0x39d08: slot 0xdc = `FUN_0001723c`, which starts the object's own task 0x2b `FUN_00017174` that re-reads its
+  switch ring; slot 0xfc = `FUN_00017bf0`, a bit set). These are state resynchronisations after a search, not kicks. The physical kick is
+  `FUN_0001fd48` (called once per search start, round and state word as arguments): for ball devices 1-3 of the table at 0x040e41f4 (kinds 5, 1 and 8 at
+  record +0x20: the trough, the shooter lane, the VUK; record +0x15 is 0 for all three) `FUN_0001fc94` calls `FUN_0001dc9c(dev, 0, 0x1a, 0)`, which starts
+  the device's eject task 0x18 + dev (`FUN_0001dc70`) whether or not the device holds a ball (its last argument 0 skips the ball-count test), and ORs 0x1a into the
+  device record flag +0xc; a record with +0x15 != 0 in a game would only be handled in round 4 (`FUN_0001e17c`). The game's `_ball_search` posts
+  `tron_ball_search` but nothing pulses the three eject coils: a difference from the ROM, not ported because the eject task (`FUN_0001dc70`, `FUN_0001bf70`,
+  `FUN_0001ba1c`: what it does for an empty device, kind by kind) is not decoded yet; MPF's ball devices own the ejects and an unseen pulse would
+  confuse their ball count. The held-START deff 39 is ported (`_start_pressed`, `_competition_hold`): at the press (the ROM acts at the press, MPF at the release) a
+  refused start runs the search and task 0x3b (`FUN_00019f20`) times 62 ticks while attract, adj 46 = YES, a credit and START hold; at its end it calls
+  `deff_start(0x27)`. During the search deff 11 (priority 224, `assets/rom_data/deffs/deffs.json`) holds the display and deff 39 has priority 80, so the ROM's own display
+  rule refuses it: COMPETITION READY is never seen behind a ball search, and flag 0xf stays clear there. The other refusal, `FUN_0001f470` false (a ball
+  device task or task 0x15 running at the press, no search), is the one where deff 39 can show; it is not modelled (a ball device task is MPF's).
 
 ## Status panel in game: the last award (2026-11-26)
 

@@ -1268,7 +1268,7 @@ class DateTimeScreen(Screen):
         y, mo, d, h, mi, sec = self.rec
         twelve = self.os.adj[3] == 0
         name = rdt.FIELDS[self.field - 1].upper()
-        clock = "{}:{:02d}:{:02d}".format((h % 12 or 12) if twelve else h, mi, sec) + (
+        clock = "{:02d}:{:02d}:{:02d}".format((h % 12 or 12) if twelve else h, mi, sec) + (
             (" PM" if h > 11 else " AM") if twelve else "")
         return ["DATE/TIME SET" if self.done else "SET " + name, "{} {:02d}, {:04d}".format(rdt.MONTHS[mo - 1], d, y), clock]
 
