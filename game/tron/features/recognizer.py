@@ -28,6 +28,8 @@ class Recognizer(Feature):
         super().__init__(os_)
         self.lit = self.prev = self.next = 0
         self.bank_up = True
+        self.speech = [0] * 4          # 0x0211177c: the Disc speech call (0xbb-0xbe) of each player
+        self.speech_prev = [0] * 4     # 0x02111784: the copy FUN_0101c088 keeps of them
         os_.lamp_rule(self.moving_target_rule, order=0x010200f4)
         os_.lamp_rule(lambda: self.recog_targets_count_active() and os_.task_running(0x7d), leff=99,
                       order=0x010201b4)
@@ -71,6 +73,20 @@ class Recognizer(Feature):
         pd.dbattle_need = pd.dbattle_remaining = 255
         pd.rec_hits = 0
         pd.rec_hits_stat = pd.rec_battles = 0
+        self.speech = list(self.speech_prev)       # FUN_0101c1b0 (event 0x26): the saved copy back, then a new pick
+        self.speech_pick()
+
+    def speech_pick(self):
+        """FUN_0101c088: the player's next Disc speech call, FUN_0101c024: 0xbb + random_below(4), the next one when it
+        repeats the saved copy (0xbe wraps to 0xbb). Only the RNG draw and the counter reset are played here: the call
+        itself is said by the DMD frames of deffs 108 / 110 (FUN_0101c198, task 0x78), which draw their variant in the Godot side."""
+        p = max(self.os.player_num - 1, 0)
+        self.speech_prev = list(self.speech)
+        value = 0xbb + self.os.random.randrange(4)
+        if value == self.speech_prev[p]:
+            value = value + 1 if value + 1 <= 0xbe else 0xbb
+        self.speech[p] = value
+        self.pd.speech_count = 0
 
     def ball_end(self):
         self.os.task_kill(0x7d)
@@ -207,6 +223,7 @@ class Recognizer(Feature):
                 return False
             os_.score_add(min(2000000 + 1000000 * pd.dbattle_award_level, 4000000))
             self.dbattle_clear()
+            self.speech_pick()                       # FUN_0101c088 [0x01020da8]
             pd.dbattle_k = min(pd.dbattle_k + 1, 0xff)
             os_.hook("dmb_start")
             os_.request_refresh()

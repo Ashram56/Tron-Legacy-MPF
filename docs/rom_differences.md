@@ -68,3 +68,11 @@ Portal Multiball read against portal_mb_start 0x0102f474, portal_mb_award_value 
 0x0102f6c8 (three phases, audits 0x8a / 0x8b / 0x8c), portal_mb_shot_entry 0x0102f34c, portal_mb_add_a_ball 0x0102f314, the grace and end routines
 0x0102f8b8-0x0102f9a4: values, order and audits identical, no change. Sea of Simulation stage shots read (stage 0-8 `sos_stageN_*_shot`, 0x010248ec-0x01026228):
 awards (k+1) x 100,000, a tenth when spotted quietly (task 0xa1), identical for every stage; no change.
+Recognizer 3-bank and Disc Battle read against recog_target_hit 0x010201e4 (2 per lit or previous target, 5 hits, 2,500 and 200,000, audits), dbattle_light
+0x01020d1c, dbattle_set_hits_needed 0x01020c40 (min(2k+4, 10)), dbattle_start_award_value 0x01020ca4 (the award level 0x021117cf is only ever reset, so 2,000,000),
+dbattle_disc_hit_or_start_multiball 0x01020da8, dbattle_clear 0x01020f10, recog_reset_player_at_game_start 0x0101fd94: identical, no change.
+Found by the audit (2026-11-27), RNG draws the ROM makes and the game did not: `on_zuse_fastscoring_started` 0x010318ac draws `random_below(2)` (stored at 0x3b928, never read) and
+`FUN_0101c088` 0x0101c088 / `FUN_0101c024` 0x0101c024 pick the player's Disc speech call (0xbb + `random_below(4)`, avoiding the saved copy) at event 0x26 (`FUN_0101c1b0`) and at each
+Disc Multiball start (0x01020da8). Both draws are now made, so the later draws (Flynn's Arcade awards, Game Over) fall on the ROM's numbers at equal seeds. Not done: saying that speech call
+(`FUN_0101c198`, task 0x78, `FUN_0101c0ec`: `snd_play2(call, counter)` while the counter is under the call's sample count 0x2d024) inside the DMD frames of the "N MORE TO ACCESS DISC" variants of deff 108,
+which pick their variant in `dmd_effect.gd`; open, to be wired with the deff variant (code read: 0x01020388 frame 0x14, 0x01020510, 0x01020698, 0x01020820).

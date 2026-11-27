@@ -136,6 +136,7 @@ class Zuse(Feature):
         self.total = os_.score_add(100000)
         self.clock.start()
         self.targets = ANY
+        os_.random.randrange(2)                    # FUN_0000c6b4(2) stored at 0x3b928, never read: it only steps the RNG
         self.value = min(10000 + 5000 * pd.zfs_starts, 50000)
         # task 0x9b runs FUN_0100f9d8, which plays the intro without waiting for the display priority
         os_.show(0x9b, 94, threshold=0x100, value=self.value)
