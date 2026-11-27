@@ -384,8 +384,11 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   (`FUN_00003138`, `FUN_000072c8`, `FUN_0000364c`, `FUN_0001fd48`, `FUN_00003b68`, `FUN_00023dd4`, `FUN_00004068`) each loop over a registered table
   (counts at 0x040c01a0, 0x00037270, 0x040d1024, 0x040c321c, 0x040d1028, 0x040d1034) and run its per-entry reset (`FUN_000030a8`, `FUN_000071f4`,
   `FUN_00003560`, `FUN_0001fc94`, `FUN_00003a8c`, `FUN_00023c6c`): they reinitialise the switch, timer and ball-device records the search shakes up;
-  `FUN_0001fd48` also sets game flag 0xa (and clears 0x3741c) when a ball device record reports a change. They are not coil pulses; the pulses of a
-  search come from the handlers of events 0xd / 0xc / 0xe (not decoded here). And the held-START deff 39 (needs the refused start with START still
+  `FUN_0001fd48` also sets game flag 0xa (and clears 0x3741c) when a ball device record reports a change. They are not coil pulses. The static handler registrations (`FUN_00007944(list, event, handler, prio)`, 121 calls) hold none for events 0xd
+  and 0xe (`event_post` 0x79ec then just returns 1) and four for event 0xc (`FUN_00017128`, `FUN_00018560`, 0x0100a414, 0x0100bc88): each walks one
+  object list (RAM 0x37408, 0x37410, 0x37404, 0x37400) and calls a virtual method of every mechanism, which is where a search's coil pulses are
+  (0x0100bc88 waits 15 ticks after each). The game posts `tron_ball_search` for this search as the in-game search does, so the same mechanism
+  pulses (`_ball_search`'s consumers) run; the per-mechanism virtual methods are not decoded one by one here. And the held-START deff 39 (needs the refused start with START still
   held 62 ticks).
 
 ## Status panel in game: the last award (2026-11-26)
