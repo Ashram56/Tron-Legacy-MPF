@@ -5,8 +5,8 @@ extends Node
 ##   p1..p4 player scores, players, player (current), valid (playfield validated),
 ##   award (last points shown under the current score) with award_age / blink_age in ticks,
 ##   bar_ds, bar_bumpers, bar_spinners (TRON target timers, 0-10), bar_zfs, bar_clu, bar_gem (0-10).
-## Timing in ROM ticks; the bottom line rotates 156 ticks BALL/credits, 312 ticks replay level (when
-## there is one), 1250 ticks BALL/credits, ... Before the playfield is valid the current score blinks
+## Timing in ROM ticks; the bottom line shows BALL/credits for 155 ticks, then 312 ticks of the replay level (when
+## there is one), 1250 ticks BALL/credits, ... (period 1562 after the first) Before the playfield is valid the current score blinks
 ## (blanked 7 of every 14 ticks once 63 ticks passed without new points). The last points fade from
 ## level 13 to 0 over 26 ticks. Seekable for scripts/render_diff.py (seek_ms).
 
@@ -88,8 +88,9 @@ func _node(n: String) -> CanvasItem:
 
 ## Ticks of the bottom-line rotation: false while BALL n / credits show, true while the replay line shows.
 static func replay_phase(ticks: int) -> bool:
-	var t := ticks % (156 + 312 + 1250)
-	return t >= 156 and t < 156 + 312
+	# deff_19 (0x1023a98): counters 0x9c then 0x138 then 0x4e2, decremented before the line is chosen: the special line shows from tick 0x9b for
+	# 0x138 ticks, then again every 0x138 + 0x4e2 = 1562 ticks (rom_deff19.special_phase, checked against the ROM code in Unicorn)
+	return ticks >= 0x9b and (ticks - 0x9b) % 1562 < 0x138
 
 
 ## The current score as a number ("1,234,560" -> 1234560; 0 when empty).

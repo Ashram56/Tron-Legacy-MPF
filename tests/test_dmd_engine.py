@@ -50,3 +50,15 @@ def test_engine_equals_the_rom_code(effect, args):
         prog = {55: rom_deff55.frames, 60: rom_deff60.frames}[effect]
         ok, total, first = C.compare(effect, args, prog)
     assert (ok, first) == (total, None)
+
+
+@pytest.mark.skipif(not os.environ.get("TRON_ROM"), reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.parametrize("score,ball,valid,replay", [(4780, 1, 0, ""), (927580, 2, 1, ""), (0, 1, 1, ""), (55130, 3, 0, "REPLAY AT 20,000,000")])
+def test_deff19_matches_rom_code(score, ball, valid, replay):
+    import subprocess
+    r = subprocess.run(["python3", os.path.join(os.path.dirname(__file__), "..", "scripts", "conform", "check19.py"), str(score), str(ball), str(valid), "5000000"],
+                       capture_output=True, text=True, env=dict(os.environ, REPLAY=replay))
+    if "unicorn" in r.stderr.lower() and "Error" in r.stderr:
+        pytest.skip("unicorn not available")
+    parts = r.stdout.split("->")[1].split()
+    assert parts[0] == parts[2], r.stdout

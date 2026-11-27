@@ -84,6 +84,14 @@ class Page:
                     continue
                 self.b[yy * W + xx] = v
 
+    def fill(self, x0, y0, x1, y1, v):
+        """FUN_0002746c / FUN_000274c0: the rectangle x0..x1, y0..y1 (inclusive, clipped to the page) set to v."""
+        if self._rec:
+            self.items.append({"r": [x0, y0, x1, y1], "v": v})
+        for y in range(max(y0, 0), min(y1, H - 1) + 1):
+            for x in range(max(x0, 0), min(x1, W - 1) + 1):
+                self.b[y * W + x] = v
+
     def width(self, n):                         # FUN_0002b094 (image width, +8)
         return image(n)[0]
 

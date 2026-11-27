@@ -475,3 +475,12 @@ The 562 misses attributed to effect 19 are the score display itself: frames view
 more from any code frame because a big score font differs everywhere. 108 and 111 are not started in this scenario (no deff_start). The open
 point is therefore the value state of 19, which only a ported program reading the live score and roll (engine) removes; it needs
 FUN_01023940 (roll), FUN_000249e4, FUN_01023704, FUN_00022a90, FUN_010230ec from the decompile.
+
+**Effect 19 ported (2026-11-27, `game/tron/rom_deff19.py`, checked by `scripts/conform/check19.py` against the ROM code, columns 41-127).**
+The score display's program: the score ("%,02lu", so 0 is "00") in the font and row of the score-size table (ROM 0x40d3484), the band blanked by
+the blink (playfield not valid) or the wipe (valid) from the tick counter RAM 0x21117f4, the BALL / CREDITS line or the special line (replay level),
+`dmd_engine.Page.fill` = FUN_0002746c. Exact on 4,780, 927,580, 0, 55,130 (with the replay line, to tick 414) and 1,534,750 (to tick 458), 100 % of the flips.
+Found by the port: the special line's phase is 0x9b + n * 1562 ticks for 0x138 ticks (the loop counters 0x9c / 0x138 / 0x4e2 are decremented before
+the line is chosen), not a 1718 tick cycle from 156 (`score_display.gd` `replay_phase` fixed; the measured 29.2 s / 26.5 s of 2026-10-30 are
+tick 1717 and a 1562 tick period at 16.9 ms). Not yet carried to Godot as an engine program (the effect never ends and its values change live: it keeps
+`score_display.gd`, whose band / wipe rows equal the program's); the special / replay text sources (FUN_000249e4, FUN_01023704) come from the rules.
