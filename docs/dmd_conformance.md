@@ -490,3 +490,8 @@ Light Cycle multiball remeasured with the ported 19 (`sweep_engine19.py`, 700 ti
 on the frames: the overlays that draw over the score display (41 / 84 "n MORE TO LIGHT LIGHT CYCLE", 62 "n MORE TO LIGHT EX. BALL" on the Daft Punk film
 with the film's score under it), the named combo text of 138 ("LAST ISO COMBO", message not read yet), the credits page and its INSERT COINS
 (deff 10), and score blink / wipe frames whose tick counter the sweep did not sample. Next ports: 41 / 84, 62, 138's names.
+
+With the programs' own frames for the scenario's arguments (`sweep_engine.py`: 55, 83, 138 and 58 / 59 / 60 as played): **1188 of 1234** distinct game frames
+found in columns 41-127 (96 %); left: effect 1 (12), 38 (2), 1 unattributed. The 83 / 55 / 138 / 58-60 frames here are the programs' (each equal to the ROM code in
+Unicorn for the arguments checked, `engine_check.py`), so this figure says the game draws what the programs draw; the named combo texts of 138 are the
+game's strings, not yet read from the ROM message table (FUN_0000a58c) in Unicorn.
