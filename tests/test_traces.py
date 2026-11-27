@@ -25,9 +25,7 @@ TRACES = {
     "flynns_arcade": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "sea_of_simulation": "score,deff_start,sound,audit,multiball_start,mark",
     "portal_multiball": "score,deff_start,sound,audit,multiball_start,mark,lamp",
-    # leff_start left out: the VUK's snd_play(0xfd) retry loop [0x0101be94, case 7] needs the sound-slot model
-    # (snd_start_sample 0x2c1e4); leff 35 then follows the replay's leff 17 by 2 ticks (rom_differences.md)
-    "portal_multiball_shots": "score,deff_start,sound,audit,multiball_start,mark,lamp",
+    "portal_multiball_shots": "score,deff_start,sound,leff_start,audit,multiball_start,mark,lamp",
     "combos": "score,deff_start,sound,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "combos_eol_jackpot": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil",
     "tron_targets": "audit,multiball_start,mark,lamp,coil",

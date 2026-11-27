@@ -36,7 +36,7 @@ SHOW_TIMEOUT = 0xea6
 HOLD_TICKS = 10             # deffs end with deff_hold_frames(10, 0x20): priority 0x20 for the last 10 ticks
 HOLD_PRIORITY = 0x20
 # a few deffs hold for fewer ticks (read from their code: deff_hold_frames(1, 0x20))
-HOLD_TICKS_BY_DEFF = {76: 1, 78: 1, 94: 1}
+HOLD_TICKS_BY_DEFF = {76: 1, 78: 1, 94: 1, 140: 2}     # 140: deff_hold_frames(2, 0x20) [0x0102faec]
 EOB_MODE_WAIT = 169         # gf_eob_mode_wait: the ROM data byte at 0x3901c
 PREVALID_PRIO = 0x10        # priority of the score display rule that runs until the playfield is valid
 
