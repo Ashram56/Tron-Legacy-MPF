@@ -49,7 +49,11 @@ TRACES = {
     "match_win": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "match_forced_loss": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "gi_and_tilt": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
+    # the reference script runner adds about 0.03 s per command, so these long scripts drift up to 0.4 s (TOLERANCE)
+    "tilt_modes": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark",
+    "multiplayer_3p": "score,tube_show_start,audit,multiball_start,mark",
 }
+TOLERANCE = {"tilt_modes": "0.4", "multiplayer_3p": "0.4"}
 
 
 class TestTraces(unittest.TestCase):
@@ -61,5 +65,5 @@ class TestTraces(unittest.TestCase):
                                      capture_output=True, text=True)
                 self.assertEqual(0, run.returncode, run.stderr[-2000:])
                 cmp = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "trace_check.py"), name,
-                                      "--events", kinds], cwd=ROOT, capture_output=True, text=True)
+                                      "--events", kinds, "--tol", TOLERANCE.get(name, "0.25")], cwd=ROOT, capture_output=True, text=True)
                 self.assertEqual(0, cmp.returncode, cmp.stdout)

@@ -57,6 +57,7 @@ VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # cycle: sound 0x0ea 1.43 s after the Quorra add-a-ball (quorra_multiball 46.68 -> 48.11), of which MPF's
 # trough eject + auto-launch take ~0.6 s.
 MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
+TILT_TIMER_TICKS = 0xda
 SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
@@ -210,6 +211,7 @@ class TronOS(CustomCode):
         self.credit_model = Credits(self)                      # credits and pricing, persisted
         self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
+        self._tilt_timer_end = 0.0  # timer 2 (0x3ab44), loaded by the plumb bob
         self.player_seconds = {}    # validated play time of each player
         self.game_seconds = 0.0     # validated play time of the running game
         self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
@@ -1473,7 +1475,10 @@ class TronOS(CustomCode):
 
     def _plumb_bob(self):
         """tilt_switch [0x00024564], bob closed: the warning (once per 62 ticks, FUN_00010ad4 / FUN_00010b18 timer 1) and task 0x2e,
-        which keeps warning every 62 ticks while the bob stays closed and tilts at the second (the open event kills it)."""
+        which keeps warning every 62 ticks while the bob stays closed and tilts at the second (the open event kills it).
+        Every closure ends by loading timer 2 with 0xda ticks [0x00024564: DAT_0003ab44 = 0xda]; end_of_ball waits for it
+        to run out, polling every 6 ticks [0x00020764: while FUN_00010ad4(2): task_sleep(6)]."""
+        self._tilt_timer_end = self.now + TILT_TIMER_TICKS * TICK
         if not self.game or self.tilted or self.state & ST_END_BALL:
             return
         if not self.task_running(0x2e):
@@ -1663,8 +1668,8 @@ class TronOS(CustomCode):
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
     def _ball_ending_bonus(self, queue):
-        if self.tilted:
-            self._ball_ending_done(queue)
+        if self.tilted:                              # no bonus [0x00020764: gf_state & 0x200], the waits still run
+            self._wait_award_tasks(queue)
             return
         self.state |= ST_BONUS
         bonus = self.features_by_name.get("bonus")
@@ -1686,6 +1691,13 @@ class TronOS(CustomCode):
         """End of ball step 7: wait for the replay / award tasks 0x33-0x34."""
         if self.task_running(0x33) or self.task_running(0x34):
             self.after(1, lambda: self._wait_award_tasks(queue))
+            return
+        self._wait_tilt_timer(queue)
+
+    def _wait_tilt_timer(self, queue):
+        """End of ball step 8: timer 2 (loaded by every tilt bob closure) must have run out; polled every 6 ticks."""
+        if self.now < self._tilt_timer_end:
+            self.after(6, lambda: self._wait_tilt_timer(queue))
             return
         self._ball_ending_done(queue)
 
