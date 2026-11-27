@@ -153,6 +153,7 @@ class TronOS(CustomCode):
         self.state = ST_ATTRACT
         self.hooks = {}             # hook name -> [functions], called in registration order
         self.pokes = {}             # ROM RAM address -> setter(value), for the scenarios' "poke"
+        self.register_poke(0x21109e4, self._poke_score, stride=4)    # the scores, one u32 per player [0x021109e4]
         self.features = []
         self.players = []           # PlayerData per player
         self.pf_valid = False
@@ -460,6 +461,10 @@ class TronOS(CustomCode):
         """Map a per-player ROM RAM array (addr + stride*(p-1)) to a setter(player_index, value)."""
         for p in range(players):
             self.pokes[addr + stride * p] = (lambda p_: lambda v: setter(p_, v))(p)
+
+    def _poke_score(self, index, value):
+        if self.game and index < len(self.game.player_list):
+            self.game.player_list[index].score = value
 
     def poke(self, addr, value):
         if addr not in self.pokes:

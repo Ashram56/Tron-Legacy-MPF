@@ -21,6 +21,7 @@ def _dir(name):
     return TRACES if os.path.exists(os.path.join(TRACES, name + ".txt")) else TRACES2
 OUT = os.path.join(ROOT, "captures", "traces")
 
+START_GAP = 0.93
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 # the reference traces credit a coin 0.528 s after the script starts; the coin task waits adj 62 COIN INPUT
 # DELAY (30 ticks at factory settings) first, so the coin switch closes that much earlier, and START comes
@@ -225,12 +226,14 @@ class ScenarioRun(TronTestCase):
             self.wait(0.01)
             self.sw("s_coin", 0)
         self.wait(START_AFTER_COIN - 0.01)
-        for _ in range(n):
+        for i in range(n):
             self.sw("s_start_button", 1)
             self.wait(0.01)
             self.sw("s_start_button", 0)
             self.wait(0.09)
-        self.wait(SCRIPT_START_TIME - 0.1 * n)
+            if i < n - 1:
+                self.wait(START_GAP - 0.1)       # the reference script's next START press (multiplayer traces: 0.93 s)
+        self.wait(SCRIPT_START_TIME - 0.1)
 
     def step(self, seconds):
         """One tron_ref step_to(): the requested time plus the average overshoot."""
@@ -277,6 +280,11 @@ class ScenarioRun(TronTestCase):
             self.sw(name, 1)
             self.step(0.06)                           # tron_ref pulses the outlane, then drains at once
             self.sw(name, 0)
+        trough = self.machine.ball_devices["bd_trough"]
+        if trough.balls >= trough.capacity:        # nothing left on the playfield (the reference's script drains more than it has out)
+            self.log("sim", what="drain_skipped")
+            self.step(0.1)
+            return
         self.log("sim", what="drain")
         self.machine.default_platform.add_ball_to_device(self.machine.ball_devices["bd_trough"])
         self.step(0.1)
