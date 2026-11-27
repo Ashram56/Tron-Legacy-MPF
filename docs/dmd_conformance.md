@@ -406,3 +406,7 @@ The attract scenario, re-run on the current game (2026-11-27; the first dump of 
 level 15, so a "REPLAY page panel" departure noted for a few minutes in this file's history does not exist): panel 86/87 distinct panels (the one miss is the
 start-up frame), columns 41-127 222/233, the 10 misses being frames of effect 1 (the pages that show the machine's own state: high score table initials, credits page,
 clock-free pages; see the attract notes above).
+
+The one body miss of the attract run (9.7 s, repeated) is the GRAND CHAMPION page ("G S" 75,000,000): the stored page frames hold only #1-#4. The ROM
+routine 0x0100075c after FUN_0001a9f4(1) (`scripts/conform/sweep_gc.py`) draws it with 0 differing dots from the game's frame. So the attract: panel
+86/87, body 233/233 apart from the start-up frame.
