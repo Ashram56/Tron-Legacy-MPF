@@ -136,6 +136,7 @@ assets/tools/os_deff_runs.py boots the ROM with its scheduler (os_unicorn.py), c
 - Deffs that read task parameters (+0x30, +0x34, set by the caller of deff_start, zero in the harness): 43, 48, 68, 85, 111, 112, 115, 119. Their length in play follows the caller's arguments (stage, score, mode), already read per caller in the features; the harness figure is for argument 0.
 - deff 108 [0x010209b0] picks one of 4 clips with `random_below(4)` [0x0000c6b4] (`FUN_0000c6b4(4)`): the length depends on the pick (the game reproduces the random clips).
 - deff 22 [0x01035d3c] is an empty routine (returns at once, 0 ticks); timing.json has 19 ticks for it (emulator frame). 
+All 142 deffs are done: the only other differences are 4 to 5 ticks (deffs 6, 12, 24 at 312 against 308 ticks, deff 39 at 382 against 377), the width of the emulator run's frame sampling, not a rule.
 Left as is, with that reason: none of the differences is a departure from the ROM, they are the harness's missing sound board and zero arguments. The stateless deffs all agree, which is what the table was meant to check.
 
 ## Attract page lengths against the code (checked 2026-11-27, ROM in Unicorn with its scheduler)
