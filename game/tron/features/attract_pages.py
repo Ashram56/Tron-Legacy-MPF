@@ -15,6 +15,9 @@ from tron.features import Feature
 ORDER = 7
 PAGE_SECONDS = 2.016
 LOGO_SECONDS, ANIMATION_SECONDS = 3.76, 3.98
+# deff 5, the version page of power-up [0x0103703c]: its task is created at tick 0 and deff 1's at tick 127 of the ROM run in Unicorn
+# (assets/tools/os_unicorn.py, task_create caller 0x27dbc); the reference trace attract_and_service has them 129 ticks apart.
+VERSION_SECONDS = 127 * 0.01626
 VERSION_DEFF = 5                 # the boot version screen (a recorded frame, media/dmd/deff_005_boot_version)
 PRIORITY = 2                     # just above deff 1 (priority 1)
 PAGE_SLIDES = {"LOGO": "attract_logo", "ANIMATION": "attract_anim"}     # the bitmaps of the ROM's logo and animation pages (scripts/gen_media.py build_attract_art)
@@ -78,7 +81,7 @@ class AttractPages(Feature):
 
     def page_list(self, first_pass):
         os_ = self.os
-        pages = [("VERSION", [], PAGE_SECONDS)] if self.boot and first_pass else []
+        pages = [("VERSION", [], VERSION_SECONDS)] if self.boot and first_pass else []
         self.boot = False
         pages += [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
         pages.append(("CREDITS", lambda: [os_.credit_model.text()], PAGE_SECONDS))
