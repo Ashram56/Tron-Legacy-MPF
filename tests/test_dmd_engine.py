@@ -53,7 +53,7 @@ def test_engine_equals_the_rom_code(effect, args):
 
 
 @pytest.mark.skipif(not os.environ.get("TRON_ROM"), reason="needs the ROM (TRON_ROM) and unicorn")
-@pytest.mark.parametrize("score,ball,valid,replay", [(4780, 1, 0, ""), (927580, 2, 1, ""), (0, 1, 1, ""), (55130, 3, 0, "REPLAY AT 20,000,000")])
+@pytest.mark.parametrize("score,ball,valid,replay", [(4780, 1, 0, "REPLAY AT 20,000,000"), (927580, 2, 1, "REPLAY AT 20,000,000"), (0, 1, 1, "REPLAY AT 20,000,000"), (55130, 3, 0, "REPLAY AT 20,000,000")])
 def test_deff19_matches_rom_code(score, ball, valid, replay):
     import subprocess
     r = subprocess.run(["python3", os.path.join(os.path.dirname(__file__), "..", "scripts", "conform", "check19.py"), str(score), str(ball), str(valid), "5000000"],
