@@ -13,6 +13,8 @@ import json
 import os
 import re
 
+from tron import rom_engine
+
 CONTEXT = "tron_media"
 SERVICE_PRIORITY = 1000         # the service slide covers every deff (ROM priorities are 0-255)
 TICK = 0.01626                                     # seconds per ROM tick (os_layer.TICK)
@@ -149,6 +151,8 @@ class MediaBridge:
             self._log_live(deff_id, vals)
             args = dict(args, **vals)
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
+        if info.get("source") == "engine":             # drawn by the game from the ROM's routine (tron/rom_engine.py)
+            return dict(self.score_display_args() if info.get("panel") else {}, engine=rom_engine.payload(deff_id, args))
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)
         if deff_id in TEXT_ARGS:

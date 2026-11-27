@@ -26,6 +26,7 @@ const RomTextHd = preload("res://tron/rom_text_hd.gd")
 const LetterPanel = preload("res://tron/letter_panel.gd")
 const ScoreDisplay = preload("res://tron/score_display.gd")
 const ArcadeReel = preload("res://tron/arcade_reel.gd")
+const ServiceScreen = preload("res://tron/service_screen.gd")
 const MEDIA := "res://media/dmd/"
 const MEDIA_HD := "res://media/dmd_hd/"
 const DMD_COLOR := Color(1, 0.45, 0.05, 1)
@@ -468,11 +469,86 @@ class State extends RefCounted:
 							Color.WHITE if art else (dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR)])
 				"letters":
 					_letters(out, it, dmd)
+				"engine":
+					_engine(out, dmd)
 				"arcade":
 					_arcade(out, it, dmd)
 				"text":
 					_text(out, i, it, panel.get(it["name"], {}))
 		return out
+
+	# ------------------------------------------------------------------ the game's own drawing (tron/rom_engine.py)
+
+	## An effect the game draws from the ROM's routine: the event arg `engine` = {ticks, loop, frames, seq}; the flip the effect's time is in
+	## gives a draw list of tron/service_screen.gd items (ROM images at a palette level, ROM text), drawn like the effect's pictures.
+	func _engine(out: Array, dmd) -> void:
+		var e = values.get("engine", null)
+		if not e is Dictionary or not e.has("seq"):
+			return
+		var seq: Array = e["seq"]
+		if seq.is_empty():
+			return
+		var k := int(elapsed_ms / (float(e["ticks"]) * ScoreDisplay.TICK_MS))
+		k = k % seq.size() if e.get("loop", false) else mini(k, seq.size() - 1)
+		var ink: Color = dmd.text_tint(DMD_COLOR) if hd and dmd else DMD_COLOR
+		for d in e["frames"][int(seq[k])]:
+			var level := float(d.get("l", 15)) / 15.0
+			if d.has("i"):
+				var tex := _engine_image(int(d["i"]), d.get("m", []))
+				if tex:
+					out.append(["tex", tex, Rect2(float(d["x"]), float(d["y"]), tex.get_width(), tex.get_height()), ink])
+			elif d.has("t"):
+				var m := RomText.font_metrics(int(d["f"]))
+				var shown := ""
+				for c in str(d["t"]):
+					if m.get("glyphs", {}).has(c):
+						shown += c
+				if m.is_empty() or shown == "":
+					continue
+				var w := RomText.rom_width(m, shown)
+				var x := int(d["x"])
+				var flags := int(d.get("a", 2))
+				var left := x - w / 2 if flags & 2 else (x + 1 - w if flags & 4 else x)
+				var ascent := int(m["ascent"])
+				var line_h := ascent + int(m["descent"])
+				var mod := Color(level, level, level, 1)
+				if hd:
+					out.append(["htext", [shown, int(d["f"]), ascent, line_h, w, flags, 0, -1],
+						Transform2D(0.0, Vector2(left, int(d["y"]) - ascent + 1)), mod, Rect2(), NO_INK, 0, false])
+				else:
+					# the ROM's glyph images, one by one (text_draw_str FUN_00028f74: x + xoff, y - h + below + 1), so every dot is the ROM's
+					var gx := left
+					for c in shown:
+						var g: Dictionary = m["glyphs"][c]
+						var gt := _engine_image(int(g["image"]), [])
+						if gt:
+							out.append(["tex", gt, Rect2(float(gx + int(g["xoff"])), float(int(d["y"]) - int(g["h"]) + int(g["below"]) + 1),
+								gt.get_width(), gt.get_height()), DMD_COLOR * mod])
+						gx += int(g["w"]) + int(m["spacing"]) + int(g["xoff"])
+
+	static var _engine_pics := {}
+
+	## ROM image n through the palette m (16 levels; [] = as it is): lit dots take the level m[level] (the palette of FUN_0002b378 / FUN_0002b424),
+	## the transparent ones stay transparent. The decoded pictures are black / white / grey dots, level = grey * 15.
+	func _engine_image(n: int, m: Array) -> Texture2D:
+		if m.is_empty():
+			return ServiceScreen.texture(n)
+		var key := "%d:%s" % [n, str(m)]
+		if _engine_pics.has(key):
+			return _engine_pics[key]
+		var src := ServiceScreen.texture(n)
+		if src == null:
+			return null
+		var img := src.get_image()
+		for yy in img.get_height():
+			for xx in img.get_width():
+				var c := img.get_pixel(xx, yy)
+				if c.a > 0.0:
+					var v := float(int(m[clampi(roundi(c.r * 15.0), 0, 15)])) / 15.0
+					img.set_pixel(xx, yy, Color(v, v, v, 1.0))
+		var tex := ImageTexture.create_from_image(img)
+		_engine_pics[key] = tex
+		return tex
 
 	# ------------------------------------------------------------------ text (tron/rom_text.gd)
 

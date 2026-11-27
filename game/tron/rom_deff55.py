@@ -39,7 +39,8 @@ def _text(p, f, cnt):
             line(0x6d5, 0x20)
 
 
-def frames(args):
+def pages(args):
+    """[(tick, Page)]: the body of each flip (columns 41-127 are the effect's; the status panel is drawn by the panel)."""
     b1, b2, a1, a2, flags, cnt = (list(args) + [0] * 7)[:6]
     out = []
     pal = E.pal_new()
@@ -55,7 +56,15 @@ def frames(args):
                 p.blit(n, x, y, None if solid else pal, 0xff)
                 x += 1 + E.image(n)[0]
         _text(p, flags, cnt)
-        out.append((k * TICKS, E.mix(bytes([0xff]) * (E.W * E.H), p.b)))
+        out.append((k * TICKS, p))
     # FUN_01024460(10, 0x20): ten frames that copy the page of RAM 0x3d528 (blank here) and redraw only the status panel (columns 0-40)
-    out.append((FLIPS * TICKS + TICKS, bytes(E.W * E.H)))
+    out.append((FLIPS * TICKS + TICKS, E.Page()))
     return out
+
+
+def frames(args):
+    return [(t, E.mix(bytes([0xff]) * (E.W * E.H), p.b)) for t, p in pages(args)]
+
+
+def draws(args):
+    return [(t, p.items) for t, p in pages(args)]

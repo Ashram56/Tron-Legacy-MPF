@@ -38,6 +38,8 @@ PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
+# effects the game draws itself from the ROM's routine (tron/rom_engine.py): no frames, no letters, no text lines
+ENGINE_DEFFS = {55, 57, 60}
 TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
@@ -620,8 +622,12 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
             items += text_items(i, lay)
     if frames and under and deff_id not in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
+    if deff_id in ENGINE_DEFFS:
+        items.append({"type": "engine"})
     if panel:
         items += score_display_items(deff_id == 19, panel == "match")
+    if deff_id in ENGINE_DEFFS:         # the game draws the body itself (tron/rom_engine.py): background, that drawing, the panel
+        items = [items[0], {"type": "engine"}] + (score_display_items(deff_id == 19, panel == "match") if panel else [])
     if frames and under and deff_id in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
     write_effect(name, folder_rel, parts, items)
@@ -648,6 +654,8 @@ def build_deffs(only_data):
         letters = LETTER_DEFFS.get(deff_id)
         if deff_id == ARCADE_DEFF:     # drawn from the rules' award, not the capture's (award id 0)
             source, lines = "arcade", []
+        elif deff_id in ENGINE_DEFFS:
+            source, lines = "engine", []
         elif letters:                    # letters drawn from the rules' state, not the capture's
             source, lines = "letters", text_lines(rom_text)
         elif dynamic or not os.path.exists(ref):

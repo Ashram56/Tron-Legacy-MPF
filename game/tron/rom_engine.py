@@ -1,0 +1,31 @@
+"""The effects drawn by the game from the ROM's routines (tron/dmd_engine.py programs) instead of from the code run's frames.
+
+payload(deff_id, args) -> the event arg `engine` of the effect's slide: {"ticks": ROM ticks a flip lasts, "loop": the sequence repeats,
+"frames": the distinct draw lists (tron/service_screen.gd items), "seq": the frame number of each flip}. tron/dmd_effect.gd draws the list
+of the flip the effect's time is in (the clock: tick_ms of tron/score_display.gd), over the status panel the effect keeps.
+"""
+from . import rom_deff55, rom_deff57, rom_deff60
+
+DEFFS = (55, 57, 60)
+
+
+def _pack(flips, ticks, loop):
+    frames, seq = [], []
+    for _, items in flips:
+        if items not in frames:
+            frames.append(items)
+        seq.append(frames.index(items))
+    return {"ticks": ticks, "loop": loop, "frames": frames, "seq": seq}
+
+
+def payload(deff_id, args):
+    """args: what the game passes the effect (before / after: (left, right) letters lit, flags, more; value: the switch count of deff 57)."""
+    if deff_id == 55:
+        before, after = args.get("before", (0, 0)), args.get("after", (0, 0))
+        flips = rom_deff55.draws([before[0], before[1], after[0], after[1], int(args.get("flags", 0)), int(args.get("more", 0))])
+        return _pack(flips, rom_deff55.TICKS, False)
+    if deff_id == 57:
+        return _pack(rom_deff57.draws(int(args.get("value", 0) or 0)), rom_deff57.TICKS, True)
+    if deff_id == 60:
+        return _pack(rom_deff60.draws([int(args.get("value", 0) or 0), int(args.get("more", 0) or 0)]), rom_deff60.TICKS, False)
+    return {}

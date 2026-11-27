@@ -101,7 +101,9 @@ class TestBridge(TronTestCase):
         if not bridge.data:
             self.skipTest("media data not generated (scripts/gen_media.py)")
         lines = bridge.deff_lines(55, dict(before=(0, 2), after=(1, 2), flags=8, more=3, screen=2))
-        self.assertEqual("3 MORE TO", lines["line4"])
+        texts = [i["t"] for f in lines["engine"]["frames"] for i in f if "t" in i]      # drawn by the game's engine (tron/rom_deff55.py)
+        self.assertIn("3 MORE TO", texts)
+        self.assertIn("LIGHT MULTIBALL", texts)
 
     def test_sounds_go_to_the_gmc_client(self):
         # MPF's bcp_trigger() skips clients without a registered handler, and GMC registers none for

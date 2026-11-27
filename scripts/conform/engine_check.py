@@ -51,12 +51,12 @@ def compare(effect, args, program, ram=None, rows=range(E.H)):
 
 
 if __name__ == "__main__":
-    from tron import rom_deff55, rom_deff57
+    from tron import rom_deff55, rom_deff57, rom_deff60
     eff = int(sys.argv[1])
     args = [int(a, 0) for a in sys.argv[2:]] or None
     if eff == 57:                   # arg: the value RAM 0x3ae00 holds; the ROM loop never ends, so the comparison covers the first frames only
         v = args[0] if args else 0
         print(compare(57, None, lambda a: rom_deff57.frames(v, flips=60), ram={0x3ae00: v}))
     else:
-        prog = {55: rom_deff55.frames}[eff]
+        prog = {55: rom_deff55.frames, 60: rom_deff60.frames}[eff]
         print(compare(eff, args, prog, rows=range(0, 32)))

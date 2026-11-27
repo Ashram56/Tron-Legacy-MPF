@@ -15,7 +15,7 @@ def fmt(v):
     return "{:,}".format(v) if v >= 1000 else "%02d" % v
 
 
-def frames(value, flips=60):
+def pages(value, flips=60):
     out = []
     c = 0
     while len(out) < flips:
@@ -26,6 +26,15 @@ def frames(value, flips=60):
             p.blit(n, 0x29, 0)
             if c & 2 == 0:
                 p.text(MSG_6DD % fmt(value), 3, 0x54, 0x1f, 2)
-            out.append((len(out) * TICKS, E.mix(bytes([0xff]) * (E.W * E.H), p.b)))
+            out.append((len(out) * TICKS, p))
             c += 1
     return out
+
+
+def frames(value, flips=60):
+    return [(t, E.mix(bytes([0xff]) * (E.W * E.H), p.b)) for t, p in pages(value, flips)]
+
+
+def draws(value):
+    """One period of the endless loop: 29 images x the text phase (counter bit 1) repeat every 116 flips."""
+    return [(t, p.items) for t, p in pages(value, 4 * len(IMAGES))]

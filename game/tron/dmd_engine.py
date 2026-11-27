@@ -54,6 +54,8 @@ def pal_set(pal, value, lo, hi):
 class Page:
     def __init__(self, fill=0):
         self.b = bytearray([fill]) * (W * H)
+        self.items = []                         # the draw list the primitives made, in order (tron/service_screen.gd items: i, t, ...)
+        self._rec = True
 
     def clear(self, v=0):                       # FUN_00027274
         self.b[:] = bytes([v]) * (W * H)
@@ -62,6 +64,11 @@ class Page:
         """FUN_0002b378 / FUN_0002b424, type 0 handlers: clipped to the page; pal maps a level (below 0x10) to a byte (else 0xff);
         a byte equal to key is not written (FUN_00029a20 / FUN_00029b7c), with no key it is (FUN_00029754 / FUN_000298b8)."""
         w, h, d = image(n)
+        if self._rec:
+            it = {"i": n, "x": x, "y": y}
+            if pal is not None and pal != list(range(16)):
+                it["m"] = list(pal)             # the palette: tron/dmd_effect.gd maps the image's levels through it
+            self.items.append(it)
         for iy in range(h):
             yy = y + iy
             if not 0 <= yy < H:
@@ -118,16 +125,24 @@ def _text(self, s, font, x, y, flags=2, pal=None):
     """FUN_00028f74: flags 2 centres on x (x - width / 2), 4 puts the right edge at x (x + 1 - width). Each glyph is an image blitted at
     (x + xoff, y - h + below + 1); a font with the outline flag blits keyed on 0xff (FUN_0002b2a0), else plain (FUN_0002b194)."""
     m = _fonts()[font]
+    x0 = x
     if flags & 2:
         x -= text_width(font, s) >> 1
     elif flags & 4:
         x = x + 1 - text_width(font, s)
+    if self._rec:
+        it = {"t": s, "f": font, "x": x0, "y": y, "a": flags}
+        if pal is not None and pal[15] != 15:
+            it["l"] = pal[15]
+        self.items.append(it)
+    self._rec = False
     for c in s:
         g = m["glyphs"].get(c)
         if g is None:
             continue
         self.blit(g["image"], x + g["xoff"], y - g["h"] + g["below"] + 1, pal, 0xff if m["outline"] else None)
         x += g["w"] + m["spacing"] + g["xoff"]
+    self._rec = True
 
 
 Page.text = _text
