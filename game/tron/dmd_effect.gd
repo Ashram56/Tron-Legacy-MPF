@@ -153,12 +153,27 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 static var _variant_rng: RandomNumberGenerator = null
 
 
+## The ROM's generator (rom_rng.py; FUN_0000c684 / FUN_0000c6b4): state = state * 0x19660d + 1 (32 bits), below(n) = (n * state) >> 32.
+## With TRON_RNG_SEED the clip picks use it, so a run draws the clips the ROM code draws from the same state.
+static var _rom_state := -1
+
+
+static func _rom_below(n: int, seed_text: String) -> int:
+	if _rom_state < 0:
+		_rom_state = int(seed_text) & 0xffffffff
+	_rom_state = (_rom_state * 0x19660d + 1) & 0xffffffff
+	return (n * _rom_state) >> 32
+
+
 ## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
 ## conformance checks repeat a scenario and get the same clips), or always the first clip when TRON_DMD_SEED is "first" (the
 ## reference run of PinMAME with TRON_RNG_ZERO makes the ROM pick its first entry too: same clip on both sides).
 static func pick_variant(n: int) -> int:
 	if OS.get_environment("TRON_DMD_SEED") == "first":
 		return 0
+	var rom_seed := OS.get_environment("TRON_RNG_SEED")
+	if rom_seed != "":
+		return _rom_below(n, rom_seed)
 	if _variant_rng == null:
 		_variant_rng = RandomNumberGenerator.new()
 		var seed_text := OS.get_environment("TRON_DMD_SEED")
