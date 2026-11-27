@@ -90,3 +90,26 @@ def test_deff95_matches_rom_code():
     from tron import rom_deff95
     ok, total, _ = C.compare(95, None, lambda a: rom_deff95.frames(7, 150000, 5, flips=60), ram={0x3b8f0: 7, 0x3b8ec: 150000, 0x3b92c: 5})
     assert ok == total
+
+
+def test_deff2_volume_draw_list():
+    from tron import rom_deff2
+    p = rom_engine.payload(2, {"volume": 40})
+    assert len(p["seq"]) == rom_deff2.FLIPS + 1 and not p["loop"]
+    items = p["items"]
+    assert {"i": 0xce, "x": 0, "y": 0x13} in items and {"i": 0xcf, "x": 40 * 2 - 0x7e, "y": 0x10} in items
+    assert any(it.get("t") == "VOLUME 40" for it in items)
+    assert any(it.get("t") == "VOLUME 41" for it in rom_engine.payload(2, {"volume": 41})["items"])
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.parametrize("volume", [0, 40, 63])
+def test_deff2_equals_the_rom_code(volume):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff2
+    C.X0 = 0
+    ora = C.oracle(2, None, {0x2110250: volume, 0x2110251: (~volume) & 0xff})
+    mine = rom_deff2.frames(volume)
+    # flip 0 shows the page the allocator left (all 0xff), not a picture; every other flip is the ROM's
+    assert [k for k, (t, f) in enumerate(ora) if k and C.body(f) != C.body(mine[min(k, len(mine) - 1)][1])] == []

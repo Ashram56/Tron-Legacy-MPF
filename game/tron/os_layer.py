@@ -212,6 +212,7 @@ class TronOS(CustomCode):
         self.credit_model = Credits(self)                      # credits and pricing, persisted
         self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
+        self._volume_sent = False
         self._tilt_timer_end = 0.0  # timer 2 (0x3ab44), loaded by the plumb bob
         self.player_seconds = {}    # validated play time of each player
         self.game_seconds = 0.0     # validated play time of the running game
@@ -1099,6 +1100,9 @@ class TronOS(CustomCode):
     def _attract_started(self, **kwargs):
         self.state = ST_ATTRACT
         self.start_button_lamp()
+        if not self._volume_sent:                    # the stored level goes to the sound output once, as the ROM does at boot
+            self._volume_sent = True
+            self.set_volume(self.volume)
 
     # ------------------------------------------------------------------ game start (4.1)
 
@@ -1376,6 +1380,10 @@ class TronOS(CustomCode):
         """FUN_0002d414: clamp to 0x3f, store (persisted) and send the sound board the level (0x1000 | level x 2 + 0x80)."""
         level = max(0, min(self.VOLUME_MAX, int(level)))
         self.machine.variables.set_machine_var("tron_volume", level, persist=True)
+        # the audio output: MPF's master_volume machine variable (0.0-1.0) is what GMC applies to the Master bus
+        # (sound_player.gd _on_volume); the board's own attenuation steps (command level x 2 + 0x80) are not in the package,
+        # so the level maps linearly
+        self.machine.variables.set_machine_var("master_volume", level / self.VOLUME_MAX)
         self.machine.events.post("tron_volume", level=level, command=0x1000 | (level * 2 + 0x80))
 
     def _volume_key(self, delta):
