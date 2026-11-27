@@ -10,7 +10,7 @@ import pickle
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "game"))
-from tron import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff138  # noqa: E402
+from tron import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff95, rom_deff138, rom_deff139  # noqa: E402
 
 
 def main(out, *logs):
@@ -21,6 +21,8 @@ def main(out, *logs):
                 e = json.loads(line)
                 if e["id"] == 57:
                     frames.update(f for _, f in rom_deff57.frames(int(e["args"].get("value", 0) or 0), flips=116))
+                elif e["id"] == 95:
+                    frames.update(f for _, f in rom_deff95.frames(int(e["args"].get("timer", 0) or 0), int(e["args"].get("value", 0) or 0)))
                 continue
             if '"deff_args"' not in line:
                 continue
@@ -32,6 +34,8 @@ def main(out, *logs):
                 fs = rom_deff55.frames([b[0], b[1], af[0], af[1], n("flags"), n("more")])
             elif i == 83:
                 fs = rom_deff83.frames83([n("more"), n("mask")])
+            elif i == 139:
+                fs = rom_deff139.frames(n("value"))
             elif i == 138:
                 fs = rom_deff138.frames(n("points"), n("count"), n("jackpot"), str(a.get("named", "") or ""))
             elif i in (58, 59):

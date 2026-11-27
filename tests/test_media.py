@@ -216,7 +216,8 @@ class TestLiveDeffs(TronTestCase):
         bridge = self._bridge()
         zuse = self.tron.features_by_name["zuse"]
         zuse.clock.seconds, zuse.value = 23, 15000
-        self.assertEqual({"line0": "23", "line1": "ALL TARGETS=15,000"}, self._lines(bridge.deff_lines(95, {})))
+        e = bridge.deff_lines(95, {})["engine"]                    # deff 95 is an engine effect (rom_deff95.py): the texts of a flip
+        self.assertEqual(["23", "23", "ALL TARGETS=15,000"], [e["items"][i]["t"] for i in e["frames"][0] if "t" in e["items"][i]])
         self.assertEqual({"line0": "15K", "line1": "23", "line2": "ALL TARGETS=15,000"},
                          self._lines(bridge.deff_lines(96, {"k": 15})))
         zuse.clock.seconds = 22                         # a refresh sends the new value
@@ -227,7 +228,7 @@ class TestLiveDeffs(TronTestCase):
             bridge.score_changed()
             last = [c.kwargs for c in iface.bcp_trigger.call_args_list
                     if c.kwargs["name"] == "slides_play" and "deff_095" in c.kwargs["settings"]][-1]
-        self.assertEqual("21", last["line0"])
+        self.assertEqual("21", [it["t"] for it in last["engine"]["items"] if "t" in it][0])
 
     def test_sos_stage_text(self):
         """deff 114 shows SHOOT / the current stage's item (the capture's FLYNNS ARCADE on every stage)."""

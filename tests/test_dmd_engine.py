@@ -62,3 +62,31 @@ def test_deff19_matches_rom_code(score, ball, valid, replay):
         pytest.skip("unicorn not available")
     parts = r.stdout.split("->")[1].split()
     assert parts[0] == parts[2], r.stdout
+
+
+def test_deff139_and_95_draw_lists():
+    from tron import rom_deff95, rom_deff139
+    p = rom_engine.payload(139, {"value": 250000})
+    assert len(p["seq"]) == rom_deff139.FLIPS + 1 and p["items"][p["frames"][0][-1]]["t"] == "250,000"
+    q = rom_engine.payload(95, {"timer": 25, "value": 10000})
+    assert q["loop"] and len(q["seq"]) == rom_deff95.PICTURES
+    assert any(it.get("t") == "ALL TARGETS=10,000" for it in q["items"]) and any(it.get("r") == [0x29, 0x1a, 0x7f, 0x1f] for it in q["items"])
+
+
+@pytest.mark.skipif(not ROM, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.parametrize("value", [250000, 2350000])
+def test_deff139_matches_rom_code(value):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff139
+    ok, total, _ = C.compare(139, [value], lambda a: rom_deff139.frames(value))
+    assert ok == total
+
+
+@pytest.mark.skipif(not ROM, reason="needs the ROM (TRON_ROM) and unicorn")
+def test_deff95_matches_rom_code():
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff95
+    ok, total, _ = C.compare(95, None, lambda a: rom_deff95.frames(7, 150000, 5, flips=60), ram={0x3b8f0: 7, 0x3b8ec: 150000, 0x3b92c: 5})
+    assert ok == total

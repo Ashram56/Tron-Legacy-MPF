@@ -511,7 +511,12 @@ class State extends RefCounted:
 		for idx in e["frames"][int(seq[k])]:
 			var d: Dictionary = table[int(idx)]
 			var level := float(d.get("l", 15)) / 15.0
-			if d.has("i"):
+			if d.has("r"):
+				# a rectangle filled with level v (FUN_0002746c): the dots under it go dark (v = 0)
+				var rr: Array = d["r"]
+				var fill := float(d.get("v", 0)) / 15.0
+				out.append(["rect", Rect2(float(rr[0]), float(rr[1]), float(rr[2] - rr[0] + 1), float(rr[3] - rr[1] + 1)), Color(fill, fill, fill, 1.0)])
+			elif d.has("i"):
 				var tex := _engine_image(int(d["i"]), d.get("m", []))
 				if tex:
 					out.append(["tex", tex, Rect2(float(d["x"]), float(d["y"]), tex.get_width(), tex.get_height()), ink])

@@ -203,10 +203,9 @@ class TestLayout(unittest.TestCase):
         if os.path.exists(slide):
             with open(slide, encoding="utf-8") as f:
                 body = f.read()
-            for node in ("Clear0", "Line0Twin"):
-                self.assertIn('[node name="%s"' % node, body)
-            # the ROM cycles 46 bitmaps (0x2d + 1): the loop is whole cycles, not the 246-frame recording
-            self.assertEqual(46, body.count('{"duration"'))
+            # deff 95 is an engine effect (rom_deff95.py): the ROM's 46 pictures are drawn from the program, the slide has no recorded frames
+            self.assertNotIn("reference_capture", body)
+            self.assertNotIn('{"duration"', body)
 
     def test_dynamic_slides_use_rom_fonts(self):
         path = os.path.join(ROOT, "game", "tron", "media_data.json")

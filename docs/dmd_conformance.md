@@ -501,3 +501,9 @@ Effect 138's named combo text is now checked against the ROM code too: the task'
 
 Daft Punk multiball with the engine (`sweep_engine.py` incl. effect 57's live values, `sweep_engine19.py`, `sweep_arcade.py`): **1372 of 1434** distinct game frames
 found in columns 41-127 (95.7 %); left: 57 (11), 95 (10, a timer / value effect), 139 (6), 60 (3), 1 unattributed.
+
+Effects 139 (End of Line combo jackpot, `rom_deff139.py`) and 95 (Zuse fast scoring, `rom_deff95.py`; the 46 pictures 0xaee + c, the band rows 0x1a-0x1f blanked,
+timer left and right, ALL TARGETS=) are ported and equal to the ROM code (101, 99, 103 flips of 139; 122, 123 of 95). Found by the port: a live engine effect's
+payload was dropped by the 0.25 s refresh (`media_bridge.score_changed` kept only the `line*` keys), so effects 57 and 95 would not have followed their values in
+Godot; the payload now goes with the refresh. `dmd_effect.gd` draws the engine's rectangle item (FUN_0002746c). Daft Punk multiball: **1378 of 1431** frames found
+(96.3 %); left 57 (12), 95 (9). End of Line (before 139 and 95): 1147 of 1224.
