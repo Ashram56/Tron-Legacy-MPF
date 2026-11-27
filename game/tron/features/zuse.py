@@ -223,7 +223,7 @@ class Zuse(Feature):
         if os_.display.running(94) or os_.display.task_running(0x9b):
             return
         if not os_.display.running(96) and not os_.any_multiball():
-            os_.deff_start(96, k=points // 1000)        # "%luK": FUN_01032900 prints points / 1000
+            os_.deff_start(96, k=points // 1000, rnd=(os_.random.randrange(3), os_.random.randrange(15), os_.random.randrange(8)))        # "%luK": FUN_01032900 prints points / 1000
         os_.sound(0x0b1)
         os_.leff_start(129)
 

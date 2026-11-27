@@ -176,3 +176,44 @@ def test_deff108_equals_the_rom_code(variant):
     for more in (3, 1):
         ok, total, first = C.compare(108, [more, 0, 0, 0], lambda a: rom_deff108.frames(variant, more), rng=_Seq([variant]), real_show_pages=True)
         assert (ok, first) == (total, None)
+
+
+def test_deff96_draw_list_popup_stages():
+    from tron import rom_deff96
+    p = rom_engine.payload(96, {"k": 250, "rnd": (0, 0, 0), "timer": 7, "value": 150000})
+    assert not p["loop"] and len(p["seq"]) == rom_deff96.HOLD + 3
+    pops = [it for it in p["items"] if it.get("t") == "250K"]
+    assert pops and all(it["o"] == 1 and it["x"] == 49 for it in pops)
+    assert pops[0]["y"] == 13 and pops[1]["y"] == 12 and {it.get("l") for it in pops} == {None, 11, 4, 1}        # the items are the distinct draws
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+def test_deff96_background_child_equals_the_rom_code():
+    """FUN_01032a30 (the background child, run alone: the harness has no scheduler), the flips before the parent's 0x3e ticks end."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff96
+    ora = C.oracle(96, None, {0x3b8f0: 7, 0x3b8ec: 150000}, real_show_pages=True, fn_addr=0x1032a30)
+    mine = rom_deff96.frames(7, 150000, [])
+    bad = [t for t, f in ora if t < rom_deff96.HOLD and C.body([ff for tt, ff in mine if tt <= t][-1]) != C.body(f)]
+    assert bad == [] and len(ora) > rom_deff96.HOLD
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.parametrize("rnd", [(0, 0, 0), (2, 14, 7), (1, 5, 3)])
+def test_deff96_popup_child_equals_the_rom_code(rnd):
+    """FUN_01032900: its 24 "%luK" draws on page 0x12 (x, y, value), against the engine's popup (the draws, not the plane: the child shows nothing itself)."""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "assets", "tools"))
+    import deff_trace as T
+    from dmd_recipes_c import _Seq
+    from tron import rom_deff96
+    _, _, calls = T.trace(96, [250000], None, 4000000, rng=_Seq(list(rnd)), fn_addr=0x1032900)
+    rom = [(r[1], r[2], r[3], s[0], s[1], s[3]) for t, n, r, s in calls if n == "text_printf"]
+    mine = []
+    for n in range(24):
+        pg = E.Page(0xff)
+        rom_deff96.popup_draw(pg, 250000, rnd, n)
+        it = pg.items[0]
+        mine.append((0x12, rom_deff96.FONT, 2, it["x"], it["y"], 250))
+    assert rom == mine

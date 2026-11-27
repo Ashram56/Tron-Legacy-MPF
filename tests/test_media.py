@@ -218,8 +218,8 @@ class TestLiveDeffs(TronTestCase):
         zuse.clock.seconds, zuse.value = 23, 15000
         e = bridge.deff_lines(95, {})["engine"]                    # deff 95 is an engine effect (rom_deff95.py): the texts of a flip
         self.assertEqual(["23", "23", "ALL TARGETS=15,000"], [e["items"][i]["t"] for i in e["frames"][0] if "t" in e["items"][i]])
-        self.assertEqual({"line0": "15K", "line1": "23", "line2": "ALL TARGETS=15,000"},
-                         self._lines(bridge.deff_lines(96, {"k": 15})))
+        e = bridge.deff_lines(96, {"k": 15})["engine"]                 # deff 96 too (rom_deff96.py): the background's texts and the popup "15K"
+        self.assertEqual({"23", "ALL TARGETS=15,000", "15K"}, {e["items"][i]["t"] for f in e["frames"] for i in f if "t" in e["items"][i]})
         zuse.clock.seconds = 22                         # a refresh sends the new value
         with mock.patch.object(bridge, "connected", return_value=True), \
                 mock.patch.object(self.machine.bcp, "interface") as iface:

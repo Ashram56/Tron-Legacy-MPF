@@ -41,7 +41,7 @@ def trace(effect, args=None, ram=None, max_insns=4000000, rng=None, real_show_pa
     D.build = build
     try:
         r = G.recipe(effect, dict(G.RECIPES.get(effect, {}), **recipe, **({"args": args} if args else {}), **({"ram": ram} if ram else {}), max_insns=max_insns))
-        snaps, ticks = F.frames(effect, args=r["args"], ram=r["ram"], rng=rng, init=r["init"], max_insns=max_insns, counters=r["counters"], real_show_pages=real_show_pages)
+        snaps, ticks = F.frames(effect, args=r["args"], ram=r["ram"], rng=rng, init=r["init"], max_insns=max_insns, counters=r["counters"], real_show_pages=real_show_pages, fn_addr=r.get("fn_addr"))
     finally:
         D.build = orig
     return snaps, ticks, calls
