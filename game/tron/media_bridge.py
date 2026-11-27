@@ -128,13 +128,26 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ display effects
 
+    def _log_live(self, deff_id, vals):
+        """The RAM values a live deff prints, in the wall-clock trace when they change (scripts/conform sets the ROM-code run from them)."""
+        trace = getattr(self.os, "trace", None)
+        if trace is None or not getattr(trace, "_wall", False):
+            return
+        vals = {k: v for k, v in vals.items() if isinstance(v, (int, float, str, bool))}
+        last = self.__dict__.setdefault("_live_logged", {})
+        if last.get(deff_id) != vals:
+            last[deff_id] = vals
+            trace.log("deff_live", id=deff_id, args=vals)
+
     def deff_lines(self, deff_id, args):
         info = self.data["deffs"].get(deff_id) if self.data else None
         if not info:
             return {}
         live = getattr(self.os, "deff_values", {}).get(deff_id)
         if live:                                       # values the deff reads from RAM, now (over the passed ones)
-            args = dict(args, **live())
+            vals = live()
+            self._log_live(deff_id, vals)
+            args = dict(args, **vals)
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)

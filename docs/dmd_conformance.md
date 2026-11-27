@@ -429,3 +429,34 @@ clock-free pages; see the attract notes above).
 The one body miss of the attract run (9.7 s, repeated) is the GRAND CHAMPION page ("G S" 75,000,000): the stored page frames hold only #1-#4. The ROM
 routine 0x0100075c after FUN_0001a9f4(1) (`scripts/conform/sweep_gc.py`) draws it with 0 differing dots from the game's frame. So the attract: panel
 86/87, body 233/233 apart from the start-up frame.
+
+## Multiball scenarios against the code (2026-11-27)
+
+Fresh runs (`godot_run.py`) of the six multiball scenarios, compared with the frames the ROM code draws (columns 41-127), after feeding the code the state
+each effect had in the game (`scripts/conform/sweep_live.py`, one pickle per effect passed to `code_conform.py --extra`). The game now traces the RAM values a
+live effect prints (`deff_live` events, `media_bridge._log_live`) in addition to the start arguments (`deff_args`); `CONFORM_BANDS` and the attribution by
+`deff_args` are options of `code_conform.py`.
+
+| Scenario | Found before | Found after | Left (last effect before the frame) |
+|---|---|---|---|
+| portal_multiball | 426 / 751 | 700 / 740 | 19: 31, 141: 4, 25: 3 |
+| light_cycle_multiball | 501 / 1072 | 942 / 1072 | 86: 71, 19: 58 |
+| disc_multiball | 903 / 1292 | 1117 / 1272 | 19: 78, 47: 75 |
+| flynns_arcade | 293 / 783 | 742 / 783 | 19: 38, 107: 2 |
+| daft_punk_multiball | 351 / 996 | 499 / 996 | 57: 341, 19: 155 |
+| end_of_line_multiball | 323 / 1071 | 577 / 1071 | 19: 382, 57: 111 |
+
+What fed the code, with the ROM addresses: effect 141 (0x0102ffa0) `pm_phase` 0x3b878, `pm_super_value` 0x3b854, the seven shot counters 0x3b85c + 4 i
+(next award FUN_0102f5f4); effects 140 (0x0102faec), 142-145, 103, 62, 48-51, 58-61, 83, 90, 112, 139, 26: the task arguments (task + 0x30, + 0x34); effect 47
+(0x01007f34): `dmb_phase` 0x3af04, disc and recognizer counts 0x3af10 / 0x3af14 (shots left = adjustment 68 / 69 minus the count), jackpot 0x3af18, super
+0x3af1c; Light Cycle jackpot films 87-89: the clip level (task + 0x3c, < 6) and the clip (task + 0x40, inside the level's range of table 0x040d2ffc, else
+its first; 88 and 89 take the table's +4 and +6 entries via the jump table 0x040d3084). The "86" misses were these films (the film runs in front of the
+background effect 86, whose own frames match).
+
+Not closed, with what is known (not a conclusion that the game is right):
+- Effect 19: the sweep puts the score move at tick 30 of the effect and starts the roll at one phase (`sweep_state.py`); the multiball scores move at other
+  ticks, so the roll's intermediate scores and the rotating bottom line are not all produced. Not yet checked with other move ticks.
+- Effect 57 (Daft Punk and End of Line, 452 frames): the ROM loop draws images 0x1fd7-0x1ff3 with "SWITCHES=" on every other flip (deff_57 0x01005524); the
+  game's frames differ from every frame of the code (nearest: 259 dots) with leftovers of the previous screen at the top left. Cause not found yet.
+- Effect 47: 75 frames left after the state sweep, 47 is drawn between effects 48/49 (jackpot awards), timing not reproduced yet.
+- Effects 25 and 77 (sweeps run, not yet folded into this table).

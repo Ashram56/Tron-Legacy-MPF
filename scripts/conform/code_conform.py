@@ -44,10 +44,19 @@ def main(paths):
         extra.append(paths[i + 1])
         del paths[i:i + 2]
     full, cols = code_set()
+    bands = os.environ.get("CONFORM_BANDS")     # "24": the rows above and the rows from 24 on must each be a band of some code frame
+    top, bottom = set(), set()
+    if bands:
+        cut = int(bands)
+        for c in cols:
+            top.add(c[:87 * cut]); bottom.add(c[87 * cut:])
     for e in extra:
         for f in pickle.load(open(e, "rb")):
             full[f] = e
-            cols[bytes(f[y * 128 + x] for y in range(32) for x in range(41, 128))] = e
+            c = bytes(f[y * 128 + x] for y in range(32) for x in range(41, 128))
+            cols[c] = e
+            if bands:
+                top.add(c[:87 * cut]); bottom.add(c[87 * cut:])
     seen, hit_full, hit_cols, miss = set(), 0, 0, []
     for p in paths:
         for t, f in game_frames(p):
@@ -57,7 +66,7 @@ def main(paths):
             if f in full:
                 hit_full += 1
             c = bytes(f[y * 128 + x] for y in range(32) for x in range(41, 128))
-            if c in cols:
+            if c in cols or (bands and c[:87 * cut] in top and c[87 * cut:] in bottom):
                 hit_cols += 1
             else:
                 miss.append((t, p))
@@ -68,7 +77,7 @@ def main(paths):
         jl = p[:-4] + ".jsonl"
         if not os.path.exists(jl):
             continue
-        starts = [(e["wall"], e["id"]) for e in map(json.loads, open(jl)) if e.get("ev") == "deff_start" and "wall" in e]
+        starts = [(e["wall"], e["id"]) for e in map(json.loads, open(jl)) if e.get("ev") in ("deff_start", "deff_args") and "wall" in e]
         cur = [i for w, i in starts if w <= t]
         by[cur[-1] if cur else None] += 1
     if by:
