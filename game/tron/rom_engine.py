@@ -4,9 +4,9 @@ payload(deff_id, args) -> the event arg `engine` of the effect's slide: {"ticks"
 "frames": the distinct draw lists (tron/service_screen.gd items), "seq": the frame number of each flip}. tron/dmd_effect.gd draws the list
 of the flip the effect's time is in (the clock: tick_ms of tron/score_display.gd), over the status panel the effect keeps.
 """
-from . import rom_deff2, rom_deff94, rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff95, rom_deff138, rom_deff139
+from . import rom_deff2, rom_deff94, rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff95, rom_deff108, rom_deff138, rom_deff139
 
-DEFFS = (2, 42, 94, 55, 57, 58, 59, 60, 83, 95, 138, 139)
+DEFFS = (2, 42, 94, 55, 57, 58, 59, 60, 83, 95, 108, 138, 139)
 
 
 def _pack(flips, ticks, loop):
@@ -52,6 +52,9 @@ def payload(deff_id, args):
         return _pack(rom_deff139.draws(int(args.get("value", 0) or 0)), rom_deff139.TICKS, False)
     if deff_id == 95:
         return _pack(rom_deff95.draws(int(args.get("timer", 0) or 0), int(args.get("value", 0) or 0)), rom_deff95.TICKS, True)
+    if deff_id == 108:
+        v = int(args.get("variant", 0) or 0) % 4
+        return _pack(rom_deff108.draws(v, int(args.get("left", 0) or 0)), rom_deff108.ticks(v), False)
     if deff_id == 83:
         return _pack(rom_deff83.draws83([int(args.get("more", 0) or 0), int(args.get("mask", 0) or 0)]), rom_deff83.TICKS, False)
     if deff_id == 42:

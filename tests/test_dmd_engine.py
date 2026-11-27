@@ -108,11 +108,15 @@ def test_deff2_equals_the_rom_code(volume):
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
     import engine_check as C
     from tron import rom_deff2
-    C.X0 = 0
-    ora = C.oracle(2, None, {0x2110250: volume, 0x2110251: (~volume) & 0xff})
-    mine = rom_deff2.frames(volume)
-    # flip 0 shows the page the allocator left (all 0xff), not a picture; every other flip is the ROM's
-    assert [k for k, (t, f) in enumerate(ora) if k and C.body(f) != C.body(mine[min(k, len(mine) - 1)][1])] == []
+    x0 = C.X0
+    C.X0 = 0                            # the whole width; restored: the other comparisons use columns 41-127
+    try:
+        ora = C.oracle(2, None, {0x2110250: volume, 0x2110251: (~volume) & 0xff})
+        mine = rom_deff2.frames(volume)
+        # flip 0 shows the page the allocator left (all 0xff), not a picture; every other flip is the ROM's
+        assert [k for k, (t, f) in enumerate(ora) if k and C.body(f) != C.body(mine[min(k, len(mine) - 1)][1])] == []
+    finally:
+        C.X0 = x0
 
 
 def test_deff94_draw_list_has_the_squeeze():
@@ -125,9 +129,50 @@ def test_deff94_draw_list_has_the_squeeze():
 
 
 @pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.usefixtures("plain_harness")
 def test_deff94_equals_the_rom_code():
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
     import engine_check as C
     from tron import rom_deff94
     ok, total, first = C.compare(94, [10000], lambda a: rom_deff94.frames(10000))
     assert (ok, first) == (total, None)
+
+
+@pytest.fixture
+def plain_harness():
+    """The Unicorn harness without the routines other tests had it answer (deff_unicorn.STUBS: the factory message id 0x6110, the RTC): an effect that reads them would run another game."""
+    if unicorn is None:
+        yield
+        return
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "assets", "tools"))
+    import deff_unicorn as D
+    saved = dict(D.STUBS)
+    D.STUBS.clear()
+    yield
+    D.STUBS.clear()
+    D.STUBS.update(saved)
+
+
+def test_deff108_draw_list_and_variants():
+    from tron import rom_deff108
+    for v in range(4):
+        p = rom_engine.payload(108, {"variant": v, "left": 3})
+        assert not p["loop"] and p["ticks"] == rom_deff108.ticks(v)
+        assert len(p["seq"]) == rom_deff108.VARIANTS[v][3] + 1
+        assert any(it.get("t") == "3 MORE" for it in p["items"])
+        film = [it for it in p["items"] if "i" in it]
+        assert film and all(it["o"] == 1 and it.get("k") is not None for it in film[:1])     # the picture lies over the panel, the key 0x10 dots are skipped
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.usefixtures("plain_harness")
+@pytest.mark.parametrize("variant", range(4))
+def test_deff108_equals_the_rom_code(variant):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "assets", "tools"))
+    import engine_check as C
+    from dmd_recipes_c import _Seq
+    from tron import rom_deff108
+    for more in (3, 1):
+        ok, total, first = C.compare(108, [more, 0, 0, 0], lambda a: rom_deff108.frames(variant, more), rng=_Seq([variant]), real_show_pages=True)
+        assert (ok, first) == (total, None)

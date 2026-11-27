@@ -58,6 +58,7 @@ class SwitchLayer:
             if handler:
                 sc.add_switch_handler(name, self._dispatch(num, handler))
         sc.add_switch_handler("s_shooter_lane", self.shooter_close, state=1)
+        sc.add_switch_handler("s_video_game_eject", self.vuk_left, state=0)
         sc.add_switch_handler("s_shooter_lane", self.shooter_open, state=0)
         os_.register("player_first_ball", self.player_first_ball)
         os_.register("ball_start", self.ball_start)
@@ -167,9 +168,16 @@ class SwitchLayer:
         if os_.in_play:
             os_.playfield_switch(11)
         os_.ball_held = True
+        os_.vuk_task_until = float("inf")           # the device task (0x1b) runs from the switch closing until VUK_SETTLE_TICKS after it opens (vuk_left)
         # The ball device settles about 0.76 s before on_vuk runs (section 5, sw11), then the eject
         # sequence (device events 7 and 4, FUN_0101bdd0) runs.
         os_.after(47, self.vuk_settled)
+
+    def vuk_left(self):
+        """The ball left the VUK (switch 11 opens): its device task runs on until the switch count has been stable for 0x5d ticks (os_layer.VUK_SETTLE_TICKS)."""
+        os_ = self.os
+        from .os_layer import TICK, VUK_SETTLE_TICKS
+        os_.vuk_task_until = os_.now + VUK_SETTLE_TICKS * TICK
 
     def vuk_settled(self):
         if self.os.in_play:

@@ -101,6 +101,8 @@ class SkillShots(Feature):
         """switch_timeout_obj_expire: done, event 0x6a -> skill_timeout_expired [0x01028b04]."""
         if not self.done[key]:
             self.done[key] = True
+            self.os.flag_set(0x1c)               # event 0x6a also runs FUN_0100f25c [0x0100f25c]: flag 0x1c and a rules refresh (multiplayer_2p 55.435: tube show 14)
+            self.os.request_refresh()
             self.kill(key)
 
     def instant_switch(self, sw):

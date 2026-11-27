@@ -39,7 +39,7 @@ GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
 # effects the game draws itself from the ROM's routine (tron/rom_engine.py): no frames, no letters, no text lines
-ENGINE_DEFFS = {2, 42, 94, 55, 57, 58, 59, 60, 83, 95, 138, 139}
+ENGINE_DEFFS = {2, 42, 94, 55, 57, 58, 59, 60, 83, 95, 108, 138, 139}
 TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
@@ -628,6 +628,8 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
         items += score_display_items(deff_id == 19, panel == "match")
     if deff_id in ENGINE_DEFFS:         # the game draws the body itself (tron/rom_engine.py): background, that drawing, the panel
         items = [items[0], {"type": "engine"}] + (score_display_items(deff_id == 19, panel == "match") if panel else [])
+        if deff_id == 108:              # the film picture lies over the panel (FUN_01020388: the panel on the text page, the picture page above it)
+            items.append({"type": "engine_over"})
     if frames and under and deff_id in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
     write_effect(name, folder_rel, parts, items)

@@ -180,7 +180,7 @@ class Recognizer(Feature):
         if hits < 5:
             os_.score_add(2500)
             if not silent:
-                os_.deff_start(108, left=5 - hits)
+                os_.deff_start(108, left=5 - hits, variant=os_.random.randrange(4))     # deff_108 0x10209b0: random_below(4) picks the film (0x10209d8)
                 os_.leff_start(101)
                 os_.sound(0x0d0)
             pd.rec_hits_stat = min(pd.rec_hits_stat + 1, 0xff)

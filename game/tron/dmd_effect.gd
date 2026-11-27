@@ -487,6 +487,8 @@ class State extends RefCounted:
 					_letters(out, it, dmd)
 				"engine":
 					_engine(out, dmd)
+				"engine_over":
+					_engine(out, dmd, true)
 				"arcade":
 					_arcade(out, it, dmd)
 				"text":
@@ -497,7 +499,7 @@ class State extends RefCounted:
 
 	## An effect the game draws from the ROM's routine: the event arg `engine` = {ticks, loop, frames, seq}; the flip the effect's time is in
 	## gives a draw list of tron/service_screen.gd items (ROM images at a palette level, ROM text), drawn like the effect's pictures.
-	func _engine(out: Array, dmd) -> void:
+	func _engine(out: Array, dmd, over := false) -> void:
 		var e = values.get("engine", null)
 		if not e is Dictionary or not e.has("seq"):
 			return
@@ -510,6 +512,8 @@ class State extends RefCounted:
 		var table: Array = e["items"]
 		for idx in e["frames"][int(seq[k])]:
 			var d: Dictionary = table[int(idx)]
+			if bool(d.get("o", false)) != over:             # "o": drawn over the status panel (deff 108's picture lies over it), the others under
+				continue
 			var level := float(d.get("l", 15)) / 15.0
 			if d.has("r"):
 				# a rectangle filled with level v (FUN_0002746c): the dots under it go dark (v = 0)
@@ -529,7 +533,7 @@ class State extends RefCounted:
 						pimg.set_pixel(px, py, Color(lv, lv, lv, 1.0))
 				out.append(["tex", ImageTexture.create_from_image(pimg), Rect2(float(pd[0]), float(pd[1]), pw, ph), ink])
 			elif d.has("i"):
-				var tex := _engine_image(int(d["i"]), d.get("m", []))
+				var tex := _engine_image(int(d["i"]), d.get("m", []), d.get("k", []))
 				if tex:
 					out.append(["tex", tex, Rect2(float(d["x"]), float(d["y"]), tex.get_width(), tex.get_height()), ink])
 			elif d.has("t"):
@@ -565,22 +569,29 @@ class State extends RefCounted:
 
 	## ROM image n through the palette m (16 levels; [] = as it is): lit dots take the level m[level] (the palette of FUN_0002b378 / FUN_0002b424),
 	## the transparent ones stay transparent. The decoded pictures are black / white / grey dots, level = grey * 15.
-	func _engine_image(n: int, m: Array) -> Texture2D:
-		if m.is_empty():
+	func _engine_image(n: int, m: Array, k := []) -> Texture2D:
+		if m.is_empty() and k.is_empty():
 			return ServiceScreen.texture(n)
-		var key := "%d:%s" % [n, str(m)]
+		var key := "%d:%s:%s" % [n, str(m), str(k)]
 		if _engine_pics.has(key):
 			return _engine_pics[key]
 		var src := ServiceScreen.texture(n)
 		if src == null:
 			return null
 		var img := src.get_image()
-		for yy in img.get_height():
-			for xx in img.get_width():
-				var c := img.get_pixel(xx, yy)
-				if c.a > 0.0:
-					var v := float(int(m[clampi(roundi(c.r * 15.0), 0, 15)])) / 15.0
-					img.set_pixel(xx, yy, Color(v, v, v, 1.0))
+		if img.get_format() != Image.FORMAT_RGBA8:
+			img.convert(Image.FORMAT_RGBA8)
+		if not m.is_empty():
+			for yy in img.get_height():
+				for xx in img.get_width():
+					var c := img.get_pixel(xx, yy)
+					if c.a > 0.0:
+						var v := float(int(m[clampi(roundi(c.r * 15.0), 0, 15)])) / 15.0
+						img.set_pixel(xx, yy, Color(v, v, v, 1.0))
+		var iw := img.get_width()
+		for r in range(0, k.size(), 2):                      # the dots whose ROM value is the blit's key 0x10 (scripts/gen_film_keys.py): not drawn
+			for q in range(int(k[r]), int(k[r]) + int(k[r + 1])):
+				img.set_pixel(q % iw, q / iw, Color(0.0, 0.0, 0.0, 0.0))
 		var tex := ImageTexture.create_from_image(img)
 		_engine_pics[key] = tex
 		return tex

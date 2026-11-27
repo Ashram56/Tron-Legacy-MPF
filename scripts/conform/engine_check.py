@@ -17,9 +17,9 @@ from tron import dmd_engine as E  # noqa: E402
 X0 = 41
 
 
-def oracle(effect, args, ram=None):
+def oracle(effect, args, ram=None, rng=None, **recipe):
     """The ROM's frames: the distinct pictures (columns X0-127, as 128 x 32 levels) in the order shown, with the tick each starts."""
-    snaps, ticks, _ = T.trace(effect, args, ram, int(os.environ.get("ENGINE_INSNS", "4000000")))
+    snaps, ticks, _ = T.trace(effect, args, ram, int(os.environ.get("ENGINE_INSNS", "4000000")), rng=rng, **recipe)
     out = []
     for (r0, r1, fg, bg), t in zip(snaps, ticks):
         f = E.mix(fg, bg)
@@ -31,9 +31,9 @@ def body(frame, rows=range(E.H)):
     return bytes(frame[y * E.W + x] for y in rows for x in range(X0, E.W))
 
 
-def compare(effect, args, program, ram=None, rows=range(E.H)):
+def compare(effect, args, program, ram=None, rows=range(E.H), rng=None, **recipe):
     """program(args) -> [(tick, 128*32 levels)]: the engine's frames. Returns (matching, total, first_mismatch)."""
-    ora = oracle(effect, args, ram)
+    ora = oracle(effect, args, ram, rng, **recipe)
     mine = program(args)
     ok = 0
     first = None

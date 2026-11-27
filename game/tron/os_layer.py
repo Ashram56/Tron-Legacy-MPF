@@ -58,6 +58,10 @@ VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # trough eject + auto-launch take ~0.6 s.
 MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
 TILT_TIMER_TICKS = 0xda
+# The VUK's device task (task 0x18 + 3 = 0x1b, FUN_0001ccec / FUN_0001d05c) ends once the device's switch count has stayed unchanged for the delay of its record
+# (device 3, 0x040e41f4 + 3 * 0x24 + 0x14 = 0x5d ticks, FUN_0001bbb0) after the ball left: trough_drain_check [0x0001dd90] returns while a ball device task runs
+# (no_balldev_tasks), so a drain in that window ends its ball only then (multiplayer_2p: ball left 63.6575 -> end of ball, audit 8, 65.1691).
+VUK_SETTLE_TICKS = 0x5d
 VOLUME_DEFF = 2           # deff_002_use_to_adjust_volume [0x0103815c]
 SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
@@ -196,6 +200,7 @@ class TronOS(CustomCode):
         self.ball_validated = False  # the playfield was validated on this ball (base music 0x01b)
         self.vuk_ejecting = False    # VUK eject not yet confirmed by a playfield switch (no ball search)
         self.vuk_device_busy = False  # VUK released, eject not yet confirmed by the ball device
+        self.vuk_task_until = -999.0   # the VUK device task still runs until then (VUK_SETTLE_TICKS after its switch changed)
         self.vuk_released_at = -999.0 # when the VUK last kicked its ball out (switches.vuk_eject)
         self._mb_first_at = -999.0    # earliest launch of a new multiball request's first ball
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
@@ -1672,6 +1677,15 @@ class TronOS(CustomCode):
                 flipper.disable()
             return
         queue.wait()
+        self._ball_ending_wait(queue)
+
+    def _ball_ending_wait(self, queue):
+        until = self.vuk_task_until
+        if until == float("inf"):                    # the ball is in the VUK (task started by its switch): over once the switch is open
+            until = self.now + TICK if self.machine.switches["s_video_game_eject"].state else 0.0
+        if self.now < until:                         # trough_drain_check waits for the VUK's device task (no_balldev_tasks)
+            self.after(max(1, round((until - self.now) / TICK)), lambda: self._ball_ending_wait(queue))
+            return
         if self.task_running(0x2b):
             self.after(self.task_ticks_left(0x2b), lambda: self._ball_ending_go(queue))
             return

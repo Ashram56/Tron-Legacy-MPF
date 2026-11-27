@@ -23,6 +23,17 @@ TRANSPARENT = 0xff
 
 _ZIP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "mpf_package", "media", "rom_images_all.zip")
 _IMAGES = {}
+_KEYS = None
+
+
+def film_keys():
+    """game/tron/film_keys.json (scripts/gen_film_keys.py): per ROM image number, the runs [start, length, ...] of dots whose ROM value is 0x10 (the key the blit skips)."""
+    global _KEYS
+    if _KEYS is None:
+        import json
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "film_keys.json")) as f:
+            _KEYS = {int(k): v for k, v in json.load(f).items()}
+    return _KEYS
 
 
 def image(n):
@@ -38,6 +49,11 @@ def image(n):
             for x in range(w):
                 r, g, b, a = px[x, y]
                 data.append(TRANSPARENT if a == 0 else (g + 8) // 17)
+        runs = film_keys().get(n)
+        if runs:                                # the decoded PNG clips the ROM value 0x10 to level 15
+            for i in range(0, len(runs), 2):
+                for q in range(runs[i], runs[i] + runs[i + 1]):
+                    data[q] = 0x10
         _IMAGES[n] = (w, h, bytes(data))
     return _IMAGES[n]
 
@@ -67,7 +83,9 @@ class Page:
         if self._rec:
             it = {"i": n, "x": x, "y": y}
             if pal is not None and pal != list(range(16)):
-                it["m"] = list(pal)             # the palette: tron/dmd_effect.gd maps the image's levels through it
+                it["m"] = list(pal)
+            if n in film_keys() and key == 0x10:
+                it["k"] = film_keys()[n]            # the dots the ROM skips (key 0x10): tron/dmd_effect.gd leaves them transparent             # the palette: tron/dmd_effect.gd maps the image's levels through it
             self.items.append(it)
         for iy in range(h):
             yy = y + iy
@@ -78,6 +96,8 @@ class Page:
                 if not 0 <= xx < W:
                     continue
                 v = d[iy * w + ix]
+                if v == 0x10 and key != 0x10:
+                    v = 15                              # no key: the byte is copied, the display uses the low nibble
                 if pal is not None:
                     v = pal[v] if v < 0x10 else 0xff
                 if key is not None and v == key:

@@ -524,3 +524,13 @@ Deff 94 and its lead-in finished (2026-11-27): the transition FUN_0102b980 (ten 
 page, record tables 0x040d3a18 / 0x040d3a40) is `rom_deff94.squeeze`; the copied rows travel as a new draw item `{"p": [x, y, w, h, hex dots]}` (`dmd_engine.Page.bitmap`,
 drawn opaque by `dmd_effect.gd`). Equal to the ROM code on 139 of 139 flips (`tests/test_dmd_engine.py::test_deff94_equals_the_rom_code`), deff 94 is now `source: engine`.
 The volume display (deff 2, `rom_deff2.py`) is equal on every flip but the first (the allocator's page).
+
+Deff 108 ported (2026-11-27, `game/tron/rom_deff108.py`, deff_108 0x010209b0, variants FUN_01020388 / 01020510 / 01020698 / 01020820 chosen by random_below(4) at 0x10209d8): "N MORE / TO ACCESS / DISC"
+(msgs 0x62d-0x62f, font 0x27 from the language table 0x040d32c4, count = the task byte +0x30, "N MORE" black when bit 1 of the flip is set) on the text page, the film picture 0xa7b / 0xa99 (x 0, 31 flips
+of 3 ticks) or 0xa3f / 0xa5d (x 0x29, 55 flips of 2 ticks) + i on the picture page, which lies over the text page (so over the status panel too: the draw item carries `o`, `dmd_effect.gd` `engine_over`).
+Equal to the ROM code on every flip, the four variants and counts 1 and 3 (75, 75, 86, 85 frames; `tests/test_dmd_engine.py::test_deff108_equals_the_rom_code`). Two findings:
+(1) the decoded PNGs of the package clip the ROM value **0x10** (the key `bitmap_draw_masked(..., 0x10)` skips, FUN_00029a20) to level 15, so a transparent dot of these films looked lit; the dots are
+generated from the ROM by `scripts/gen_film_keys.py` into `game/tron/film_keys.json` (runs per picture) and `dmd_engine.image` puts 0x10 back (item `k` for the renderer);
+(2) the harness did not run the real `dmd_show_pages` for these effects: FUN_01024378(n) redraws the panel on a copy of the shown page (RAM 0x3d524) for the n-1 following ticks, so without the bookkeeping
+(0x3d524 / 0x3d528) the oracle showed blank frames. `engine_check.compare(..., real_show_pages=True)` runs it. The speech at flip 0x14 (3 ticks) / 0x1e (2 ticks), tick 60 in every variant (snd 0x0d1 below 3
+hits left, else FUN_0101c198), stays with the sounds of the effect's media.

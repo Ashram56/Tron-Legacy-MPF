@@ -23,7 +23,7 @@ PRIMS = {0x276d0: "clear_page", 0x27274: "begin_frame", 0x27400: "fill_page", 0x
          0x241a0: "flip_wait", 0x24230: "flip_wait2", 0x27830: "show_pages", 0x27a70: "flip_ticks"}
 
 
-def trace(effect, args=None, ram=None, max_insns=4000000, rng=None):
+def trace(effect, args=None, ram=None, max_insns=4000000, rng=None, real_show_pages=False, **recipe):
     calls = []
     orig = D.build
 
@@ -40,8 +40,8 @@ def trace(effect, args=None, ram=None, max_insns=4000000, rng=None):
         return mu
     D.build = build
     try:
-        r = G.recipe(effect, dict(G.RECIPES.get(effect, {}), **({"args": args} if args else {}), **({"ram": ram} if ram else {}), max_insns=max_insns))
-        snaps, ticks = F.frames(effect, args=r["args"], ram=r["ram"], rng=rng, init=r["init"], max_insns=max_insns, counters=r["counters"])
+        r = G.recipe(effect, dict(G.RECIPES.get(effect, {}), **recipe, **({"args": args} if args else {}), **({"ram": ram} if ram else {}), max_insns=max_insns))
+        snaps, ticks = F.frames(effect, args=r["args"], ram=r["ram"], rng=rng, init=r["init"], max_insns=max_insns, counters=r["counters"], real_show_pages=real_show_pages)
     finally:
         D.build = orig
     return snaps, ticks, calls
