@@ -222,6 +222,22 @@ class Display:
                 self._start_rule(deff_id, on_start)
             self._pump()
 
+    def restart(self, deff_id, **args):
+        """The deff's task created again under the same id with new arguments, no start call (deff 2 on a volume key, FUN_0000fc28):
+        its run starts over (the trace logs the task creation as a deff start, no stop)."""
+        os_ = self.os
+        if self.fg != deff_id:
+            return
+        os_.trace.log("deff_start", id=deff_id)
+        if self.fg_handle:
+            os_.machine.clock.unschedule(self.fg_handle)
+        info = self.media.get(deff_id)
+        os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+        os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
+        if info and info.seconds:
+            self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), info.seconds)
+            self.fg_end = os_.now + info.seconds
+
     def stop(self, deff_id):
         os_ = self.os
         os_.trace.log("deff_stop", id=deff_id)

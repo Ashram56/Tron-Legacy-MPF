@@ -244,7 +244,7 @@ class Screen:
 
 class EntryScreen(Screen):
     """The service entry screen, deff 3 [0x01037a6c]: version, SERVICE MENU, PRESS 'SELECT' TO CONTINUE.
-    SELECT opens the main menu, BACK leaves; MINUS / PLUS show the technician alerts."""
+    SELECT opens the main menu, BACK leaves; MINUS / PLUS do nothing."""
 
     def __init__(self, svc):
         super().__init__(svc, "SERVICE MENU")
@@ -264,10 +264,10 @@ class EntryScreen(Screen):
     def button(self, name):
         if name == "select":
             self.svc.push(MenuScreen(self.svc, "MAIN MENU"))
-        elif name in ("minus", "plus"):
-            self.svc.push(SwitchAlertsScreen(self.svc, "TECHNICIAN ALERTS"))
-        else:
+        elif name == "back":
             self.svc.exit()
+        # MINUS / PLUS here start only the key-repeat tasks (FUN_0000fc28 cases 2 and 4 with the menu up, 0x0000fc28): the
+        # coin_door_buttons reference run shows no screen change, and the next BACK leaves the menu
 
 
 class MenuScreen(Screen):
@@ -1865,6 +1865,10 @@ class ServiceMode(Mode):
             attract.stop()                        # the ROM's attract pages and lamp show stop
         os_.deff_stop(1)
         os_.leff_stop(1)
+        os_.trace.log("deff_start", id=3)         # the entry screen is deff 3 [0x01037a6c, FUN_0000f9a8]; this menu draws it itself
+        os_.leff_start(2)
+        os_.sound(0x00c, in_deff=3)
+        os_.sound(0x001)                           # the music stops
         if self.machine.modes["attract"].active:
             self.machine.modes["attract"].stop()  # no game start from the service menu
         sc = self.machine.switch_controller
@@ -1882,6 +1886,9 @@ class ServiceMode(Mode):
         self.handlers = []
         os_ = self.os
         os_.in_service = False
+        os_.sound(0x009, in_deff=3)               # the menu ends [FUN_0000fa7c]: deff 3 and leff 2 stop
+        os_.trace.log("deff_stop", id=3)
+        os_.leff_stop(2)
         os_.media.service_hide()
         self.backglass = {"show": False}
         self._backglass_screen = None

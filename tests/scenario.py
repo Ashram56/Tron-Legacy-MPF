@@ -6,6 +6,7 @@ part of the player (plunge, drain, hits).
 
 Usage: .venv/bin/python -m tests.scenario <name> [out.jsonl]
 """
+import json
 import os
 import shlex
 import sys
@@ -15,6 +16,13 @@ from tests.tron_test import ROOT, TronTestCase
 
 TRACES = os.path.join(ROOT, "assets", "rules", "traces")
 TRACES2 = os.path.join(ROOT, "assets", "rom_data", "states", "traces")   # the newer reference traces
+
+
+def _loads(line):
+    try:
+        return json.loads(line)
+    except ValueError:                      # a mark text with unescaped quotes (coin_door_buttons.jsonl)
+        return {"ev": "mark"}
 
 
 def _dir(name):
@@ -56,7 +64,7 @@ def forced_picks(name):
     path = os.path.join(_dir(name), name + ".jsonl")
     if not os.path.exists(path):
         return forced
-    evs = [json.loads(line) for line in open(path, encoding="utf-8")]
+    evs = [_loads(line) for line in open(path, encoding="utf-8")]
     for i, e in enumerate(evs):
         if e.get("ev") == "audit" and 0x53 <= e.get("id", 0) <= 0x5e:
             forced["arcade"].append(e["id"] - 0x53)
@@ -315,8 +323,9 @@ class ScenarioRun(TronTestCase):
 
     cmd_pretracepc = cmd_trace = cmd_dump_tasks = cmd_dump_events = cmd_dump_rules = cmd_pokeat = cmd_pretrace
 
-    def cmd_dsw(self, *a):
-        pass                                          # a PinMAME switch number of the coin door column: no rebuild input yet
+    def cmd_dsw(self, number, ms="100"):
+        """A PinMAME switch number (dedicated column): no rebuild input, but the press takes its time as in the reference run."""
+        self.step(int(ms) / 1000)
 
     def cmd_mark(self, *text):
         self.log("mark", text=" ".join(text))

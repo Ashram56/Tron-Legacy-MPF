@@ -139,6 +139,7 @@ class Credits:
         """BACK outside the service menu [0x0000fc20 case 1]: one service credit, audit 0x24 SERVICE
         CREDITS when it was added, deff 17."""
         if self.add(1):
+            self.os.sound(0x0f2)                  # event 0x51 handler [0x0002df34]: the credit sound, audit 0x24, deff 17
             self.os.audit(SERVICE_CREDITS_AUDIT)
         self.os.deff_start(17, credits=self.text(), prompt=self.prompt())
 

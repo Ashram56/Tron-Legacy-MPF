@@ -56,7 +56,7 @@ class TestCoinDoor(AdjCase):
         self.hit_and_release_switch("s_service_back")           # BACK inside the menu leaves it
         self.advance_time_and_run(0.5)
         self.assertFalse(os_.in_service)
-        self.assertNotIn("0x009", self.sounds())
+        self.assertEqual(1, self.sounds().count("0x009"))     # the menu's own exit sound [FUN_0000fa7c], not the warning's BACK
 
     def test_no_warning_when_the_door_opens_in_the_menu(self):
         os_ = self.tron

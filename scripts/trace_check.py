@@ -16,6 +16,7 @@ Usage: scripts/trace_check.py <scenario> [--events score,deff_start,...] [--tol 
 """
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -49,10 +50,21 @@ def keep(e):
     return True
 
 
+def _loads(line):
+    """One trace line; a mark whose text holds unescaped quotes (coin_door_buttons.jsonl, 4 lines) is read by regex."""
+    try:
+        return json.loads(line)
+    except ValueError:
+        m = re.match(r'\{"t":([\d.]+),"ev":"mark","text":"(.*)"\}\s*$', line)
+        if not m:
+            raise
+        return {"t": float(m.group(1)), "ev": "mark", "text": m.group(2)}
+
+
 def filtered(path, tmp):
     """Copy of the trace without non-rules events and without anything before "ready"."""
     out = os.path.join(tmp, os.path.basename(path))
-    evs = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
+    evs = [_loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     t0 = next((e["t"] for e in evs if e.get("ev") == "ready"), None)
     with open(out, "w", encoding="utf-8") as g:
         for e in evs:

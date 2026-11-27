@@ -58,6 +58,7 @@ VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # trough eject + auto-launch take ~0.6 s.
 MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
 TILT_TIMER_TICKS = 0xda
+VOLUME_DEFF = 2           # deff_002_use_to_adjust_volume [0x0103815c]
 SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
@@ -255,6 +256,8 @@ class TronOS(CustomCode):
         self._service_confirm = None    # clock handle while the end-the-game question is up
         self._service_kill = False      # the game is ending into the service menu
         sw.add_switch_handler("s_service_select", self._service_select)
+        sw.add_switch_handler("s_service_minus", lambda: self._volume_key(-1))
+        sw.add_switch_handler("s_service_plus", lambda: self._volume_key(1))
         self.in_service = False     # the service menu (mode tron_service) is running
 
         self.register("rules_refresh", self.request_refresh)
@@ -1361,6 +1364,34 @@ class TronOS(CustomCode):
             return
         self.credit_model.service_credit()
 
+    # master volume [FUN_0002d3d0 / FUN_0002d414]: NVRAM byte 0x02110250, 0-0x3f, 0x28 when the NVRAM byte is invalid
+    VOLUME_DEFAULT, VOLUME_MAX = 0x28, 0x3f
+
+    @property
+    def volume(self):
+        value = self.machine.variables.get_machine_var("tron_volume")
+        return self.VOLUME_DEFAULT if value is None else int(value)
+
+    def set_volume(self, level):
+        """FUN_0002d414: clamp to 0x3f, store (persisted) and send the sound board the level (0x1000 | level x 2 + 0x80)."""
+        level = max(0, min(self.VOLUME_MAX, int(level)))
+        self.machine.variables.set_machine_var("tron_volume", level, persist=True)
+        self.machine.events.post("tron_volume", level=level, command=0x1000 | (level * 2 + 0x80))
+
+    def _volume_key(self, delta):
+        """Coin-door MINUS / PLUS outside the service menu [FUN_0000fc28 cases 2 and 4]. With no volume display up, the
+        first press starts deff 2 (task 0xb, FUN_0000fad0: event_post then deff_start(2)); the display lasts 0x34 flips of 6
+        ticks. While it runs, a press changes the volume by one (never below 0, never above 0x3f) and the display starts
+        over (the key's repeat, FUN_0000fb10 style, is not modelled: a held key counts once)."""
+        if self.in_service or self._service_kill:
+            return
+        if not self.display.running(VOLUME_DEFF):
+            self.sound(0x01a)                      # the event posted first (0x15a38 caller) plays the base music call
+            self.deff_start(VOLUME_DEFF, volume=self.volume)
+            return
+        self.set_volume(self.volume + delta)
+        self.display.restart(VOLUME_DEFF, volume=self.volume)
+
     def _service_select(self):
         """Coin-door SELECT: the service menu (tron/service.py). In attract mode it opens at once. In a game the
         ROM suspends the game and resumes it after the menu (FUN_0000f9b0 / FUN_0000fa34); here the first
@@ -1369,6 +1400,7 @@ class TronOS(CustomCode):
         (docs/rom_differences.md). BACK or the timeout leaves the game running."""
         if self.in_service or self._service_kill:
             return
+        self.display.stop(VOLUME_DEFF)             # FUN_000282e0(2): the volume display ends first [0x0000fc28 case 8]
         if not self.game:
             self.machine.modes["tron_service"].start()
             return
