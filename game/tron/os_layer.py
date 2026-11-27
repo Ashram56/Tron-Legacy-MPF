@@ -1636,7 +1636,8 @@ class TronOS(CustomCode):
         self.hook("ball_end")                        # event 0x1d: every mode stops
         for flipper in self.machine.flippers.values():
             flipper.disable()
-        self.audit(8)
+        if not self.hook("slammed"):                 # the slam reset never reaches the end of ball [0x00023e18]
+            self.audit(8)
         if self._valid_at is not None:               # play time of this ball (AVERAGE BALL / GAME TIME)
             played = self.now - self._valid_at
             self._valid_at = None
@@ -1701,13 +1702,14 @@ class TronOS(CustomCode):
         # game-time audit (audits 59-71, by the game's validated play time) and the score-range audits
         # (audits 30-46, one per player) [0x00023774]
         players = self.game.player_list if self.game else []
-        self.audit(self.audits.game_time_counter(self.game_seconds))
-        for player in players:
-            self.audit(self.audits.score_range_counter(player.score))
-        self.audits.add_extra("game_seconds", self.game_seconds)
-        self.audits.add_extra("score_total", sum(p.score for p in players))
-        self._replay_statistics(len(players))
-        self.hook("game_over")
+        if not self.hook("slammed"):                 # slam_reset_task [0x00023e18] ends in the halt loop 0x10ce8:
+            self.audit(self.audits.game_time_counter(self.game_seconds))   # the game-over audits never run
+            for player in players:
+                self.audit(self.audits.score_range_counter(player.score))
+            self.audits.add_extra("game_seconds", self.game_seconds)
+            self.audits.add_extra("score_total", sum(p.score for p in players))
+            self._replay_statistics(len(players))
+            self.hook("game_over")
         queue.wait()
         match = self.features_by_name.get("match")
         hs = self.features_by_name.get("high_scores")

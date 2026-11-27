@@ -18,8 +18,14 @@ class GameOver(Feature):
 
     def run(self, done):
         os_ = self.os
-        if os_.hook("slammed"):                   # a slam tilt resets the machine: straight to attract
-            os_.hook("attract_start")
+        if os_.hook("slammed"):
+            # slam_reset_task [0x00023e18] ends in the halt loop 0x10ce8: the machine resets and boots again: the version
+            # screen (deff 5) first, deff 1 / leff 1 BOOT_SECONDS later like at power-up (features/attract.py)
+            from tron.features.attract import BOOT_SECONDS
+            pages = os_.features_by_name.get("attract_pages")
+            if pages:
+                pages.boot = True
+            os_.machine.clock.schedule_once(lambda dt=None: None if os_.game else os_.hook("attract_start"), BOOT_SECONDS)
             done()
             return
         forced = os_.forced.get("match")
