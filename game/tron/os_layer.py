@@ -210,6 +210,7 @@ class TronOS(CustomCode):
         self.credit_model = Credits(self)                      # credits and pricing, persisted
         self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
+        self.player_seconds = {}    # validated play time of each player
         self.game_seconds = 0.0     # validated play time of the running game
         self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
         self._coindoor_save = False  # the running multiball save is the coin door ball saver's (adj 41)
@@ -1111,6 +1112,7 @@ class TronOS(CustomCode):
         self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
         self.replayed = False
         self.game_seconds = 0.0
+        self.player_seconds = {}
         self._valid_at = None
         self.shoot_again = False
         self.flags.clear()
@@ -1648,6 +1650,7 @@ class TronOS(CustomCode):
             played = self.now - self._valid_at
             self._valid_at = None
             self.game_seconds += played
+            self.player_seconds[self.player_num] = self.player_seconds.get(self.player_num, 0.0) + played   # DAT_0003d500[player] [0x00025c50]
             self.audits.add_extra("ball_seconds", played)
         if self.task_running(0x37):                  # end_of_ball [0x00020764]: last outlane drain side
             self.audit(0x28)
@@ -1709,7 +1712,8 @@ class TronOS(CustomCode):
         # (audits 30-46, one per player) [0x00023774]
         players = self.game.player_list if self.game else []
         if not self.hook("slammed"):                 # slam_reset_task [0x00023e18] ends in the halt loop 0x10ce8:
-            self.audit(self.audits.game_time_counter(self.game_seconds))   # the game-over audits never run
+            for number in range(1, len(players) + 1):        # one game-time audit per player [0x00025e70, table 0x39020]
+                self.audit(self.audits.game_time_counter(self.player_seconds.get(number, 0.0)))
             for player in players:
                 self.audit(self.audits.score_range_counter(player.score))
             self.audits.add_extra("game_seconds", self.game_seconds)
