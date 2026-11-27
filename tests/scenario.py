@@ -14,6 +14,11 @@ import unittest
 from tests.tron_test import ROOT, TronTestCase
 
 TRACES = os.path.join(ROOT, "assets", "rules", "traces")
+TRACES2 = os.path.join(ROOT, "assets", "rom_data", "states", "traces")   # the newer reference traces
+
+
+def _dir(name):
+    return TRACES if os.path.exists(os.path.join(TRACES, name + ".txt")) else TRACES2
 OUT = os.path.join(ROOT, "captures", "traces")
 
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
@@ -47,7 +52,7 @@ def forced_picks(name):
     """Random choices the ROM made in the reference run, so the rebuild makes the same ones."""
     import json
     forced = {"arcade": []}
-    path = os.path.join(TRACES, name + ".jsonl")
+    path = os.path.join(_dir(name), name + ".jsonl")
     if not os.path.exists(path):
         return forced
     evs = [json.loads(line) for line in open(path, encoding="utf-8")]
@@ -194,7 +199,7 @@ class ScenarioRun(TronTestCase):
         self.fill_trough()
         self.wait(6)                                  # the ROM boots 8 s before line 1
         self.log("ready")
-        with open(os.path.join(TRACES, name + ".txt"), encoding="utf-8") as f:
+        with open(os.path.join(_dir(name), name + ".txt"), encoding="utf-8") as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
                 if line.startswith("mark "):
@@ -295,6 +300,15 @@ class ScenarioRun(TronTestCase):
             self.step(ms / 1000)
             self.sw(name, 0)
             self.step(0.05)                           # tron_ref: 50 ms settle after a button pulse
+
+    # commands that only instrument the ROM run in PinMAME (breakpoints, dumps): nothing to do in the rebuild
+    def cmd_pretrace(self, *a):
+        pass
+
+    cmd_pretracepc = cmd_trace = cmd_dump_tasks = cmd_dump_events = cmd_dump_rules = cmd_pokeat = cmd_pretrace
+
+    def cmd_dsw(self, *a):
+        pass                                          # a PinMAME switch number of the coin door column: no rebuild input yet
 
     def cmd_mark(self, *text):
         self.log("mark", text=" ".join(text))

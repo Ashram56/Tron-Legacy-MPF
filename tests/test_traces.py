@@ -44,6 +44,8 @@ TRACES = {
     "clu_hurryup": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "gem_hurryup": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,coil",
     "zuse_fast_scoring": "audit,multiball_start,mark",
+    # the newer reference traces (assets/rom_data/states/traces); the sound kind differs by a 0.25 s ball-save timing
+    "gi_and_tilt": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
 }
 
 

@@ -1511,6 +1511,11 @@ class TronOS(CustomCode):
         self.ball_search_reload(15)
         self.audit(0x2a)
         self.kill_ball_save()
+        # task_kill(0, 0x1000) [0x00024444]: every task without flag 0x1000 dies, the leff tasks too (leff_start
+        # creates them with flags 0x22 | 0x100 / 0x2000 [0x000087ac]); the rules start them again at the next ball
+        self.leffs.kill_all()
+        for rule in self.rules:
+            rule[3] = False
         self.machine.events.post("tron_tilt")
         self.hook("tilt")                            # event 0x65
         self.deff_start(21)

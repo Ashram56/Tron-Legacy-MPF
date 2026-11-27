@@ -23,6 +23,7 @@ import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 REF = os.path.join(ROOT, "assets", "rules", "traces")
+REF2 = os.path.join(ROOT, "assets", "rom_data", "states", "traces")   # the newer reference traces
 CAND = os.path.join(ROOT, "captures", "traces")
 COMPARE = os.path.join(ROOT, "assets", "rules", "tools", "trace", "trace_compare.py")
 DEFAULT = "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil"
@@ -70,7 +71,7 @@ def main():
     global STRICT
     STRICT = a.strict
     with tempfile.TemporaryDirectory() as tmp:
-        ref = filtered(os.path.join(REF, a.scenario + ".jsonl"), os.path.join(tmp, "r") if os.makedirs(
+        ref = filtered(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"), os.path.join(tmp, "r") if os.makedirs(
             os.path.join(tmp, "r")) is None else tmp)
         os.makedirs(os.path.join(tmp, "c"))
         cand = filtered(os.path.join(CAND, a.scenario + ".jsonl"), os.path.join(tmp, "c"))
@@ -84,7 +85,7 @@ def main():
             sys.stdout.flush()
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             import lamp_state
-            good, total, _ = lamp_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+            good, total, _ = lamp_state.compare(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"),
                                                 os.path.join(CAND, a.scenario + ".jsonl"))
             if good == total:
                 print("{:16s} OK   {} samples".format("lamp", total))
@@ -95,7 +96,7 @@ def main():
             sys.stdout.flush()
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             import coil_state
-            good, total, _ = coil_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+            good, total, _ = coil_state.compare(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"),
                                                 os.path.join(CAND, a.scenario + ".jsonl"))
             if good == total:
                 print("{:16s} OK   {} bursts".format("coil", total))
