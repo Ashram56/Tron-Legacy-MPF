@@ -20,6 +20,7 @@ import re
 from mpf.core.custom_code import CustomCode
 
 from tron.trace import Trace
+from tron.rom_rng import RomRandom
 
 TICK = 0.01626          # seconds per ROM tick in play (game_flow.md section 0)
 SECOND = 62             # ticks the ROM treats as one second
@@ -180,7 +181,9 @@ class TronOS(CustomCode):
         # mode values, the current stage): its display lines (tron/media_bridge.py, refreshed while shown)
         self.deff_values = {}
         self.deff_texts = {}
-        self.random = random.Random()
+        # the ROM's own generator (rom_rng.py, FUN_0000c684/0xc6b4); TRON_RNG_SEED fixes the state for conformance runs
+        _seed = os.environ.get("TRON_RNG_SEED")
+        self.random = RomRandom(int(_seed, 0) if _seed else None)
         self._new_game = False
         self._new_game_ball = False
         self._search_handle = None

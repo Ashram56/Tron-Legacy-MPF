@@ -83,17 +83,21 @@ class TestBridge(TronTestCase):
         self.assertTrue(plays, "no 2-way combo display")
         kw = plays[-1]
         jackpot = self.tron.hook("eol_combo_jackpot_value")
-        self.assertEqual(["%u", "WAY", "COMBO", "%,02lu", "%s", "JACKPOT=%,02lu"], bridge.data["deffs"][138]["text"])
-        self.assertEqual("2", kw["line0"])                       # the count, in the ring font
-        self.assertEqual(("WAY", "COMBO"), (kw["line1"], kw["line2"]))
-        self.assertRegex(kw["line3"], r"^\d{1,3}(,\d{3})+$")    # the points
-        self.assertEqual("CASTOR COMBO", kw["line4"])           # the named combo (the ROM's message 0x6a4), on its own row
-        self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), kw["line5"])
+        # deff 138 is an engine effect (rom_deff138.py, ported from the ROM): its texts are the draw items of the last flip
+        e = kw["engine"]
+        texts = [e["items"][i]["t"] for i in e["frames"][e["seq"][-2]] if "t" in e["items"][i]]
+        self.assertEqual("2", texts[0])                          # the count, in the ring font
+        self.assertEqual(("WAY", "COMBO"), tuple(texts[1:3]))
+        self.assertRegex(texts[3], r"^\d{1,3}(,\d{3})+$")       # the points
+        self.assertEqual("CASTOR COMBO", texts[4])               # the named combo (the ROM's message 0x6a4), on its own row
+        self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), texts[5])
         with mock.patch.object(bridge, "connected", return_value=True), \
                 mock.patch.object(self.machine.bcp, "interface") as iface:
             self.tron.deff_start(138, points=300000, named=None, count=3, total=2, jackpot=850000)
             kw = self._slide_plays(iface, "deff_138")[-1]
-        self.assertEqual(("3", "300,000", "", "JACKPOT=850,000"), (kw["line0"], kw["line3"], kw["line4"], kw["line5"]))
+        e = kw["engine"]
+        texts = [e["items"][i]["t"] for i in e["frames"][e["seq"][-2]] if "t" in e["items"][i]]
+        self.assertEqual(["3", "WAY", "COMBO", "300,000", "JACKPOT=850,000"], texts)   # no named combo: no row
 
     def test_end_of_line_more_text(self):
         # deff 55 prints only `more`; before / after / flags pick the screen
