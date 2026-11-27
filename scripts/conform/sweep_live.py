@@ -33,7 +33,7 @@ def ram_47(a, discs=6, recogs=3):
             0x3af18: a["jackpot"], 0x3af1c: a["super"]}
 
 
-RAMS = {141: ram_141, 47: ram_47}
+RAMS = {141: ram_141, 47: ram_47, 57: lambda a: {0x3ae00: a["value"]}}      # deff_57 0x01005524: eol_switch_value 0x3ae00
 # Effects whose values are the task arguments (task + 0x30, +0x34, ...): the deff_args events. 140 (0x0102faec): total, sos_bonus (task + 0x34 != 0 prints
 # SEA OF SIMULATION BONUS and the value).
 TASK_ARGS = {140: lambda a: [a["total"], a["sos_bonus"], 0, 0],
@@ -46,7 +46,10 @@ TASK_ARGS = {140: lambda a: [a["total"], a["sos_bonus"], 0, 0],
              51: lambda a: [a["total"], 0, 0, 0], 90: lambda a: [a["total"], 0, 0, 0],
              58: lambda a: [a["value"], 0, 0, 0], 59: lambda a: [a["value"], 0, 0, 0], 61: lambda a: [a["value"], 0, 0, 0],
              139: lambda a: [a["value"], 0, 0, 0], 60: lambda a: [a["value"], a["more"], 0, 0],
-             83: lambda a: [a["more"], 0, 0, 0], 26: lambda a: [a["player"], 0, 0, 0], 112: lambda a: [a["award"], 0, 0, 0]}              # SKILL SHOT value
+             # deff_55 (0x0100461c, ZUSE/TRON letters): bytes task + 0x30 / + 0x38 = lit letters of the left row before / after, + 0x34 / + 0x3c the right row,
+             # + 0x40 = flags, + 0x44 = the count printed ("%u MORE TO")
+             55: lambda a: [a["before"][0], a["before"][1], a["after"][0], a["after"][1], a["flags"], a["more"]],
+             83: lambda a: [a["more"], a["mask"], 0, 0], 26: lambda a: [a["player"], 0, 0, 0], 112: lambda a: [a["award"], 0, 0, 0]}              # SKILL SHOT value
 
 
 def clip_args(e, a):
@@ -94,7 +97,7 @@ def main(out, e, *logs):
             if '"ev": "deff_live"' in line or ('"ev": "deff_args"' in line and (e in TASK_ARGS or e in EXPAND)):
                 ev = json.loads(line)
                 if ev["id"] == e:
-                    states.add(tuple(sorted(ev["args"].items())))
+                    states.add(tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in ev["args"].items())))
     if e in EXPAND:
         jobs = [(e, (("args", tuple(x)),)) for s in (sorted(states) or [()]) for x in EXPAND[e](e, dict(s))]
         jobs = sorted(set(jobs))

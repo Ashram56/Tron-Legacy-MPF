@@ -84,7 +84,8 @@ class Display:
     def _log_args(self, deff_id, args):
         """The arguments a deff starts with, in the wall-clock trace only (scripts/conform: they set the state of the ROM-code run)."""
         if args and getattr(self.os.trace, "_wall", False):
-            self.os.trace.log("deff_args", id=deff_id, args={k: v for k, v in args.items() if isinstance(v, (int, float, str, bool))})
+            self.os.trace.log("deff_args", id=deff_id, args={k: (list(v) if isinstance(v, (tuple, list)) else v) for k, v in args.items()
+                                                     if isinstance(v, (int, float, str, bool)) or (isinstance(v, (tuple, list)) and all(isinstance(x, int) for x in v))})
 
     def start(self, deff_id, hold=False, refresh=True, run_seconds=None, sounds=None, media=False, **args):
         """run_seconds: the run length when this call's variant differs from the recorded one.
