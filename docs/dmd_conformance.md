@@ -402,8 +402,7 @@ Other scenarios, same method (2026-11-27): `game_flow_tilt` panel 47/48, `bonus`
 or 10 rows, column x = 40 rows 21-31, while the last award fades (`SWEEP_GEM=9,10`) and while the score rolls up in the 15 000 000 bonus
 (`SWEEP_GEM_ROLL=9,10`, counters 0x21117f4 and 0x21117fc), both options of `sweep_panel.py`). Each scenario's one remaining panel is the
 display's start-up frame, which is not a ROM frame. Bodies (columns 41-127): game_flow 515/516, bonus 349/350, tilt 229/230, same single frame.
-The attract scenario's panel (no game, no score): 79/81 distinct panels. One is the start-up frame; the other, seen 83 times (every 2 s page from
-3.7 s to 59.5 s), is a text page of two lines in font 15 (the REPLAY pages, layout 2 of `attract_pages.page_layout`) whose panel the game draws with
-the separator column x 40 at level 15 on every row, no row-31 segments and the bright "00", where the ROM's attract pages
-(`assets/rom_data/dmd_code/deff_001_pages`, 61 pages) draw the separator at level 1 with the three 10-dot segments at level 1 (62 dots differ).
-Open, a game fix in the page's panel (`slides/text_page.tscn` / `dmd_mode_only.gd`), not a sweep gap.
+The attract scenario, re-run on the current game (2026-11-27; the first dump of the day predated the attract panel fix and wrongly showed the separator at
+level 15, so a "REPLAY page panel" departure noted for a few minutes in this file's history does not exist): panel 86/87 distinct panels (the one miss is the
+start-up frame), columns 41-127 222/233, the 10 misses being frames of effect 1 (the pages that show the machine's own state: high score table initials, credits page,
+clock-free pages; see the attract notes above).
