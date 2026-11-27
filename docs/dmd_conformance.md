@@ -459,3 +459,14 @@ Not closed, with what is known (not a conclusion that the game is right):
 - Effects 55, 57, 58, 59, 60, 83, 42 (Daft Punk and End of Line): drawn by the game's own engine from the ROM's routines since 2026-11-27 ([dmd_engine.md](dmd_engine.md)). Daft Punk 654 -> 1382 / 1383 and End of Line 700 -> 1196 / 1197 frames found; the one left in each is the display's start-up frame. The report's "last deff_start" attribution hid these effects behind 19 and 57: 58 / 59 draw their own dimmed film.
 - Effect 47: 75 frames left after the state sweep, 47 is drawn between effects 48/49 (jackpot awards), timing not reproduced yet.
 - Effects 25 and 77 (sweeps run, not yet folded into this table).
+
+## Light Cycle multiball with the engine (2026-11-27)
+
+Effect 138 (N WAY COMBO) is ported (`rom_deff138.py`, 129/129, 128/128, 129/129 frames against the ROM code in Unicorn); in the
+light_cycle_multiball scenario it leaves 4 misses (the named-combo text, ROM message not yet read), effect 55 two. The 562 misses
+attributed to effect 19 are not its drawing: of 574 distinct frames, 512 are 200 dots or more from every frame the code produces
+(`/tmp/near.py` method). They are the film clips of the progress overlays 108 (`0x10209b0`, `random_below(4)` at `0x10209d8` picks one
+of 4 clips) and 111 (`0x1021bac`, `random_below(11)` at `0x1021be4` picks one of 11 clips through the table `0x40d337c`) drawn over the
+score display. These are pure animations, so they stay the code-run frames (no engine program: nothing is computed from game state);
+which clip plays depends on the ROM's RNG draws, so an exact frame match needs the same draws (`TRON_DMD_SEED`), as for 105 (7 draws
+at the reels). Ported effects need state (text, values), which is where the engine matters; 47, 86-89 and 140-145 are films as well.
