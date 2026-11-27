@@ -113,3 +113,21 @@ def test_deff2_equals_the_rom_code(volume):
     mine = rom_deff2.frames(volume)
     # flip 0 shows the page the allocator left (all 0xff), not a picture; every other flip is the ROM's
     assert [k for k, (t, f) in enumerate(ora) if k and C.body(f) != C.body(mine[min(k, len(mine) - 1)][1])] == []
+
+
+def test_deff94_draw_list_has_the_squeeze():
+    from tron import rom_deff94
+    p = rom_engine.payload(94, {"value": 10000})
+    assert not p["loop"] and p["ticks"] == 1
+    assert len(p["seq"]) == rom_deff94.FLIPS * rom_deff94.TICKS + 10 * rom_deff94.SQUEEZE_TICKS + rom_deff94.HOLD_FLIPS * rom_deff94.HOLD_TICKS + 1
+    assert sum(1 for it in p["items"] if "p" in it) >= 5                    # the copied rows of the new-page stages
+    assert any(it.get("t") == "10,000 POINTS" for it in p["items"])
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+def test_deff94_equals_the_rom_code():
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff94
+    ok, total, first = C.compare(94, [10000], lambda a: rom_deff94.frames(10000))
+    assert (ok, first) == (total, None)

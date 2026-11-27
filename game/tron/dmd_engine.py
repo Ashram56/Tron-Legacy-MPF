@@ -92,6 +92,19 @@ class Page:
             for x in range(max(x0, 0), min(x1, W - 1) + 1):
                 self.b[y * W + x] = v
 
+    def bitmap(self, x, y, w, h, levels):
+        """Rows of dots set to the given levels (a copy of rows of a page, FUN_0102b980's dmd_copy_rect): the draw list gets the dots as an
+        item {"p": [x, y, w, h, hex]} (one hex digit a dot), tron/dmd_effect.gd draws them opaque."""
+        if self._rec:
+            self.items.append({"p": [x, y, w, h, "".join("%x" % (v & 15) for v in levels)]})
+        for iy in range(h):
+            yy = y + iy
+            if 0 <= yy < H:
+                for ix in range(w):
+                    xx = x + ix
+                    if 0 <= xx < W:
+                        self.b[yy * W + xx] = levels[iy * w + ix] & 15
+
     def width(self, n):                         # FUN_0002b094 (image width, +8)
         return image(n)[0]
 

@@ -516,6 +516,18 @@ class State extends RefCounted:
 				var rr: Array = d["r"]
 				var fill := float(d.get("v", 0)) / 15.0
 				out.append(["rect", Rect2(float(rr[0]), float(rr[1]), float(rr[2] - rr[0] + 1), float(rr[3] - rr[1] + 1)), Color(fill, fill, fill, 1.0)])
+			elif d.has("p"):
+				# rows of dots copied from a page (FUN_0102b980's dmd_copy_rect): [x, y, w, h, one hex level per dot], drawn opaque
+				var pd: Array = d["p"]
+				var pw := int(pd[2])
+				var ph := int(pd[3])
+				var pimg := Image.create(pw, ph, false, Image.FORMAT_RGBA8)
+				var digits := str(pd[4])
+				for py in ph:
+					for px in pw:
+						var lv := float(("0x" + digits[py * pw + px]).hex_to_int()) / 15.0
+						pimg.set_pixel(px, py, Color(lv, lv, lv, 1.0))
+				out.append(["tex", ImageTexture.create_from_image(pimg), Rect2(float(pd[0]), float(pd[1]), pw, ph), ink])
 			elif d.has("i"):
 				var tex := _engine_image(int(d["i"]), d.get("m", []))
 				if tex:
