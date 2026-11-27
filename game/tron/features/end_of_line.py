@@ -137,10 +137,13 @@ class EndOfLine(Feature):
         if os_.flag(LIT) or os_.any_multiball() or os_.flag(0x34):
             return False
         before = (pd.eol_left, pd.eol_right)
-        if side == 0:
-            pd.eol_left = min(pd.eol_left + 1, 4)
-        else:
-            pd.eol_right = min(pd.eol_right + 1, 4)
+        advanced = False                                  # the routine's result: a letter was lit (a word already at 4 letters is not)
+        if side == 0 and pd.eol_left < 4:
+            pd.eol_left += 1
+            advanced = True
+        elif side == 1 and pd.eol_right < 4:
+            pd.eol_right += 1
+            advanced = True
         after = (pd.eol_left, pd.eol_right)
         needed = os_.adj_value(83) if pd.eol_times_lit == 0 else os_.adj_value(84)
         eb_adj = os_.adj_value(85)
@@ -166,7 +169,7 @@ class EndOfLine(Feature):
                 what = 0xc                                            # "LIGHT M.B. + E.B."
         os_.deff_start(55, before=before, after=after, flags=flags | what, more=more,
                        screen=self.letters_screen(flags | what))
-        return True
+        return advanced
 
     @staticmethod
     def letters_screen(flags):
