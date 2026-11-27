@@ -463,10 +463,15 @@ Not closed, with what is known (not a conclusion that the game is right):
 ## Light Cycle multiball with the engine (2026-11-27)
 
 Effect 138 (N WAY COMBO) is ported (`rom_deff138.py`, 129/129, 128/128, 129/129 frames against the ROM code in Unicorn); in the
-light_cycle_multiball scenario it leaves 4 misses (the named-combo text, ROM message not yet read), effect 55 two. The 562 misses
-attributed to effect 19 are not its drawing: of 574 distinct frames, 512 are 200 dots or more from every frame the code produces
-(`/tmp/near.py` method). They are the film clips of the progress overlays 108 (`0x10209b0`, `random_below(4)` at `0x10209d8` picks one
-of 4 clips) and 111 (`0x1021bac`, `random_below(11)` at `0x1021be4` picks one of 11 clips through the table `0x40d337c`) drawn over the
-score display. These are pure animations, so they stay the code-run frames (no engine program: nothing is computed from game state);
-which clip plays depends on the ROM's RNG draws, so an exact frame match needs the same draws (`TRON_DMD_SEED`), as for 105 (7 draws
-at the reels). Ported effects need state (text, values), which is where the engine matters; 47, 86-89 and 140-145 are films as well.
+light_cycle_multiball scenario it leaves 4 misses (the named-combo text, ROM message not yet read), effect 55 two.
+Effect 105 (Flynn's awards): with the draws the game made (`sweep_arcade.py`) its 50 misses go to 0, so the comparison is exact at
+equal draws. The ROM's generator is ported (`game/tron/rom_rng.py`: FUN_0000c684 state = state * 0x19660d + 1 at RAM 0x372c4,
+FUN_0000c6b4 random_below(n) = (n * state) >> 32; the game's `os.random`, `TRON_RNG_SEED` fixes the state; Godot's clip picks use it
+with the same variable). Not yet shared: Godot and Python keep separate states, so a run's clip picks do not interleave with the
+ROM's other draws; `DMDPICK` lines in the Godot log + `sweep_clips.py` give the draw of each clip to the ROM code as input.
+
+The 562 misses attributed to effect 19 are the score display itself: frames viewed (credits page, 4,780, 927,580, 1,182,310 with REPLAY AT
+..., "TO LIGHT" over 55,130) are 19 with score values and rolls that the state sweeps (`sweep_state.py`) do not reach, 512 of 574 being 200 dots or
+more from any code frame because a big score font differs everywhere. 108 and 111 are not started in this scenario (no deff_start). The open
+point is therefore the value state of 19, which only a ported program reading the live score and roll (engine) removes; it needs
+FUN_01023940 (roll), FUN_000249e4, FUN_01023704, FUN_00022a90, FUN_010230ec from the decompile.

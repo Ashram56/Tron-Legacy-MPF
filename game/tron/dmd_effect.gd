@@ -399,6 +399,7 @@ class State extends RefCounted:
 		var vs: Array = items[_frames_item].get("variants", [])
 		if vs.size() and DmdEffect.variants_enabled():
 			_variant = DmdEffect.pick_variant(vs.size() - (1 if items[_frames_item].has("alt") else 0))
+			print("DMDPICK ", effect_name, " ", vs.size() - (1 if items[_frames_item].has("alt") else 0), " ", _variant)   # the draw, for scripts/conform/sweep_clips.py
 		for f in _frames():
 			_durations.append(float(f[1]))
 			_total_ms += float(f[1])
