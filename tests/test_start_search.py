@@ -57,3 +57,19 @@ class StartSearchTest(TronTestCase):
         self.fill_trough()
         self.hit_switch_and_run("s_start_button", 1.5)
         self.assertFalse(self.tron.display.running(39))
+
+    def pulses(self):
+        seen = []
+        for name in ("c_left_slingshot", "c_right_slingshot", "c_left_bumper", "c_right_bumper", "c_bottom_bumper"):
+            self.machine.coils[name].hw_driver.pulse = (lambda n: lambda *a, **k: seen.append(n))(name)
+        return seen
+
+    def test_each_search_round_pulses_the_two_slingshots_only(self):
+        """FUN_00003138 -> FUN_000030a8: ball search pulse length 64 ms on coils 13 / 14; the bumpers (flag 0x2000) and flashers (0x4) are excluded."""
+        seen = self.pulses()
+        self.three_balls()
+        self.hit_and_release_switch("s_start_button")
+        self.advance_time_and_run(30)
+        self.assertEqual(4, seen.count("c_left_slingshot"))
+        self.assertEqual(4, seen.count("c_right_slingshot"))
+        self.assertEqual(8, len(seen))

@@ -973,6 +973,7 @@ class TronOS(CustomCode):
         def round_start():
             rounds[0] += 1
             self.audit(0x25)
+            self._search_pulses()
             self.machine.events.post("tron_ball_search", count=rounds[0])
             check(0)
 
@@ -1302,9 +1303,19 @@ class TronOS(CustomCode):
             # bonus_skip 15.35 -> 15.93)
             self.after(BALL_SEARCH_EVENT_TICKS, lambda: self.task_running(0x2b) and self.request_refresh())
             self.audit(0x25)
+            self._search_pulses()
             self.hook("ball_search")
             self.machine.events.post("tron_ball_search", count=self.ball_search_count)
         self.ball_search_reload(15 if self.tilted else 10)
+
+    SEARCH_COILS = ("c_left_slingshot", "c_right_slingshot")
+
+    def _search_pulses(self):
+        """FUN_00003138 [0x00003138] at every search start (task_ball_search, on_ball_search_started 0x0001f634): FUN_000030a8 pulses each coil
+        whose descriptor has a ball search pulse length (+0x12) and none of the flag bits 0xa0dc (bumpers carry 0x2000, flashers 0x4, kickers
+        0x40): the two slingshots (coils 13 and 14), 64 ms, together (assets/rom_data/io/coils.csv ballsearch_ms)."""
+        for name in self.SEARCH_COILS:
+            self.machine.coils[name].pulse()
 
     def _lost_ball_feed(self):
         """ball_search_start(5) with adj 63 LOST BALL RECOVERY [0x0001f79c]: the balls missing from the
