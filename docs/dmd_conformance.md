@@ -484,3 +484,9 @@ Found by the port: the special line's phase is 0x9b + n * 1562 ticks for 0x138 t
 the line is chosen), not a 1718 tick cycle from 156 (`score_display.gd` `replay_phase` fixed; the measured 29.2 s / 26.5 s of 2026-10-30 are
 tick 1717 and a 1562 tick period at 16.9 ms). Not yet carried to Godot as an engine program (the effect never ends and its values change live: it keeps
 `score_display.gd`, whose band / wipe rows equal the program's); the special / replay text sources (FUN_000249e4, FUN_01023704) come from the rules.
+
+Light Cycle multiball remeasured with the ported 19 (`sweep_engine19.py`, 700 ticks, the scenario's scores) and 105 at the game's draws:
+**915 of 1234 distinct game frames found in columns 41-127** (534 of 1214 before the engine work); the 19 misses go from 562 to 271. What is left, seen
+on the frames: the overlays that draw over the score display (41 / 84 "n MORE TO LIGHT LIGHT CYCLE", 62 "n MORE TO LIGHT EX. BALL" on the Daft Punk film
+with the film's score under it), the named combo text of 138 ("LAST ISO COMBO", message not read yet), the credits page and its INSERT COINS
+(deff 10), and score blink / wipe frames whose tick counter the sweep did not sample. Next ports: 41 / 84, 62, 138's names.
