@@ -88,3 +88,6 @@ Combos read against on_combo_shot 0x01003714, combo_value 0x0100344c (250,000 + 
 Found by the audit (2026-11-27), a regression of the ROM RNG port the same day: `RomRandom.randrange(a, b, step)` ignored `step`, so the match number (`os_.random.randrange(0, 100, 10)`) could be any
 two-digit number instead of the ROM's `random_below(10) * 10` [match 0x0001b660]. Fixed (one draw of the count of values, times the step); `tests/test_rom_rng.py`. The rest of `match`
 (rate test against adj 30, the next free tens number, `match_award` 0x0001b86c, adj 29) read: identical.
+Found by the audit (2026-11-27), tilt: `tilt_switch` 0x00024564 also starts task 0x2e (`task_2e` 0x00024520) when the plumb bob closes, and the task warns again every 62 ticks while the bob
+stays closed (the open event kills it) and tilts at the second one: a bob held closed for 124 ticks tilts whatever adj 32 says. The game only warned on the closing edge (once a second).
+Now `os_layer._plumb_bob` / `_bob_held` / `_plumb_bob_open`; `tests/test_adjustments.py` `test_tilt_bob_held_closed_tilts_after_two_periods`. Not modelled: the stuck-switch bit the task sets in 0x021100f4 after the tilt.

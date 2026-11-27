@@ -240,6 +240,7 @@ class TronOS(CustomCode):
         sw.add_switch_handler("s_start_button", self._start_pressed)
         sw.add_switch_handler("s_service_back", self._service_back)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
+        sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob_open, state=0)
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
         sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
         sw.add_switch_handler("s_left_flipper", lambda: self._abort_animations("s_right_flipper"))
@@ -1464,11 +1465,32 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ tilt (5.3)
 
     def _plumb_bob(self):
+        """tilt_switch [0x00024564], bob closed: the warning (once per 62 ticks, FUN_00010ad4 / FUN_00010b18 timer 1) and task 0x2e,
+        which keeps warning every 62 ticks while the bob stays closed and tilts at the second (the open event kills it)."""
         if not self.game or self.tilted or self.state & ST_END_BALL:
             return
+        if not self.task_running(0x2e):
+            self.task_start(0x2e, SECOND, lambda: self._bob_held(0))
         if self.now - self._last_bob < SECOND * TICK:
             return
         self._last_bob = self.now
+        self._tilt_warning()
+
+    def _plumb_bob_open(self):
+        self.task_kill(0x2e)
+
+    def _bob_held(self, n):
+        """task_2e [0x00024520]: after 62 ticks tilt_warning, after 62 more tilt_warning, then tilt."""
+        if not self.game or self.tilted or self.state & ST_END_BALL:
+            return
+        self._tilt_warning()
+        if n == 0:
+            self.task_start(0x2e, SECOND, lambda: self._bob_held(1))
+        else:
+            self._tilt()
+
+    def _tilt_warning(self):
+        """tilt_warning [0x00024398]: a warning while under adj 32, else the tilt."""
         if self.adj_value(64) and self.coin_door_open():
             return                                   # FUN_00024344: adj 64 ignores the tilt with the door open
         if self.tilt_warnings < self.adj_value(32):
@@ -1477,6 +1499,12 @@ class TronOS(CustomCode):
             self.leff_start(11)
             self.sound(0x016)
             self.after(31, lambda: self.sound(0x03d))
+            return
+        self._tilt()
+
+    def _tilt(self):
+        """tilt [0x0002444c]."""
+        if self.tilted or (self.adj_value(64) and self.coin_door_open()):
             return
         self.hook("tilt_start")                      # event 0x66, posted before the tilt state is set
         self.state |= ST_TILT

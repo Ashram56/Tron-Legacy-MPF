@@ -129,6 +129,21 @@ class TestGameFlowAdjustments(AdjCase):
         self.advance_time_and_run(0.1)
         self.assertTrue(os_.tilted)
 
+    def test_tilt_bob_held_closed_tilts_after_two_periods(self):
+        """task_2e [0x00024520]: a bob that stays closed warns again every 62 ticks and tilts at the second; opening kills it."""
+        os_ = self.start_game()
+        self.hit_switch_and_run("s_plumb_bob_tilt", 0.1)         # warning 1 at once
+        self.release_switch_and_run("s_plumb_bob_tilt", 0.1)     # opened at once: nothing more
+        self.advance_time_and_run(3)
+        self.assertFalse(os_.tilted)
+        self.assertEqual(1, self.deffs().count(23))
+        os_.tilt_warnings = 0
+        os_._last_bob = -999.0
+        self.hit_switch_and_run("s_plumb_bob_tilt", 1.2)         # still closed after 62 ticks: warning 2
+        self.assertFalse(os_.tilted)
+        self.advance_time_and_run(1.2)                           # 124 ticks: the third and the tilt
+        self.assertTrue(os_.tilted)
+
     def test_64_coin_door_disable_tilt(self):
         os_ = self.start_game()
         self.hit_switch_and_run("s_coin_door_open", 0.1)
