@@ -19,7 +19,7 @@ X0 = 41
 
 def oracle(effect, args, ram=None):
     """The ROM's frames: the distinct pictures (columns X0-127, as 128 x 32 levels) in the order shown, with the tick each starts."""
-    snaps, ticks, _ = T.trace(effect, args, ram)
+    snaps, ticks, _ = T.trace(effect, args, ram, int(os.environ.get("ENGINE_INSNS", "4000000")))
     out = []
     for (r0, r1, fg, bg), t in zip(snaps, ticks):
         f = E.mix(fg, bg)
@@ -51,12 +51,13 @@ def compare(effect, args, program, ram=None, rows=range(E.H)):
 
 
 if __name__ == "__main__":
-    from tron import rom_deff55, rom_deff57, rom_deff60
+    from tron import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83
     eff = int(sys.argv[1])
     args = [int(a, 0) for a in sys.argv[2:]] or None
     if eff == 57:                   # arg: the value RAM 0x3ae00 holds; the ROM loop never ends, so the comparison covers the first frames only
         v = args[0] if args else 0
         print(compare(57, None, lambda a: rom_deff57.frames(v, flips=60), ram={0x3ae00: v}))
     else:
-        prog = {55: rom_deff55.frames, 60: rom_deff60.frames}[eff]
+        prog = {55: rom_deff55.frames, 60: rom_deff60.frames,
+                83: lambda a: rom_deff83.frames83(a, 400), 58: lambda a: rom_deff58.frames(58, a), 59: lambda a: rom_deff58.frames(59, a)}[eff]
         print(compare(eff, args, prog, rows=range(0, 32)))

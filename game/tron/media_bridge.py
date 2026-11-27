@@ -100,6 +100,7 @@ class MediaBridge:
         # last deff / text slide stays up until the next one plays, never GMC's base slide below them all
         self.shown = set()                         # deff and text slides playing now
         self.kept = None                           # the last one, stopped but left up until the next plays
+        self._engine_key = {}                      # deff -> the arguments of the engine payload the slide holds
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
         # last points: each score_add on its own (FUN_010238ac on event 0x4d, posted by every score_add: os_layer calls
         # score_added), not the sum of one task run's adds (a jackpot and its switch's 10,000 showed 510,000 for 500,000)
@@ -152,7 +153,12 @@ class MediaBridge:
             args = dict(args, **vals)
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
         if info.get("source") == "engine":             # drawn by the game from the ROM's routine (tron/rom_engine.py)
-            return dict(self.score_display_args() if info.get("panel") else {}, engine=rom_engine.payload(deff_id, args))
+            key = repr(sorted((k, v) for k, v in args.items() if isinstance(v, (int, tuple, list))))
+            panel = self.score_display_args() if info.get("panel") else {}
+            if self._engine_key.get(deff_id) == key:       # the slide keeps the payload it was sent (long ones, deff 83, are sent once)
+                return panel
+            self._engine_key[deff_id] = key
+            return dict(panel, engine=rom_engine.payload(deff_id, args))
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)
         if deff_id in TEXT_ARGS:
@@ -182,6 +188,7 @@ class MediaBridge:
         if not info:
             return
         slide = info["slide"]
+        self._engine_key.pop(deff_id, None)
         self.started[deff_id] = args
         if info.get("panel") or deff_id in getattr(self.os, "deff_values", {}):
             self.active.add(deff_id)

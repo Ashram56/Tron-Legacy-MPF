@@ -4,18 +4,24 @@ payload(deff_id, args) -> the event arg `engine` of the effect's slide: {"ticks"
 "frames": the distinct draw lists (tron/service_screen.gd items), "seq": the frame number of each flip}. tron/dmd_effect.gd draws the list
 of the flip the effect's time is in (the clock: tick_ms of tron/score_display.gd), over the status panel the effect keeps.
 """
-from . import rom_deff55, rom_deff57, rom_deff60
+from . import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83
 
-DEFFS = (55, 57, 60)
+DEFFS = (42, 55, 57, 58, 59, 60, 83)
 
 
 def _pack(flips, ticks, loop):
-    frames, seq = [], []
-    for _, items in flips:
-        if items not in frames:
-            frames.append(items)
-        seq.append(frames.index(items))
-    return {"ticks": ticks, "loop": loop, "frames": frames, "seq": seq}
+    """items: every distinct draw item once; frames: the distinct draw lists as lists of item numbers; seq: the frame of each flip."""
+    items, frames, seq = [], [], []
+    for _, lst in flips:
+        row = []
+        for it in lst:
+            if it not in items:
+                items.append(it)
+            row.append(items.index(it))
+        if row not in frames:
+            frames.append(row)
+        seq.append(frames.index(row))
+    return {"ticks": ticks, "loop": loop, "items": items, "frames": frames, "seq": seq}
 
 
 def payload(deff_id, args):
@@ -26,6 +32,13 @@ def payload(deff_id, args):
         return _pack(flips, rom_deff55.TICKS, False)
     if deff_id == 57:
         return _pack(rom_deff57.draws(int(args.get("value", 0) or 0)), rom_deff57.TICKS, True)
+    if deff_id == 83:
+        return _pack(rom_deff83.draws83([int(args.get("more", 0) or 0), int(args.get("mask", 0) or 0)]), rom_deff83.TICKS, False)
+    if deff_id == 42:
+        p0 = rom_deff83.pages42(int(args.get("last", 0) or 0), int(args.get("total", 0) or 0))
+        return _pack([(i, p0[0][1].items) for i in range(0x5d)] + [(0x5d, [])], 1, False)
+    if deff_id in (58, 59):
+        return _pack(rom_deff58.draws(deff_id, [int(args.get("value", 0) or 0)]), rom_deff58.TICKS, False)
     if deff_id == 60:
         return _pack(rom_deff60.draws([int(args.get("value", 0) or 0), int(args.get("more", 0) or 0)]), rom_deff60.TICKS, False)
     return {}

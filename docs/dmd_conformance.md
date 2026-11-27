@@ -456,8 +456,6 @@ background effect 86, whose own frames match).
 Not closed, with what is known (not a conclusion that the game is right):
 - Effect 19: the sweep puts the score move at tick 30 of the effect and starts the roll at one phase (`sweep_state.py`); the multiball scores move at other
   ticks, so the roll's intermediate scores and the rotating bottom line are not all produced. Not yet checked with other move ticks.
-- Effects 55, 57, 60 (Daft Punk and End of Line): drawn by the game's own engine from the ROM's routines since 2026-11-27 ([dmd_engine.md](dmd_engine.md)); the
-  frames they showed before did not depend on the state (letters, switch count, award). Daft Punk 654 -> 1302 / 1354 and End of Line 700 -> 1128 / 1199 frames found.
-  Left in Daft Punk: 31 frames after effect 57 (not identified), effect 19: 20 (DP) and 70 (EOL), rows 26-29 of the bottom line.
+- Effects 55, 57, 58, 59, 60, 83, 42 (Daft Punk and End of Line): drawn by the game's own engine from the ROM's routines since 2026-11-27 ([dmd_engine.md](dmd_engine.md)). Daft Punk 654 -> 1382 / 1383 and End of Line 700 -> 1196 / 1197 frames found; the one left in each is the display's start-up frame. The report's "last deff_start" attribution hid these effects behind 19 and 57: 58 / 59 draw their own dimmed film.
 - Effect 47: 75 frames left after the state sweep, 47 is drawn between effects 48/49 (jackpot awards), timing not reproduced yet.
 - Effects 25 and 77 (sweeps run, not yet folded into this table).

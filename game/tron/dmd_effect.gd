@@ -491,7 +491,9 @@ class State extends RefCounted:
 		var k := int(elapsed_ms / (float(e["ticks"]) * ScoreDisplay.TICK_MS))
 		k = k % seq.size() if e.get("loop", false) else mini(k, seq.size() - 1)
 		var ink: Color = dmd.text_tint(DMD_COLOR) if hd and dmd else DMD_COLOR
-		for d in e["frames"][int(seq[k])]:
+		var table: Array = e["items"]
+		for idx in e["frames"][int(seq[k])]:
+			var d: Dictionary = table[int(idx)]
 			var level := float(d.get("l", 15)) / 15.0
 			if d.has("i"):
 				var tex := _engine_image(int(d["i"]), d.get("m", []))

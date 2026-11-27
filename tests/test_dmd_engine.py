@@ -28,8 +28,11 @@ def test_deff55_draw_list():
 def test_payload_packs_distinct_frames():
     pay = rom_engine.payload(57, {"value": 12000})
     assert pay["loop"] and len(pay["seq"]) == 116 and len(pay["frames"]) == 58
-    assert "12,000" in pay["frames"][0][1]["t"]
-    assert rom_engine.payload(60, {"value": 200000, "more": 0})["frames"][0][-1]["t"] == "BALL ADDED"
+    assert "12,000" in pay["items"][pay["frames"][0][1]]["t"]
+    p60 = rom_engine.payload(60, {"value": 200000, "more": 0})
+    assert p60["items"][p60["frames"][0][-1]]["t"] == "BALL ADDED"
+    p83 = rom_engine.payload(83, {"more": 3, "mask": 2})
+    assert len(p83["seq"]) == 0x3b2 and len(str(p83)) < 400000
 
 
 ROM = os.environ.get("TRON_ROM")
