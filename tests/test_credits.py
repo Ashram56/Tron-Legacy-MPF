@@ -42,10 +42,10 @@ class TestCoins(CreditCase):
         self.assertEqual(texts, [kw["credits"] for kw in shown])            # deff 10 shows the credit text
         self.assertEqual((4, 4, 1), (os_.audits[4], os_.audits[7], os_.audits[1]))
         self.assertEqual(["0x0f0", "0x0f0", "0x0f1", "0x0f0"], [s for s in self.sounds() if s in ("0x0f0", "0x0f1")])
-        self.assertEqual({"credits": 1, "counter": 0}, cr.store.written_data)
-        os_.adj[28] = 0                                       # AUSTRALIA 1: not in the decompile, USA 10's table
+        self.assertEqual({"credits": 1, "counter": 3}, cr.store.written_data)   # ladder position (8-step ROM ladder 0 0 1 0 0 1 0 1)
+        os_.adj[28] = 0                                       # AUSTRALIA 1: its own ROM entry (pricing.csv: slot 1 = 2 units, 10 units a credit)
         self.coins(2)
-        self.assertEqual(2, cr.credits)
+        self.assertEqual(1, cr.credits)
 
     def test_28_custom_pricing(self):
         os_ = self.tron

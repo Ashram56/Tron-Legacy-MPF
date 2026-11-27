@@ -14,9 +14,9 @@ Coin task FUN_00004a50, one per coin switch closure [0x00004cb4]:
 - The credit text (FUN_00004ff4): "FREE PLAY" on adj 34, else "CREDITS n", "CREDITS a/b" or
   "CREDITS n a/b" (units since the last credit over the units of the ladder step that gives the next one;
   attract capture: "CREDITS 1/3" after one coin).
-Pricing tables are ROM data the decompile does not include: only USA 10 (factory, adj 28 = 62) is known
-from the reference traces (a right-slot coin is one unit, every 3rd unit a credit). The other countries use
-USA 10's table; CUSTOM (64) uses the operator's SET CUSTOM PRICING values (machine vars custom_coin_units,
+The pricing tables are the ROM's (assets/rom_data/settings/pricing.csv, one entry per adj 28 value: units of the
+five slots and the credit ladder; USA 10, the factory value 62, has the ladder 0 0 1 0 0 1 0 1, 3 credits for 8 units);
+CUSTOM (64) uses the operator's SET CUSTOM PRICING values (machine vars custom_coin_units,
 custom_units_per_credit).
 """
 
@@ -50,7 +50,22 @@ class Credits:
             var = self.machine.variables.get_machine_var
             per_credit = max(1, int(var("custom_units_per_credit") or 3))
             return {1: max(1, int(var("custom_coin_units") or 1))}, (0,) * (per_credit - 1) + (1,)
-        return USA_10["units"], USA_10["ladder"]
+        row = self.table().get(self.os.adj[28])
+        if row is None:
+            return USA_10["units"], USA_10["ladder"]
+        return ({i: int(row["slot{}_units".format(i)]) for i in range(1, 6)}, tuple(int(c) for c in row["ladder"].split()))
+
+    _table = None
+
+    def table(self):
+        """The ROM's pricing entries (assets/rom_data/settings/pricing.csv: record 0x37528.., read from the decompile), by adj 28 value."""
+        if Credits._table is None:
+            import csv
+            import os
+            path = os.path.join(self.machine.machine_path, "..", "assets", "rom_data", "settings", "pricing.csv")
+            with open(path, encoding="utf-8") as f:
+                Credits._table = {int(r["adj_value"]): r for r in csv.DictReader(f)}
+        return Credits._table
 
     def free_play(self):
         return self.os.adj[34] == 1

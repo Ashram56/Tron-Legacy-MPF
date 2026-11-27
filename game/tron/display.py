@@ -159,10 +159,14 @@ class Display:
         """The deff's lamp effects, sounds and tube shows at their offsets. A capture can hold more than
         one run of the effect (deff 115 recorded two skipped stages back to back: 0x109 at 0 and 3.1 s);
         only what falls inside this run's length plays."""
-        if self.fg != deff_id:
-            return
+        replaced = self.fg != deff_id
         os_ = self.os
         info = self.media[deff_id]
+        # replaced in the same tick it started: its task already ran its first instructions (the lamp effects
+        # and the sounds at offset 0) before the new deff preempted it (multiplayer_3p 21.195: leff 110 and
+        # sound 0x046 of deff 101 under the deffs 83, 137, 55 started in that tick)
+        if replaced and not self.start_tick_replaced(deff_id):
+            return
         for leff in info.leffs:
             os_.leff_start(leff)
         if sounds is not None:
@@ -175,9 +179,18 @@ class Display:
                 self._deff_sound(v, deff_id) if k == "sound" else v() if k == "call" else os_.tube_start(v)))(
                 kind, value)
             if offset <= 0:
-                fire()
+                if replaced:
+                    if kind == "sound":
+                        self._deff_sound(value, deff_id)
+                else:
+                    fire()
+            elif replaced:
+                continue
             else:
                 self._sound_handles.append(os_.machine.clock.schedule_once(fire, offset))
+
+    def start_tick_replaced(self, deff_id):
+        return True
 
     def _hold(self, deff_id):
         """Last 10 ticks of deff_id (cancelled with it when it is replaced): its priority drops to 0x20,
