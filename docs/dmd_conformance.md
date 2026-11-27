@@ -498,3 +498,6 @@ game's strings, not yet read from the ROM message table (FUN_0000a58c) in Unicor
 
 Effect 138's named combo text is now checked against the ROM code too: the task's +0x34 entry is the table at 0x040d236c (24 bytes an entry, message id u16 at +8,
 1700 + k): the program with the names of entries 0, 1, 2, 8 and 10 equals the code run on 125, 124, 122, 121 and 123 of as many flips (`engine_check.compare`).
+
+Daft Punk multiball with the engine (`sweep_engine.py` incl. effect 57's live values, `sweep_engine19.py`, `sweep_arcade.py`): **1372 of 1434** distinct game frames
+found in columns 41-127 (95.7 %); left: 57 (11), 95 (10, a timer / value effect), 139 (6), 60 (3), 1 unattributed.

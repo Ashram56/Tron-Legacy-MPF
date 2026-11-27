@@ -10,13 +10,18 @@ import pickle
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "game"))
-from tron import rom_deff55, rom_deff58, rom_deff60, rom_deff83, rom_deff138  # noqa: E402
+from tron import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff138  # noqa: E402
 
 
 def main(out, *logs):
     frames = set()
     for p in logs:
         for line in open(p):
+            if '"deff_live"' in line:                  # the values a live effect printed (RAM): effect 57's switch count
+                e = json.loads(line)
+                if e["id"] == 57:
+                    frames.update(f for _, f in rom_deff57.frames(int(e["args"].get("value", 0) or 0), flips=116))
+                continue
             if '"deff_args"' not in line:
                 continue
             e = json.loads(line)
