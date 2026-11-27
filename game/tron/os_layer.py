@@ -1632,6 +1632,7 @@ class TronOS(CustomCode):
         self.kill_mb_save()
         self._mb_pending = 0
         self.task_kill(MB_TASK)
+        deff_wait = self.display.eob_wait_ticks()    # end_of_ball [0x00020764] waits for a running deff task (flag 0x2000)
         self.display.clear()
         self.hook("ball_end")                        # event 0x1d: every mode stops
         for flipper in self.machine.flippers.values():
@@ -1650,7 +1651,7 @@ class TronOS(CustomCode):
         # mode TOTAL displays (flag-0x2000 tasks) [0x00020764]: the longest one. (The ROM stops waiting after
         # gf_eob_mode_wait ticks; sea_of_simulation.jsonl waits longer than 169, so no limit is applied.)
         waits = [fn() or 0 for fn in self.hooks.get("ball_end_wait", ())]
-        wait_ticks = max(waits, default=0)
+        wait_ticks = max(waits + [deff_wait], default=0)
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
     def _ball_ending_bonus(self, queue):

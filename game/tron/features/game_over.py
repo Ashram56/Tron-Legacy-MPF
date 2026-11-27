@@ -3,7 +3,9 @@ from tron.features import Feature
 from tron.os_layer import TICK
 
 MATCH_REVEAL = 258       # ticks from deff 38 to the match award (traces/game_flow.jsonl 4.19 s)
-ATTRACT_DELAY = 482      # ticks from the match display to attract (7.84 s measured)
+MATCH_FRAMES = 65 * 4    # deff 38 [0x0102cdd8]: 65 frames of deff_frame_sleep(4) ...
+MATCH_HIT_FRAMES = 24 * 4   # ... 24 more of FUN_000279c4(4) when a player matched ...
+MATCH_END_SLEEP = 0x7d   # ... and task_sleep(0x7d) at the end; match [0x0001b660] returns when the deff ends
 MUSIC_TICKS = 0x271      # leff 133 runs 625 ticks with the game-over music [0x0100f29c]
 SPEECH_WAIT_MAX = 0x1d4  # FUN_0100ff08: wait for the speech to end, at most 468 ticks
 SPEECH_GAP = 0x2e        # then 46 ticks before the music
@@ -52,7 +54,7 @@ class GameOver(Feature):
             matched = forced.pop(0)
         if matched:
             os_.after(MATCH_REVEAL, lambda: self._award(matched))
-        os_.after(ATTRACT_DELAY, lambda: self._attract(done))
+        os_.after(MATCH_FRAMES + (MATCH_HIT_FRAMES if matched else 0) + MATCH_END_SLEEP, lambda: self._attract(done))
 
     def _award(self, matched):
         """Match award (adj 29): 0 = credit with knocker 0x019."""

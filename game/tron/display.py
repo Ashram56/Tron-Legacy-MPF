@@ -26,6 +26,7 @@ Model of the SAM OS deff system as the Tron rules use it:
   it started.
 """
 import csv
+import json
 import os
 
 from tron import media_table
@@ -36,6 +37,7 @@ HOLD_TICKS = 10             # deffs end with deff_hold_frames(10, 0x20): priorit
 HOLD_PRIORITY = 0x20
 # a few deffs hold for fewer ticks (read from their code: deff_hold_frames(1, 0x20))
 HOLD_TICKS_BY_DEFF = {76: 1, 78: 1, 94: 1}
+EOB_MODE_WAIT = 169         # gf_eob_mode_wait: the ROM data byte at 0x3901c
 PREVALID_PRIO = 0x10        # priority of the score display rule that runs until the playfield is valid
 
 
@@ -65,6 +67,11 @@ class Display:
         self.arcade_held = False    # ... the Flynn's Arcade show 0x97: the score display comes back at its exit
         self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
+        self.fg_end = 0.0
+        self.deff_flags = {}        # deff id -> the flags of its table record (assets/rom_data/deffs/deffs.json, ROM 0x040e1350)
+        with open(os.path.join(assets, "rom_data", "deffs", "deffs.json"), encoding="utf-8") as f:
+            for d in json.load(f)["deffs"]:
+                self.deff_flags[d["id"]] = int(d["table"]["flags"], 16)
         self.bg = None              # running background deff id
         self.shows = []             # waiting Show entries
         self.show = None            # Show playing now
@@ -138,6 +145,7 @@ class Display:
                     lambda: self._media(deff_id, seconds, sounds), 0))
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
+                self.fg_end = os_.now + seconds
                 from tron.os_layer import TICK
                 hold_ticks = HOLD_TICKS_BY_DEFF.get(deff_id, HOLD_TICKS)
                 self._sound_handles.append(os_.machine.clock.schedule_once(
@@ -237,6 +245,7 @@ class Display:
             return False
         self.os.machine.clock.unschedule(self.fg_handle)
         self.fg_handle = self.os.machine.clock.schedule_once(lambda: self._ended(deff_id), info.seconds)
+        self.fg_end = self.os.now + info.seconds
         return True
 
     def running(self, deff_id):
@@ -371,6 +380,16 @@ class Display:
             # (traces/sea_of_simulation.jsonl 14.31 s: music 0x01b at the VUK, no deff_start)
             self.music = music
             os_.sound(music)
+
+    def eob_wait_ticks(self):
+        """Ticks the end of ball waits for the foreground deff [0x00020764]: a deff task carries flag 0x2000 when its table
+        flags have neither bit 1 nor bit 4 (deff_start 0x000280b0), and the end of ball sleeps while a 0x2000 task runs, at most
+        gf_eob_mode_wait (169, the ROM data byte at 0x3901c) ticks."""
+        if self.fg is None or not self.fg_handle or self.deff_flags.get(self.fg, 1) & 5:
+            return 0
+        from tron.os_layer import TICK
+        left = max(0.0, self.fg_end - self.os.now)
+        return min(EOB_MODE_WAIT, round(left / TICK))
 
     def clear(self):
         """Ball end / game end: drop the queue and the foreground deff (no trace event)."""
