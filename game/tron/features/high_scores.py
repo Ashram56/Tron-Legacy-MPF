@@ -42,7 +42,9 @@ FRAME_TICKS = 1
 SECOND_FRAMES = 63                       # 0x3e frames, then the second counts down
 COUNTDOWN, LAST_COUNTDOWN = 30, 15
 REPEAT_FIRST, REPEAT_NEXT = 31, 6        # held button: first repeat after 0x1f frames, then every 7
-DEFF_SECONDS = {31: 1.841, 33: 2.353}    # run lengths (event_map.csv run_ms) when the media table has none
+# run lengths when the media table has none, from the ROM code (assets/tools/deff_unicorn.py: tick of the last task_sleep(10)
+# + 10): deff 31 [0x0103...] 104 + 10 = 114 ticks, deff 33 136 + 10 = 146 ticks (the capture gave 1.841 s and 2.353 s)
+DEFF_SECONDS = {31: 114 * 0.01626, 33: 146 * 0.01626}
 # OS words read from the ROM image: 0x36f74 = 0x33 (left), 0x36f76 = 0x34 (right), 0x36f78 = 0x35 (a letter or special taken); 0x3908a (the 15 s countdown, deff 32) and
 # 0x39088 (deff 31's blink) are 0 in the image and no code writes them: no sound.
 SOUNDS = {"left": 0x33, "right": 0x34, "select": 0x35, "countdown": None, "enter_initials": None}
