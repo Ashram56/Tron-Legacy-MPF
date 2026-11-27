@@ -43,7 +43,10 @@ SECOND_FRAMES = 63                       # 0x3e frames, then the second counts d
 COUNTDOWN, LAST_COUNTDOWN = 30, 15
 REPEAT_FIRST, REPEAT_NEXT = 31, 6        # held button: first repeat after 0x1f frames, then every 7
 DEFF_SECONDS = {31: 1.841, 33: 2.353}    # run lengths (event_map.csv run_ms) when the media table has none
-SOUNDS = {"left": None, "right": None, "select": None, "countdown": None, "enter_initials": None}
+# OS words read from the ROM image: 0x36f74 = 0x33 (left), 0x36f76 = 0x34 (right), 0x36f78 = 0x35 (a letter or special taken); 0x3908a (the 15 s countdown, deff 32) and
+# 0x39088 (deff 31's blink) are 0 in the image and no code writes them: no sound.
+SOUNDS = {"left": 0x33, "right": 0x34, "select": 0x35, "countdown": None, "enter_initials": None}
+MUSIC_ENTRY = 0x1f                       # event 0x35 [0x0100ee70]: snd_play(0x1f) unless it already plays
 
 
 class Entry:
@@ -81,7 +84,7 @@ class Entry:
 
     def _sound(self, key):
         if SOUNDS[key] is not None:
-            self.os.sound(SOUNDS[key])
+            self.os.sound(SOUNDS[key], in_deff=32)     # the entry is deff 32's own task (the traces mark these sounds in_deff)
 
     def _step(self, name):
         """One frame of a button: (stepped, holding)."""
@@ -177,6 +180,7 @@ class HighScores(Feature):
         self.entries = [dict(e) for e in entries] if len(entries) == len(TITLES) else None
         self.count = data.get("reset_count")
         self.entry = None
+        self.music_entry = False                 # sound 0x1f playing (until the match music replaces it)
         self._loaded()
 
     @property
@@ -239,6 +243,7 @@ class HighScores(Feature):
         self.placed = [False] * len(self.scores)
         self.names = [None] * len(self.scores)
         self._done = done
+        self.music_entry = False
         self._next(0)
 
     def best(self, i):
@@ -267,19 +272,34 @@ class HighScores(Feature):
             self._next(i + 1)
             return
         post = self.machine.events.post
-        post("tron_high_score", stage=0x33, player=player, entry=i)
+        self._stage(0x33, player, i)
 
         def initials():
-            post("tron_high_score", stage=0x34, player=player, entry=i)
-            post("tron_high_score", stage=0x35, player=player, entry=i)
+            self._stage(0x34, player, i)
+            self._stage(0x35, player, i)
             self.entry = Entry(self, player, entered)
 
         def entered(name):
             self.entry = None
             self.names[player - 1] = name
-            post("tron_high_score", stage=0x36, player=player, entry=i)
+            self._stage(0x36, player, i)
             self._place(i, player)
         self._deff(31, initials, player=player)
+
+    def _stage(self, stage, player, i):
+        """Event 0x33-0x38 and the game rules' hooks on them [0x0100ee04, 0x0100ee70, 0x0100ee94]."""
+        os_ = self.os
+        os_.machine.events.post("tron_high_score", stage=stage, player=player, entry=i)
+        if stage == 0x33 and not self.music_entry and len(self.machine.game.player_list) == 1:
+            if player == 1:
+                os_.sound(0x38)                      # speech, one player
+        elif stage == 0x33 and not self.music_entry and 1 <= player <= 4:
+            os_.sound2(0x39, player, index=player - 1)       # snd_play2(0x39, player): the speech of the player (0x177-0x17a, one per player)
+        elif stage == 0x35 and not self.music_entry:
+            self.music_entry = True
+            os_.sound(MUSIC_ENTRY)
+        elif stage == 0x37:
+            os_.sound(0x36)
 
     def _place(self, i, player):
         """FUN_0001abfc: the entry and the ones below move down, the award, deff 33."""
@@ -293,17 +313,17 @@ class HighScores(Feature):
             if kind == 0:
                 os_.award_credit(count)
                 for _ in range(count):
-                    os_.knock()                     # FUN_0001b370(1, n)
+                    os_.after(1, os_.knock)         # FUN_0001b370(1, n) queues the knock: the knocker task plays it a tick later (after event 0x37's sound 0x036)
             elif kind == 1:
                 for _ in range(count):
                     self.machine.events.post("tron_award_ticket")
             os_.audit(0x10, count)
         post = self.machine.events.post
-        post("tron_high_score", stage=0x37, player=player, entry=i)
+        self._stage(0x37, player, i)
         self.placed[player - 1] = True
 
         def shown():
-            post("tron_high_score", stage=0x38, player=player, entry=i)
+            self._stage(0x38, player, i)
             self._next(i + 1)
         self._deff(33, shown, player=player, title=TITLES[i], name=self.entries[i]["name"],
                    score=self.entries[i]["score"], award=kind if count else None, count=count)

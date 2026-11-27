@@ -476,7 +476,10 @@ class TronOS(CustomCode):
 
     def _poke_score(self, index, value):
         if self.game and index < len(self.game.player_list):
-            self.game.player_list[index].score = value
+            pl = self.game.player_list[index]
+            delta, pl.score = value - pl.score, value
+            if delta:                                   # the reference tracer reports every change of the score RAM (a poke too) as a score event
+                self.trace.log("score", player=index + 1, delta=delta, total=value)
 
     def poke(self, addr, value):
         if addr not in self.pokes:
@@ -1020,6 +1023,12 @@ class TronOS(CustomCode):
         if num > 1:
             self.credit_model.take(1)
             self.audit(0x11)
+            if self.display.fg == 10:
+                # the credits deff (coin / free play) is gone 14 ms after a START adds a player and the deff rules start deff 19 (reference
+                # multiplayer_3p 18.79 -> 19.03: deff 10 started at the 3rd coin, the player add at 19.02, task 0x2 = deff 19 at 19.032, no deff_stop call
+                # logged); the code that does it (event 0x46 after 0x00021304) is not traced yet
+                self.display._end_fg(stopped=True)
+                self.display._after_fg()
 
     def _competition_ok(self):
         """FUN_00019ecc: attract (state & 0x118 == 0x10), adj 46 PLAYER COMPETITION = YES, a credit or free play."""

@@ -51,11 +51,12 @@ TRACES = {
     "gi_and_tilt": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark,lamp",
     # the reference script runner adds about 0.03 s per command, so these long scripts drift up to 0.4 s (TOLERANCE)
     "tilt_modes": "score,deff_start,leff_start,tube_show_start,audit,multiball_start,mark",
-    "multiplayer_2p": "score,tube_show_start,audit,multiball_start,mark",
-    "multiplayer_3p": "score,tube_show_start,audit,multiball_start,mark",
+    "multiplayer_2p": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
+    "multiplayer_3p": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
+    "multiplayer_4p": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "coin_door_buttons": "deff_start,leff_start,tube_show_start,audit,mark",
 }
-TOLERANCE = {"tilt_modes": "0.4", "multiplayer_2p": "0.4", "multiplayer_3p": "0.4", "coin_door_buttons": "0.6"}
+TOLERANCE = {"tilt_modes": "0.4", "multiplayer_2p": "0.4", "multiplayer_3p": "0.4", "multiplayer_4p": "0.4", "coin_door_buttons": "0.6"}
 
 
 class TestTraces(unittest.TestCase):
