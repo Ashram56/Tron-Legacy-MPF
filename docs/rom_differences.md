@@ -63,3 +63,8 @@ Flynn's Arcade and End of Line read routine by routine against `assets/code/tron
 0x01004cc0, eol_jackpot_shot 0x01004e94, the grace tasks 0x010050b8-0x01005154). The features already followed them; two departures found and removed:
 `Arcade.light` lit the award while a multiball ran (the ROM's arcade_set_lit refuses, through FUN_0100dd98 = no multiball), and `eol_letter` returned
 True for a ramp hit whose word was already complete (the ROM returns 1 only when a letter was lit). Not touched: no scoring or value changed.
+
+Portal Multiball read against portal_mb_start 0x0102f474, portal_mb_award_value 0x0102f5f4 (500,000 + 50,000 per shot made, capped 1,500,000), portal_mb_shot
+0x0102f6c8 (three phases, audits 0x8a / 0x8b / 0x8c), portal_mb_shot_entry 0x0102f34c, portal_mb_add_a_ball 0x0102f314, the grace and end routines
+0x0102f8b8-0x0102f9a4: values, order and audits identical, no change. Sea of Simulation stage shots read (stage 0-8 `sos_stageN_*_shot`, 0x010248ec-0x01026228):
+awards (k+1) x 100,000, a tenth when spotted quietly (task 0xa1), identical for every stage; no change.
