@@ -55,6 +55,9 @@ TRACES = {
     "multiplayer_3p": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "multiplayer_4p": "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark",
     "coin_door_buttons": "deff_start,leff_start,tube_show_start,audit,mark",
+    # stages 4-8: the stage deffs' clip lengths are the ROM's (97 / 121 / 139 ticks, forced per start from the reference); leff_start / tube_show_start still differ
+    # from the first deff 121 end (the forced lengths of a refused start shift the list: open)
+    "sos_stages_4_to_8": "score,deff_start,sound,audit,multiball_start,mark",
 }
 TOLERANCE = {"tilt_modes": "0.4", "multiplayer_2p": "0.4", "multiplayer_3p": "0.4", "multiplayer_4p": "0.4", "coin_door_buttons": "0.6"}
 

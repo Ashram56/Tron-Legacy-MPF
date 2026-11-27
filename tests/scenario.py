@@ -144,6 +144,8 @@ def forced_samples(evs):
 # stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
 # same deff keeps the recorded length (None).
 CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+# the Sea of Simulation stage deffs 116-124 run a random clip (29 or 37 pictures, FUN_01027374: 97 or 121 ticks with the hold); their tube show (68-76) stops at the deff's end
+CLIP_DEFFS.update({116 + i: ("tube_show_stop", 68 + i) for i in range(9)})
 
 
 def clip_lengths(evs, deff_id, stop_ev, stop_id):

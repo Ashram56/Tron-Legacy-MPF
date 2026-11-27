@@ -65,8 +65,12 @@ HELMET_BITS = 0x1c0
 # deff 116+k "stage complete" variant (FUN_01027478): its animation and speech 0x111 take 2.105 s, then
 # the deff drops to priority 0x20 for a 10-frame hold (traces/sea_of_simulation: 22.208 -> 24.318,
 # 28.632 -> 30.736 when the queued deff 115 takes the display).
-STAGE_DONE_SECONDS = 2.105
-STAGE_SPEECH_SECONDS = 2.1      # snd_play2(0x111) as the variant's animation ends (36.637 -> 38.741 s)
+# From the code (each of deffs 116-124, run in Unicorn with the clip pick forced, all alike): the not-done variant FUN_01027374 picks random_below(2) between the
+# clips 0x1a4c-0x1a68 (29 pictures) and 0x1a69-0x1a8d (37 pictures) of table 0x040d3980, 3 ticks a picture, then the 10-tick hold (97 or 121 ticks in all);
+# the done variant FUN_01027478 has the one clip 0x1a8e-0x1ab8 (43 pictures: 129 ticks, then speech 0x111) and the hold (139 ticks).
+STAGE_CLIP_TICKS = (97, 121)
+STAGE_DONE_SECONDS = 129 * TICK
+STAGE_SPEECH_SECONDS = 129 * TICK
 MAIN_TASK_TICKS = 90            # deff 114: 15 loops of 6 frames before the final-stage speech
 # deff 115 [0x010270a4]: bitmaps 0x1931-0x196f (63) of 3 ticks, then deff_hold_frames(10, 0x20). Its capture
 # holds two skipped stages back to back (0x109 at 0 and 3.102 s, the second run's first frame at 3.109 s):
@@ -319,7 +323,8 @@ class SeaOfSimulation(Feature):
         points = os_.score_add((k + 1) * (10000 if quiet else 100000))
         self.total += points
         done = not self.needed
-        length = STAGE_DONE_SECONDS + 10 * TICK if done else None     # the hold follows the speech
+        length = (STAGE_DONE_SECONDS + 10 * TICK if done                  # the hold follows the speech
+                  else STAGE_CLIP_TICKS[os_.pick("sos_stage_clip", [1, 1])] * TICK)     # random_below(2) [0x0000c6b4] in FUN_01027374
         # the stage deff's own sounds (FUN_01027374 / FUN_01027478): snd_play2(0x10a, counter) as it starts
         # and, for the stage-completing shot, speech snd_play2(0x111, counter) as its animation ends
         sounds = [(0, lambda: self._counted_sound(0x10a, "shot_sound", SHOT_SAMPLES, 116 + k))]

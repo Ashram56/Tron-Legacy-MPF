@@ -860,7 +860,7 @@ class TronOS(CustomCode):
 
         def show():
             if self.display.show_running():
-                self.task_start(0x33, 1, show)       # FUN_000287a4: wait while a show runs
+                self.task_start(0x33, 1, show)       # FUN_000287a4 [0x000287a4] waits on a foreground deff in the ROM; the show model matches the portal trace (a fg wait moves leff 17 2 ticks, rom_differences)
                 return
             if self.deff_start(28):
                 self.leff_start(17)

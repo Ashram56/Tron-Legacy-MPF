@@ -173,7 +173,10 @@ class Display:
             events = [(t, "call", fn) for t, fn in sounds]
         else:
             events = [(t, "sound", c) for t, c in info.sounds if not seconds or t < seconds]
-        events += [(t, "tube", n) for t, n in info.tubes if not seconds or t < seconds]
+        tubes = info.tubes
+        if deff_id == 115:
+            tubes = sorted(tubes)[:1]       # deff_115 [0x010270a4] starts tubeshow_067 once (0x010270d8); its capture holds two runs back to back
+        events += [(t, "tube", n) for t, n in tubes if not seconds or t < seconds]
         for offset, kind, value in sorted(events, key=lambda e: e[0]):
             fire = (lambda k, v: lambda: self.fg == deff_id and (
                 self._deff_sound(v, deff_id) if k == "sound" else v() if k == "call" else os_.tube_start(v)))(
