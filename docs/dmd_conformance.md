@@ -380,9 +380,13 @@ via `D.STUBS[0xd244]`, 12 months, 12 h and 24 h, hours 0/1/11/12/13/23, leap day
   NVRAM 0x0211191c); it runs `task_ball_search` (0x0001f4a0, `FUN_0001f758`), and the press that started it does not start the game. Per
   round (4 rounds): audit 0x25, deff 11, then 52 re-counts every 6 ticks, ending at once when the count is right; at the end game flag 0xb when
   fewer balls than recorded, recorded count := min(counted, installed) (`FUN_0001e0e4`), deff 11 stops. The next START starts the game and,
-  with flag 0xb, clears it and adds audit 0x27 (0x00020d14). `os_layer.py` `_start_search`, `tests/test_start_search.py`. Not modelled: the
-  search's coil pulses (`FUN_00003138`, `FUN_000072c8`, `FUN_0000364c`, `FUN_0001fd48`, `FUN_00003b68`, `FUN_00023dd4`, `FUN_00004068`), and the
-  held-START deff 39 (needs the refused start with START still held 62 ticks).
+  with flag 0xb, clears it and adds audit 0x27 (0x00020d14). `os_layer.py` `_start_search`, `tests/test_start_search.py`. Not modelled, with their code reading: the seven calls after audit 0x25
+  (`FUN_00003138`, `FUN_000072c8`, `FUN_0000364c`, `FUN_0001fd48`, `FUN_00003b68`, `FUN_00023dd4`, `FUN_00004068`) each loop over a registered table
+  (counts at 0x040c01a0, 0x00037270, 0x040d1024, 0x040c321c, 0x040d1028, 0x040d1034) and run its per-entry reset (`FUN_000030a8`, `FUN_000071f4`,
+  `FUN_00003560`, `FUN_0001fc94`, `FUN_00003a8c`, `FUN_00023c6c`): they reinitialise the switch, timer and ball-device records the search shakes up;
+  `FUN_0001fd48` also sets game flag 0xa (and clears 0x3741c) when a ball device record reports a change. They are not coil pulses; the pulses of a
+  search come from the handlers of events 0xd / 0xc / 0xe (not decoded here). And the held-START deff 39 (needs the refused start with START still
+  held 62 ticks).
 
 ## Status panel in game: the last award (2026-11-26)
 
