@@ -26,9 +26,10 @@ class RomRandom(random.Random):
         return self.below(n)
 
     def randrange(self, a, b=None, step=1):
+        """random_below on the count of values: the ROM's match number is random_below(10) * 10 [0x0001b660]."""
         if b is None:
             return self.below(a)
-        return a + self.below(b - a)
+        return a + step * self.below((b - a + step - 1) // step)
 
     def random(self):
         return self.step() / 4294967296.0

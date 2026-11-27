@@ -85,3 +85,6 @@ ZEN rollover read against zen_award 0x0103129c (42,000, charge unless a multibal
 Skill shots read against skillA_value 0x01028c68 (250,000 + 50,000, max 500,000), skillB_value 0x01028e54 (300,000, max 500,000), skillC_value 0x01028fec (500,000, max 750,000), the collect and kill routines: identical, no change.
 Bonus read against bonus_ball_reset 0x01000a88 (50,000 base, x reset unless flag 0x2d), bonus_x_add 0x01000b28 (max 25; called with 1 at the right inner loop), bonus_total 0x01000cf8, bonus_item_value 0x01015f7c, bonus_sos_value 0x01000cb0 (450,000 each), bonus_portal_value 0x01000cd4 (2,250,000 each): identical, no change.
 Combos read against on_combo_shot 0x01003714, combo_value 0x0100344c (250,000 + 50,000 per shot past the second), combo_history_trim 0x010034ac and the window task 0x010033c4: identical, no change.
+Found by the audit (2026-11-27), a regression of the ROM RNG port the same day: `RomRandom.randrange(a, b, step)` ignored `step`, so the match number (`os_.random.randrange(0, 100, 10)`) could be any
+two-digit number instead of the ROM's `random_below(10) * 10` [match 0x0001b660]. Fixed (one draw of the count of values, times the step); `tests/test_rom_rng.py`. The rest of `match`
+(rate test against adj 30, the next free tens number, `match_award` 0x0001b86c, adj 29) read: identical.
