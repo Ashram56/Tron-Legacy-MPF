@@ -495,3 +495,6 @@ With the programs' own frames for the scenario's arguments (`sweep_engine.py`: 5
 found in columns 41-127 (96 %); left: effect 1 (12), 38 (2), 1 unattributed. The 83 / 55 / 138 / 58-60 frames here are the programs' (each equal to the ROM code in
 Unicorn for the arguments checked, `engine_check.py`), so this figure says the game draws what the programs draw; the named combo texts of 138 are the
 game's strings, not yet read from the ROM message table (FUN_0000a58c) in Unicorn.
+
+Effect 138's named combo text is now checked against the ROM code too: the task's +0x34 entry is the table at 0x040d236c (24 bytes an entry, message id u16 at +8,
+1700 + k): the program with the names of entries 0, 1, 2, 8 and 10 equals the code run on 125, 124, 122, 121 and 123 of as many flips (`engine_check.compare`).
