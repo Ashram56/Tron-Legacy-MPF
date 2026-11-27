@@ -397,3 +397,9 @@ gem timer bar (0x3b584) pairs other than the swept ones.
 Result of the same run against all the sweeps kept so far (state, bonus, args, gem, credits, arcade, 10, 25, 105, panel): columns 41-127 of
 `game_flow` 515/516 distinct frames (the one miss is the start-up frame above); the status panel 119/121 as above. The panels of the other
 scenarios (bonus, tilt, attract) are not swept with the score_add pairs yet: the same script takes their `.jsonl`.
+
+Other scenarios, same method (2026-11-27): `game_flow_tilt` panel 47/48, `bonus` panel 120/121 (29 missing at first: the gem timer bar 0x3b584 held at 9
+or 10 rows, column x = 40 rows 21-31, while the last award fades (`SWEEP_GEM=9,10`) and while the score rolls up in the 15 000 000 bonus
+(`SWEEP_GEM_ROLL=9,10`, counters 0x21117f4 and 0x21117fc), both options of `sweep_panel.py`). Each scenario's one remaining panel is the
+display's start-up frame, which is not a ROM frame. Bodies (columns 41-127): game_flow 515/516, bonus 349/350, tilt 229/230, same single frame.
+The attract scenario's panel is still to be swept.
