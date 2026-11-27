@@ -49,9 +49,11 @@ class GameOver(Feature):
                 number = (number + 10) % 100
                 if number not in ends:
                     break
-        os_.deff_start(38, number=number, number_again=number)   # deff 38 prints the number (task + 0x34)
+        winners = sum(1 << (i + 1) for i, e in enumerate(ends) if e == number)     # task + 0x30: bit p set when player p matches (0x0102cdd8)
         if forced:
             matched = forced.pop(0)
+            winners = winners or (2 if matched else 0)
+        os_.deff_start(38, number=number, number_again=number, winners=winners)   # deff 38 prints the number (task + 0x34)
         if matched:
             os_.after(MATCH_REVEAL, lambda: self._award(matched))
         os_.after(MATCH_FRAMES + (MATCH_HIT_FRAMES if matched else 0) + MATCH_END_SLEEP, lambda: self._attract(done))

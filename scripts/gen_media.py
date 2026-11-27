@@ -39,7 +39,7 @@ GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
 # effects the game draws itself from the ROM's routine (tron/rom_engine.py): no frames, no letters, no text lines
-ENGINE_DEFFS = {2, 42, 94, 55, 57, 58, 59, 60, 83, 95, 96, 108, 138, 139}
+ENGINE_DEFFS = {2, 38, 42, 94, 55, 57, 58, 59, 60, 83, 95, 96, 108, 138, 139}
 TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)

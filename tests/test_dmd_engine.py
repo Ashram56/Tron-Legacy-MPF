@@ -217,3 +217,21 @@ def test_deff96_popup_child_equals_the_rom_code(rnd):
         it = pg.items[0]
         mine.append((0x12, rom_deff96.FONT, 2, it["x"], it["y"], 250))
     assert rom == mine
+
+
+def test_deff38_draw_list():
+    from tron import rom_deff38
+    p = rom_engine.payload(38, {"number": 40, "winners": 0})
+    assert not p["loop"] and len(p["seq"]) == rom_deff38.FLIPS + 1 and any(it.get("t") == "MATCH" for it in p["items"]) and any(it.get("t") == "40" for it in p["items"])
+    q = rom_engine.payload(38, {"number": 40, "winners": 2})
+    assert len(q["seq"]) == rom_deff38.FLIPS + 0x19 + 1
+
+
+@pytest.mark.skipif(unicorn is None, reason="needs the ROM (TRON_ROM) and unicorn")
+@pytest.mark.parametrize("winners,number", [(0, 7), (2, 42)])
+def test_deff38_equals_the_rom_code(winners, number):
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "conform"))
+    import engine_check as C
+    from tron import rom_deff38
+    ok, total, first = C.compare(38, [winners, number], lambda a: rom_deff38.frames(winners, number))
+    assert (ok, first) == (total, None)

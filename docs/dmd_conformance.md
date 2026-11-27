@@ -534,3 +534,6 @@ generated from the ROM by `scripts/gen_film_keys.py` into `game/tron/film_keys.j
 (2) the harness did not run the real `dmd_show_pages` for these effects: FUN_01024378(n) redraws the panel on a copy of the shown page (RAM 0x3d524) for the n-1 following ticks, so without the bookkeeping
 (0x3d524 / 0x3d528) the oracle showed blank frames. `engine_check.compare(..., real_show_pages=True)` runs it. The speech at flip 0x14 (3 ticks) / 0x1e (2 ticks), tick 60 in every variant (snd 0x0d1 below 3
 hits left, else FUN_0101c198), stays with the sounds of the effect's media.
+
+
+Deff 38 (match, 0x0102cdd8, 2026-11-27): `rom_deff38.py`, 65 flips of 4 ticks (the second loop runs 0x19 flips: the test is on the next count < 0x180001) and the winners' flashes (task + 0x30 = winners' bitmask, +0x34 = the number); equal to the ROM code in Unicorn for 0 and 1 winner (`test_deff38_equals_the_rom_code`). The panel's digits (FUN_0102cc48) are the panel's.
