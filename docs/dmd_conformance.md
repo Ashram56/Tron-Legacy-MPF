@@ -552,3 +552,11 @@ sweeps (`sweep_live.py` RNGN), the effect 42 live sweep (`sweep_engine.py`), the
 (`sweep_gc.py`), the columns 41-127 coverage of the 2026-11-28 replays is: disc 1291/1292, game_flow 1029/1030, bonus 349/350, tilt 230/231, attract 232/233,
 daft punk 976/977 (the one miss everywhere is the display's start-up frame), end of line 1397/1408, portal 756/763, flynn's 748/764, light cycle 1009/1046; the rest is
 effect 19 (score roll), the Zuse popups "10K" of deff 96 (random positions) and a few frames of 141, 25, 95, 107.
+
+Open after the 2026-11-28 re-measure (each with its code reason):
+- Portal Multiball, 4 frames (columns 41-127): the held picture under the text of deffs 140 (0x0102fa6c, "PORTAL / MULTIBALL" after bitmaps 0x1b55..0x1b97) and 142
+  (0x01030504, bitmaps 0x1d56..0x1d78 then the points) is the picture the code draws after its loop (`bitmap_id` 0x1b98 / 0x1d79, one past the last one the loop drew),
+  with `palette_fill(pal, 1, 2, 15)`; the game holds the clip's last picture (`dim_after`, `gen_media.py`), so 90-120 dots differ between level 0 and 1. Not fixed yet.
+- Light Cycle, 22 frames: the Zuse popups "10K" of deff 96 (0x01032900) over the deff 95 background: x = (0x21, 0x57, 0x3c)[random_below(3)] + random_below(15) + 0x10,
+  y = random_below(8) + 13 per tick; `rom_deff96` draws them as the code does but `sweep_engine.py` runs one draw per logged value, not the 360 combinations.
+- 95 (2 frames) and the display start-up frame (1 per scenario, the first dump line before any effect).

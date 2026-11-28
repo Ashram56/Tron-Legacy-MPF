@@ -106,6 +106,8 @@ def one(job):
 def _one(e, a, rng):
     sub = dict(G.RECIPES.get(e, {}))
     sub.setdefault("max_insns", 60000000)
+    if e == 141:                       # an endless loop (4M instructions of the recipe reach only its first frames): run long enough for the blinks and the screen's whole cycle
+        sub["max_insns"] = 40000000
     base = sub["ram"]() if callable(sub.get("ram")) else dict(sub.get("ram") or S.game())
     if e in RAMS:
         base.update(RAMS[e](dict(a)))
