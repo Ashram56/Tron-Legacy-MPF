@@ -99,6 +99,19 @@ def forced_picks(name):
     for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
         forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
     forced.update(forced_samples(evs))
+    # the random clip each reference run made: the pick whose ROM run length (assets/rom_data/deffs/variant_runs.csv) is the
+    # closest to the recorded length; the longest when the run was replaced by a new start (it ran to that start)
+    from tron import media_table
+    variants = media_table.load_variants(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets"))
+    recorded = media_table.load(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets"))
+    for deff_id, lengths in [(d, forced.get("deff_{}_seconds".format(d)) or [recorded[d].seconds] * 30) for d in variants]:
+        if lengths:
+            forced["deff_{}_clip".format(deff_id)] = [
+                max(range(len(variants[deff_id])), key=lambda k: variants[deff_id][k]) if n is None else min(range(len(variants[deff_id])), key=lambda k: abs(variants[deff_id][k] * 0.01626 - n))
+                for n in lengths]
+    for spec in filter(None, os.environ.get("TRON_TEST_CLIPS", "").split(",")):
+        deff_id, pick = spec.split(":")
+        forced["deff_{}_clip".format(deff_id)] = [int(pick)] * 20
     return forced
 
 

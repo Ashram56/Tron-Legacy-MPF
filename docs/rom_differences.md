@@ -149,7 +149,7 @@ Left as is, with that reason: none of the differences is a departure from the RO
 
 deff 1 [0x01034364] walks the page table at 0x00036e10 and runs each page as a child task. The ROM booted in assets/tools/os_unicorn.py (scheduler, RTC, lock-out counter, trough switches; nothing else stubbed) creates the page tasks (task_create caller 0xb890) at these tick intervals: text pages 126 ticks (tasks 0x10008a8, 0x1000128, 0x1000878, 0x100075c, 0x1000750, 0x1000744, 0x1000738, 0x100072c, 0x1000468), the Tron logo page 0x010001f0 to the next page 233 ticks, the animation page 0x0100026c 248 ticks. Page task bodies end 2 ticks earlier (the logo's 231 ticks read by deff_unicorn.py: gap of 2 ticks, deff 1's poll and the next task_create). Visible times at 16.26 ms: text page 124 ticks = 2.016 s (the game's `PAGE_SECONDS`), logo 231 = 3.756 s (`LOGO_SECONDS` 3.76), animation 246 = 4.00 s (`ANIMATION_SECONDS` 3.98: 1 tick, 16 ms, shorter than the code). The power-up VERSION page (deff 5 [0x0103703c]) lives 127 ticks from its task to deff 1's in the same run (the reference trace has 129): `VERSION_SECONDS` = 127 ticks (was the 124 of a text page). So the capture values agree with the code to one tick; the period from page start to page start is 2 ticks (32 ms) longer than the visible time, which the game does not model. Left as is: a 32 ms gap per page, no visible effect; the page order is the code's (logo page to logo page: 1489 ticks in the Unicorn run).
 
-## Random clip variants: per-variant ROM durations (read from the code, not yet used by the game)
+## Random clip variants: per-variant ROM durations (read from the code, used by the game since 2026-11-28)
 
 Deffs with a random pick (`random_below` 0xc6b4 inside the deff body) last a different time per variant. Run in the ROM with its
 scheduler, the pick forced to k (`assets/tools/os_deff_runs.py --rng k`, table `assets/rom_data/deffs/variant_runs.csv`, ticks of
@@ -157,25 +157,34 @@ scheduler, the pick forced to k (`assets/tools/os_deff_runs.py --rng k`, table `
 198, 183, 213, 204, 183, 282, 203, 174, 204, 223 (the two deffs agree); 68 [0x0101e320] 214, 237, 225 (the parameter at +0x34, 1 or
 2, does not change it); 69 [0x0101e654] 270, 267; 97 [0x01032d38] 111, 114; 108 [0x010209b0] 96, 96, 113, 113; 111 [0x01021bac], 11
 variants, 257, 369, 267, 282, 282, 224, 216, 249, 237, 234, 342; Sea of Simulation stages 116-124 [0x010275d4 .. 0x0102801c]: 99, 123,
-99 for picks 0, 1, 2. Deff 112 [0x0100d108] does not depend on its parameters (1, 2, 4): 246 ticks, used by `media_table.CODE_TICKS`.
+99 for picks 0, 1, 2 (not used: their `alt` clip has no run). Deff 112 [0x0100d108] does not depend on its parameters (1, 2, 4):
+246 ticks, used by `media_table.CODE_TICKS`.
 
-Departure still open: the game plays one fixed length per deff (timing.json `run_seconds`) and the clip variant is chosen on the Godot
-side with its own random draw, so a variant's clip length and the deff's hold do not always match the ROM's pair. Fixing it means
-Python drawing the variant with the ROM's LCG, passing `variant` and the table's duration to `dmd_effect.gd`, which needs Godot
-tests under Xvfb: not done in this pass.
+In the game (`Display.start`, `media_table.load_variants`): for deffs 48, 49, 68, 69, 97, 108 and 111 Python draws the pick with the
+ROM's generator (`os_.random.below(n)`, FUN_0000c6b4), sends it to Godot as the show's `clip` argument (the path the Light Cycle
+jackpots already use, `dmd_effect.gd` `update`) and runs the deff for that pick's ROM length. The pick index is taken as the clip
+index v00.. (inferred: the clips' picture counts and the ROM lengths rise and fall together for deffs 48, 49, 68, 69, 111). What is
+not reproduced: the draw happens when the deff starts, not at the instruction where the body draws, so the generator's later
+values can differ from the ROM's by that offset. Tests: `tests/test_deff_variants.py`, and `tests/test_godot_variant_clip.py`
+(the pinned Godot 4.6.3 under Xvfb plays exactly the clip named). The trace scenarios force the pick that matches the reference run's
+length (`tests/scenario.py`, `deff_N_clip`).
 
 Parameter deffs, same method (`--set OFFSET=VALUE` writes the caller's argument into the task at +OFFSET): deff 119 [0x01027a64] with
 +0x34 non zero 141 ticks (99 / 123 with zero); deff 85 [0x0101921c] 334 ticks with +0x30 = 1 and 194 with +0x30 = 3, +0x34 = 2, so its
-length follows the caller's arguments (the callers' values are not traced yet: open, reason: the call sites are in the mode code that
-`on_vuk` / the mode handlers reach, not read in this pass); deff 43 [0x0101c65c] 172 ticks with +0x30 = 1 (state-driven, attract state
+length follows +0x30 (< 2: 161 loops of 2 ticks, else 91 loops, then hold 10 [0x0101921c]). Its only caller is task_92_lc_intro_queue
+[0x0101b228], which sets +0x30 = 1 before queue_fullscreen_deff(0x55) [0x0101b238]: 334 ticks start to end, body 332 (5.40 s,
+timing.json 5.475 s), applied in `media_table.CODE_TICKS`; deff 43 [0x0101c65c] 172 ticks with +0x30 = 1 (state-driven, attract state
 otherwise).
 
 ## State of the points left open earlier (2026-11-28)
 
 - Start-up frame of the effects: the one frame per scenario that the sweeps miss is the uniform level the display shows before the
   ROM draws anything (docs/dmd_conformance.md); it is the display's own start-up, no ROM routine draws it. Closed as not a ROM frame.
-- Score roll phase: still open. Reason from the code: the roll is FUN_01023940 reading the live score and the tick counter 0x21117f4;
-  the game rolls with `score_display.gd`, whose phase differs until that routine is ported (dmd_conformance.md, "Effect 19").
+- Score roll: FUN_01023940 is ported (`score_display.gd` `roll()`), checked line by line on 2026-11-28: record choice by score from the
+  table at 0x40d3484 (rows 4-20 from 1,000,000, else 2-23), period 62 + 4H ticks, 2 ticks per row; the counter 0x21117f4 is +1 per
+  tick by the handler 0x01023900 on event 0x21 (seen in Unicorn: tick 1, 2, 3 ...), reset by FUN_01023858 on event 0x13 and by
+  FUN_010238ac on event 0x4d, which `media_bridge.py` reproduces. The phase offset still seen against PinMAME frames is not
+  explained by the code (open: no code reason found).
 - Deffs 1 and 10: deff 1 pages and their lengths are read from the ROM (section "Attract page lengths against the code"); deff 10 takes
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of

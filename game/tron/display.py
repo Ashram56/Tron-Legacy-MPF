@@ -59,6 +59,7 @@ class Display:
         self.os = os_
         assets = os.path.join(os_.machine.machine_path, "..", "assets")
         self.media = media_table.load(assets)
+        self.variant_ticks = media_table.load_variants(assets)
         self.prio, self.background = {}, set()
         with open(os.path.join(assets, "mpf_package", "event_map.csv"), encoding="utf-8") as f:
             for row in csv.DictReader(f):
@@ -128,6 +129,15 @@ class Display:
             if refresh and not self.show and self.mode_bg():
                 os_.after(1, lambda: self.mode_bg() and self.start(self.mode_bg(), refresh=False))
             return False
+        pick_ticks = self.variant_ticks.get(deff_id)
+        if pick_ticks and "clip" not in args and not hold:
+            # the deff's own random_below(n) [0x0000c6b4], drawn with the ROM's generator: the clip and the run length go together
+            pick = 0 if os.environ.get("TRON_DMD_SEED") == "first" else os_.random.below(len(pick_ticks))
+            forced_pick = os_.forced.get("deff_{}_clip".format(deff_id))      # a test names the pick its reference run made
+            if forced_pick and forced_pick[0] is not None:
+                pick = forced_pick.pop(0)
+            args["clip"] = pick
+            run_seconds = pick_ticks[pick] * media_table.TICK
         self._end_fg(stopped=True)
         if self.bg is not None:
             os_.media.deff_stop(self.bg)
