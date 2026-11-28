@@ -560,3 +560,7 @@ Open after the 2026-11-28 re-measure (each with its code reason):
 - Light Cycle, 22 frames: the Zuse popups "10K" of deff 96 (0x01032900) over the deff 95 background: x = (0x21, 0x57, 0x3c)[random_below(3)] + random_below(15) + 0x10,
   y = random_below(8) + 13 per tick; `rom_deff96` draws them as the code does but `sweep_engine.py` runs one draw per logged value, not the 360 combinations.
 - 95 (2 frames) and the display start-up frame (1 per scenario, the first dump line before any effect).
+
+Light Cycle popups, checked directly (2026-11-28, `scripts/conform/verify_deff96.py`): 22 of the 36 missed frames are reproduced exactly by the ported deff 96 / 95 routines with
+the draws the game made ((0, 12, 0..2) at timer 0, (0, 7, 4..6) at timer 23) and the background counter running on; the game draws what the code draws, the frames were
+missing from the sweeps (360 draws x 46 counters x 24 popup ticks per value cannot be enumerated into the pickle set cheaply; verifying the missed frames is the cheap way).

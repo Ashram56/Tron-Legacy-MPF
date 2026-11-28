@@ -53,7 +53,8 @@ def main(out, *logs):
             elif i == 2:
                 fs = rom_deff2.frames(int(a.get("volume", 0x28) or 0))
             elif i == 96:
-                fs = rom_deff96.frames(n("timer"), n("value"), [(n("k") * 1000, tuple(a.get("rnd", (0, 0, 0))), 0)])
+                fs = [f for c in range(rom_deff96.PICTURES)       # the background picture counter (RAM 0x3b92c) goes on from the last run: every start value
+                      for f in rom_deff96.frames(n("timer"), n("value"), [(n("k") * 1000, tuple(a.get("rnd", (0, 0, 0))), 0)], c)]
             elif i == 42:
                 fs = rom_deff83.frames42(n("last"), n("total"))[:1]
             else:
