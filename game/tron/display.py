@@ -36,7 +36,11 @@ SHOW_TIMEOUT = 0xea6
 HOLD_TICKS = 10             # deffs end with deff_hold_frames(10, 0x20): priority 0x20 for the last 10 ticks
 HOLD_PRIORITY = 0x20
 # a few deffs hold for fewer ticks (read from their code: deff_hold_frames(1, 0x20))
-HOLD_TICKS_BY_DEFF = {76: 1, 78: 1, 94: 1, 140: 2}     # 140: deff_hold_frames(2, 0x20) [0x0102faec]
+HOLD_TICKS_BY_DEFF = {d: 1 for d in (48, 49, 50, 62, 63, 64, 66, 67, 68, 76, 78, 80, 83, 84, 87, 88, 89, 91, 92, 94,
+                                      97, 98, 107, 108, 109, 111)}
+HOLD_TICKS_BY_DEFF.update({96: 2, 140: 2})   # 140: deff_hold_frames(2, 0x20) [0x0102faec]
+# every deff of the ROM run alone in Unicorn (assets/tools/os_deff_runs.py, column holds): the deffs above call
+# deff_hold_frames(1, 0x20) [0x01024460] (96 and 140: 2), every other deff 10
 EOB_MODE_WAIT = 169         # gf_eob_mode_wait: the ROM data byte at 0x3901c
 PREVALID_PRIO = 0x10        # priority of the score display rule that runs until the playfield is valid
 
