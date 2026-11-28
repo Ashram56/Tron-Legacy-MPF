@@ -157,13 +157,15 @@ scheduler, the pick forced to k (`assets/tools/os_deff_runs.py --rng k`, table `
 198, 183, 213, 204, 183, 282, 203, 174, 204, 223 (the two deffs agree); 68 [0x0101e320] 214, 237, 225 (the parameter at +0x34, 1 or
 2, does not change it); 69 [0x0101e654] 270, 267; 97 [0x01032d38] 111, 114; 108 [0x010209b0] 96, 96, 113, 113; 111 [0x01021bac], 11
 variants, 257, 369, 267, 282, 282, 224, 216, 249, 237, 234, 342; Sea of Simulation stages 116-124 [0x010275d4 .. 0x0102801c]: 99, 123,
-99 for picks 0, 1, 2 (not used: their `alt` clip has no run). Deff 112 [0x0100d108] does not depend on its parameters (1, 2, 4):
+99 for picks 0, 1 and 141 for the stage-completing `alt` clip (+0x34 non zero: FUN_01027478, all nine alike; the game already had 97 / 121 / 139 from the code in `features/sea_of_simulation.py`, and sends the pick as `clip` to Godot since 2026-11-28 so the clip matches the length). Deff 112 [0x0100d108] does not depend on its parameters (1, 2, 4):
 246 ticks, used by `media_table.CODE_TICKS`.
 
 In the game (`Display.start`, `media_table.load_variants`): for deffs 48, 49, 68, 69, 97, 108 and 111 Python draws the pick with the
 ROM's generator (`os_.random.below(n)`, FUN_0000c6b4), sends it to Godot as the show's `clip` argument (the path the Light Cycle
-jackpots already use, `dmd_effect.gd` `update`) and runs the deff for that pick's ROM length. The pick index is taken as the clip
-index v00.. (inferred: the clips' picture counts and the ROM lengths rise and fall together for deffs 48, 49, 68, 69, 111). What is
+jackpots already use, `dmd_effect.gd` `update`) and runs the deff for that pick's ROM length. The pick index is the clip
+index v00.. (code: the frames the ROM draws with the pick forced, `assets/rom_data/dmd_code/deff_NNN/variants/`, hold the clip vk's
+pictures exactly, distance 0 in columns 41-127, for deffs 48, 49, 68, 69 and 111; deff 48's table 0x040d2804 holds the 12 clip
+routines; deffs 97 and 108 have no matching code render, so their index is inferred from the lengths). What is
 not reproduced: the draw happens when the deff starts, not at the instruction where the body draws, so the generator's later
 values can differ from the ROM's by that offset. Tests: `tests/test_deff_variants.py`, and `tests/test_godot_variant_clip.py`
 (the pinned Godot 4.6.3 under Xvfb plays exactly the clip named). The trace scenarios force the pick that matches the reference run's
@@ -184,7 +186,9 @@ otherwise).
   table at 0x40d3484 (rows 4-20 from 1,000,000, else 2-23), period 62 + 4H ticks, 2 ticks per row; the counter 0x21117f4 is +1 per
   tick by the handler 0x01023900 on event 0x21 (seen in Unicorn: tick 1, 2, 3 ...), reset by FUN_01023858 on event 0x13 and by
   FUN_010238ac on event 0x4d, which `media_bridge.py` reproduces. The phase offset still seen against PinMAME frames is not
-  explained by the code (open: no code reason found).
+  explained by one thing found in the code: the ROM posts event 0x13 [0x0002063c] in the tick the game starts, the game reset the counter at
+  `ball_started`, 0.52 s later; the first ball now resets at the game start (`media_bridge._game_start`). Later balls still reset at
+  `ball_started` (the ROM's tick of event 0x13 on ball 2 and after is not traced: open, the multiplayer_2p run was cut at 14 s).
 - Deffs 1 and 10: deff 1 pages and their lengths are read from the ROM (section "Attract page lengths against the code"); deff 10 takes
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of

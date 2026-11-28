@@ -105,6 +105,8 @@ class MediaBridge:
         # last points: each score_add on its own (FUN_010238ac on event 0x4d, posted by every score_add: os_layer calls
         # score_added), not the sum of one task run's adds (a jackpot and its switch's 10,000 showed 510,000 for 500,000)
         self.machine.events.add_handler("ball_started", self._ball_start, priority=1000)
+        self.machine.events.add_handler("game_started", self._game_start, priority=1000)
+        self._counter_reset_at_game_start = False
 
     # ------------------------------------------------------------------ transport
 
@@ -276,9 +278,19 @@ class MediaBridge:
         self.bar_max[key] = top
         return seconds * 10 // top if top else 0
 
+    def _game_start(self, **kwargs):
+        """The ROM posts event 0x13 from 0x0002063c in the tick the game starts (Unicorn run of the multiplayer_2p script:
+        game_start 3.284 s, event 0x13 3.285 s, the first ball ejected 3.2 s later), so the first ball's counter 0x021117f4
+        starts there, not when the ball is launched (ball_started 0.52 s after the start press in this game)."""
+        self._counter_reset_at_game_start = True
+        self.award = (0, None, self.machine.clock.get_time())
+
     def _ball_start(self, **kwargs):
         """FUN_01023858 on the ball start event (0x13): the ticks since the last points start at 0 (the score blinks
-        only 63 ticks later), no last points."""
+        only 63 ticks later), no last points. The first ball's was done at the game start (_game_start)."""
+        if self._counter_reset_at_game_start:
+            self._counter_reset_at_game_start = False
+            return
         self.award = (0, None, self.machine.clock.get_time())
 
     def score_added(self, player_num, change, value):

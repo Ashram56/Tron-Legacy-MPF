@@ -2,6 +2,7 @@
 that clip's ROM length (assets/rom_data/deffs/variant_runs.csv), the clip going to Godot as the show's `clip` argument."""
 from tests.tron_test import TronTestCase
 import os
+import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TICK = 0.01626
 
@@ -28,3 +29,34 @@ class TestDeffVariants(TronTestCase):
                 self.assertAlmostEqual(self.tron.display.variant_ticks[deff_id][expect] * TICK,
                                        self.tron.display.fg_end - self.tron.now, places=3)
                 self.tron.display._end_fg(stopped=True)
+
+
+class TestVariantIdentity(unittest.TestCase):
+    """The pick k of the ROM's random_below(n) is the game's clip vk: the frames the ROM draws with the pick forced
+    (assets/rom_data/dmd_code/deff_NNN/variants/deff_00k, tools/gen_code_dmd.py) hold the clip vk's pictures exactly
+    (columns 41-127). Checked for deffs 68 and 69; deffs 48, 49 and 111 were checked the same way on 2026-11-28."""
+
+    def test_pick_is_the_clip_index(self):
+        import glob
+        try:
+            import numpy as np
+            from PIL import Image, ImageSequence
+        except ImportError:
+            self.skipTest("numpy or PIL missing")
+
+        def arr(im):
+            return np.array(im.convert("L").resize((128, 32)), dtype=float)[:, 41:] / 17
+
+        for deff_id, n in ((68, 3), (69, 2)):
+            code = os.path.join(ROOT, "assets", "rom_data", "dmd_code", "deff_%03d" % deff_id, "variants")
+            gifs = sorted(glob.glob(os.path.join(ROOT, "assets", "mpf_package", "media", "dmd", "deff_%03d_*" % deff_id,
+                                                 "variants", "v*.gif")))
+            self.assertEqual(n, len(gifs))
+            clips = [[arr(f) for f in ImageSequence.Iterator(Image.open(g))] for g in gifs]
+            for k in range(n):
+                frames = [arr(Image.open(f)) for f in sorted(glob.glob(os.path.join(code, "deff_%03d" % k, "frames", "*.png")))]
+                dist = [sum(min(float(np.mean(np.abs(c - f))) for f in frames) for c in clip[::max(1, len(clip) // 6)])
+                        for clip in clips]
+                with self.subTest(deff=deff_id, pick=k):
+                    self.assertEqual(k, dist.index(min(dist)))
+                    self.assertAlmostEqual(0.0, min(dist), places=6)

@@ -323,8 +323,10 @@ class SeaOfSimulation(Feature):
         points = os_.score_add((k + 1) * (10000 if quiet else 100000))
         self.total += points
         done = not self.needed
-        length = (STAGE_DONE_SECONDS + 10 * TICK if done                  # the hold follows the speech
-                  else STAGE_CLIP_TICKS[os_.pick("sos_stage_clip", [1, 1])] * TICK)     # random_below(2) [0x0000c6b4] in FUN_01027374
+        pick = None if done else os_.pick("sos_stage_clip", [1, 1])        # random_below(2) [0x0000c6b4] in FUN_01027374
+        length = STAGE_DONE_SECONDS + 10 * TICK if done else STAGE_CLIP_TICKS[pick] * TICK     # the hold follows the speech
+        # the pick is the clip index (v00 = 29 pictures, v01 = 37; the done clip is the alt): Godot plays the clip the length is for
+        clip = {} if done else {"clip": pick}
         # the stage deff's own sounds (FUN_01027374 / FUN_01027478): snd_play2(0x10a, counter) as it starts
         # and, for the stage-completing shot, speech snd_play2(0x111, counter) as its animation ends
         sounds = [(0, lambda: self._counted_sound(0x10a, "shot_sound", SHOT_SAMPLES, 116 + k))]
@@ -332,9 +334,9 @@ class SeaOfSimulation(Feature):
             sounds.append((STAGE_SPEECH_SECONDS,
                            lambda: self._counted_sound(0x111, "done_sound", DONE_SAMPLES, 116 + k)))
         if quiet:
-            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
+            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length, sounds=sounds, **clip)
         else:
-            os_.deff_start(116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
+            os_.deff_start(116 + k, value=points, done=done, run_seconds=length, sounds=sounds, **clip)
 
     def _counted_sound(self, call, counter, samples, deff_id):
         n = getattr(self, counter)
