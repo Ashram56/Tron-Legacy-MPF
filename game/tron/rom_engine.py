@@ -59,7 +59,7 @@ def payload(deff_id, args):
         pops = [(int(args.get("k", 0) or 0) * 1000, r, 0)]
         return _pack(rom_deff96.draws(int(args.get("timer", 0) or 0), int(args.get("value", 0) or 0), pops), rom_deff96.TICKS, False)
     if deff_id == 108:
-        v = int(args.get("variant", 0) or 0) % 4
+        v = int(args.get("clip", args.get("variant", 0)) or 0) % 4      # the variant the display drew (random_below(4) at 0x010209d8), passed as `clip`
         return _pack(rom_deff108.draws(v, int(args.get("left", 0) or 0)), rom_deff108.ticks(v), False)
     if deff_id == 83:
         return _pack(rom_deff83.draws83([int(args.get("more", 0) or 0), int(args.get("mask", 0) or 0)]), rom_deff83.TICKS, False)

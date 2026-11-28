@@ -10,7 +10,7 @@ import pickle
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "game"))
-from tron import rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff95, rom_deff138, rom_deff139  # noqa: E402
+from tron import rom_deff2, rom_deff38, rom_deff55, rom_deff57, rom_deff58, rom_deff60, rom_deff83, rom_deff94, rom_deff95, rom_deff96, rom_deff108, rom_deff138, rom_deff139  # noqa: E402
 
 
 def main(out, *logs):
@@ -42,6 +42,18 @@ def main(out, *logs):
                 fs = rom_deff58.frames(i, [n("value")])
             elif i == 60:
                 fs = rom_deff60.frames([n("value"), n("more")])
+            elif i == 94:
+                fs = rom_deff94.frames(n("value"))
+            elif i == 108:
+                fs = rom_deff108.frames(int(a.get("clip", a.get("variant", 0)) or 0) % 4, n("left"))
+            elif i == 38:
+                fs = rom_deff38.frames(n("winners"), n("number"))
+            elif i == 2:
+                fs = rom_deff2.frames(int(a.get("volume", 0x28) or 0))
+            elif i == 96:
+                fs = rom_deff96.frames(n("timer"), n("value"), [(n("k") * 1000, tuple(a.get("rnd", (0, 0, 0))), 0)])
+            elif i == 42:
+                fs = [(0, rom_deff83.pages42(n("last"), n("total"))[0][1].b)]
             else:
                 continue
             frames.update(f for _, f in fs)
