@@ -26,8 +26,10 @@ class DeffInfo:
 
 # Foreground deff lengths read from the ROM code instead of timing.json (ticks of 16.26 ms), measured by running the
 # deff routine in assets/tools/deff_unicorn.py: the tick of its last task_sleep. deff 140 [0x0102faec]: 67 + 21 + 35
-# frame loops and the final hold end at tick 324 (5.27 s; timing.json says 5.295 s).
-CODE_TICKS = {140: 324}
+# frame loops and the final hold end at tick 324 (5.27 s; timing.json says 5.295 s). Deff 112 [0x0100d108], run with
+# the caller's parameters injected (assets/tools/os_deff_runs.py --set, parameters 1, 2 and 4 alike): its body ends at
+# tick 246 (4.00 s; timing.json says 251 ticks).
+CODE_TICKS = {140: 324, 112: 246}
 
 
 def load(assets_dir):
