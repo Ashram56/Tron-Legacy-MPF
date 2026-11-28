@@ -188,7 +188,7 @@ otherwise).
   FUN_010238ac on event 0x4d, which `media_bridge.py` reproduces. The phase offset still seen against PinMAME frames is not
   explained by one thing found in the code: the ROM posts event 0x13 [0x0002063c] in the tick the game starts, the game reset the counter at
   `ball_started`, 0.52 s later; the first ball now resets at the game start (`media_bridge._game_start`). Later balls still reset at
-  `ball_started` (the ROM's tick of event 0x13 on ball 2 and after is not traced: open, the multiplayer_2p run was cut at 14 s).
+  `ball_started` (the ROM's tick of event 0x13 on later balls is not traced: open, the Unicorn replay of multiplayer_2p posts only the game-start 0x13 in its first 40 s, the harness does not reach the next ball).
 - Deffs 1 and 10: deff 1 pages and their lengths are read from the ROM (section "Attract page lengths against the code"); deff 10 takes
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of
