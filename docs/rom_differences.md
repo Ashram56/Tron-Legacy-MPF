@@ -187,7 +187,7 @@ otherwise).
   explained by one thing found in the code: the ROM posts event 0x13 as the last call of ball_start [0x00020650 / 0x00020754], right after
   serve_ball(3), on every ball (the Unicorn replay saw it at the game_start tick, 3.285 s, the eject 3.2 s later); the game reset the
   counter at MPF's `ball_started`, 0.52 s after the serve. It now resets in the same tick as `serve(3)` (`os_layer.py`, `media_bridge.ball_start_finished`),
-  every ball. The tick of later balls was not replayed in Unicorn (its trough logic keeps ejecting: the harness's ball model, not the code).
+  every ball. The tick of later balls is the tick of `serve(3)` in `ball_start`, which the game already places where the reference traces start the ball (deff_start and sound events of multiplayer_2p / 3p / 4p match); the Unicorn replay (`os_scenario.py`: trough up-kicker is coil 1 via FUN_00002b60, coil 17 is the ZEN flasher `task_cc_zen_flasher` [0x01031138], the ball leaves switch 21, shooter lane 23 closes then opens, `drain` closes jam 22 then 21) plays ball 1 but `trough_drain_check` [0x0001dd90] does not end the ball after the `drain`: its conditions (`no_balldev_tasks`, task 0x28 / 0x29 / 0x2a, `balls_count_all` against FUN_0001e080, the trough count FUN_0001bb58 against DAT_00037446) are not all met by the harness's switch model (open: which one).
 - Deffs 1 and 10: deff 1 pages and their lengths are read from the ROM (section "Attract page lengths against the code"); deff 10 takes
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of
