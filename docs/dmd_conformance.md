@@ -537,3 +537,11 @@ hits left, else FUN_0101c198), stays with the sounds of the effect's media.
 
 
 Deff 38 (match, 0x0102cdd8, 2026-11-27): `rom_deff38.py`, 65 flips of 4 ticks (the second loop runs 0x19 flips: the test is on the next count < 0x180001) and the winners' flashes (task + 0x30 = winners' bitmask, +0x34 = the number); equal to the ROM code in Unicorn for 0 and 1 winner (`test_deff38_equals_the_rom_code`). The panel's digits (FUN_0102cc48) are the panel's.
+
+## Disc Multiball jackpots 48/49 and Light Cycle jackpots 87-89: dark blink (2026-11-28, code)
+
+The points of deffs 48 (0x01008920), 49 (0x01008c1c), 87-89 (0x01019e74 ...) are printed every frame (4 ticks) with `color = 0` on even frames and with the
+palette `palette_fill(pal, 0, 1, 15)` (glyph colours mapped to 0) on odd frames, over the picture dimmed by `palette_fill(pal, 1, 2, 15)`: the off frames carve
+the digits black out of the dimmed picture, they do not hide the line. `rom_layout.py` now sets `blink_dark` for them (it had a plain hide, fitted on a capture).
+`sweep_live.py` runs the 12 clips (`RNGN`, random_below(12) at 0x1008974 / 0x0100..c74) for each state: Disc Multiball, columns 41-127: 188 misses -> 35
+(25 are effect 19, 9 effect 10, 1 start-up frame; effect 47 and 108 have none left).

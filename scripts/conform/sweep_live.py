@@ -74,14 +74,31 @@ EXPAND = {87: clip_args, 88: clip_args, 89: clip_args, 62: count_args}
 ALWAYS = (62,)
 
 
+# Effects that pick their clip with one random_below(n) (assets/rom_data/deffs/random_parts.csv): 48 and 49 (Disc jackpot awards, 12 clips, the last
+# frame of the clip stays as the background under "JACKPOT %,02lu" and the value blinks): every draw is run, as the game may roll any.
+RNGN = {48: 12, 49: 12}
+
+
 def one(job):
     e, a = job
+    if e in RNGN:
+        from dmd_recipes_c import _Seq
+        out = []
+        for k in range(RNGN[e]):
+            out += _one(e, a, _Seq([k]))
+        return out
+    return _one(e, a, None)
+
+
+def _one(e, a, rng):
     sub = dict(G.RECIPES.get(e, {}))
     sub.setdefault("max_insns", 60000000)
     base = sub["ram"]() if callable(sub.get("ram")) else dict(sub.get("ram") or S.game())
     if e in RAMS:
         base.update(RAMS[e](dict(a)))
     sub.update(ram=base)
+    if rng is not None:
+        sub.update(rng=rng, max_insns=max(sub.get("max_insns", 0), 20000000))
     if e in EXPAND:
         sub["args"] = list(dict(a)["args"])
     elif e in TASK_ARGS:

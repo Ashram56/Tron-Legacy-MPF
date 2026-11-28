@@ -238,16 +238,17 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
              # deff 48 (0x01008950) Disc Multiball jackpot: the clip plays bare, the text comes at 1410 ms with the sound
-             # 0x05b (1420 ms), the points blinking on 4 ticks off 4 (PinMAME capture)
+             # 0x05b (1420 ms), the points blinking on 4 ticks off 4: the off frames print the value with the palette 0x0 (palette_fill(pal, 0, 1, 15) at 0x01008950-ish,
+             # color = that palette when (frame & 1) != 0), i.e. the glyphs drawn black over the dimmed picture (blink_dark), as deffs 49, 87-89 (same code)
              48: {"DISC MULTIBALL": {"show_after_ms": 1410}, "JACKPOT": {"show_after_ms": 1410},
-                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4, "blink_dark": True}},
              # deffs 49, 87-89 (the other jackpot clips): the same, at DIM_AFTER_MS
              49: {"DISC MULTIBALL": {"show_after_ms": 1865}, "JACKPOT": {"show_after_ms": 1865},
-                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4}},
-             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4}},
-             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4, "blink_dark": True}},
+             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4, "blink_dark": True}},
+             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4, "blink_dark": True}},
              89: {"DOUBLE": {"show_after_ms": 983}, "SUPER JACKPOT": {"show_after_ms": 983},
-                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4, "blink_dark": True}},
              # deffs 68, 69 (Quorra's jackpots): the clip plays bare, the text of the screen the capture shows comes at the last
              # sound call (timing.json), the points blinking like the other jackpots
              68: {"JACKPOT": {"show_after_ms": 1806}, "%,02lu": {"show_after_ms": 1806, "blink_ticks": 4}},
