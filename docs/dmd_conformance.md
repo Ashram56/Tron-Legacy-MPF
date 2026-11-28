@@ -545,3 +545,10 @@ palette `palette_fill(pal, 0, 1, 15)` (glyph colours mapped to 0) on odd frames,
 the digits black out of the dimmed picture, they do not hide the line. `rom_layout.py` now sets `blink_dark` for them (it had a plain hide, fitted on a capture).
 `sweep_live.py` runs the 12 clips (`RNGN`, random_below(12) at 0x1008974 / 0x0100..c74) for each state: Disc Multiball, columns 41-127: 188 misses -> 35
 (25 are effect 19, 9 effect 10, 1 start-up frame; effect 47 and 108 have none left).
+
+Deff 111 (0x01021bac, "%d / MORE TO START / DISC MULTIBALL") has the same structure: the count is printed with color 0 on even 6-tick frames and with the black palette on odd ones
+over the clip's dimmed last picture (11 clips, random_below(0xb) at 0x01021be4); `rom_layout.py` sets `blink_dark` (blink 97 ms). With the 12-clip (48, 49) and 11-clip (111)
+sweeps (`sweep_live.py` RNGN), the effect 42 live sweep (`sweep_engine.py`), the attract credits page (`sweep_attr_credits.py`, 0x01000128) and the GRAND CHAMPION page
+(`sweep_gc.py`), the columns 41-127 coverage of the 2026-11-28 replays is: disc 1291/1292, game_flow 1029/1030, bonus 349/350, tilt 230/231, attract 232/233,
+daft punk 976/977 (the one miss everywhere is the display's start-up frame), end of line 1397/1408, portal 756/763, flynn's 748/764, light cycle 1009/1046; the rest is
+effect 19 (score roll), the Zuse popups "10K" of deff 96 (random positions) and a few frames of 141, 25, 95, 107.

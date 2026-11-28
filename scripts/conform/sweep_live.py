@@ -33,7 +33,13 @@ def ram_47(a, discs=6, recogs=3):
             0x3af18: a["jackpot"], 0x3af1c: a["super"]}
 
 
-RAMS = {141: ram_141, 47: ram_47, 57: lambda a: {0x3ae00: a["value"]}}      # deff_57 0x01005524: eol_switch_value 0x3ae00
+def ram_43(a):
+    """deff_43 (0x0101c65c, "%d MORE / POP BUMPERS = value / score"): pop_hits_left[player 1] 0x211179c (the count printed, re-read every frame, task + 0x30 the
+    first one) and the player's score FUN_000233c8 = gf_scores[0] 0x21109e4 (printed under the bumper value, task + 0x3c)."""
+    return {0x211179c: a["hits_left"], 0x21109e4: a["score"]}
+
+
+RAMS = {43: ram_43, 141: ram_141, 47: ram_47, 57: lambda a: {0x3ae00: a["value"]}}      # deff_57 0x01005524: eol_switch_value 0x3ae00
 # Effects whose values are the task arguments (task + 0x30, +0x34, ...): the deff_args events. 140 (0x0102faec): total, sos_bonus (task + 0x34 != 0 prints
 # SEA OF SIMULATION BONUS and the value).
 TASK_ARGS = {140: lambda a: [a["total"], a["sos_bonus"], 0, 0],
@@ -45,6 +51,7 @@ TASK_ARGS = {140: lambda a: [a["total"], a["sos_bonus"], 0, 0],
              48: lambda a: [a["points"], 0, 0, 0], 49: lambda a: [a["points"], 0, 0, 0], 50: lambda a: [a["points"], 0, 0, 0],
              51: lambda a: [a["total"], 0, 0, 0], 90: lambda a: [a["total"], 0, 0, 0],
              58: lambda a: [a["value"], 0, 0, 0], 59: lambda a: [a["value"], 0, 0, 0], 61: lambda a: [a["value"], 0, 0, 0],
+             111: lambda a: [a["left"], 0, 0, 0],
              139: lambda a: [a["value"], 0, 0, 0], 60: lambda a: [a["value"], a["more"], 0, 0],
              # deff_55 (0x0100461c, ZUSE/TRON letters): bytes task + 0x30 / + 0x38 = lit letters of the left row before / after, + 0x34 / + 0x3c the right row,
              # + 0x40 = flags, + 0x44 = the count printed ("%u MORE TO")
@@ -76,7 +83,7 @@ ALWAYS = (62,)
 
 # Effects that pick their clip with one random_below(n) (assets/rom_data/deffs/random_parts.csv): 48 and 49 (Disc jackpot awards, 12 clips, the last
 # frame of the clip stays as the background under "JACKPOT %,02lu" and the value blinks): every draw is run, as the game may roll any.
-RNGN = {48: 12, 49: 12}
+RNGN = {48: 12, 49: 12, 111: 11}       # 111: random_below(0xb) at 0x01021be4, table 0x040d337c; the count "%d" is task + 0x30
 
 
 def one(job):
@@ -101,6 +108,8 @@ def _one(e, a, rng):
         sub.update(rng=rng, max_insns=max(sub.get("max_insns", 0), 20000000))
     if e in EXPAND:
         sub["args"] = list(dict(a)["args"])
+    elif e == 43:
+        sub["args"] = [dict(a)["hits_left"], 0, 0, dict(a)["points"]]
     elif e in TASK_ARGS:
         sub["args"] = TASK_ARGS[e](dict(a))
     return [f for f, _ in G._run(e, G.recipe(e, sub))]
@@ -111,10 +120,15 @@ def main(out, e, *logs):
     states = set()
     for p in logs:
         for line in open(p):
-            if '"ev": "deff_live"' in line or ('"ev": "deff_args"' in line and (e in TASK_ARGS or e in EXPAND)):
+            if '"ev": "deff_live"' in line or ('"ev": "deff_args"' in line and (e in TASK_ARGS or e in EXPAND or e == 43)):
                 ev = json.loads(line)
                 if ev["id"] == e:
-                    states.add(tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in ev["args"].items())))
+                    states.add(tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in ev["args"].items() if not (e in RNGN and k == "clip"))))
+    if e == 43:                       # the bumper value comes with the start (deff_args), the score and the count change while it runs (deff_live)
+        pts = {dict(s).get("points") for s in states if "points" in dict(s)}
+        live = [dict(s) for s in states if "score" in dict(s)]
+        hits = {d["hits_left"] for d in live} | {dict(s)["hits_left"] for s in states if "points" in dict(s)}
+        states = {tuple(sorted({"hits_left": h, "score": d["score"], "points": p}.items())) for d in live for h in hits for p in pts}
     if e in EXPAND:
         jobs = [(e, (("args", tuple(x)),)) for s in (sorted(states) or [()]) for x in EXPAND[e](e, dict(s))]
         jobs = sorted(set(jobs))

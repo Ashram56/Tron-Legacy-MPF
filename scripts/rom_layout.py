@@ -269,8 +269,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # picture dimmed, the value lit and black on alternate 3-tick frames (CLIP_END_TEXT moves the times with the clip)
              97: {"ALL": {"show_after_ms": 640}, "TARGETS": {"show_after_ms": 640},
                   "%,02lu": {"show_after_ms": 640, "blink_ms": 49, "blink_dark": True}},
-             # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
-             111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
+             # deff 111 (Disc Multiball progress, 0x01021bac): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms); the count "%d" is printed
+             # every 6-tick frame with color 0 on even frames and with the palette palette_fill(pal, 0, 1, 15) on odd ones (glyphs black over the dimmed picture)
+             111: {"%d": {"show_after_ms": 1960, "blink_ms": 97, "blink_dark": True}, "MORE TO START": {"show_after_ms": 1960},
                    "DISC MULTIBALL": {"show_after_ms": 1960}},
              # deff 142 (Portal shot): the clip plays bare, then the picture dims and the points blink on it from 1680 ms (PinMAME
              # capture; on 48 ms, black 48 ms)

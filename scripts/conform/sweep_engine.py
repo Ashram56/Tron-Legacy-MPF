@@ -21,6 +21,8 @@ def main(out, *logs):
                 e = json.loads(line)
                 if e["id"] == 57:
                     frames.update(f for _, f in rom_deff57.frames(int(e["args"].get("value", 0) or 0), flips=116))
+                elif e["id"] == 42:                    # deff_42 (0x01029fd8): rspin_last / rspin_total, the first page of the 0x5d-tick cycle
+                    frames.add(rom_deff83.frames42(int(e["args"].get("last", 0) or 0), int(e["args"].get("total", 0) or 0))[0][1])
                 elif e["id"] == 95:
                     frames.update(f for _, f in rom_deff95.frames(int(e["args"].get("timer", 0) or 0), int(e["args"].get("value", 0) or 0)))
                 continue
@@ -53,7 +55,7 @@ def main(out, *logs):
             elif i == 96:
                 fs = rom_deff96.frames(n("timer"), n("value"), [(n("k") * 1000, tuple(a.get("rnd", (0, 0, 0))), 0)])
             elif i == 42:
-                fs = [(0, rom_deff83.pages42(n("last"), n("total"))[0][1].b)]
+                fs = rom_deff83.frames42(n("last"), n("total"))[:1]
             else:
                 continue
             frames.update(f for _, f in fs)
