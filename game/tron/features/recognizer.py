@@ -8,6 +8,10 @@ the "disabled targets" mask of the ROM is always 0.
 """
 from tron.features import Feature
 
+TICK = 0.01626
+DISC_SPEECH_TICKS = 60                      # deff 108: frame 20 x 3 ticks [0x01020388], frame 30 x 2 ticks [0x01020698]
+DISC_SAMPLES = {0xbb: 11, 0xbc: 6, 0xbd: 13, 0xbe: 7}      # FUN_0002d024(call) run in the ROM
+
 ORDER = 40
 # moving lit target steps (table 0x040d32b4): target mask per step, L C R C
 STEP_MASK = (1, 2, 4, 2)
@@ -75,6 +79,17 @@ class Recognizer(Feature):
         pd.rec_hits_stat = pd.rec_battles = 0
         self.speech = list(self.speech_prev)       # FUN_0101c1b0 (event 0x26): the saved copy back, then a new pick
         self.speech_pick()
+
+    def disc_speech(self):
+        """FUN_0101c0ec (task 0x78, started by FUN_0101c198): snd_play2(call, counter) with the player's call 0xbb-0xbe and counter
+        0x0211178c, once, while the counter is under the call's sample count (FUN_0002d024, run in the ROM: 11, 6, 13, 7); it does
+        not wrap."""
+        p = max(self.os.player_num - 1, 0)
+        call = self.speech[p]
+        n = getattr(self.pd, "speech_count", 0)
+        if call in DISC_SAMPLES and n < DISC_SAMPLES[call]:
+            self.os.sound2(call, n, index=n, in_deff=108)
+            self.pd.speech_count = n + 1
 
     def speech_pick(self):
         """FUN_0101c088: the player's next Disc speech call, FUN_0101c024: 0xbb + random_below(4), the next one when it
@@ -180,7 +195,9 @@ class Recognizer(Feature):
         if hits < 5:
             os_.score_add(2500)
             if not silent:
-                os_.deff_start(108, left=5 - hits, variant=os_.random.randrange(4))     # deff_108 0x10209b0: random_below(4) picks the film (0x10209d8)
+                # deff_108 [0x010209b0] draws its own random_below(4) (the film, 0x010209d8: Display.start); at its tick 60 (frame 20 x 3 ticks,
+                # or frame 30 x 2) it says snd 0x0d1 when fewer than 3 hits are left, else the player's Disc speech (FUN_0101c198, task 0x78)
+                os_.deff_start(108, left=5 - hits, **({} if 5 - hits < 3 else {"sounds": [(DISC_SPEECH_TICKS * TICK, self.disc_speech)]}))
                 os_.leff_start(101)
                 os_.sound(0x0d0)
             pd.rec_hits_stat = min(pd.rec_hits_stat + 1, 0xff)
