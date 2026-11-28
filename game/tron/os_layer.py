@@ -1023,10 +1023,11 @@ class TronOS(CustomCode):
         if num > 1:
             self.credit_model.take(1)
             self.audit(0x11)
-            if self.display.fg == 10:
-                # the credits deff (coin / free play) is gone 14 ms after a START adds a player and the deff rules start deff 19 (reference
-                # multiplayer_3p 18.79 -> 19.03: deff 10 started at the 3rd coin, the player add at 19.02, task 0x2 = deff 19 at 19.032, no deff_stop call
-                # logged); the code that does it (event 0x46 after 0x00021304) is not traced yet
+            if self.display.fg is not None and self.display.fg != self.display.bg:
+                # the START that adds a player calls FUN_000283f8(1) [0x000283f8] before FUN_00021304 [0x00021034 caller, decompile 33990-34000]:
+                # it kills the deff on screen (DAT_000381a8) unless it is the default one (DAT_000381ae), then empties the queue. The credits deff 10
+                # (coin / free play) is that deff in the reference multiplayer_3p 18.79 -> 19.03 (deff 10 from the 3rd coin, the player add at 19.02, task 0x2
+                # = deff 19 at 19.032, no deff_stop call logged): events 0x45 / 0x46 have no hooks in play (Unicorn, list at 0x3e3a0 + 4 x event)
                 self.display._end_fg(stopped=True)
                 self.display._after_fg()
 
