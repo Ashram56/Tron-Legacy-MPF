@@ -52,6 +52,7 @@ TASK_ARGS = {140: lambda a: [a["total"], a["sos_bonus"], 0, 0],
              51: lambda a: [a["total"], 0, 0, 0], 90: lambda a: [a["total"], 0, 0, 0],
              58: lambda a: [a["value"], 0, 0, 0], 59: lambda a: [a["value"], 0, 0, 0], 61: lambda a: [a["value"], 0, 0, 0],
              111: lambda a: [a["left"], 0, 0, 0],
+             99: lambda a: [a["total"], 0, 0, 0],          # deff_99 (0x01033194..): Zuse fast scoring total, task + 0x30 (FUN_00028eb0 0x4e4)
              139: lambda a: [a["value"], 0, 0, 0], 60: lambda a: [a["value"], a["more"], 0, 0],
              # deff_55 (0x0100461c, ZUSE/TRON letters): bytes task + 0x30 / + 0x38 = lit letters of the left row before / after, + 0x34 / + 0x3c the right row,
              # + 0x40 = flags, + 0x44 = the count printed ("%u MORE TO")
@@ -77,7 +78,12 @@ def count_args(e, a):
     return [[n, 0, 0, 0] for n in range(1, 11)]
 
 
-EXPAND = {87: clip_args, 88: clip_args, 89: clip_args, 62: count_args}
+def collect_args(e, a):
+    """deff_107 (0x0102c8e4, COLLECT ... FOR TIMED AWARD): task + 0x30 = the letters lit before, + 0x34 = after (bit masks of 4, ZUSE/TRON, 0..15 each)."""
+    return [[o, n, 0, 0] for o in range(16) for n in range(16)]
+
+
+EXPAND = {107: collect_args, 87: clip_args, 88: clip_args, 89: clip_args, 62: count_args}
 ALWAYS = (62,)
 
 
