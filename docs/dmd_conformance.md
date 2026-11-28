@@ -554,9 +554,6 @@ daft punk 976/977 (the one miss everywhere is the display's start-up frame), end
 effect 19 (score roll), the Zuse popups "10K" of deff 96 (random positions) and a few frames of 141, 25, 95, 107.
 
 Open after the 2026-11-28 re-measure (each with its code reason):
-- Portal Multiball, 4 frames (columns 41-127), effects 140 (0x0102fa6c) and 142 (0x01030504): the picture held under the text (bitmap 0x1d79 = 7545 for 142, which the game's
-  graphics frames hold and dim: `dim_after`, `gen_media.py`) differs from the code's by 90-120 dots, 58 at level 1 in the game against 0 in the code and 32 the other way round;
-  the cause (a placement of the masked draw, or a palette entry) is not found yet; frames compared with `live_portal_multiball_142.pkl`, 38 code frames.
 - Light Cycle, 22 frames: the Zuse popups "10K" of deff 96 (0x01032900) over the deff 95 background: x = (0x21, 0x57, 0x3c)[random_below(3)] + random_below(15) + 0x10,
   y = random_below(8) + 13 per tick; `rom_deff96` draws them as the code does but `sweep_engine.py` runs one draw per logged value, not the 360 combinations.
 - 95 (2 frames) and the display start-up frame (1 per scenario, the first dump line before any effect).
@@ -564,3 +561,8 @@ Open after the 2026-11-28 re-measure (each with its code reason):
 Light Cycle popups, checked directly (2026-11-28, `scripts/conform/verify_deff96.py`): 22 of the 36 missed frames are reproduced exactly by the ported deff 96 / 95 routines with
 the draws the game made ((0, 12, 0..2) at timer 0, (0, 7, 4..6) at timer 23) and the background counter running on; the game draws what the code draws, the frames were
 missing from the sweeps (360 draws x 46 counters x 24 popup ticks per value cannot be enumerated into the pickle set cheaply; verifying the missed frames is the cheap way).
+
+Portal Multiball (2026-11-28, from the code): the 4 frames of effects 140, 142 and 143 were the text drawn over the previous picture for one to two frames. The ROM draws the held picture and the
+text from the same tick (142: bitmap 0x1d79, graphics frame 35; 143: bitmap 0x1fad, frame 132; 140: bitmap 0x1b98, frame 67); the game started the text from the capture's time (142: 1680 ms, 143: 4240 ms)
+or from `t_ms` that drifts 13 ms from the durations' sum (140). `rom_layout.py` now starts them at `frame_sum_ms` of that frame (1715, 4312, 2209 ms); portal replay: 755/756 (the start-up frame).
+Light Cycle: the 2 frames of deff 95 and the 22 of 96 are popups "10K" (draws not enumerated by the sweeps; `verify_deff96.py`).
