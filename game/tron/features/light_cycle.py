@@ -156,7 +156,12 @@ class LightCycle(Feature):
         made = popcount(pd.lc_collected)
         if made < needed:
             if not quiet:
-                self.os.deff_start(83, more=needed - made, mask=mask, clip=0 if mask & 7 == 0 else 1)   # the bike crosses right to left, or the other way
+                rec = self.os.features_by_name.get("recognizer")
+                # frame 0x1e of the body calls FUN_0101c198 [0x01018bd0 area, decompile 82575]: Disc speech task 0x78 (FUN_0101c0ec); each frame
+                # ends with FUN_01024230(2, 0) = 2 ticks, so the call comes 30 x 2 = 60 ticks after the deff starts (59 + 1 frames, 120 ticks)
+                sounds = [(60 * 0.01626, lambda: rec.disc_speech(83))] if rec is not None else None
+                self.os.deff_start(83, more=needed - made, mask=mask, clip=0 if mask & 7 == 0 else 1,   # the bike crosses right to left, or the other way
+                                   **({"sounds": sounds} if sounds else {}))
         elif self.os.hook("vuk_lit_add", VUK_BIT):
             pd.lc_remaining, pd.lc_collected = ALL_SHOTS, 0
             if not quiet:

@@ -80,7 +80,7 @@ class Recognizer(Feature):
         self.speech = list(self.speech_prev)       # FUN_0101c1b0 (event 0x26): the saved copy back, then a new pick
         self.speech_pick()
 
-    def disc_speech(self):
+    def disc_speech(self, deff=108):
         """FUN_0101c0ec (task 0x78, started by FUN_0101c198): snd_play2(call, counter) with the player's call 0xbb-0xbe and counter
         0x0211178c, once, while the counter is under the call's sample count (FUN_0002d024, run in the ROM: 11, 6, 13, 7); it does
         not wrap."""
@@ -88,7 +88,7 @@ class Recognizer(Feature):
         call = self.speech[p]
         n = getattr(self.pd, "speech_count", 0)
         if call in DISC_SAMPLES and n < DISC_SAMPLES[call]:
-            self.os.sound2(call, n, index=n, in_deff=108)
+            self.os.sound2(call, n, index=n, in_deff=deff)
             self.pd.speech_count = n + 1
 
     def speech_pick(self):
