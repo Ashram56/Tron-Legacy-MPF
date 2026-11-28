@@ -286,7 +286,9 @@ class TestDiagnostics(ServiceCase):
         self.assertIn(8, [e["id"] for e in self.tron.trace.of("leff_start")])
         self.press("back")
         self.goto("DOT MATRIX TEST")
-        self.assertEqual("ALL DOTS ON", self.shown[-1][1])
+        self.assertEqual("DOT MATRIX TEST", self.shown[-1][0])
+        self.advance_time_and_run(0.1)                                    # 6 ticks: the second column lit on black (routine 0x01003fb44)
+        self.assertEqual([{"r": [0, 0, 128, 32], "l": 0}, {"r": [1, 0, 1, 32], "l": 15}], self.svc.draw_items)
         self.press("back")
         self.goto("GAME-SPECIFIC TESTS", "DISC MOTOR TEST")
         self.press("select")
@@ -529,20 +531,28 @@ class TestAuditsAndAdjustments(ServiceCase):
         self.assertEqual("B", self.machine.variables.get_machine_var("custom_message_text"))
         self.assertTrue(self.machine.variables.machine_vars["custom_message_text"]["persist"])
         self.goto("SET DATE/TIME")
-        self.assertEqual("SET YEAR", self.shown[-1][0])
-        self.assertRegex(self.shown[-1][2], r"^\d{1,2}:\d\d [AP]M$")       # adj 3 = 12-HOUR
-        self.press("plus")                                        # year + 1
-        self.press("select")
-        for field in ("MONTH", "DAY", "HOUR", "MINUTE"):          # +1 and -1 on every other field
+        self.assertEqual("SET MONTH", self.shown[-1][0])          # FUN_01045b44: month, day, year, hour, minute, second
+        self.assertRegex(self.shown[-1][2], r"^\d{1,2}:\d\d:\d\d [AP]M$")       # adj 3 = 12-HOUR
+        for field in ("MONTH", "DAY"):
             self.assertEqual("SET " + field, self.shown[-1][0])
             self.press("plus")
             self.press("minus")
             self.press("select")
+        self.assertEqual("SET YEAR", self.shown[-1][0])
+        self.press("plus")                                        # year + 1
+        self.press("select")
+        for field in ("HOUR", "MINUTE", "SECOND"):
+            self.assertEqual("SET " + field, self.shown[-1][0])
+            self.press("plus")
+            self.press("minus")
+            self.press("select")
+        self.assertEqual("DATE/TIME SET", self.shown[-1][0])
+        self.press("select")
         offset = self.machine.variables.get_machine_var("clock_offset")
         self.assertAlmostEqual(365 * 86400, offset, delta=2 * 86400)
         os_.adj[3] = 1                                            # 24-HOUR
         self.goto("SET DATE/TIME")
-        self.assertRegex(self.shown[-1][2], r"^\d\d:\d\d$")
+        self.assertRegex(self.shown[-1][2], r"^\d\d:\d\d:\d\d$")
         self.press("back")
         self.goto("SET CUSTOM PRICING")
         self.assertEqual(("COIN UNITS", "> 1"), tuple(self.shown[-1][1:]))

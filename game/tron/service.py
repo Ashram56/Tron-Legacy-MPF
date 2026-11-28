@@ -28,6 +28,7 @@ import re
 from mpf.core.mode import Mode
 
 from tron import network
+from tron import rom_datetime as rdt
 from tron import rom_draw as rd
 from tron import service_backglass as bg
 from tron.hw_numbers import sam_number
@@ -243,7 +244,7 @@ class Screen:
 
 class EntryScreen(Screen):
     """The service entry screen, deff 3 [0x01037a6c]: version, SERVICE MENU, PRESS 'SELECT' TO CONTINUE.
-    SELECT opens the main menu, BACK leaves; MINUS / PLUS show the technician alerts."""
+    SELECT opens the main menu, BACK leaves; MINUS / PLUS do nothing."""
 
     def __init__(self, svc):
         super().__init__(svc, "SERVICE MENU")
@@ -263,10 +264,10 @@ class EntryScreen(Screen):
     def button(self, name):
         if name == "select":
             self.svc.push(MenuScreen(self.svc, "MAIN MENU"))
-        elif name in ("minus", "plus"):
-            self.svc.push(SwitchAlertsScreen(self.svc, "TECHNICIAN ALERTS"))
-        else:
+        elif name == "back":
             self.svc.exit()
+        # MINUS / PLUS here start only the key-repeat tasks (FUN_0000fc28 cases 2 and 4 with the menu up, 0x0000fc28): the
+        # coin_door_buttons reference run shows no screen change, and the next BACK leaves the menu
 
 
 class MenuScreen(Screen):
@@ -845,29 +846,49 @@ class BurnInScreen(Screen):
             super().button(name)
 
 
-class DotMatrixScreen(ListScreen):
-    """DOT MATRIX TEST: full, blank and striped pages; MINUS / PLUS step."""
+class DotMatrixScreen(Screen):
+    """DOT MATRIX TEST [routine 0x01003fb44 of the menu, service_texts.csv 0xbd]: every 6 ticks (96 ms) the next picture, forever, until a button.
+    Leaves on BACK (the routine polls the service exit flag RAM 0x3c950 every step, like every service routine). Pass 0: one lit column (x 0-127) then one lit row (y 0-31) on black; pass 1: one black column then row on lit; then 64 pictures of the one-dot
+    checkerboard, its phase flipping each time (outer loop 32 x phase 0, 1). Checked: the first frame of every tick of the code run
+    (assets/tools/deff_frames.py on the routine) equals these pictures for the first 2400 ticks."""
 
-    PAGES = (("ALL DOTS ON", "#" * 21), ("ALL DOTS OFF", ""), ("STRIPES", "# " * 10 + "#"))
+    STEP_SECONDS = 6 * 0.016
+    WIDTH, HEIGHT = 128, 32
 
     def __init__(self, svc):
         super().__init__(svc, "DOT MATRIX TEST")
+        self.step = 0
+        self.handle = None
 
-    def entries(self):
-        return list(self.PAGES)
+    def enter(self):
+        self.step = 0
+        self.handle = self.machine.clock.schedule_once(self._next, self.STEP_SECONDS)
 
-    def entry_lines(self, entry):
-        return [entry[0], entry[1]]
+    def leave(self):
+        if self.handle:
+            self.machine.clock.unschedule(self.handle)
+            self.handle = None
+
+    def _next(self):
+        self.step = (self.step + 1) % (2 * (self.WIDTH + self.HEIGHT) + 64)
+        self.refresh()
+        self.handle = self.machine.clock.schedule_once(self._next, self.STEP_SECONDS)
+
+    def lines(self):
+        return [self.title]
 
     def draw(self):
-        """The page itself: every dot lit, none, or every other row lit (the ROM's pages are not in the
-        decompile)."""
-        name = self.current()[0]
-        if name == "ALL DOTS ON":
-            return [rd.box(0, 0, rd.WIDTH, 32, 15)]
-        if name == "STRIPES":
-            return [rd.box(0, y, rd.WIDTH, 1, 15) for y in range(0, 32, 2)]
-        return []
+        w, h = self.WIDTH, self.HEIGHT
+        sweep = w + h
+        if self.step < 2 * sweep:
+            p, i = divmod(self.step, sweep)
+            bg, col = (15, 0) if p else (0, 15)
+            items = [rd.box(0, 0, w, h, bg)]
+            items.append(rd.box(i, 0, 1, h, col) if i < w else rd.box(0, i - w, w, 1, col))
+            return items
+        phase = (self.step - 2 * sweep) % 2
+        return [rd.box(x, y, 1, 1, 15) for y in range(h) for x in range(w) if (x + y + phase) % 2]
+
 
 
 class MotorTestScreen(Screen):
@@ -1198,55 +1219,100 @@ def clock_text(machine, when, time_format):
 
 
 class DateTimeScreen(Screen):
-    """SET DATE/TIME: SELECT steps through year, month, day, hour, minute (MINUS / PLUS change the field)
-    and stores the clock offset after the minutes."""
+    """SET DATE/TIME [FUN_01045b44, the line FUN_0000d814: tron/rom_datetime.py]. The record is read once; SELECT goes through the fields
+    month, day, year, hour, minute, second (the one being edited blinks: shown 9 loops, hidden 8, a loop = 2 ticks, solid for 16 loops
+    after a +/- press), BACK goes to the previous field (the first one leaves), SELECT after the seconds sets the clock
+    (DATE/TIME SET, the running clock, PRESS 'SELECT' TO CONTINUE) and the next SELECT leaves."""
 
-    FIELDS = ("YEAR", "MONTH", "DAY", "HOUR", "MINUTE")
+    LOOP_SECONDS = 2 * 0.01626            # FUN_0002791c(2): two 16.26 ms ticks per loop
+    LAST_FIELD = 6
 
     def __init__(self, svc):
         super().__init__(svc, "SET DATE/TIME")
-        self.when = clock_now(self.machine).replace(second=0, microsecond=0)
-        self.field = 0
+        now = clock_now(self.machine)
+        self.rec = [now.year, now.month, now.day, now.hour, now.minute, now.second]
+        self.field = 1
+        self.a, self.b = 0, 8             # iVar4, iVar3 of FUN_01045b44: the blink counters
+        self.done = False
+        self.handle = None
+        self.last = None
+
+    def enter(self):
+        self._loop()
+
+    def leave(self):
+        if self.handle:
+            self.machine.clock.unschedule(self.handle)
+            self.handle = None
+
+    def _hidden(self):
+        return self.field if (self.a < 0 and self.b < 0 and not self.done) else None
+
+    def _loop(self):
+        if self.a < 0:
+            self.b -= 1
+        else:
+            self.a -= 1
+        if self.done:
+            now = clock_now(self.machine)
+            self.rec = [now.year, now.month, now.day, now.hour, now.minute, now.second]
+        items = self.draw()
+        if items != self.last:
+            self.last = items
+            self.refresh()
+        if self.b + 7 < 0:
+            self.b = 8
+        self.handle = self.machine.clock.schedule_once(self._loop, self.LOOP_SECONDS)
 
     def lines(self):
-        date, clock = clock_text(self.machine, self.when, self.os.adj[3])
-        return ["SET " + self.FIELDS[self.field], date, clock]
+        y, mo, d, h, mi, sec = self.rec
+        twelve = self.os.adj[3] == 0
+        name = rdt.FIELDS[self.field - 1].upper()
+        clock = "{:02d}:{:02d}:{:02d}".format((h % 12 or 12) if twelve else h, mi, sec) + (
+            (" PM" if h > 11 else " AM") if twelve else "")
+        return ["DATE/TIME SET" if self.done else "SET " + name, "{} {:02d}, {:04d}".format(rdt.MONTHS[mo - 1], d, y), clock]
 
     def draw(self):
-        """SET DATE/TIME (msg 0x1e6): the header, the field edited (CURRENT DATE/TIME: in the ROM) on row 16,
-        the date and the time in font 2 on rows 23 and 30."""
-        title, date, clock = self.lines()
-        return header("SET DATE/TIME") + [rd.text(title, 2, 64, 16), rd.text(date, 2, 64, 23),
-                                          rd.text(clock, 2, 64, 30)]
+        """The ROM's two screens. Setting: msg 0x1e6 on row 4, the rule on row 6, msg 0x1e7 on row 16 and the line on row 26 (font 2).
+        Set: msg 0x1e8 in font 8 on row 10, the line on row 18, msg 0x1e9 fitted on row 27."""
+        twelve = self.os.adj[3] == 0
+        if self.done:
+            return [rd.text("DATE/TIME SET", 8, 64, 10)] + rdt.draw(self.rec, twelve, 18) + [rd.fit(CONTINUE, 64, 27, SMALL_FONTS)]
+        return header("SET DATE/TIME") + [rd.text("CURRENT DATE/TIME:", 2, 64, 16)] + rdt.draw(self.rec, twelve, 26, self._hidden())
 
-    def _change(self, step):
-        w = self.when
-        field = self.FIELDS[self.field]
-        if field == "YEAR":
-            w = w.replace(year=min(2099, max(2000, w.year + step)))
-        elif field == "MONTH":
-            w = w.replace(month=(w.month - 1 + step) % 12 + 1, day=min(w.day, 28))
-        elif field == "DAY":
-            w = w + datetime.timedelta(days=step)
-        elif field == "HOUR":
-            w = w + datetime.timedelta(hours=step)
-        else:
-            w = w + datetime.timedelta(minutes=step)
-        self.when = w
+    def _solid(self):
+        self.a, self.b = 15, 8
 
     def button(self, name):
+        if self.done:
+            if name == "select":
+                self.svc.pop()
+            return
         if name in ("minus", "plus"):
-            self._change(1 if name == "plus" else -1)
+            self.rec = rdt.step(self.rec, self.field, 1 if name == "plus" else -1)
+            self._solid()
         elif name == "select":
-            self.field += 1
-            if self.field == len(self.FIELDS):
-                offset = int((self.when - datetime.datetime.now()).total_seconds())
-                persist_var(self.machine, "clock_offset", offset)
+            if self.field < self.LAST_FIELD:
+                self.field += 1
+                self.a, self.b = 0, 8
+            else:
+                y, mo, d, h, mi, sec = self.rec
+                try:
+                    when = datetime.datetime(y, mo, d, h, mi, sec)
+                except ValueError:                  # the ROM keeps a day past the month's end (Feb 31): the clock takes the last day
+                    when = datetime.datetime(y, mo, rdt.month_days(y, mo), h, mi, sec)
+                persist_var(self.machine, "clock_offset", int((when - datetime.datetime.now()).total_seconds()))
+                self.done = True
+        elif name == "back":
+            if self.field < 2:
                 self.svc.pop()
                 return
+            self.field -= 1
+            self.a, self.b = 0, 8
         else:
             super().button(name)
             return
+        self.last = None
         self.refresh()
 
 
@@ -1799,6 +1865,10 @@ class ServiceMode(Mode):
             attract.stop()                        # the ROM's attract pages and lamp show stop
         os_.deff_stop(1)
         os_.leff_stop(1)
+        os_.trace.log("deff_start", id=3)         # the entry screen is deff 3 [0x01037a6c, FUN_0000f9a8]; this menu draws it itself
+        os_.leff_start(2)
+        os_.sound(0x00c, in_deff=3)
+        os_.sound(0x001)                           # the music stops
         if self.machine.modes["attract"].active:
             self.machine.modes["attract"].stop()  # no game start from the service menu
         sc = self.machine.switch_controller
@@ -1816,6 +1886,9 @@ class ServiceMode(Mode):
         self.handlers = []
         os_ = self.os
         os_.in_service = False
+        os_.sound(0x009, in_deff=3)               # the menu ends [FUN_0000fa7c]: deff 3 and leff 2 stop
+        os_.trace.log("deff_stop", id=3)
+        os_.leff_stop(2)
         os_.media.service_hide()
         self.backglass = {"show": False}
         self._backglass_screen = None

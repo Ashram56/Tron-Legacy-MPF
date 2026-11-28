@@ -16,6 +16,7 @@ Usage: scripts/trace_check.py <scenario> [--events score,deff_start,...] [--tol 
 """
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -23,6 +24,7 @@ import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 REF = os.path.join(ROOT, "assets", "rules", "traces")
+REF2 = os.path.join(ROOT, "assets", "rom_data", "states", "traces")   # the newer reference traces
 CAND = os.path.join(ROOT, "captures", "traces")
 COMPARE = os.path.join(ROOT, "assets", "rules", "tools", "trace", "trace_compare.py")
 DEFAULT = "score,deff_start,sound,leff_start,tube_show_start,audit,multiball_start,mark,lamp,coil"
@@ -48,10 +50,21 @@ def keep(e):
     return True
 
 
+def _loads(line):
+    """One trace line; a mark whose text holds unescaped quotes (coin_door_buttons.jsonl, 4 lines) is read by regex."""
+    try:
+        return json.loads(line)
+    except ValueError:
+        m = re.match(r'\{"t":([\d.]+),"ev":"mark","text":"(.*)"\}\s*$', line)
+        if not m:
+            raise
+        return {"t": float(m.group(1)), "ev": "mark", "text": m.group(2)}
+
+
 def filtered(path, tmp):
     """Copy of the trace without non-rules events and without anything before "ready"."""
     out = os.path.join(tmp, os.path.basename(path))
-    evs = [json.loads(line) for line in open(path, encoding="utf-8") if line.strip()]
+    evs = [_loads(line) for line in open(path, encoding="utf-8") if line.strip()]
     t0 = next((e["t"] for e in evs if e.get("ev") == "ready"), None)
     with open(out, "w", encoding="utf-8") as g:
         for e in evs:
@@ -70,7 +83,7 @@ def main():
     global STRICT
     STRICT = a.strict
     with tempfile.TemporaryDirectory() as tmp:
-        ref = filtered(os.path.join(REF, a.scenario + ".jsonl"), os.path.join(tmp, "r") if os.makedirs(
+        ref = filtered(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"), os.path.join(tmp, "r") if os.makedirs(
             os.path.join(tmp, "r")) is None else tmp)
         os.makedirs(os.path.join(tmp, "c"))
         cand = filtered(os.path.join(CAND, a.scenario + ".jsonl"), os.path.join(tmp, "c"))
@@ -84,7 +97,7 @@ def main():
             sys.stdout.flush()
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             import lamp_state
-            good, total, _ = lamp_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+            good, total, _ = lamp_state.compare(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"),
                                                 os.path.join(CAND, a.scenario + ".jsonl"))
             if good == total:
                 print("{:16s} OK   {} samples".format("lamp", total))
@@ -95,7 +108,7 @@ def main():
             sys.stdout.flush()
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
             import coil_state
-            good, total, _ = coil_state.compare(os.path.join(REF, a.scenario + ".jsonl"),
+            good, total, _ = coil_state.compare(os.path.join(REF if os.path.exists(os.path.join(REF, a.scenario + ".jsonl")) else REF2, a.scenario + ".jsonl"),
                                                 os.path.join(CAND, a.scenario + ".jsonl"))
             if good == total:
                 print("{:16s} OK   {} bursts".format("coil", total))

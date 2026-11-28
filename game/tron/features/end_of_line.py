@@ -16,6 +16,7 @@ belongs to the combos feature. For others: eol_running() (flag 0x27), eol_runnin
 (0x01004c30, Disc/Recognizer), eol_running_or_grace_a() (Recognizer bank motor, 0x0102227c).
 """
 from tron.features import Feature
+from tron.os_layer import TICK
 
 ORDER = 60
 
@@ -46,13 +47,47 @@ class EndOfLine(Feature):
         # lamp/tube rules [eol_init_rules 0x01006298]; the ROM starts leff 60 before leff 59
         os_.lamp_rule(self.lit_rule, leff=57, order=0x01005198)
         os_.lamp_rule(self.background_on, leff=60, order=0x010055d8)
+        os_.lamps.leff_code(60, self._leff_disc_flashers)
         os_.lamp_rule(self.background_on, leff=59, order=0x010055d8)
+        os_.lamps.tube_code(88, self._tube_show_88)
         os_.lamp_rule(self.background_on, tube=88, order=0x010055d8)
         # deff + music rule [0x01005610]: deff 57, music 0x20 + (level & 3), priority 7
         os_.deff_rule(self.background_on, 57, music=lambda: 0x20 + (self.level & 3), priority=MUSIC_PRIORITY)
         os_.deff_live((57,), lambda: {"value": self.switch_value})    # deff 57 [0x01005524]: eol_switch_value
         # End of Line combo jackpot lit (task 0xcf) [leff rule 0x01003914]
         os_.lamp_rule(lambda: os_.task_running(COMBO_JACKPOT_LIT_A), leff=161, order=0x01003914)
+
+    TUBES = ((1, "l_left_ramp_tube"), (2, "l_right_ramp_tube"))      # eol_lit_mask bit 0 / 1 (tube table order)
+
+    def _tube_show_88(self, lamps):
+        """tubeshow_088_eol_ramps_lit [0x010056b8]: every 31 ticks each tube is set dark when its jackpot bit
+        of eol_lit_mask is clear, else faded 500 ms to white (15/15/15) then back to dark."""
+        clock = self.os.machine.clock
+        state = {"white": True, "handle": None}
+
+        def step():
+            for bit, light in self.TUBES:
+                if not self.mask & bit:
+                    lamps.rgb(light, "000000")
+                else:
+                    lamps.rgb(light, "ffffff" if state["white"] else "000000", fade_ms=500)
+            state["white"] = not state["white"]
+            state["handle"] = clock.schedule_once(step, 0x1f * TICK)
+
+        step()
+
+        def stop():
+            if state["handle"]:
+                clock.unschedule(state["handle"])
+            for _, light in self.TUBES:
+                lamps.rgb(light, "000000")
+        return stop
+
+    def _leff_disc_flashers(self, task):
+        """leff_060 [0x01005658]: every 8 ticks coil_pulse(0x1f FLASH: RED DISC when eol_level is even, 0x20
+        FLASH: BLUE DISC when odd, 0x20 = 32 ms); the captured show only had the red one."""
+        self.os.lamps.flasher("f_blue_disc" if self.level & 1 else "f_red_disc", 32)
+        task.sleep(8, self._leff_disc_flashers)
 
     # ------------------------------------------------------------------ per player / per ball
 
@@ -102,10 +137,13 @@ class EndOfLine(Feature):
         if os_.flag(LIT) or os_.any_multiball() or os_.flag(0x34):
             return False
         before = (pd.eol_left, pd.eol_right)
-        if side == 0:
-            pd.eol_left = min(pd.eol_left + 1, 4)
-        else:
-            pd.eol_right = min(pd.eol_right + 1, 4)
+        advanced = False                                  # the routine's result: a letter was lit (a word already at 4 letters is not)
+        if side == 0 and pd.eol_left < 4:
+            pd.eol_left += 1
+            advanced = True
+        elif side == 1 and pd.eol_right < 4:
+            pd.eol_right += 1
+            advanced = True
         after = (pd.eol_left, pd.eol_right)
         needed = os_.adj_value(83) if pd.eol_times_lit == 0 else os_.adj_value(84)
         eb_adj = os_.adj_value(85)
@@ -131,7 +169,7 @@ class EndOfLine(Feature):
                 what = 0xc                                            # "LIGHT M.B. + E.B."
         os_.deff_start(55, before=before, after=after, flags=flags | what, more=more,
                        screen=self.letters_screen(flags | what))
-        return True
+        return advanced
 
     @staticmethod
     def letters_screen(flags):

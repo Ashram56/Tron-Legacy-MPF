@@ -223,11 +223,12 @@ class TestFrameText(unittest.TestCase):
 
     def lines(self, deff, frame):
         from PIL import Image
-        path = os.path.join(GAME, "media", "dmd", deff, frame)
+        path = os.path.join(GAME, "media", "dmd", deff, frame) if deff != "code_page_7" else os.path.join(
+            GAME, "..", "assets", "rom_data", "dmd_code", "deff_001_pages", "deff_007", "frames", "000.png")   # the ROM code's HIGH SCORE #1 page
         return [(t, fid, x, b) for t, fid, x, b, *_ in self.ft.frame_text(Image.open(path), self.fonts)]
 
     def test_finds_the_rom_text(self):
-        self.assertEqual([("HIGH SCORE #1", 12, 43, 9), ("55,000,000", 12, 55, 29)], self.lines("deff_001", "f004.png")[:2])
+        self.assertEqual([("HIGH SCORE #1", 12, 43, 9), ("55,000,000", 12, 55, 29)], self.lines("code_page_7", "")[:2])
         # O or 0 by the rest of the word
         self.assertIn(("50V / 20V DISABLED", 8, 16, 10), self.lines("deff_004", "f000.png"))
         self.assertIn(("PLEASE TRY AGAIN!", 12), [l[:2] for l in self.lines("deff_034", "f001.png")]

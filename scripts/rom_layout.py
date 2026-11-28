@@ -238,16 +238,17 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
                             "level_steps": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15]},
                   "%,02lu": {"show_after_frame": 64}},
              # deff 48 (0x01008950) Disc Multiball jackpot: the clip plays bare, the text comes at 1410 ms with the sound
-             # 0x05b (1420 ms), the points blinking on 4 ticks off 4 (PinMAME capture)
+             # 0x05b (1420 ms), the points blinking on 4 ticks off 4: the off frames print the value with the palette 0x0 (palette_fill(pal, 0, 1, 15) at 0x01008950-ish,
+             # color = that palette when (frame & 1) != 0), i.e. the glyphs drawn black over the dimmed picture (blink_dark), as deffs 49, 87-89 (same code)
              48: {"DISC MULTIBALL": {"show_after_ms": 1410}, "JACKPOT": {"show_after_ms": 1410},
-                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 1410, "blink_ticks": 4, "blink_dark": True}},
              # deffs 49, 87-89 (the other jackpot clips): the same, at DIM_AFTER_MS
              49: {"DISC MULTIBALL": {"show_after_ms": 1865}, "JACKPOT": {"show_after_ms": 1865},
-                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4}},
-             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4}},
-             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 1865, "blink_ticks": 4, "blink_dark": True}},
+             87: {"JACKPOT": {"show_after_ms": 1235}, "%,02lu": {"show_after_ms": 1235, "blink_ticks": 4, "blink_dark": True}},
+             88: {"SUPER JACKPOT": {"show_after_ms": 1473}, "%,02lu": {"show_after_ms": 1473, "blink_ticks": 4, "blink_dark": True}},
              89: {"DOUBLE": {"show_after_ms": 983}, "SUPER JACKPOT": {"show_after_ms": 983},
-                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4}},
+                  "%,02lu": {"show_after_ms": 983, "blink_ticks": 4, "blink_dark": True}},
              # deffs 68, 69 (Quorra's jackpots): the clip plays bare, the text of the screen the capture shows comes at the last
              # sound call (timing.json), the points blinking like the other jackpots
              68: {"JACKPOT": {"show_after_ms": 1806}, "%,02lu": {"show_after_ms": 1806, "blink_ticks": 4}},
@@ -268,8 +269,9 @@ OVERRIDES = {38: {"MATCH": {"font": 37, "x": 127, "y": 7, "flags": 4, "source": 
              # picture dimmed, the value lit and black on alternate 3-tick frames (CLIP_END_TEXT moves the times with the clip)
              97: {"ALL": {"show_after_ms": 640}, "TARGETS": {"show_after_ms": 640},
                   "%,02lu": {"show_after_ms": 640, "blink_ms": 49, "blink_dark": True}},
-             # deff 111 (Disc Multiball progress): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms)
-             111: {"%d": {"show_after_ms": 1960}, "MORE TO START": {"show_after_ms": 1960},
+             # deff 111 (Disc Multiball progress, 0x01021bac): the clip plays bare, the text comes with its last frame (PinMAME capture, 1960 ms); the count "%d" is printed
+             # every 6-tick frame with color 0 on even frames and with the palette palette_fill(pal, 0, 1, 15) on odd ones (glyphs black over the dimmed picture)
+             111: {"%d": {"show_after_ms": 1960, "blink_ms": 97, "blink_dark": True}, "MORE TO START": {"show_after_ms": 1960},
                    "DISC MULTIBALL": {"show_after_ms": 1960}},
              # deff 142 (Portal shot): the clip plays bare, then the picture dims and the points blink on it from 1680 ms (PinMAME
              # capture; on 48 ms, black 48 ms)
@@ -415,20 +417,40 @@ def frame_ms(deff_id, k):
         return frames[k]["t_ms"] - t0
     step = frames[-2]["duration_ms"] if len(frames) > 1 else frames[-1]["duration_ms"]
     return frames[-1]["t_ms"] - t0 + step * (k - len(frames) + 1)
+def frame_sum_ms(deff_id, k):
+    """Start of graphics frame k as `gen_media.dim_after` counts it: the sum of the durations of the frames before it (not the capture's t_ms, which drift from the
+    sum by a few ms: a picture switched on one side of the text's start showed the text over the wrong picture for one frame)."""
+    import glob
+    import json
+    path = glob.glob(os.path.join(ROOT, "assets", "mpf_package", "media", "dmd", "deff_%03d_*" % deff_id, "timing.json"))
+    frames = json.load(open(path[0], encoding="utf-8"))["graphics_frames"] if path else []
+    return sum(max(1, int(f["duration_ms"])) for f in frames[:k])
+
+
 # deff 140 (0x0102faec): the animation's 67 frames (2 ticks) with the bonus lines, then PORTAL / MULTIBALL
 # (font 0x27) for 21 frames of 3 ticks, then COMPLETE ALL SHOTS / FOR / SUPER JACKPOT to the end
-_P140 = frame_ms(140, 67)
+_P140 = frame_sum_ms(140, 67)
 # Past the animation its last picture stays at level 1 (palette 0x30 of the deff) and the text blinks every 3-tick frame,
 # lit first (palette 0x40 on odd frames: the glyphs vanish); COMPLETE ALL SHOTS holds its first frame (FUN_00027acc(1),
 # about 370 ms in the capture) before it blinks.
 _B140 = round(3 * TICK_MS)
-OVERRIDES[140] = {**{t: {"hide_after_frame": 67} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
-                  **{t: {"show_after_frame": 67, "hide_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140,
+OVERRIDES[140] = {**{t: {"hide_after_ms": _P140} for t in ("%,02lu", "SEA OF SIMULATION", "BONUS")},
+                  **{t: {"show_after_ms": _P140, "hide_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140,
                          "blink_dark": True} for t in ("PORTAL", "MULTIBALL")},
                   **{t: {"show_after_ms": _P140 + round(63 * TICK_MS), "blink_ms": _B140, "blink_dark": True,
                          "blink_after_ms": _P140 + round(63 * TICK_MS) + 370}
                      for t in ("COMPLETE ALL SHOTS", "FOR", "SUPER JACKPOT")}}
 DIM_AFTER_MS[140] = _P140
+# deff 142 (0x01030504): the 35 bitmaps 0x1d56..0x1d78 (3 ticks each), then bitmap 0x1d79 held dimmed with the points from the same tick: both start at the start of graphics
+# frame 35 (1717 ms in timing.json, 1715 as the durations add up), not at the 1680 ms the capture suggested (37 ms of the dimmed picture 0x1d78 with the points were shown)
+_P142 = frame_sum_ms(142, 35)
+OVERRIDES[142]["%,02lu"]["show_after_ms"] = _P142
+DIM_AFTER_MS[142] = _P142
+# deff 143 (0x010307c4): the 132 bitmaps 0x1f29..0x1fac (2 ticks each), then bitmap 0x1fad (graphics frame 132, undimmed) with SUPER / JACKPOT / the points from the same tick:
+# 4312 ms as the durations add up (the capture's 4240 ms showed the text over the picture 0x1fab / 0x1fac for two frames)
+_P143 = frame_sum_ms(143, 132)
+for _t in ("SUPER", "JACKPOT", "%,02lu"):
+    OVERRIDES[143][_t]["show_after_ms"] = _P143
 SAMPLE = {"%,02lu": "1,234,560", "%luK": "100K"}
 
 

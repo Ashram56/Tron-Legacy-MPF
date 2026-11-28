@@ -132,6 +132,22 @@ class TestHurryUps(TronTestCase):
         self.assertFalse(gem.end_now())
         self.assertIsNone(gem.more_time())
 
+    def test_find_flynn_blocked_only_by_end_of_line_and_wizards(self):
+        """FUN_0100d654 [0x0100d654]: task 0xd1, flags 0x34 / 0x37 and End of Line (0x27) block the start;
+        Disc, Light Cycle and Quorra multiballs do not."""
+        os_ = self.start_game()
+        for flag in (0x24, 0x29, 0x2b):
+            os_.flag_set(flag)
+            os_.hook("find_flynn_started")
+            self.assertTrue(os_.task_running(0xd1), flag)
+            os_.task_kill(0xd1)
+            os_.flag_clear(flag)
+        for flag in (0x27, 0x34, 0x37):
+            os_.flag_set(flag)
+            os_.hook("find_flynn_started")
+            self.assertFalse(os_.task_running(0xd1), flag)
+            os_.flag_clear(flag)
+
     def test_gem_tilt_state_shows_no_total(self):
         os_ = self.start_game()
         gem = self.feature("gem")

@@ -26,6 +26,7 @@ const RomTextHd = preload("res://tron/rom_text_hd.gd")
 const LetterPanel = preload("res://tron/letter_panel.gd")
 const ScoreDisplay = preload("res://tron/score_display.gd")
 const ArcadeReel = preload("res://tron/arcade_reel.gd")
+const ServiceScreen = preload("res://tron/service_screen.gd")
 const MEDIA := "res://media/dmd/"
 const MEDIA_HD := "res://media/dmd_hd/"
 const DMD_COLOR := Color(1, 0.45, 0.05, 1)
@@ -152,12 +153,27 @@ static func letter_art(letter: String, on: bool) -> Texture2D:
 static var _variant_rng: RandomNumberGenerator = null
 
 
+## The ROM's generator (rom_rng.py; FUN_0000c684 / FUN_0000c6b4): state = state * 0x19660d + 1 (32 bits), below(n) = (n * state) >> 32.
+## With TRON_RNG_SEED the clip picks use it, so a run draws the clips the ROM code draws from the same state.
+static var _rom_state := -1
+
+
+static func _rom_below(n: int, seed_text: String) -> int:
+	if _rom_state < 0:
+		_rom_state = int(seed_text) & 0xffffffff
+	_rom_state = (_rom_state * 0x19660d + 1) & 0xffffffff
+	return (n * _rom_state) >> 32
+
+
 ## The index of the clip picked among `n`: random, or from a fixed sequence when TRON_DMD_SEED is set (reproducible runs: the
 ## conformance checks repeat a scenario and get the same clips), or always the first clip when TRON_DMD_SEED is "first" (the
 ## reference run of PinMAME with TRON_RNG_ZERO makes the ROM pick its first entry too: same clip on both sides).
 static func pick_variant(n: int) -> int:
 	if OS.get_environment("TRON_DMD_SEED") == "first":
 		return 0
+	var rom_seed := OS.get_environment("TRON_RNG_SEED")
+	if rom_seed != "":
+		return _rom_below(n, rom_seed)
 	if _variant_rng == null:
 		_variant_rng = RandomNumberGenerator.new()
 		var seed_text := OS.get_environment("TRON_DMD_SEED")
@@ -383,6 +399,7 @@ class State extends RefCounted:
 		var vs: Array = items[_frames_item].get("variants", [])
 		if vs.size() and DmdEffect.variants_enabled():
 			_variant = DmdEffect.pick_variant(vs.size() - (1 if items[_frames_item].has("alt") else 0))
+			print("DMDPICK ", effect_name, " ", vs.size() - (1 if items[_frames_item].has("alt") else 0), " ", _variant)   # the draw, for scripts/conform/sweep_clips.py
 		for f in _frames():
 			_durations.append(float(f[1]))
 			_total_ms += float(f[1])
@@ -468,11 +485,116 @@ class State extends RefCounted:
 							Color.WHITE if art else (dmd.text_tint(DMD_COLOR) if hd else DMD_COLOR)])
 				"letters":
 					_letters(out, it, dmd)
+				"engine":
+					_engine(out, dmd)
+				"engine_over":
+					_engine(out, dmd, true)
 				"arcade":
 					_arcade(out, it, dmd)
 				"text":
 					_text(out, i, it, panel.get(it["name"], {}))
 		return out
+
+	# ------------------------------------------------------------------ the game's own drawing (tron/rom_engine.py)
+
+	## An effect the game draws from the ROM's routine: the event arg `engine` = {ticks, loop, frames, seq}; the flip the effect's time is in
+	## gives a draw list of tron/service_screen.gd items (ROM images at a palette level, ROM text), drawn like the effect's pictures.
+	func _engine(out: Array, dmd, over := false) -> void:
+		var e = values.get("engine", null)
+		if not e is Dictionary or not e.has("seq"):
+			return
+		var seq: Array = e["seq"]
+		if seq.is_empty():
+			return
+		var k := int(elapsed_ms / (float(e["ticks"]) * ScoreDisplay.TICK_MS))
+		k = k % seq.size() if e.get("loop", false) else mini(k, seq.size() - 1)
+		var ink: Color = dmd.text_tint(DMD_COLOR) if hd and dmd else DMD_COLOR
+		var table: Array = e["items"]
+		for idx in e["frames"][int(seq[k])]:
+			var d: Dictionary = table[int(idx)]
+			if bool(d.get("o", false)) != over:             # "o": drawn over the status panel (deff 108's picture lies over it), the others under
+				continue
+			var level := float(d.get("l", 15)) / 15.0
+			if d.has("r"):
+				# a rectangle filled with level v (FUN_0002746c): the dots under it go dark (v = 0)
+				var rr: Array = d["r"]
+				var fill := float(d.get("v", 0)) / 15.0
+				out.append(["rect", Rect2(float(rr[0]), float(rr[1]), float(rr[2] - rr[0] + 1), float(rr[3] - rr[1] + 1)), Color(fill, fill, fill, 1.0)])
+			elif d.has("p"):
+				# rows of dots copied from a page (FUN_0102b980's dmd_copy_rect): [x, y, w, h, one hex level per dot], drawn opaque
+				var pd: Array = d["p"]
+				var pw := int(pd[2])
+				var ph := int(pd[3])
+				var pimg := Image.create(pw, ph, false, Image.FORMAT_RGBA8)
+				var digits := str(pd[4])
+				for py in ph:
+					for px in pw:
+						var lv := float(("0x" + digits[py * pw + px]).hex_to_int()) / 15.0
+						pimg.set_pixel(px, py, Color(lv, lv, lv, 1.0))
+				out.append(["tex", ImageTexture.create_from_image(pimg), Rect2(float(pd[0]), float(pd[1]), pw, ph), ink])
+			elif d.has("i"):
+				var tex := _engine_image(int(d["i"]), d.get("m", []), d.get("k", []))
+				if tex:
+					out.append(["tex", tex, Rect2(float(d["x"]), float(d["y"]), tex.get_width(), tex.get_height()), ink])
+			elif d.has("t"):
+				var m := RomText.font_metrics(int(d["f"]))
+				var shown := ""
+				for c in str(d["t"]):
+					if m.get("glyphs", {}).has(c):
+						shown += c
+				if m.is_empty() or shown == "":
+					continue
+				var w := RomText.rom_width(m, shown)
+				var x := int(d["x"])
+				var flags := int(d.get("a", 2))
+				var left := x - w / 2 if flags & 2 else (x + 1 - w if flags & 4 else x)
+				var ascent := int(m["ascent"])
+				var line_h := ascent + int(m["descent"])
+				var mod := Color(level, level, level, 1)
+				if hd:
+					out.append(["htext", [shown, int(d["f"]), ascent, line_h, w, flags, 0, -1],
+						Transform2D(0.0, Vector2(left, int(d["y"]) - ascent + 1)), mod, Rect2(), NO_INK, 0, false])
+				else:
+					# the ROM's glyph images, one by one (text_draw_str FUN_00028f74: x + xoff, y - h + below + 1), so every dot is the ROM's
+					var gx := left
+					for c in shown:
+						var g: Dictionary = m["glyphs"][c]
+						var gt := _engine_image(int(g["image"]), [])
+						if gt:
+							out.append(["tex", gt, Rect2(float(gx + int(g["xoff"])), float(int(d["y"]) - int(g["h"]) + int(g["below"]) + 1),
+								gt.get_width(), gt.get_height()), DMD_COLOR * mod])
+						gx += int(g["w"]) + int(m["spacing"]) + int(g["xoff"])
+
+	static var _engine_pics := {}
+
+	## ROM image n through the palette m (16 levels; [] = as it is): lit dots take the level m[level] (the palette of FUN_0002b378 / FUN_0002b424),
+	## the transparent ones stay transparent. The decoded pictures are black / white / grey dots, level = grey * 15.
+	func _engine_image(n: int, m: Array, k := []) -> Texture2D:
+		if m.is_empty() and k.is_empty():
+			return ServiceScreen.texture(n)
+		var key := "%d:%s:%s" % [n, str(m), str(k)]
+		if _engine_pics.has(key):
+			return _engine_pics[key]
+		var src := ServiceScreen.texture(n)
+		if src == null:
+			return null
+		var img := src.get_image()
+		if img.get_format() != Image.FORMAT_RGBA8:
+			img.convert(Image.FORMAT_RGBA8)
+		if not m.is_empty():
+			for yy in img.get_height():
+				for xx in img.get_width():
+					var c := img.get_pixel(xx, yy)
+					if c.a > 0.0:
+						var v := float(int(m[clampi(roundi(c.r * 15.0), 0, 15)])) / 15.0
+						img.set_pixel(xx, yy, Color(v, v, v, 1.0))
+		var iw := img.get_width()
+		for r in range(0, k.size(), 2):                      # the dots whose ROM value is the blit's key 0x10 (scripts/gen_film_keys.py): not drawn
+			for q in range(int(k[r]), int(k[r]) + int(k[r + 1])):
+				img.set_pixel(q % iw, q / iw, Color(0.0, 0.0, 0.0, 0.0))
+		var tex := ImageTexture.create_from_image(img)
+		_engine_pics[key] = tex
+		return tex
 
 	# ------------------------------------------------------------------ text (tron/rom_text.gd)
 

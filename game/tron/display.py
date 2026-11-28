@@ -26,6 +26,7 @@ Model of the SAM OS deff system as the Tron rules use it:
   it started.
 """
 import csv
+import json
 import os
 
 from tron import media_table
@@ -35,7 +36,12 @@ SHOW_TIMEOUT = 0xea6
 HOLD_TICKS = 10             # deffs end with deff_hold_frames(10, 0x20): priority 0x20 for the last 10 ticks
 HOLD_PRIORITY = 0x20
 # a few deffs hold for fewer ticks (read from their code: deff_hold_frames(1, 0x20))
-HOLD_TICKS_BY_DEFF = {76: 1, 78: 1, 94: 1}
+HOLD_TICKS_BY_DEFF = {d: 1 for d in (48, 49, 50, 62, 63, 64, 66, 67, 68, 76, 78, 80, 83, 84, 87, 88, 89, 91, 92, 94,
+                                      97, 98, 107, 108, 109, 111)}
+HOLD_TICKS_BY_DEFF.update({96: 2, 140: 2})   # 140: deff_hold_frames(2, 0x20) [0x0102faec]
+# every deff of the ROM run alone in Unicorn (assets/tools/os_deff_runs.py, column holds): the deffs above call
+# deff_hold_frames(1, 0x20) [0x01024460] (96 and 140: 2), every other deff 10
+EOB_MODE_WAIT = 169         # gf_eob_mode_wait: the ROM data byte at 0x3901c
 PREVALID_PRIO = 0x10        # priority of the score display rule that runs until the playfield is valid
 
 
@@ -53,6 +59,7 @@ class Display:
         self.os = os_
         assets = os.path.join(os_.machine.machine_path, "..", "assets")
         self.media = media_table.load(assets)
+        self.variant_ticks = media_table.load_variants(assets)
         self.prio, self.background = {}, set()
         with open(os.path.join(assets, "mpf_package", "event_map.csv"), encoding="utf-8") as f:
             for row in csv.DictReader(f):
@@ -65,6 +72,11 @@ class Display:
         self.arcade_held = False    # ... the Flynn's Arcade show 0x97: the score display comes back at its exit
         self.fg_prio = 0            # its priority (HOLD_PRIORITY in its last 10 ticks)
         self.fg_handle = None
+        self.fg_end = 0.0
+        self.deff_flags = {}        # deff id -> the flags of its table record (assets/rom_data/deffs/deffs.json, ROM 0x040e1350)
+        with open(os.path.join(assets, "rom_data", "deffs", "deffs.json"), encoding="utf-8") as f:
+            for d in json.load(f)["deffs"]:
+                self.deff_flags[d["id"]] = int(d["table"]["flags"], 16)
         self.bg = None              # running background deff id
         self.shows = []             # waiting Show entries
         self.show = None            # Show playing now
@@ -80,6 +92,12 @@ class Display:
         self.held = False           # from ball end / game start until the ball start's deff 19: no rules refresh
 
     # ------------------------------------------------------------------ start / stop
+
+    def _log_args(self, deff_id, args):
+        """The arguments a deff starts with, in the wall-clock trace only (scripts/conform: they set the state of the ROM-code run)."""
+        if args and getattr(self.os.trace, "_wall", False):
+            self.os.trace.log("deff_args", id=deff_id, args={k: (list(v) if isinstance(v, (tuple, list)) else v) for k, v in args.items()
+                                                     if isinstance(v, (int, float, str, bool)) or (isinstance(v, (tuple, list)) and all(isinstance(x, int) for x in v))})
 
     def start(self, deff_id, hold=False, refresh=True, run_seconds=None, sounds=None, media=False, **args):
         """run_seconds: the run length when this call's variant differs from the recorded one.
@@ -99,6 +117,7 @@ class Display:
             os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
             if deff_id == 19 and self.fg is None:
                 getattr(os_.media, "score_display_shown", lambda: None)()    # shown at once: deff_019's task starts now
+            self._log_args(deff_id, args)
             os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
             if deff_id == 19:
                 os_.tube_start(10)
@@ -110,6 +129,15 @@ class Display:
             if refresh and not self.show and self.mode_bg():
                 os_.after(1, lambda: self.mode_bg() and self.start(self.mode_bg(), refresh=False))
             return False
+        pick_ticks = self.variant_ticks.get(deff_id)
+        if pick_ticks and "clip" not in args and not hold:
+            # the deff's own random_below(n) [0x0000c6b4], drawn with the ROM's generator: the clip and the run length go together
+            pick = 0 if os.environ.get("TRON_DMD_SEED") == "first" else os_.random.below(len(pick_ticks))
+            forced_pick = os_.forced.get("deff_{}_clip".format(deff_id))      # a test names the pick its reference run made
+            if forced_pick and forced_pick[0] is not None:
+                pick = forced_pick.pop(0)
+            args["clip"] = pick
+            run_seconds = pick_ticks[pick] * media_table.TICK
         self._end_fg(stopped=True)
         if self.bg is not None:
             os_.media.deff_stop(self.bg)
@@ -117,6 +145,7 @@ class Display:
         self.fg_prio = self.prio.get(deff_id, 0)
         self.bg = None
         os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+        self._log_args(deff_id, args)
         os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
         info = self.media.get(deff_id)
         if info:
@@ -130,6 +159,7 @@ class Display:
                     lambda: self._media(deff_id, seconds, sounds), 0))
             if not hold and seconds:
                 self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), seconds)
+                self.fg_end = os_.now + seconds
                 from tron.os_layer import TICK
                 hold_ticks = HOLD_TICKS_BY_DEFF.get(deff_id, HOLD_TICKS)
                 self._sound_handles.append(os_.machine.clock.schedule_once(
@@ -143,25 +173,41 @@ class Display:
         """The deff's lamp effects, sounds and tube shows at their offsets. A capture can hold more than
         one run of the effect (deff 115 recorded two skipped stages back to back: 0x109 at 0 and 3.1 s);
         only what falls inside this run's length plays."""
-        if self.fg != deff_id:
-            return
+        replaced = self.fg != deff_id
         os_ = self.os
         info = self.media[deff_id]
+        # replaced in the same tick it started: its task already ran its first instructions (the lamp effects
+        # and the sounds at offset 0) before the new deff preempted it (multiplayer_3p 21.195: leff 110 and
+        # sound 0x046 of deff 101 under the deffs 83, 137, 55 started in that tick)
+        if replaced and not self.start_tick_replaced(deff_id):
+            return
         for leff in info.leffs:
             os_.leff_start(leff)
         if sounds is not None:
             events = [(t, "call", fn) for t, fn in sounds]
         else:
             events = [(t, "sound", c) for t, c in info.sounds if not seconds or t < seconds]
-        events += [(t, "tube", n) for t, n in info.tubes if not seconds or t < seconds]
+        tubes = info.tubes
+        if deff_id == 115:
+            tubes = sorted(tubes)[:1]       # deff_115 [0x010270a4] starts tubeshow_067 once (0x010270d8); its capture holds two runs back to back
+        events += [(t, "tube", n) for t, n in tubes if not seconds or t < seconds]
         for offset, kind, value in sorted(events, key=lambda e: e[0]):
             fire = (lambda k, v: lambda: self.fg == deff_id and (
                 self._deff_sound(v, deff_id) if k == "sound" else v() if k == "call" else os_.tube_start(v)))(
                 kind, value)
             if offset <= 0:
-                fire()
+                if replaced:
+                    if kind == "sound":
+                        self._deff_sound(value, deff_id)
+                else:
+                    fire()
+            elif replaced:
+                continue
             else:
                 self._sound_handles.append(os_.machine.clock.schedule_once(fire, offset))
+
+    def start_tick_replaced(self, deff_id):
+        return True
 
     def _hold(self, deff_id):
         """Last 10 ticks of deff_id (cancelled with it when it is replaced): its priority drops to 0x20,
@@ -192,6 +238,22 @@ class Display:
             if self.os.in_play and deff_id != 19:
                 self._start_rule(deff_id, on_start)
             self._pump()
+
+    def restart(self, deff_id, **args):
+        """The deff's task created again under the same id with new arguments, no start call (deff 2 on a volume key, FUN_0000fc28):
+        its run starts over (the trace logs the task creation as a deff start, no stop)."""
+        os_ = self.os
+        if self.fg != deff_id:
+            return
+        os_.trace.log("deff_start", id=deff_id)
+        if self.fg_handle:
+            os_.machine.clock.unschedule(self.fg_handle)
+        info = self.media.get(deff_id)
+        os_.machine.events.post("tron_deff_{}".format(deff_id), **args)
+        os_.media.deff_start(deff_id, self.prio.get(deff_id, 0), **args)
+        if info and info.seconds:
+            self.fg_handle = os_.machine.clock.schedule_once(lambda: self._ended(deff_id), info.seconds)
+            self.fg_end = os_.now + info.seconds
 
     def stop(self, deff_id):
         os_ = self.os
@@ -229,6 +291,7 @@ class Display:
             return False
         self.os.machine.clock.unschedule(self.fg_handle)
         self.fg_handle = self.os.machine.clock.schedule_once(lambda: self._ended(deff_id), info.seconds)
+        self.fg_end = self.os.now + info.seconds
         return True
 
     def running(self, deff_id):
@@ -364,6 +427,16 @@ class Display:
             self.music = music
             os_.sound(music)
 
+    def eob_wait_ticks(self):
+        """Ticks the end of ball waits for the foreground deff [0x00020764]: a deff task carries flag 0x2000 when its table
+        flags have neither bit 1 nor bit 4 (deff_start 0x000280b0), and the end of ball sleeps while a 0x2000 task runs, at most
+        gf_eob_mode_wait (169, the ROM data byte at 0x3901c) ticks."""
+        if self.fg is None or not self.fg_handle or self.deff_flags.get(self.fg, 1) & 5:
+            return 0
+        from tron.os_layer import TICK
+        left = max(0.0, self.fg_end - self.os.now)
+        return min(EOB_MODE_WAIT, round(left / TICK))
+
     def clear(self):
         """Ball end / game end: drop the queue and the foreground deff (no trace event)."""
         self.shows = []
@@ -429,6 +502,19 @@ class Display:
     def show_running(self):
         """task_running_range(0x81, 0xa7): a show task is waiting or playing."""
         return bool(self.show or self.shows)
+
+    def abort(self, mode):
+        """FUN_0100fb10 after the two flipper buttons: FUN_000283f8(1) kills the deff on screen unless it is the
+        default (background) one and empties the deff queue; mode 2 also kills the show tasks 0x81-0xa7 and the
+        mode total tasks 0x4d-0x58 (task_kill_range)."""
+        self.os.trace.log("abort_animations", mode=mode)
+        if mode == 2:
+            self.shows = []
+            self.idle_waits = []
+            if self.show:
+                self._end_show()
+        if self.fg is not None and self.fg != self.bg:
+            self.stop(self.fg)
 
     def _pump(self):
         if self._pump_handle:

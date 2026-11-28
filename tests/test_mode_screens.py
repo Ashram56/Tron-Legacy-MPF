@@ -66,6 +66,11 @@ class ScreenTestCase(TronTestCase):
         for slide, action, kw in self.sent:
             if slide != "deff_%03d" % deff_id or action != "play":
                 continue
+            if info.get("source") == "engine":            # drawn by the game's engine: the text items of its first flip
+                e = kw.get("engine") or {}
+                first = e["frames"][e["seq"][0]] if e.get("seq") else []
+                out.append(tuple(e["items"][i]["t"] for i in first if "t" in e["items"][i]))
+                continue
             shown = kw.get("screen", 0)
             out.append(tuple(kw["line%d" % i] for i in range(len(info["text"]))
                              if kw.get("line%d" % i) and shown in screens.get(i, (shown,))))

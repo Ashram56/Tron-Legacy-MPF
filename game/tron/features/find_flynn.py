@@ -96,8 +96,10 @@ class FindFlynn(Feature):
     def find_flynn_started(self):
         """sw12 [0x0100d698]."""
         os_ = self.os
+        # FUN_0100d654: task 0xd1, flag 0x34, Portal (0x37) and End of Line (0x27, eol_multiball_running
+        # 0x01004be8). Disc, Light Cycle and Quorra multiballs do not block it (the spec says "no multiball").
         if (os_.task_running(0xd1) or os_.flag(0x34) or os_.hook("portal_running")
-                or os_.any_multiball()):
+                or os_.flag(0x27)):
             return
         self.pos = 0
         self.prev = self.next = 0

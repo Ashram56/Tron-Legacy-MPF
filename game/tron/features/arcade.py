@@ -92,6 +92,8 @@ class Arcade(Feature):
 
     def light(self):
         """0x0100ddb0(1): media only when the flag goes 0 -> 1 (deff 104 brings leff 115 and 0x0df)."""
+        if self.os.any_multiball():                # arcade_set_lit [0x0100ddb0]: FUN_0100dd98 = no multiball running, else nothing is lit
+            return
         if not self.pd.arcade_lit:
             self.pd.arcade_lit = 1
             self.os.deff_start(104)

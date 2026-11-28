@@ -15,6 +15,9 @@ from tron.features import Feature
 ORDER = 7
 PAGE_SECONDS = 2.016
 LOGO_SECONDS, ANIMATION_SECONDS = 3.76, 3.98
+# deff 5, the version page of power-up [0x0103703c]: its task is created at tick 0 and deff 1's at tick 127 of the ROM run in Unicorn
+# (assets/tools/os_unicorn.py, task_create caller 0x27dbc); the reference trace attract_and_service has them 129 ticks apart.
+VERSION_SECONDS = 127 * 0.01626
 VERSION_DEFF = 5                 # the boot version screen (a recorded frame, media/dmd/deff_005_boot_version)
 PRIORITY = 2                     # just above deff 1 (priority 1)
 PAGE_SLIDES = {"LOGO": "attract_logo", "ANIMATION": "attract_anim"}     # the bitmaps of the ROM's logo and animation pages (scripts/gen_media.py build_attract_art)
@@ -29,7 +32,7 @@ def page_layout(name, lines):
     if name == "CREDITS":
         return 0
     if name == "URL":
-        return 5                    # three lines in the 5-dot font, 9 dots apart (PinMAME)
+        return 5                    # three lines in the 5-dot font, 9 dots apart (ROM code run: rows 4-8, 13-17, 22-26 in assets/rom_data/dmd_code/deff_001_pages/deff_029)
     if name == "DEFAULT MESSAGE":
         return 6                    # the factory custom message, two lines in the 5-dot font 2 (PinMAME)
     return {1: 0, 2: 2, 3: 3}.get(len(lines), 0)
@@ -46,6 +49,7 @@ class AttractPages(Feature):
         self.index = 0
         self.boot = False                       # the next first pass is the power-up's: the version screen comes first
         self.last_scores = []
+        self.last_player = 1                    # the player whose turn was last (the panel's bright score)
         ev = self.machine.events
         ev.add_handler("game_starting", self.stop, priority=2000)
         ev.add_handler("tron_service_entered", self.stop)
@@ -64,18 +68,27 @@ class AttractPages(Feature):
 
     def _game_ending(self, **kwargs):
         self.last_scores = [p.score for p in self.machine.game.player_list] if self.machine.game else []
+        self.last_player = self.os.player_num or 1
+
+    def panel(self):
+        """The status panel left of every page (deff_draw_status_panel 0x010230ec, tron/score_display.gd): the last game's scores, the player of
+        the last turn bright, the others dim; "00" for P1 on a fresh machine."""
+        from tron.media_bridge import format_rom_text   # noqa: E402
+        out = {"players": max(len(self.last_scores), 1), "player": self.last_player, "valid": True}
+        for p in range(1, 5):
+            out["p%d" % p] = format_rom_text("%,02lu", [self.last_scores[p - 1]]) if p <= len(self.last_scores) else ("00" if p == 1 else "")
+        return out
 
     def page_list(self, first_pass):
         os_ = self.os
-        pages = [("VERSION", [], PAGE_SECONDS)] if self.boot and first_pass else []
+        pages = [("VERSION", [], VERSION_SECONDS)] if self.boot and first_pass else []
         self.boot = False
         pages += [("GAME OVER", ["GAME OVER"], PAGE_SECONDS)] if first_pass else []
         pages.append(("CREDITS", lambda: [os_.credit_model.text()], PAGE_SECONDS))
-        if self.last_scores:
-            for n, score in enumerate(self.last_scores, 1):
-                pages.append(("PLAYER {}".format(n), ["PLAYER {}".format(n), "{:,}".format(score)], PAGE_SECONDS))
-        elif os_.replay_level(1):
-            pages.append(("REPLAY", ["REPLAY AT", "{:,}".format(os_.replay_level(1))], PAGE_SECONDS))
+        for n in range(1, 5):          # table entries 2-5 (predicates 0x2eb68, 0x2eb88, 0x2eba8, 0x2ebc8 = FUN_00022a90(n) != 0): REPLAY AT for each level set
+            level = os_.replay_level(n)
+            if level:
+                pages.append(("REPLAY" if n == 1 else "REPLAY {}".format(n), ["REPLAY AT", "{:,}".format(level)], PAGE_SECONDS))
         hs = os_.features_by_name.get("high_scores")
         for title, name, score in (hs.table() if hs else []):
             pages.append((title, [title, name, "{:,}".format(score)], PAGE_SECONDS))
@@ -87,9 +100,8 @@ class AttractPages(Feature):
             pages.append(("CUSTOM MESSAGE", [text], PAGE_SECONDS))
         elif os_.adj[2] == 1:                          # ON with no message set: the factory message (PinMAME attract, 27 s)
             pages.append(("DEFAULT MESSAGE", ["PARTICIPATE IN", "LOCAL TOURNAMENTS!"], PAGE_SECONDS))
-        from tron.service import clock_now, clock_text   # noqa: E402
-        day, clock = clock_text(self.machine, clock_now(self.machine), os_.adj[3])
-        pages.append(("CLOCK", [day, clock], PAGE_SECONDS))
+        # No clock page: the ROM's clock page (table 0x36e10 entry 30, routine 0x32d04) has the predicate 0x32cfc, which returns 0, and
+        # deff 1 (0x01034364) skips a page whose predicate returns 0 [code], so the attract never shows the date and time.
         return pages
 
     def attract_start(self):
@@ -121,7 +133,7 @@ class AttractPages(Feature):
         if shown is None:
             pass
         elif shown == "text_page":
-            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), p1="00")
+            self.os.media.text_show("text_page", lines, PRIORITY, screen=page_layout(name, lines), **self.panel())
         else:
             self.os.media.text_show(shown, [], PRIORITY)
         for slide in ("text_page",) + tuple(PAGE_SLIDES.values()):

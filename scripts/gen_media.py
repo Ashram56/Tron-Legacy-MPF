@@ -38,6 +38,8 @@ PKG = os.path.join(ROOT, "assets", "mpf_package")
 GAME = os.path.join(ROOT, "game")
 DMD_COLOR = "Color(1, 0.45, 0.05, 1)"
 # The score display and the other effects that show live values are drawn from text
+# effects the game draws itself from the ROM's routine (tron/rom_engine.py): no frames, no letters, no text lines
+ENGINE_DEFFS = {2, 38, 42, 94, 55, 57, 58, 59, 60, 83, 95, 96, 108, 138, 139}
 TEXT_ONLY = {10, 15, 17, 19, 25, 26, 33, 38, 40, 112}
 # Captured effects whose code draws the status panel (deff_draw_status_panel) but whose own art covers its
 # columns in the capture: their capture is shown whole (the others get the live panel over columns 0-40)
@@ -152,6 +154,19 @@ def gif_frames(path):
     for frame in ImageSequence.Iterator(img):
         out.append((frame.convert("RGBA"), int(frame.info.get("duration", 49)) or 49))
     return out
+
+
+def code_frames(deff_id):
+    """The effect's frames from the ROM's own code (assets/rom_data/dmd_code, tools/gen_code_dmd.py: the ROM routine run in Unicorn,
+    one frame per page flip, times in OS ticks of 16.000 ms) as (RGBA image, ms). None when the code run drew nothing (the effect has
+    no render: tournament-only, dead code; docs/dmd_from_code.md). PinMAME captures are never a source (STRICT RULE 4)."""
+    folder = os.path.join(ROOT, "assets", "rom_data", "dmd_code", "deff_{:03d}".format(deff_id))
+    if not os.path.exists(os.path.join(folder, "timing.json")):
+        return None
+    from PIL import Image
+    with open(os.path.join(folder, "timing.json"), encoding="utf-8") as f:
+        meta = json.load(f)["frames"]
+    return [(Image.open(os.path.join(folder, m["file"])).convert("RGBA"), max(1, int(round(m["duration_ms"])))) for m in meta]
 
 
 def remap_levels(img, mapping):
@@ -607,8 +622,14 @@ def write_slide(deff_id, frames, layouts, loop, folder_rel, panel=False, fills=(
             items += text_items(i, lay)
     if frames and under and deff_id not in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
+    if deff_id in ENGINE_DEFFS:
+        items.append({"type": "engine"})
     if panel:
         items += score_display_items(deff_id == 19, panel == "match")
+    if deff_id in ENGINE_DEFFS:         # the game draws the body itself (tron/rom_engine.py): background, that drawing, the panel
+        items = [items[0], {"type": "engine"}] + (score_display_items(deff_id == 19, panel == "match") if panel else [])
+        if deff_id in (96, 108):        # 96: the popups' plane over the body; 108: the film picture lies over the panel (FUN_01020388: the panel on the text page, the picture page above it)
+            items.append({"type": "engine_over"})
     if frames and under and deff_id in rom_layout.CLIP_OVER_PANEL:
         items.append(item)
     write_effect(name, folder_rel, parts, items)
@@ -635,12 +656,16 @@ def build_deffs(only_data):
         letters = LETTER_DEFFS.get(deff_id)
         if deff_id == ARCADE_DEFF:     # drawn from the rules' award, not the capture's (award id 0)
             source, lines = "arcade", []
+        elif deff_id in ENGINE_DEFFS:
+            source, lines = "engine", []
         elif letters:                    # letters drawn from the rules' state, not the capture's
             source, lines = "letters", text_lines(rom_text)
         elif dynamic or not os.path.exists(ref):
             source, lines = ("graphics" if has_graphics else "none"), text_lines(rom_text)
-        else:
-            source, lines = "reference", []
+        elif os.path.exists(os.path.join(ROOT, "assets", "rom_data", "dmd_code", "deff_{:03d}".format(deff_id), "timing.json")):
+            source, lines = "reference", []     # the frames of the ROM's own code run (code_frames)
+        else:                                   # the code run draws nothing (deff 1: pages in deff_001_pages, 22: no render): no capture
+            source, lines = "none", []
         layouts = rom_layout.line_layouts(deff_id, lines, fonts, calls.get(deff_id, []))
         # a capture shows the status panel of the moment it was recorded (score 00): the live panel is drawn
         # over its columns 0-40 instead, except where the effect itself covers them (deffs 85, 112)
@@ -662,7 +687,7 @@ def build_deffs(only_data):
         if source == "arcade":
             arcade_slide(folder, rel, panel)
             continue
-        frames = gif_frames(ref) if source == "reference" else png_frames(folder) if source == "graphics" else []
+        frames = (code_frames(deff_id) or []) if source == "reference" else png_frames(folder) if source == "graphics" else []
         if source == "reference" and panel:
             from PIL import ImageDraw
             for img, _ in frames:
@@ -881,12 +906,16 @@ def build_attract_art():
         img = image(i)
         canvas = Image.new("RGBA", (128, 32), (0, 0, 0, 255))
         canvas.paste(img, (128 - img.width, 0))
-        # the ROM draws the status panel left of the animation (PinMAME's attract capture, constant on all its frames): P1's "00"
-        # (two 3x5 zeros at x 32 and 36, row 1) and the separator column x 40, at level 15; without them every frame of the page is
-        # one that Serum does not know. A game's last scores are not drawn here (the panel's live scores are not given to this page).
+        # the status panel the ROM's attract code draws left of the page (assets/rom_data/dmd_code/deff_001_pages, every page of the
+        # code run shows it), no scores yet: P1's "00"
+        # (two 3x5 zeros at x 32 and 36, row 1) at level 15, and the separator column x 40 and the three 10-dot segments of row 31
+        # (x 4-13, 16-25, 28-37) at level 1 [code run: deff_001_pages/deff_028 frame 000]. A game's last scores are not drawn here.
         px = canvas.load()
         for y in range(32):
-            px[40, y] = (255, 255, 255, 255)
+            px[40, y] = (17, 17, 17, 255)
+        for x0 in (4, 16, 28):
+            for x in range(x0, x0 + 10):
+                px[x, 31] = (17, 17, 17, 255)
         for x0 in (32, 36):
             for y in range(1, 6):
                 for x in range(x0, x0 + 3):

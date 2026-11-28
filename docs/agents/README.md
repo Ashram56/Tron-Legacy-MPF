@@ -70,7 +70,8 @@ coin door and in-game service (PR #17). Open:
    with a logic analyzer (docs/hardware.md).
 5. Real-machine checks only the owner can do: coil strengths on the P-ROC, tube sides, coin door input.
 6. From the test bench's review (2026-11-15, [test_bench.md](../test_bench.md) "Found by the bench"): adj 80 DISABLE DROP
-   TARGETS, adj 75 ABORT ANIMATIONS and adj 46 PLAYER COMPETITION do nothing; what the ROM does on a GAME RESTART with
+   TARGETS and adj 75 ABORT ANIMATIONS were built from the code on 2026-11-26 (tests/test_adj_75_80.py); adj 46 PLAYER COMPETITION acts only on a
+   refused START (tests/test_start_search.py) and the competition pages are hidden behind the country DIP (docs/dmd_conformance.md); what the ROM does on a GAME RESTART with
    a ball in play is not traced. Five bugs it found are fixed there (tilt before a multiball's launches, fast plunge,
    GAME RESTART with a ball in play, MATCH OFF, end-of-ball wait).
 

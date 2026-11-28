@@ -83,17 +83,21 @@ class TestBridge(TronTestCase):
         self.assertTrue(plays, "no 2-way combo display")
         kw = plays[-1]
         jackpot = self.tron.hook("eol_combo_jackpot_value")
-        self.assertEqual(["%u", "WAY", "COMBO", "%,02lu", "%s", "JACKPOT=%,02lu"], bridge.data["deffs"][138]["text"])
-        self.assertEqual("2", kw["line0"])                       # the count, in the ring font
-        self.assertEqual(("WAY", "COMBO"), (kw["line1"], kw["line2"]))
-        self.assertRegex(kw["line3"], r"^\d{1,3}(,\d{3})+$")    # the points
-        self.assertEqual("CASTOR COMBO", kw["line4"])           # the named combo (the ROM's message 0x6a4), on its own row
-        self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), kw["line5"])
+        # deff 138 is an engine effect (rom_deff138.py, ported from the ROM): its texts are the draw items of the last flip
+        e = kw["engine"]
+        texts = [e["items"][i]["t"] for i in e["frames"][e["seq"][-2]] if "t" in e["items"][i]]
+        self.assertEqual("2", texts[0])                          # the count, in the ring font
+        self.assertEqual(("WAY", "COMBO"), tuple(texts[1:3]))
+        self.assertRegex(texts[3], r"^\d{1,3}(,\d{3})+$")       # the points
+        self.assertEqual("CASTOR COMBO", texts[4])               # the named combo (the ROM's message 0x6a4), on its own row
+        self.assertEqual("JACKPOT=" + format_rom_text("%,02lu", [jackpot]), texts[5])
         with mock.patch.object(bridge, "connected", return_value=True), \
                 mock.patch.object(self.machine.bcp, "interface") as iface:
             self.tron.deff_start(138, points=300000, named=None, count=3, total=2, jackpot=850000)
             kw = self._slide_plays(iface, "deff_138")[-1]
-        self.assertEqual(("3", "300,000", "", "JACKPOT=850,000"), (kw["line0"], kw["line3"], kw["line4"], kw["line5"]))
+        e = kw["engine"]
+        texts = [e["items"][i]["t"] for i in e["frames"][e["seq"][-2]] if "t" in e["items"][i]]
+        self.assertEqual(["3", "WAY", "COMBO", "300,000", "JACKPOT=850,000"], texts)   # no named combo: no row
 
     def test_end_of_line_more_text(self):
         # deff 55 prints only `more`; before / after / flags pick the screen
@@ -101,7 +105,9 @@ class TestBridge(TronTestCase):
         if not bridge.data:
             self.skipTest("media data not generated (scripts/gen_media.py)")
         lines = bridge.deff_lines(55, dict(before=(0, 2), after=(1, 2), flags=8, more=3, screen=2))
-        self.assertEqual("3 MORE TO", lines["line4"])
+        texts = [i["t"] for i in lines["engine"]["items"] if "t" in i]      # drawn by the game's engine (tron/rom_deff55.py)
+        self.assertIn("3 MORE TO", texts)
+        self.assertIn("LIGHT MULTIBALL", texts)
 
     def test_sounds_go_to_the_gmc_client(self):
         # MPF's bcp_trigger() skips clients without a registered handler, and GMC registers none for
@@ -210,9 +216,10 @@ class TestLiveDeffs(TronTestCase):
         bridge = self._bridge()
         zuse = self.tron.features_by_name["zuse"]
         zuse.clock.seconds, zuse.value = 23, 15000
-        self.assertEqual({"line0": "23", "line1": "ALL TARGETS=15,000"}, self._lines(bridge.deff_lines(95, {})))
-        self.assertEqual({"line0": "15K", "line1": "23", "line2": "ALL TARGETS=15,000"},
-                         self._lines(bridge.deff_lines(96, {"k": 15})))
+        e = bridge.deff_lines(95, {})["engine"]                    # deff 95 is an engine effect (rom_deff95.py): the texts of a flip
+        self.assertEqual(["23", "23", "ALL TARGETS=15,000"], [e["items"][i]["t"] for i in e["frames"][0] if "t" in e["items"][i]])
+        e = bridge.deff_lines(96, {"k": 15})["engine"]                 # deff 96 too (rom_deff96.py): the background's texts and the popup "15K"
+        self.assertEqual({"23", "ALL TARGETS=15,000", "15K"}, {e["items"][i]["t"] for f in e["frames"] for i in f if "t" in e["items"][i]})
         zuse.clock.seconds = 22                         # a refresh sends the new value
         with mock.patch.object(bridge, "connected", return_value=True), \
                 mock.patch.object(self.machine.bcp, "interface") as iface:
@@ -221,7 +228,7 @@ class TestLiveDeffs(TronTestCase):
             bridge.score_changed()
             last = [c.kwargs for c in iface.bcp_trigger.call_args_list
                     if c.kwargs["name"] == "slides_play" and "deff_095" in c.kwargs["settings"]][-1]
-        self.assertEqual("21", last["line0"])
+        self.assertEqual("21", [it["t"] for it in last["engine"]["items"] if "t" in it][0])
 
     def test_sos_stage_text(self):
         """deff 114 shows SHOOT / the current stage's item (the capture's FLYNNS ARCADE on every stage)."""

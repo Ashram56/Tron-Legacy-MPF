@@ -13,6 +13,8 @@ import json
 import os
 import re
 
+from tron import rom_engine
+
 CONTEXT = "tron_media"
 SERVICE_PRIORITY = 1000         # the service slide covers every deff (ROM priorities are 0-255)
 TICK = 0.01626                                     # seconds per ROM tick (os_layer.TICK)
@@ -98,10 +100,10 @@ class MediaBridge:
         # last deff / text slide stays up until the next one plays, never GMC's base slide below them all
         self.shown = set()                         # deff and text slides playing now
         self.kept = None                           # the last one, stopped but left up until the next plays
+        self._engine_key = {}                      # deff -> the arguments of the engine payload the slide holds
         self.drawn = set()                         # deffs shown by deff_draw (rom_screen) in place of their frames
         # last points: each score_add on its own (FUN_010238ac on event 0x4d, posted by every score_add: os_layer calls
         # score_added), not the sum of one task run's adds (a jackpot and its switch's 10,000 showed 510,000 for 500,000)
-        self.machine.events.add_handler("ball_started", self._ball_start, priority=1000)
 
     # ------------------------------------------------------------------ transport
 
@@ -128,14 +130,34 @@ class MediaBridge:
 
     # ------------------------------------------------------------------ display effects
 
+    def _log_live(self, deff_id, vals):
+        """The RAM values a live deff prints, in the wall-clock trace when they change (scripts/conform sets the ROM-code run from them)."""
+        trace = getattr(self.os, "trace", None)
+        if trace is None or not getattr(trace, "_wall", False):
+            return
+        vals = {k: v for k, v in vals.items() if isinstance(v, (int, float, str, bool))}
+        last = self.__dict__.setdefault("_live_logged", {})
+        if last.get(deff_id) != vals:
+            last[deff_id] = vals
+            trace.log("deff_live", id=deff_id, args=vals)
+
     def deff_lines(self, deff_id, args):
         info = self.data["deffs"].get(deff_id) if self.data else None
         if not info:
             return {}
         live = getattr(self.os, "deff_values", {}).get(deff_id)
         if live:                                       # values the deff reads from RAM, now (over the passed ones)
-            args = dict(args, **live())
+            vals = live()
+            self._log_live(deff_id, vals)
+            args = dict(args, **vals)
         passed = {k: args[k] for k in info.get("args", []) if k in args}   # e.g. letters for letter_panel.gd
+        if info.get("source") == "engine":             # drawn by the game from the ROM's routine (tron/rom_engine.py)
+            key = repr(sorted((k, v) for k, v in args.items() if isinstance(v, (int, tuple, list))))
+            panel = self.score_display_args() if info.get("panel") else {}
+            if self._engine_key.get(deff_id) == key:       # the slide keeps the payload it was sent (long ones, deff 83, are sent once)
+                return panel
+            self._engine_key[deff_id] = key
+            return dict(panel, engine=rom_engine.payload(deff_id, args))
         if not info["text"]:
             return dict(self.score_display_args() if info.get("panel") else {}, **passed)
         if deff_id in TEXT_ARGS:
@@ -165,6 +187,7 @@ class MediaBridge:
         if not info:
             return
         slide = info["slide"]
+        self._engine_key.pop(deff_id, None)
         self.started[deff_id] = args
         if info.get("panel") or deff_id in getattr(self.os, "deff_values", {}):
             self.active.add(deff_id)
@@ -252,9 +275,10 @@ class MediaBridge:
         self.bar_max[key] = top
         return seconds * 10 // top if top else 0
 
-    def _ball_start(self, **kwargs):
-        """FUN_01023858 on the ball start event (0x13): the ticks since the last points start at 0 (the score blinks
-        only 63 ticks later), no last points."""
+    def ball_start_finished(self):
+        """FUN_01023858 on event 0x13, which ball_start [0x00020650] posts as its last call [0x00020754] right after serve_ball(3),
+        for every ball (Unicorn run of multiplayer_2p: game_start 3.284 s, event 0x13 3.285 s, the first ball ejected 3.2 s later):
+        the ticks since the last points start at 0 (the score blinks only 63 ticks later), no last points."""
         self.award = (0, None, self.machine.clock.get_time())
 
     def score_added(self, player_num, change, value):
@@ -322,7 +346,7 @@ class MediaBridge:
                 # its own lines only: BALL n / score for deff 19, fresh RAM values for a live deff (one
                 # effect's lines never go to another: they share the names line0, line1, ...)
                 mine.update({k: v for k, v in self.deff_lines(deff_id, self.started.get(deff_id, {})).items()
-                             if k.startswith("line") or k == "screen"})
+                             if k.startswith("line") or k in ("screen", "engine")})   # an engine effect's payload follows its live values
             self._send("slides_play", {info["slide"]: {"action": "update", "key": info["slide"],
                                                        "expire": None}}, **mine)
         if args is None:

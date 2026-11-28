@@ -20,6 +20,7 @@ import re
 from mpf.core.custom_code import CustomCode
 
 from tron.trace import Trace
+from tron.rom_rng import RomRandom
 
 TICK = 0.01626          # seconds per ROM tick in play (game_flow.md section 0)
 SECOND = 62             # ticks the ROM treats as one second
@@ -56,6 +57,12 @@ VUK_BUSY_TICKS = 149 + SHOOTER_COUNT_SHIFT
 # cycle: sound 0x0ea 1.43 s after the Quorra add-a-ball (quorra_multiball 46.68 -> 48.11), of which MPF's
 # trough eject + auto-launch take ~0.6 s.
 MB_FIRST_EJECT_TICKS = 51 + SHOOTER_COUNT_SHIFT
+TILT_TIMER_TICKS = 0xda
+# The VUK's device task (task 0x18 + 3 = 0x1b, FUN_0001ccec / FUN_0001d05c) ends once the device's switch count has stayed unchanged for the delay of its record
+# (device 3, 0x040e41f4 + 3 * 0x24 + 0x14 = 0x5d ticks, FUN_0001bbb0) after the ball left: trough_drain_check [0x0001dd90] returns while a ball device task runs
+# (no_balldev_tasks), so a drain in that window ends its ball only then (multiplayer_2p: ball left 63.6575 -> end of ball, audit 8, 65.1691).
+VUK_SETTLE_TICKS = 0x5d
+VOLUME_DEFF = 2           # deff_002_use_to_adjust_volume [0x0103815c]
 SAVE_SERVE_TICKS = 48 + SHOOTER_COUNT_SHIFT    # ball save re-serve: deff 20 -> shooter lane opens 1.383 s (game_flow, game_flow_tilt)
 BALL_SEARCH_EVENT_TICKS = 36
 BALL_SEARCH_RUN_TICKS = 297     # a search that finds no ball: coils and 3-bank cycle, then the countdown
@@ -152,6 +159,7 @@ class TronOS(CustomCode):
         self.state = ST_ATTRACT
         self.hooks = {}             # hook name -> [functions], called in registration order
         self.pokes = {}             # ROM RAM address -> setter(value), for the scenarios' "poke"
+        self.register_poke(0x21109e4, self._poke_score, stride=4)    # the scores, one u32 per player [0x021109e4]
         self.features = []
         self.players = []           # PlayerData per player
         self.pf_valid = False
@@ -180,7 +188,9 @@ class TronOS(CustomCode):
         # mode values, the current stage): its display lines (tron/media_bridge.py, refreshed while shown)
         self.deff_values = {}
         self.deff_texts = {}
-        self.random = random.Random()
+        # the ROM's own generator (rom_rng.py, FUN_0000c684/0xc6b4); TRON_RNG_SEED fixes the state for conformance runs
+        _seed = os.environ.get("TRON_RNG_SEED")
+        self.random = RomRandom(int(_seed, 0) if _seed else None)
         self._new_game = False
         self._new_game_ball = False
         self._search_handle = None
@@ -190,6 +200,7 @@ class TronOS(CustomCode):
         self.ball_validated = False  # the playfield was validated on this ball (base music 0x01b)
         self.vuk_ejecting = False    # VUK eject not yet confirmed by a playfield switch (no ball search)
         self.vuk_device_busy = False  # VUK released, eject not yet confirmed by the ball device
+        self.vuk_task_until = -999.0   # the VUK device task still runs until then (VUK_SETTLE_TICKS after its switch changed)
         self.vuk_released_at = -999.0 # when the VUK last kicked its ball out (switches.vuk_eject)
         self._mb_first_at = -999.0    # earliest launch of a new multiball request's first ball
         settings = os.path.join(self.machine.machine_path, "..", "assets", "mpf_package", "config",
@@ -206,6 +217,9 @@ class TronOS(CustomCode):
         self.credit_model = Credits(self)                      # credits and pricing, persisted
         self._restart = False       # adj 36 GAME RESTART: the running game ends into a new one
         self._valid_at = None       # when the playfield was validated on this ball (play-time audits)
+        self._volume_sent = False
+        self._tilt_timer_end = 0.0  # timer 2 (0x3ab44), loaded by the plumb bob
+        self.player_seconds = {}    # validated play time of each player
         self.game_seconds = 0.0     # validated play time of the running game
         self.replayed = False       # a replay was awarded in this game (DAT_0003817e)
         self._coindoor_save = False  # the running multiball save is the coin door ball saver's (adj 41)
@@ -234,16 +248,22 @@ class TronOS(CustomCode):
         sw = self.machine.switch_controller
         sw.add_switch_handler("s_coin", lambda: self.credit_model.coin("s_coin"))
         sw.add_switch_handler("s_start_button", self._start_held, ms=START_HOLD_TICKS * TICK * 1000)
+        sw.add_switch_handler("s_start_button", self._start_pressed)
         sw.add_switch_handler("s_service_back", self._service_back)
         sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob)
+        sw.add_switch_handler("s_plumb_bob_tilt", self._plumb_bob_open, state=0)
         sw.add_switch_handler("s_left_flipper", lambda: self._flipper_launch(1))
         sw.add_switch_handler("s_right_flipper", lambda: self._flipper_launch(2))
+        sw.add_switch_handler("s_left_flipper", lambda: self._abort_animations("s_right_flipper"))
+        sw.add_switch_handler("s_right_flipper", lambda: self._abort_animations("s_left_flipper"))
         sw.add_switch_handler("s_coin_door_open", self._coin_door_opened)
         sw.add_switch_handler("s_coin_door_open", self._coin_door_closed, state=0)
         self._power_off_run = 0     # counts deff 4 starts, so a dim timer of an earlier start does nothing
         self._service_confirm = None    # clock handle while the end-the-game question is up
         self._service_kill = False      # the game is ending into the service menu
         sw.add_switch_handler("s_service_select", self._service_select)
+        sw.add_switch_handler("s_service_minus", lambda: self._volume_key(-1))
+        sw.add_switch_handler("s_service_plus", lambda: self._volume_key(1))
         self.in_service = False     # the service menu (mode tron_service) is running
 
         self.register("rules_refresh", self.request_refresh)
@@ -453,6 +473,13 @@ class TronOS(CustomCode):
         """Map a per-player ROM RAM array (addr + stride*(p-1)) to a setter(player_index, value)."""
         for p in range(players):
             self.pokes[addr + stride * p] = (lambda p_: lambda v: setter(p_, v))(p)
+
+    def _poke_score(self, index, value):
+        if self.game and index < len(self.game.player_list):
+            pl = self.game.player_list[index]
+            delta, pl.score = value - pl.score, value
+            if delta:                                   # the reference tracer reports every change of the score RAM (a poke too) as a score event
+                self.trace.log("score", player=index + 1, delta=delta, total=value)
 
     def poke(self, addr, value):
         if addr not in self.pokes:
@@ -832,8 +859,8 @@ class TronOS(CustomCode):
         self.audit(9 + n)
 
         def show():
-            if self.display.show_running():
-                self.task_start(0x33, 1, show)       # FUN_000287a4: wait while a show runs
+            if self.display.fg is not None:
+                self.task_start(0x33, 1, show)       # FUN_000287a4 [0x000287a4]: wait while a foreground deff runs (0x381a8 != background 0x381ae)
                 return
             if self.deff_start(28):
                 self.leff_start(17)
@@ -910,11 +937,82 @@ class TronOS(CustomCode):
         """start_button_handler [0x00020d14] in attract: a game needs a credit or free play; otherwise event
         0x2d and deff 15 (credit text, PRESS START / INSERT COINS) unless it already runs."""
         if self.credit_model.can_start():
+            if self.game is None and not self._start_balls_ok():
+                self._start_search()                 # FUN_0001f6fc -> FUN_0001f758: the start is refused, the search runs
+                return False
+            if self.game is None and self.display.running(39):
+                self.flag_set(0xf)                   # FUN_00020584: a game started while deff 39 runs is the competition game
+            if self.game is None and self.flag(0xb):
+                self.flag_clear(0xb)                 # [0x00020d14]: game_flag_clear(0xb), audit_add(0x27)
+                self.audit(0x27)
             return True
         self.machine.events.post("tron_start_refused")    # event 0x2d
         if not self.display.running(15):
             self.deff_start(15, credits=self.credit_model.text(), prompt=self.credit_model.prompt())
         return False
+
+    # the balls the machine counts at a start: FUN_0001f6fc / task_ball_search [0x0001f4a0]
+    BALL_DEVICES = ("bd_trough", "bd_shooter_lane", "bd_vuk")
+    START_SEARCH_ROUNDS = 4          # `iVar6` 1..4: the search ends once the 4th round has passed (4 < iVar7)
+    START_SEARCH_WAITS = 0x34        # `uVar5 < 0x34` checks per round, task_sleep(6) each
+
+    def _balls_counted(self):
+        """balls_count_all [0x0001bd18]: the balls the ball devices' switches hold."""
+        return sum(self.machine.ball_devices[name].balls for name in self.BALL_DEVICES)
+
+    def _balls_installed(self):
+        """FUN_0001e044 [0x0001e044]: the trough's switch list length (4 here)."""
+        return self.machine.ball_devices["bd_trough"].capacity
+
+    def _balls_recorded(self):
+        """FUN_0001e080 [0x0001e080]: the recorded ball count (NVRAM 0x0211191c, valid with its checksum), the
+        installed count when not written yet (FUN_0001e0e4)."""
+        return min(self.audits.extra.get("recorded_balls", self._balls_installed()), self._balls_installed())
+
+    def _start_balls_ok(self):
+        """FUN_0001f6fc [0x0001f6fc]: the start goes ahead when some balls are counted and their number is the
+        installed one or the recorded one."""
+        counted = self._balls_counted()
+        return counted != 0 and counted in (self._balls_installed(), self._balls_recorded())
+
+    def _start_search(self):
+        """task_ball_search [0x0001f4a0] started by a START that FUN_0001f6fc refused (FUN_0001f758). The
+        press that starts it does not start the game. Each of the 4 rounds posts the search (event 0xd/0xc/0xe:
+        deff 11 LOCATING PINBALLS, audit 0x25) and then re-counts every 6 ticks, 52 times: the search stops at
+        once when the count is the installed or the recorded one. After the last round: game flag 0xb when
+        fewer balls are counted than recorded, and the recorded count becomes the balls counted (FUN_0001e0e4)."""
+        if self.task_running(0x2b) or self.game is not None:
+            return
+        self.deff_start(11)
+        rounds = [0]
+
+        def finish():
+            counted = self._balls_counted()
+            if counted < self._balls_recorded():
+                self.flag_set(0xb)
+            if counted:
+                self.audits.extra["recorded_balls"] = min(counted, self._balls_installed())
+            self.deff_stop(11)
+
+        def round_start():
+            rounds[0] += 1
+            self.audit(0x25)
+            self._search_pulses()
+            self.machine.events.post("tron_ball_search", count=rounds[0])
+            check(0)
+
+        def check(i):
+            if self._start_balls_ok():
+                self.task_kill(0x2b)
+                finish()
+                return
+            if i + 1 < self.START_SEARCH_WAITS:
+                self.task_start(0x2b, 6, lambda: check(i + 1))
+            elif rounds[0] < self.START_SEARCH_ROUNDS:
+                self.task_start(0x2b, 6, round_start)
+            else:
+                self.task_start(0x2b, 6, finish)
+        round_start()
 
     def _player_add_request(self, **kwargs):
         """START on ball 1 adds a player when a credit (or free play) allows it [0x00020d14]."""
@@ -925,6 +1023,39 @@ class TronOS(CustomCode):
         if num > 1:
             self.credit_model.take(1)
             self.audit(0x11)
+            if self.display.fg is not None and self.display.fg != self.display.bg:
+                # the START that adds a player calls FUN_000283f8(1) [0x000283f8] before FUN_00021304 [0x00021034 caller, decompile 33990-34000]:
+                # it kills the deff on screen (DAT_000381a8) unless it is the default one (DAT_000381ae), then empties the queue. The credits deff 10
+                # (coin / free play) is that deff in the reference multiplayer_3p 18.79 -> 19.03 (deff 10 from the 3rd coin, the player add at 19.02, task 0x2
+                # = deff 19 at 19.032, no deff_stop call logged): events 0x45 / 0x46 have no hooks in play (Unicorn, list at 0x3e3a0 + 4 x event)
+                self.display._end_fg(stopped=True)
+                self.display._after_fg()
+
+    def _competition_ok(self):
+        """FUN_00019ecc: attract (state & 0x118 == 0x10), adj 46 PLAYER COMPETITION = YES, a credit or free play."""
+        return (self.game is None and self.state & 0x118 == ST_ATTRACT and self.adj_value(46) == 1 and self.has_credit()
+                and not self._start_balls_ok())   # a START that FUN_0001f6fc accepts starts the game at once in the ROM (MPF starts on release)
+
+    def _start_pressed(self):
+        """START pressed in attract [0x00020d14, run at the press]: a refused start (FUN_0001f6fc) runs the search at once, while task 0x3b
+        (FUN_00019f98) times the hold; MPF itself would only act on the release."""
+        if self.game is None and self.state & 0x118 == ST_ATTRACT and self.credit_model.can_start() and not self._start_balls_ok():
+            self._start_search()
+        self._competition_hold()
+
+    def _competition_hold(self):
+        """START pressed [0x0002dcc0 -> FUN_00019f98]: task 0x3b (FUN_00019f20) watches START for 62 ticks while FUN_00019ecc holds;
+        held to its end it starts deff 39 COMPETITION READY. A START that starts a game (clears the attract bit) ends it at once; only a
+        refused start (balls missing: the start search) leaves START held long enough. A game started while deff 39 runs is the
+        competition game (game flag 0xf, set in FUN_00020584)."""
+        if not self._competition_ok() or self.display.running(39) or self.task_running(0x3b):
+            return
+        sw = self.machine.switch_controller
+
+        def end():
+            if self._competition_ok() and sw.is_active(self.machine.switches["s_start_button"]):
+                self.deff_start(39)
+        self.task_start(0x3b, START_HOLD_TICKS, end)
 
     def _start_held(self):
         """adj 36 GAME RESTART [0x00020d14]: START held 62 ticks (timer 4) on ball 2 or later restarts the game,
@@ -984,6 +1115,9 @@ class TronOS(CustomCode):
     def _attract_started(self, **kwargs):
         self.state = ST_ATTRACT
         self.start_button_lamp()
+        if not self._volume_sent:                    # the stored level goes to the sound output once, as the ROM does at boot
+            self._volume_sent = True
+            self.set_volume(self.volume)
 
     # ------------------------------------------------------------------ game start (4.1)
 
@@ -1002,6 +1136,7 @@ class TronOS(CustomCode):
         self.replays_awarded = {}                    # player -> replay levels awarded (0x2110993)
         self.replayed = False
         self.game_seconds = 0.0
+        self.player_seconds = {}
         self._valid_at = None
         self.shoot_again = False
         self.flags.clear()
@@ -1052,6 +1187,9 @@ class TronOS(CustomCode):
         later_ball = not self._new_game_ball
         self._new_game_ball = False
         self.serve(3)
+        # event 0x13 [0x00020754: the last call of ball_start 0x00020650, right after serve_ball(3)]: FUN_01023858 resets the
+        # score display's tick counter 0x021117f4 and the last points, on every ball
+        getattr(self.media, "ball_start_finished", lambda: None)()
         # The trough eject task kicks the ball about 32 ticks after the serve (traces/game_flow.jsonl
         # ball start 1.90 s, trough eject 2.42 s); MPF ejects when the ball_starting queue clears.
         if queue:
@@ -1203,9 +1341,19 @@ class TronOS(CustomCode):
             # bonus_skip 15.35 -> 15.93)
             self.after(BALL_SEARCH_EVENT_TICKS, lambda: self.task_running(0x2b) and self.request_refresh())
             self.audit(0x25)
+            self._search_pulses()
             self.hook("ball_search")
             self.machine.events.post("tron_ball_search", count=self.ball_search_count)
         self.ball_search_reload(15 if self.tilted else 10)
+
+    SEARCH_COILS = ("c_left_slingshot", "c_right_slingshot")
+
+    def _search_pulses(self):
+        """FUN_00003138 [0x00003138] at every search start (task_ball_search, on_ball_search_started 0x0001f634): FUN_000030a8 pulses each coil
+        whose descriptor has a ball search pulse length (+0x12) and none of the flag bits 0xa0dc (bumpers carry 0x2000, flashers 0x4, kickers
+        0x40): the two slingshots (coils 13 and 14), 64 ms, together (assets/rom_data/io/coils.csv ballsearch_ms)."""
+        for name in self.SEARCH_COILS:
+            self.machine.coils[name].pulse()
 
     def _lost_ball_feed(self):
         """ball_search_start(5) with adj 63 LOST BALL RECOVERY [0x0001f79c]: the balls missing from the
@@ -1238,6 +1386,38 @@ class TronOS(CustomCode):
             return
         self.credit_model.service_credit()
 
+    # master volume [FUN_0002d3d0 / FUN_0002d414]: NVRAM byte 0x02110250, 0-0x3f, 0x28 when the NVRAM byte is invalid
+    VOLUME_DEFAULT, VOLUME_MAX = 0x28, 0x3f
+
+    @property
+    def volume(self):
+        value = self.machine.variables.get_machine_var("tron_volume")
+        return self.VOLUME_DEFAULT if value is None else int(value)
+
+    def set_volume(self, level):
+        """FUN_0002d414: clamp to 0x3f, store (persisted) and send the sound board the level (0x1000 | level x 2 + 0x80)."""
+        level = max(0, min(self.VOLUME_MAX, int(level)))
+        self.machine.variables.set_machine_var("tron_volume", level, persist=True)
+        # the audio output: MPF's master_volume machine variable (0.0-1.0) is what GMC applies to the Master bus
+        # (sound_player.gd _on_volume); the board's own attenuation steps (command level x 2 + 0x80) are not in the package,
+        # so the level maps linearly
+        self.machine.variables.set_machine_var("master_volume", level / self.VOLUME_MAX)
+        self.machine.events.post("tron_volume", level=level, command=0x1000 | (level * 2 + 0x80))
+
+    def _volume_key(self, delta):
+        """Coin-door MINUS / PLUS outside the service menu [FUN_0000fc28 cases 2 and 4]. With no volume display up, the
+        first press starts deff 2 (task 0xb, FUN_0000fad0: event_post then deff_start(2)); the display lasts 0x34 flips of 6
+        ticks. While it runs, a press changes the volume by one (never below 0, never above 0x3f) and the display starts
+        over (the key's repeat, FUN_0000fb10 style, is not modelled: a held key counts once)."""
+        if self.in_service or self._service_kill:
+            return
+        if not self.display.running(VOLUME_DEFF):
+            self.sound(0x01a)                      # the event posted first (0x15a38 caller) plays the base music call
+            self.deff_start(VOLUME_DEFF, volume=self.volume)
+            return
+        self.set_volume(self.volume + delta)
+        self.display.restart(VOLUME_DEFF, volume=self.volume)
+
     def _service_select(self):
         """Coin-door SELECT: the service menu (tron/service.py). In attract mode it opens at once. In a game the
         ROM suspends the game and resumes it after the menu (FUN_0000f9b0 / FUN_0000fa34); here the first
@@ -1246,6 +1426,7 @@ class TronOS(CustomCode):
         (docs/rom_differences.md). BACK or the timeout leaves the game running."""
         if self.in_service or self._service_kill:
             return
+        self.display.stop(VOLUME_DEFF)             # FUN_000282e0(2): the volume display ends first [0x0000fc28 case 8]
         if not self.game:
             self.machine.modes["tron_service"].start()
             return
@@ -1312,6 +1493,17 @@ class TronOS(CustomCode):
                                                                ("TO RESTORE POWER", 28))]
         self.media.deff_draw(POWER_OFF_DEFF, self.display.prio.get(POWER_OFF_DEFF, 0), draw)
 
+    def _abort_animations(self, other):
+        """adj 75 ABORT ANIMATIONS (queue_fullscreen_deff 0x0100fbb0, FUN_0100fb10): while a show task is waiting or
+        playing, a flipper button pressed while the other is held (FUN_00007404 edge, FUN_000073e4 held) aborts the
+        animation: 0 never, 1 the deff on screen (FUN_000283f8(1)), 2 also every show task 0x81-0xa7 and the mode
+        total tasks 0x4d-0x58."""
+        mode = self.adj_value(75)
+        if not mode or not self.display.show_running():
+            return
+        if self.machine.switch_controller.is_active(self.machine.switches[other]):
+            self.display.abort(mode)
+
     def _flipper_launch(self, side):
         """Flipper button with a ball waiting in the shooter lane [0x0002dcc0]: adj 40 FLIPPER BALL LAUNCH
         (1 left, 2 right, 3 either, 4 both: this button with the other one held) launches it."""
@@ -1340,11 +1532,35 @@ class TronOS(CustomCode):
     # ------------------------------------------------------------------ tilt (5.3)
 
     def _plumb_bob(self):
+        """tilt_switch [0x00024564], bob closed: the warning (once per 62 ticks, FUN_00010ad4 / FUN_00010b18 timer 1) and task 0x2e,
+        which keeps warning every 62 ticks while the bob stays closed and tilts at the second (the open event kills it).
+        Every closure ends by loading timer 2 with 0xda ticks [0x00024564: DAT_0003ab44 = 0xda]; end_of_ball waits for it
+        to run out, polling every 6 ticks [0x00020764: while FUN_00010ad4(2): task_sleep(6)]."""
+        self._tilt_timer_end = self.now + TILT_TIMER_TICKS * TICK
         if not self.game or self.tilted or self.state & ST_END_BALL:
             return
+        if not self.task_running(0x2e):
+            self.task_start(0x2e, SECOND, lambda: self._bob_held(0))
         if self.now - self._last_bob < SECOND * TICK:
             return
         self._last_bob = self.now
+        self._tilt_warning()
+
+    def _plumb_bob_open(self):
+        self.task_kill(0x2e)
+
+    def _bob_held(self, n):
+        """task_2e [0x00024520]: after 62 ticks tilt_warning, after 62 more tilt_warning, then tilt."""
+        if not self.game or self.tilted or self.state & ST_END_BALL:
+            return
+        self._tilt_warning()
+        if n == 0:
+            self.task_start(0x2e, SECOND, lambda: self._bob_held(1))
+        else:
+            self._tilt()
+
+    def _tilt_warning(self):
+        """tilt_warning [0x00024398]: a warning while under adj 32, else the tilt."""
         if self.adj_value(64) and self.coin_door_open():
             return                                   # FUN_00024344: adj 64 ignores the tilt with the door open
         if self.tilt_warnings < self.adj_value(32):
@@ -1354,11 +1570,22 @@ class TronOS(CustomCode):
             self.sound(0x016)
             self.after(31, lambda: self.sound(0x03d))
             return
+        self._tilt()
+
+    def _tilt(self):
+        """tilt [0x0002444c]."""
+        if self.tilted or (self.adj_value(64) and self.coin_door_open()):
+            return
         self.hook("tilt_start")                      # event 0x66, posted before the tilt state is set
         self.state |= ST_TILT
         self.ball_search_reload(15)
         self.audit(0x2a)
         self.kill_ball_save()
+        # task_kill(0, 0x1000) [0x00024444]: every task without flag 0x1000 dies, the leff tasks too (leff_start
+        # creates them with flags 0x22 | 0x100 / 0x2000 [0x000087ac]); the rules start them again at the next ball
+        self.leffs.kill_all()
+        for rule in self.rules:
+            rule[3] = False
         self.machine.events.post("tron_tilt")
         self.hook("tilt")                            # event 0x65
         self.deff_start(21)
@@ -1463,6 +1690,15 @@ class TronOS(CustomCode):
                 flipper.disable()
             return
         queue.wait()
+        self._ball_ending_wait(queue)
+
+    def _ball_ending_wait(self, queue):
+        until = self.vuk_task_until
+        if until == float("inf"):                    # the ball is in the VUK (task started by its switch): over once the switch is open
+            until = self.now + TICK if self.machine.switches["s_video_game_eject"].state else 0.0
+        if self.now < until:                         # trough_drain_check waits for the VUK's device task (no_balldev_tasks)
+            self.after(max(1, round((until - self.now) / TICK)), lambda: self._ball_ending_wait(queue))
+            return
         if self.task_running(0x2b):
             self.after(self.task_ticks_left(0x2b), lambda: self._ball_ending_go(queue))
             return
@@ -1475,15 +1711,18 @@ class TronOS(CustomCode):
         self.kill_mb_save()
         self._mb_pending = 0
         self.task_kill(MB_TASK)
+        deff_wait = self.display.eob_wait_ticks()    # end_of_ball [0x00020764] waits for a running deff task (flag 0x2000)
         self.display.clear()
         self.hook("ball_end")                        # event 0x1d: every mode stops
         for flipper in self.machine.flippers.values():
             flipper.disable()
-        self.audit(8)
+        if not self.hook("slammed"):                 # the slam reset never reaches the end of ball [0x00023e18]
+            self.audit(8)
         if self._valid_at is not None:               # play time of this ball (AVERAGE BALL / GAME TIME)
             played = self.now - self._valid_at
             self._valid_at = None
             self.game_seconds += played
+            self.player_seconds[self.player_num] = self.player_seconds.get(self.player_num, 0.0) + played   # DAT_0003d500[player] [0x00025c50]
             self.audits.add_extra("ball_seconds", played)
         if self.task_running(0x37):                  # end_of_ball [0x00020764]: last outlane drain side
             self.audit(0x28)
@@ -1492,12 +1731,12 @@ class TronOS(CustomCode):
         # mode TOTAL displays (flag-0x2000 tasks) [0x00020764]: the longest one. (The ROM stops waiting after
         # gf_eob_mode_wait ticks; sea_of_simulation.jsonl waits longer than 169, so no limit is applied.)
         waits = [fn() or 0 for fn in self.hooks.get("ball_end_wait", ())]
-        wait_ticks = max(waits, default=0)
+        wait_ticks = max(waits + [deff_wait], default=0)
         self.after(wait_ticks, lambda: self._ball_ending_bonus(queue))
 
     def _ball_ending_bonus(self, queue):
-        if self.tilted:
-            self._ball_ending_done(queue)
+        if self.tilted:                              # no bonus [0x00020764: gf_state & 0x200], the waits still run
+            self._wait_award_tasks(queue)
             return
         self.state |= ST_BONUS
         bonus = self.features_by_name.get("bonus")
@@ -1519,6 +1758,13 @@ class TronOS(CustomCode):
         """End of ball step 7: wait for the replay / award tasks 0x33-0x34."""
         if self.task_running(0x33) or self.task_running(0x34):
             self.after(1, lambda: self._wait_award_tasks(queue))
+            return
+        self._wait_tilt_timer(queue)
+
+    def _wait_tilt_timer(self, queue):
+        """End of ball step 8: timer 2 (loaded by every tilt bob closure) must have run out; polled every 6 ticks."""
+        if self.now < self._tilt_timer_end:
+            self.after(6, lambda: self._wait_tilt_timer(queue))
             return
         self._ball_ending_done(queue)
 
@@ -1544,13 +1790,15 @@ class TronOS(CustomCode):
         # game-time audit (audits 59-71, by the game's validated play time) and the score-range audits
         # (audits 30-46, one per player) [0x00023774]
         players = self.game.player_list if self.game else []
-        self.audit(self.audits.game_time_counter(self.game_seconds))
-        for player in players:
-            self.audit(self.audits.score_range_counter(player.score))
-        self.audits.add_extra("game_seconds", self.game_seconds)
-        self.audits.add_extra("score_total", sum(p.score for p in players))
-        self._replay_statistics(len(players))
-        self.hook("game_over")
+        if not self.hook("slammed"):                 # slam_reset_task [0x00023e18] ends in the halt loop 0x10ce8:
+            for number in range(1, len(players) + 1):        # one game-time audit per player [0x00025e70, table 0x39020]
+                self.audit(self.audits.game_time_counter(self.player_seconds.get(number, 0.0)))
+            for player in players:
+                self.audit(self.audits.score_range_counter(player.score))
+            self.audits.add_extra("game_seconds", self.game_seconds)
+            self.audits.add_extra("score_total", sum(p.score for p in players))
+            self._replay_statistics(len(players))
+            self.hook("game_over")
         queue.wait()
         match = self.features_by_name.get("match")
         hs = self.features_by_name.get("high_scores")

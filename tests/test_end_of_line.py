@@ -54,6 +54,42 @@ class TestEndOfLine(TronTestCase):
         eol.eol_letter(0)                                     # full word: nothing more, still deff 55
         self.assertEqual(os_.pd.eol_left, 4)
 
+    def test_leff_60_pulses_red_disc_flasher_at_even_level_blue_at_odd(self):
+        """leff_060 [0x01005658]: coil 0x1f (red disc) when eol_level is even, 0x20 (blue) when odd,
+        32 ms every 8 ticks."""
+        eol = self.start_game()
+        os_ = self.tron
+        pulses = []
+        flasher = os_.lamps.flasher
+        os_.lamps.flasher = lambda name, ms=30, owner=None: (pulses.append((name, ms)), flasher(name, ms, owner))[1]
+        os_.flag_set(0x26)
+        self.assertTrue(eol.eol_vuk())
+        os_.display.clear()
+        self.advance_time_and_run(3)
+        self.assertTrue(eol.background_on())
+        self.assertTrue(pulses)
+        self.assertEqual({p for p in pulses if p[0] in ("f_red_disc", "f_blue_disc")}, {("f_red_disc", 32)})
+        eol.level = 1
+        del pulses[:]
+        self.advance_time_and_run(8 * TICK * 3)
+        self.assertEqual({p[0] for p in pulses if p[0] in ("f_red_disc", "f_blue_disc")}, {"f_blue_disc"})
+
+    def test_tube_show_88_follows_the_lit_mask(self):
+        """tubeshow_088 [0x010056b8]: a tube whose bit of eol_lit_mask is clear stays dark; the others fade white."""
+        eol = self.start_game()
+        os_ = self.tron
+        eol.mask = 2                                          # right jackpot only
+        seen = []
+        orig = os_.lamps.rgb
+        os_.lamps.rgb = lambda light, value, fade_ms=0: (seen.append((light, value, fade_ms)), orig(light, value, fade_ms))[1]
+        os_.lamps.tube_play(88)
+        self.assertIn(("l_left_ramp_tube", "000000", 0), seen)
+        self.assertIn(("l_right_ramp_tube", "ffffff", 500), seen)
+        del seen[:]
+        self.advance_time_and_run(0x1f * TICK + 0.01)
+        self.assertIn(("l_right_ramp_tube", "000000", 500), seen)
+        os_.lamps.tube_end(88)
+
     def test_multiball_grace_restart_total_and_ball_end(self):
         eol = self.start_game()
         os_ = self.tron

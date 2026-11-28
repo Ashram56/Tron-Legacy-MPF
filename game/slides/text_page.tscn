@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://tron/dmd_slide.gd" id="slide"]
 [ext_resource type="Script" path="res://tron/rom_text.gd" id="text"]
 [ext_resource type="Script" path="res://tron/dmd_mode_only.gd" id="mode_only"]
+[ext_resource type="Script" path="res://tron/score_display.gd" id="score"]
 
 [node name="text_page" type="Control"]
 layout_mode = 3
@@ -45,13 +46,6 @@ offset_right = 40.0
 offset_bottom = 32.0
 color = Color(0, 0, 0, 1)
 
-[node name="PanelLine" type="ColorRect" parent="Classic"]
-layout_mode = 0
-offset_left = 40.0
-offset_right = 41.0
-offset_bottom = 32.0
-color = Color(1, 0.45, 0.05, 1)
-
 [node name="P1" type="Label" parent="Classic"]
 layout_mode = 0
 theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
@@ -62,6 +56,140 @@ rom_font = 0
 rom_x = 38
 rom_y = 5
 rom_flags = 4
+
+[node name="P2" type="Label" parent="Classic"]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "p2"
+rom_font = 0
+rom_x = 38
+rom_y = 13
+rom_flags = 4
+
+[node name="P3" type="Label" parent="Classic"]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "p3"
+rom_font = 0
+rom_x = 38
+rom_y = 21
+rom_flags = 4
+
+[node name="P4" type="Label" parent="Classic"]
+layout_mode = 0
+theme_override_colors/font_color = Color(1, 0.45, 0.05, 1)
+script = ExtResource("text")
+variable_type = 1
+variable_name = "p4"
+rom_font = 0
+rom_x = 38
+rom_y = 29
+rom_flags = 4
+
+[node name="Separator" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 0.0
+offset_right = 41.0
+offset_bottom = 32.0
+color = Color(0.06667, 0.03, 0.003333, 1)
+
+[node name="Dash0" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 31.0
+offset_right = 14.0
+offset_bottom = 32.0
+color = Color(0.06667, 0.03, 0.003333, 1)
+
+[node name="BarDs" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 31.0
+offset_right = 4.0
+offset_bottom = 32.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="Dash1" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 31.0
+offset_right = 26.0
+offset_bottom = 32.0
+color = Color(0.06667, 0.03, 0.003333, 1)
+
+[node name="BarBumpers" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 31.0
+offset_right = 16.0
+offset_bottom = 32.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="Dash2" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 31.0
+offset_right = 38.0
+offset_bottom = 32.0
+color = Color(0.06667, 0.03, 0.003333, 1)
+
+[node name="BarSpinners" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 31.0
+offset_right = 28.0
+offset_bottom = 32.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="BarZfs" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 0.0
+offset_right = 41.0
+offset_bottom = 0.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="BarClu" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 0.0
+offset_right = 41.0
+offset_bottom = 0.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="BarGem" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 0.0
+offset_right = 41.0
+offset_bottom = 0.0
+color = Color(1, 0.45, 0.05, 1)
+
+[node name="RollBig" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(0, 0, 0, 1)
+visible = false
+
+[node name="RollPanel" type="ColorRect" parent="Classic"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(0, 0, 0, 1)
+visible = false
+
+[node name="ScoreDisplay" type="Node" parent="Classic"]
+script = ExtResource("score")
 
 [node name="OneLine" type="Label" parent="."]
 layout_mode = 0

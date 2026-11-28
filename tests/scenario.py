@@ -6,6 +6,7 @@ part of the player (plunge, drain, hits).
 
 Usage: .venv/bin/python -m tests.scenario <name> [out.jsonl]
 """
+import json
 import os
 import shlex
 import sys
@@ -14,8 +15,21 @@ import unittest
 from tests.tron_test import ROOT, TronTestCase
 
 TRACES = os.path.join(ROOT, "assets", "rules", "traces")
+TRACES2 = os.path.join(ROOT, "assets", "rom_data", "states", "traces")   # the newer reference traces
+
+
+def _loads(line):
+    try:
+        return json.loads(line)
+    except ValueError:                      # a mark text with unescaped quotes (coin_door_buttons.jsonl)
+        return {"ev": "mark"}
+
+
+def _dir(name):
+    return TRACES if os.path.exists(os.path.join(TRACES, name + ".txt")) else TRACES2
 OUT = os.path.join(ROOT, "captures", "traces")
 
+START_GAP = 0.93
 SCRIPT_START_TIME = 2.745 - 1.896   # 'start' runs this long after the Start press (reference traces)
 # the reference traces credit a coin 0.528 s after the script starts; the coin task waits adj 62 COIN INPUT
 # DELAY (30 ticks at factory settings) first, so the coin switch closes that much earlier, and START comes
@@ -47,10 +61,10 @@ def forced_picks(name):
     """Random choices the ROM made in the reference run, so the rebuild makes the same ones."""
     import json
     forced = {"arcade": []}
-    path = os.path.join(TRACES, name + ".jsonl")
+    path = os.path.join(_dir(name), name + ".jsonl")
     if not os.path.exists(path):
         return forced
-    evs = [json.loads(line) for line in open(path, encoding="utf-8")]
+    evs = [_loads(line) for line in open(path, encoding="utf-8")]
     for i, e in enumerate(evs):
         if e.get("ev") == "audit" and 0x53 <= e.get("id", 0) <= 0x5e:
             forced["arcade"].append(e["id"] - 0x53)
@@ -85,6 +99,19 @@ def forced_picks(name):
     for deff_id, (stop_ev, stop_id) in CLIP_DEFFS.items():
         forced["deff_{}_seconds".format(deff_id)] = clip_lengths(evs, deff_id, stop_ev, stop_id)
     forced.update(forced_samples(evs))
+    # the random clip each reference run made: the pick whose ROM run length (assets/rom_data/deffs/variant_runs.csv) is the
+    # closest to the recorded length; the longest when the run was replaced by a new start (it ran to that start)
+    from tron import media_table
+    variants = media_table.load_variants(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets"))
+    recorded = media_table.load(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets"))
+    for deff_id, lengths in [(d, forced.get("deff_{}_seconds".format(d)) or [recorded[d].seconds] * 30) for d in variants]:
+        if lengths:
+            forced["deff_{}_clip".format(deff_id)] = [
+                max(range(len(variants[deff_id])), key=lambda k: variants[deff_id][k]) if n is None else min(range(len(variants[deff_id])), key=lambda k: abs(variants[deff_id][k] * 0.01626 - n))
+                for n in lengths]
+    for spec in filter(None, os.environ.get("TRON_TEST_CLIPS", "").split(",")):
+        deff_id, pick = spec.split(":")
+        forced["deff_{}_clip".format(deff_id)] = [int(pick)] * 20
     return forced
 
 
@@ -130,6 +157,8 @@ def forced_samples(evs):
 # stop of the effect the deff runs (its exit handler stops it). A deff replaced by a new start of the
 # same deff keeps the recorded length (None).
 CLIP_DEFFS = {48: ("leff_stop", 48), 111: ("tube_show_stop", 62)}
+# the Sea of Simulation stage deffs 116-124 run a random clip (29 or 37 pictures, FUN_01027374: 97 or 121 ticks with the hold); their tube show (68-76) stops at the deff's end
+CLIP_DEFFS.update({116 + i: ("tube_show_stop", 68 + i) for i in range(9)})
 
 
 def clip_lengths(evs, deff_id, stop_ev, stop_id):
@@ -194,7 +223,7 @@ class ScenarioRun(TronTestCase):
         self.fill_trough()
         self.wait(6)                                  # the ROM boots 8 s before line 1
         self.log("ready")
-        with open(os.path.join(TRACES, name + ".txt"), encoding="utf-8") as f:
+        with open(os.path.join(_dir(name), name + ".txt"), encoding="utf-8") as f:
             for line in f:
                 line = line.split("#", 1)[0].strip()
                 if line.startswith("mark "):
@@ -220,12 +249,14 @@ class ScenarioRun(TronTestCase):
             self.wait(0.01)
             self.sw("s_coin", 0)
         self.wait(START_AFTER_COIN - 0.01)
-        for _ in range(n):
+        for i in range(n):
             self.sw("s_start_button", 1)
             self.wait(0.01)
             self.sw("s_start_button", 0)
             self.wait(0.09)
-        self.wait(SCRIPT_START_TIME - 0.1 * n)
+            if i < n - 1:
+                self.wait(START_GAP - 0.1)       # the reference script's next START press (multiplayer traces: 0.93 s)
+        self.wait(SCRIPT_START_TIME - 0.1)
 
     def step(self, seconds):
         """One tron_ref step_to(): the requested time plus the average overshoot."""
@@ -272,6 +303,11 @@ class ScenarioRun(TronTestCase):
             self.sw(name, 1)
             self.step(0.06)                           # tron_ref pulses the outlane, then drains at once
             self.sw(name, 0)
+        trough = self.machine.ball_devices["bd_trough"]
+        if trough.balls >= trough.capacity:        # nothing left on the playfield (the reference's script drains more than it has out)
+            self.log("sim", what="drain_skipped")
+            self.step(0.1)
+            return
         self.log("sim", what="drain")
         self.machine.default_platform.add_ball_to_device(self.machine.ball_devices["bd_trough"])
         self.step(0.1)
@@ -295,6 +331,16 @@ class ScenarioRun(TronTestCase):
             self.step(ms / 1000)
             self.sw(name, 0)
             self.step(0.05)                           # tron_ref: 50 ms settle after a button pulse
+
+    # commands that only instrument the ROM run in PinMAME (breakpoints, dumps): nothing to do in the rebuild
+    def cmd_pretrace(self, *a):
+        pass
+
+    cmd_pretracepc = cmd_trace = cmd_dump_tasks = cmd_dump_events = cmd_dump_rules = cmd_pokeat = cmd_pretrace
+
+    def cmd_dsw(self, number, ms="100"):
+        """A PinMAME switch number (dedicated column): no rebuild input, but the press takes its time as in the reference run."""
+        self.step(int(ms) / 1000)
 
     def cmd_mark(self, *text):
         self.log("mark", text=" ".join(text))

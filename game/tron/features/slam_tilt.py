@@ -30,7 +30,21 @@ class SlamTilt(Feature):
 
     def slam_tilt(self):
         os_ = self.os
-        if not os_.game or os_.task_running(0x39):
+        if os_.task_running(0x39) or os_.in_service:
+            return
+        if not os_.game:
+            # in attract the same routine runs [0x00023e40] (gf_state 0x100 = service is the only exclusion): task_kill(0,
+            # 0x1000) ends the attract tasks, deff 24 / leff 12 / sound 0x018, and the reset boots the attract again
+            for name in ("attract", "attract_pages"):
+                feature = os_.features_by_name.get(name)
+                if feature:
+                    feature.stop()
+            os_.leffs.kill_all()
+            os_.tubes.clear()
+            os_.deff_start(24)
+            os_.leff_start(12)
+            os_.sound(0x018)
+            os_.task_start(0x39, SLAM_RESET_TICKS, self._attract_reset)
             return
         self.slam = True
         os_.state |= ST_TILT                         # no scores, no rules, no bonus
@@ -43,6 +57,14 @@ class SlamTilt(Feature):
         os_.leff_start(12)
         os_.sound(0x018)
         os_.ball_search_reload(15)
+
+    def _attract_reset(self):
+        from tron.features.attract import BOOT_SECONDS
+        pages = self.os.features_by_name.get("attract_pages")
+        if pages:
+            pages.boot = True
+        self.os.display.clear()
+        self.machine.clock.schedule_once(lambda dt=None: None if self.os.game else self.os.hook("attract_start"), BOOT_SECONDS)
 
     def reset(self):
         """thunk_FUN_00010ce8(0): the machine resets; the game in progress is gone."""

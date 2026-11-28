@@ -15,6 +15,7 @@ if GAME not in sys.path:
 TESTED = {3, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 29, 30, 31, 32, 35, 38, 39, 40, 41,
           42, 44, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 76, 77, 78, 79, 82, 83, 84, 85, 86}
 # credits, game start / restart, high scores and attract pages: tests/test_credits.py
+TESTED |= {75, 80}      # tests/test_adj_75_80.py
 TESTED |= {2, 25, 28, 33, 34, 36, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62}
 # adjustment -> why no behaviour test (where the effect was looked for)
 NO_EFFECT = {
@@ -28,8 +29,6 @@ NO_EFFECT = {
     45: "TICKET DISPENSER: only shows the REDEMPTION menu (tested in test_service)",
     46: "PLAYER COMPETITION: 0x00019ecc, multi-player tournament play; not modelled",
     47: "TEAM SCORES: team display, not read by the game code",
-    75: "ABORT ANIMATIONS: flipper abort of queued shows (0x0100fbb0 / 0x0100fd88); not modelled in display.py",
-    80: "DISABLE DROP TARGETS: tron_targets.md open question; no adj_get(80) call site (inferred only)",
     81: "DISABLE RECOGNIZER MOTOR: head motor object parameter; the rebuild does not drive the head motor",
     87: "MUSIC VOLUME (trim): sound board", 88: "SPEECH VOLUME (trim): sound board",
 }
@@ -128,6 +127,21 @@ class TestGameFlowAdjustments(AdjCase):
         self.assertEqual(2, self.deffs().count(23))
         self.hit_and_release_switch("s_plumb_bob_tilt")
         self.advance_time_and_run(0.1)
+        self.assertTrue(os_.tilted)
+
+    def test_tilt_bob_held_closed_tilts_after_two_periods(self):
+        """task_2e [0x00024520]: a bob that stays closed warns again every 62 ticks and tilts at the second; opening kills it."""
+        os_ = self.start_game()
+        self.hit_switch_and_run("s_plumb_bob_tilt", 0.1)         # warning 1 at once
+        self.release_switch_and_run("s_plumb_bob_tilt", 0.1)     # opened at once: nothing more
+        self.advance_time_and_run(3)
+        self.assertFalse(os_.tilted)
+        self.assertEqual(1, self.deffs().count(23))
+        os_.tilt_warnings = 0
+        os_._last_bob = -999.0
+        self.hit_switch_and_run("s_plumb_bob_tilt", 1.2)         # still closed after 62 ticks: warning 2
+        self.assertFalse(os_.tilted)
+        self.advance_time_and_run(1.2)                           # 124 ticks: the third and the tilt
         self.assertTrue(os_.tilted)
 
     def test_64_coin_door_disable_tilt(self):

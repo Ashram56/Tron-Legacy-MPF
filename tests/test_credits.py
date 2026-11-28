@@ -42,10 +42,10 @@ class TestCoins(CreditCase):
         self.assertEqual(texts, [kw["credits"] for kw in shown])            # deff 10 shows the credit text
         self.assertEqual((4, 4, 1), (os_.audits[4], os_.audits[7], os_.audits[1]))
         self.assertEqual(["0x0f0", "0x0f0", "0x0f1", "0x0f0"], [s for s in self.sounds() if s in ("0x0f0", "0x0f1")])
-        self.assertEqual({"credits": 1, "counter": 0}, cr.store.written_data)
-        os_.adj[28] = 0                                       # AUSTRALIA 1: not in the decompile, USA 10's table
+        self.assertEqual({"credits": 1, "counter": 3}, cr.store.written_data)   # ladder position (8-step ROM ladder 0 0 1 0 0 1 0 1)
+        os_.adj[28] = 0                                       # AUSTRALIA 1: its own ROM entry (pricing.csv: slot 1 = 2 units, 10 units a credit)
         self.coins(2)
-        self.assertEqual(2, cr.credits)
+        self.assertEqual(1, cr.credits)
 
     def test_28_custom_pricing(self):
         os_ = self.tron
@@ -395,22 +395,22 @@ class TestAttractPages(HsCase):
         self.advance_time_and_run(46)
         names = [p["page"] for p in pages]
         self.assertIn("CUSTOM MESSAGE", names)
-        self.assertEqual("CREDITS", names[names.index("CLOCK") + 1])     # wraps without GAME OVER
+        self.assertEqual("CREDITS", names[names.index("CUSTOM MESSAGE") + 1])     # wraps without GAME OVER
         os_.adj[2] = 0                                                   # CUSTOM MESSAGE OFF
         self.advance_time_and_run(60)                                    # from the next pass on
         self.assertNotIn("CUSTOM MESSAGE", [p["page"] for p in pages[-10:]])
         os_.features_by_name["attract_pages"].attract_start()
         self.hit_and_release_switch("s_left_flipper")                    # first page: back to the last one
         self.advance_time_and_run(0.01)
-        self.assertEqual("CLOCK", pages[-1]["page"])
+        self.assertEqual("URL", pages[-1]["page"])     # the last page (adj 2 off); the ROM has no clock page
         current = pages[-1]["page"]
         self.hit_and_release_switch("s_right_flipper")
         self.hit_and_release_switch("s_left_flipper")
         self.advance_time_and_run(0.01)
         self.assertEqual(current, pages[-1]["page"])          # next, then back
         self.assertNotEqual(current, pages[-2]["page"])
-        self.play(1000)                                       # the last game's scores replace REPLAY AT
+        self.play(1000)                                       # the last game's scores go to the status panel (no page of their own in the ROM table)
         self.advance_time_and_run(15)
         after = [p["page"] for p in pages]
         last = len(after) - 1 - after[::-1].index("GAME OVER")
-        self.assertEqual(["GAME OVER", "CREDITS", "PLAYER 1", "GRAND CHAMPION"], after[last:last + 4])
+        self.assertEqual(["GAME OVER", "CREDITS", "REPLAY", "GRAND CHAMPION"], after[last:last + 4])

@@ -6,7 +6,7 @@ whose item is already collected is skipped and pays (k+1) million once per playe
 Game flags: 0x33 played since the last Portal, 0x34 running, 0x35 final stage, 0x36 completed.
 
 ROM tables that are not in the decompile (stage 2 shot order, the CLU helmet sounds, the Light Cycle
-chain table 0x040d3748) are modelled as the spec describes them; see STAGES.
+chain table 0x040d3748) are read from the ROM image; see STAGES.
 """
 from tron.features import Feature
 from tron.os_layer import TICK
@@ -28,9 +28,10 @@ def bits(ids):
 
 
 # Stage table 0x040d37d8, k = item: shot ids in spot order (the first needed one is spotted).
-# Stage 2 (CLU): mask 0x94001, the decompile shows the left orbit first; the rest of the order is assumed.
-# Stage 6 (LIGHT CYCLE): mask 0xc8000; its chain table 0x040d3748 is not readable here, so the three
-# shots are needed in any order (shots already made stay excluded, as in the ROM).
+# Stage 2 (CLU): mask 0x94001; spot order = 0x040d367c (12-byte entries: id, bit, ...) read from the ROM image:
+# left orbit 14 (0xe, checked first by FUN_010250f0), left inner loop 16, right orbit 19, VUK 0 [0x01024f34].
+# Stage 5 (DISCS): the six chain ids 14-19 in the order of table 0x040d3748 (FUN_01025d94). Stage 6 (LIGHT CYCLE):
+# mask 0xc8000 (shots 15, 18, 19); the shots are needed in any order, a made shot adds its chain below.
 STAGES = (
     (VUK,),
     (RIGHT_INNER_LOOP,),
@@ -42,8 +43,9 @@ STAGES = (
     (13,),
     (2, 3, 4, 5),
 )
-# Stage 6: the shots a made shot adds (chain table 0x040d3748; ids 14 left orbit, 15 left ramp, 16 left inner loop,
-# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (PinMAME: six deff 122)
+# Stage 6: the shots a made shot adds, word 2 of the 16-byte entries of table 0x040d3748 (read from the ROM image:
+# 0x14000, 0x60000, 0, 0, 0x60000; ids 14 left orbit, 15 left ramp, 16 left inner loop,
+# 17 right inner loop, 18 right ramp, 19 right orbit): all six shots end up needed (FUN_01025c50 [0x01025c50])
 LIGHT_CYCLE_CHAIN = {15: (14, 16), 16: (17, 18), 19: (17, 18)}
 # The stage's messages (stage table + 0x18 and + 0x19), drawn by deff 114 under SEA OF SIMULATION
 STAGE_TEXT = ("FLYNNS ARCADE", "GEM", "CLU HELMETS", "ZUSE TARGETS", "QUORRA", "DISCS", "LIGHT CYCLES",
@@ -63,8 +65,12 @@ HELMET_BITS = 0x1c0
 # deff 116+k "stage complete" variant (FUN_01027478): its animation and speech 0x111 take 2.105 s, then
 # the deff drops to priority 0x20 for a 10-frame hold (traces/sea_of_simulation: 22.208 -> 24.318,
 # 28.632 -> 30.736 when the queued deff 115 takes the display).
-STAGE_DONE_SECONDS = 2.105
-STAGE_SPEECH_SECONDS = 2.1      # snd_play2(0x111) as the variant's animation ends (36.637 -> 38.741 s)
+# From the code (each of deffs 116-124, run in Unicorn with the clip pick forced, all alike): the not-done variant FUN_01027374 picks random_below(2) between the
+# clips 0x1a4c-0x1a68 (29 pictures) and 0x1a69-0x1a8d (37 pictures) of table 0x040d3980, 3 ticks a picture, then the 10-tick hold (97 or 121 ticks in all);
+# the done variant FUN_01027478 has the one clip 0x1a8e-0x1ab8 (43 pictures: 129 ticks, then speech 0x111) and the hold (139 ticks).
+STAGE_CLIP_TICKS = (97, 121)
+STAGE_DONE_SECONDS = 129 * TICK
+STAGE_SPEECH_SECONDS = 129 * TICK
 MAIN_TASK_TICKS = 90            # deff 114: 15 loops of 6 frames before the final-stage speech
 # deff 115 [0x010270a4]: bitmaps 0x1931-0x196f (63) of 3 ticks, then deff_hold_frames(10, 0x20). Its capture
 # holds two skipped stages back to back (0x109 at 0 and 3.102 s, the second run's first frame at 3.109 s):
@@ -317,7 +323,10 @@ class SeaOfSimulation(Feature):
         points = os_.score_add((k + 1) * (10000 if quiet else 100000))
         self.total += points
         done = not self.needed
-        length = STAGE_DONE_SECONDS + 10 * TICK if done else None     # the hold follows the speech
+        pick = None if done else os_.pick("sos_stage_clip", [1, 1])        # random_below(2) [0x0000c6b4] in FUN_01027374
+        length = STAGE_DONE_SECONDS + 10 * TICK if done else STAGE_CLIP_TICKS[pick] * TICK     # the hold follows the speech
+        # the pick is the clip index (v00 = 29 pictures, v01 = 37; the done clip is the alt): Godot plays the clip the length is for
+        clip = {} if done else {"clip": pick}
         # the stage deff's own sounds (FUN_01027374 / FUN_01027478): snd_play2(0x10a, counter) as it starts
         # and, for the stage-completing shot, speech snd_play2(0x111, counter) as its animation ends
         sounds = [(0, lambda: self._counted_sound(0x10a, "shot_sound", SHOT_SAMPLES, 116 + k))]
@@ -325,9 +334,9 @@ class SeaOfSimulation(Feature):
             sounds.append((STAGE_SPEECH_SECONDS,
                            lambda: self._counted_sound(0x111, "done_sound", DONE_SAMPLES, 116 + k)))
         if quiet:
-            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
+            os_.show(0xa1, 116 + k, value=points, done=done, run_seconds=length, sounds=sounds, **clip)
         else:
-            os_.deff_start(116 + k, value=points, done=done, run_seconds=length, sounds=sounds)
+            os_.deff_start(116 + k, value=points, done=done, run_seconds=length, sounds=sounds, **clip)
 
     def _counted_sound(self, call, counter, samples, deff_id):
         n = getattr(self, counter)
