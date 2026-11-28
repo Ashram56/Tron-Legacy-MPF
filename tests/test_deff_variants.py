@@ -60,3 +60,27 @@ class TestVariantIdentity(unittest.TestCase):
                 with self.subTest(deff=deff_id, pick=k):
                     self.assertEqual(k, dist.index(min(dist)))
                     self.assertAlmostEqual(0.0, min(dist), places=6)
+
+
+class TestDeff108Identity(unittest.TestCase):
+    """Deff 108 [0x010209b0]: pick k draws the bitmaps from the first id the code's table gives (random_parts.csv: 2683, 2713 at
+    x = 0, 2623, 2653 at x = 41); the library animation of that first bitmap is frame for frame the game's clip vk."""
+
+    def test_pick_is_the_clip_index(self):
+        import glob
+        try:
+            import numpy as np
+            from PIL import Image, ImageSequence
+        except ImportError:
+            self.skipTest("numpy or PIL missing")
+        media = os.path.join(ROOT, "assets", "mpf_package", "media")
+
+        def frames(path):
+            return [np.array(f.convert("L").resize((128, 32))) for f in ImageSequence.Iterator(Image.open(path))]
+
+        for k, first in enumerate((2683, 2713, 2623, 2653)):
+            lib = frames(glob.glob(os.path.join(media, "dmd_library", "anim_*_img%d" % first, "animation_128x32.gif"))[0])
+            clip = frames(os.path.join(media, "dmd", "deff_108_disc_access_progress", "variants", "v%02d.gif" % k))
+            with self.subTest(pick=k):
+                self.assertEqual(len(lib), len(clip))
+                self.assertTrue(all((a == b).all() for a, b in zip(lib, clip)))

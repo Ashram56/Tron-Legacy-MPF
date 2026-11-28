@@ -165,7 +165,7 @@ ROM's generator (`os_.random.below(n)`, FUN_0000c6b4), sends it to Godot as the 
 jackpots already use, `dmd_effect.gd` `update`) and runs the deff for that pick's ROM length. The pick index is the clip
 index v00.. (code: the frames the ROM draws with the pick forced, `assets/rom_data/dmd_code/deff_NNN/variants/`, hold the clip vk's
 pictures exactly, distance 0 in columns 41-127, for deffs 48, 49, 68, 69 and 111; deff 48's table 0x040d2804 holds the 12 clip
-routines; deffs 97 and 108 have no matching code render, so their index is inferred from the lengths). What is
+routines; deff 97: the ROM render with the pick forced equals v00 / v01 exactly (table 0x040d6fd4, anims 5609..5617 and 5670..5677, `random_parts.csv`); deff 108: the code's table `assets/rom_data/deffs/random_parts.csv` gives the first bitmap of each pick, 2683 / 2713 at x = 0 and 2623 / 2653 at x = 41 [0x010209d8], and the library animations of those bitmaps (`dmd_library/anim_012_img2683`, `anim_013_img2713`, `anim_010_img2623`, `anim_011_img2653`) are frame for frame the GIFs v00, v01, v02, v03: every pick of every random-clip deff is now read from the code). What is
 not reproduced: the draw happens when the deff starts, not at the instruction where the body draws, so the generator's later
 values can differ from the ROM's by that offset. Tests: `tests/test_deff_variants.py`, and `tests/test_godot_variant_clip.py`
 (the pinned Godot 4.6.3 under Xvfb plays exactly the clip named). The trace scenarios force the pick that matches the reference run's
