@@ -566,3 +566,7 @@ Portal Multiball (2026-11-28, from the code): the 4 frames of effects 140, 142 a
 text from the same tick (142: bitmap 0x1d79, graphics frame 35; 143: bitmap 0x1fad, frame 132; 140: bitmap 0x1b98, frame 67); the game started the text from the capture's time (142: 1680 ms, 143: 4240 ms)
 or from `t_ms` that drifts 13 ms from the durations' sum (140). `rom_layout.py` now starts them at `frame_sum_ms` of that frame (1715, 4312, 2209 ms); portal replay: 755/756 (the start-up frame).
 Light Cycle: the 2 frames of deff 95 and the 22 of 96 are popups "10K" (draws not enumerated by the sweeps; `verify_deff96.py`).
+
+Light Cycle, final (2026-11-28): the 24 remaining frames (22 popups of deff 96 and the 2 of deff 95) are all reproduced exactly by `verify_deff96.py` with the draws (r3, r15, r8) the game made (the 12
+others in the first list were the deff 99 totals, covered by the 99 sweep). The ROM draws the three random numbers every tick of every popup, so the sweeps cannot list them; each missed frame is verified
+instead. Columns 41-127 coverage of the light cycle run: 1021/1046 by sweeps, 1045/1046 with the verified popups (the 1 left is the start-up frame).
