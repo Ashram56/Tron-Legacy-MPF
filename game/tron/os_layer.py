@@ -1186,6 +1186,9 @@ class TronOS(CustomCode):
         later_ball = not self._new_game_ball
         self._new_game_ball = False
         self.serve(3)
+        # event 0x13 [0x00020754: the last call of ball_start 0x00020650, right after serve_ball(3)]: FUN_01023858 resets the
+        # score display's tick counter 0x021117f4 and the last points, on every ball
+        getattr(self.media, "ball_start_finished", lambda: None)()
         # The trough eject task kicks the ball about 32 ticks after the serve (traces/game_flow.jsonl
         # ball start 1.90 s, trough eject 2.42 s); MPF ejects when the ball_starting queue clears.
         if queue:

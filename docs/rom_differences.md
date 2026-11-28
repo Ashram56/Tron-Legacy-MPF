@@ -186,9 +186,10 @@ otherwise).
   table at 0x40d3484 (rows 4-20 from 1,000,000, else 2-23), period 62 + 4H ticks, 2 ticks per row; the counter 0x21117f4 is +1 per
   tick by the handler 0x01023900 on event 0x21 (seen in Unicorn: tick 1, 2, 3 ...), reset by FUN_01023858 on event 0x13 and by
   FUN_010238ac on event 0x4d, which `media_bridge.py` reproduces. The phase offset still seen against PinMAME frames is not
-  explained by one thing found in the code: the ROM posts event 0x13 [0x0002063c] in the tick the game starts, the game reset the counter at
-  `ball_started`, 0.52 s later; the first ball now resets at the game start (`media_bridge._game_start`). Later balls still reset at
-  `ball_started` (the ROM's tick of event 0x13 on later balls is not traced: open, the Unicorn replay of multiplayer_2p posts only the game-start 0x13 in its first 40 s, the harness does not reach the next ball).
+  explained by one thing found in the code: the ROM posts event 0x13 as the last call of ball_start [0x00020650 / 0x00020754], right after
+  serve_ball(3), on every ball (the Unicorn replay saw it at the game_start tick, 3.285 s, the eject 3.2 s later); the game reset the
+  counter at MPF's `ball_started`, 0.52 s after the serve. It now resets in the same tick as `serve(3)` (`os_layer.py`, `media_bridge.ball_start_finished`),
+  every ball. The tick of later balls was not replayed in Unicorn (its trough logic keeps ejecting: the harness's ball model, not the code).
 - Deffs 1 and 10: deff 1 pages and their lengths are read from the ROM (section "Attract page lengths against the code"); deff 10 takes
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of
