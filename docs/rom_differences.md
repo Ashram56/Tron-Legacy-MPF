@@ -189,3 +189,6 @@ otherwise).
   the credit record number as its argument (`sweep_credits.py`).
 - Test isolation: the full suite passes (666 passed, 42 skipped); the only residue is the "Event loop is closed" teardown warning of
   the MPF event loop, which does not affect any result.
+
+
+ZEN flasher timing (2026-11-28): `task_cc_zen_flasher` [0x01031138] counts passes 1..7 with `task_sleep(5)` after each: the first coil-17 pulse comes 6 sleeps = 30 ticks after the task starts, then every 7 sleeps = 35 ticks; the game used 35 for the first one too (`features/zen.py` `FIRST_FLASH_TICKS`). multiplayer_4p coil comparison after it: 428 of 468 bursts match (was 426); the remaining coil-17 differences (missing bursts at 14.63, 24.19, 27.07 and 33.73 s of the reference, extra ones at 139.7 to 141.4 s) belong to other flasher shows that also pulse coil 17 (e.g. the burst show from 0x01015eb8), not yet attributed to a routine; `coil` and `lamp` are not in TRACES for the 4p scenario.

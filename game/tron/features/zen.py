@@ -1,7 +1,8 @@
 """ZEN rollover charges (assets/rules/modes/zen_rollover.md)."""
 from tron.features import Feature
 
-FLASH_TICKS = 35          # task 0xcc pulses coil 17 every 7 x 5 ticks
+FLASH_TICKS = 35          # task 0xcc pulses coil 17 every 7 x 5 ticks [task_cc_zen_flasher 0x01031138]: the counter starts at 0, so the first pulse comes
+FIRST_FLASH_TICKS = 30    # on the 7th pass after 6 sleeps of 5 ticks; the counter is then reset and the next pass count 7 follows a 7th sleep (35)
 
 
 class Zen(Feature):
@@ -46,11 +47,11 @@ class Zen(Feature):
             os_.task_kill(0xcc)
         return True
 
-    def _flash_task(self):
+    def _flash_task(self, first=True):
         def pulse():
             self.os.lamps.flasher("f_zen_flasher", 18)      # coil 17, logged as the ROM's coil events
-            self._flash_task()
-        self.os.task_start(0xcc, FLASH_TICKS, pulse)
+            self._flash_task(first=False)
+        self.os.task_start(0xcc, FIRST_FLASH_TICKS if first else FLASH_TICKS, pulse)
 
 
 feature = Zen
